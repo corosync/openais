@@ -441,8 +441,8 @@ int lck_resource_close (struct resource *resource)
 	iovec.iov_base = (char *)&req_exec_lck_resourceclose;
 	iovec.iov_len = sizeof (req_exec_lck_resourceclose);
 
-	if (totempg_send_ok (sizeof (struct req_exec_lck_resourceclose))) {
-		assert (totempg_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
+	if (totempg_groups_send_ok_joined (openais_group_handle, &iovec, 1)) {
+		assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 		return (0);
 	}
 
@@ -471,7 +471,7 @@ void resource_lock_orphan (struct resource_lock *resource_lock)
 	iovec.iov_base = (char *)&req_exec_lck_resourcelockorphan;
 	iovec.iov_len = sizeof (req_exec_lck_resourcelockorphan);
 
-	assert (totempg_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 
 	// AAA
 }
@@ -621,21 +621,23 @@ static int message_handler_req_exec_lck_resourceopen (
 	/*
 	 * Setup connection information and mark resource as referenced
 	 */
-	log_printf (LOG_LEVEL_DEBUG, "Lock resource opened is %p\n", resource);
-	resource_cleanup = malloc (sizeof (struct resource_cleanup));
-	if (resource_cleanup == 0) {
-		free (resource);
-		error = SA_AIS_ERR_NO_MEMORY;
-	} else {
-		list_init (&resource_cleanup->list);
-		list_init (&resource_cleanup->resource_lock_list_head);
-		resource_cleanup->resource = resource;
-		resource_cleanup->resource_handle = req_exec_lck_resourceopen->resource_handle;
-		list_add (
-			&resource_cleanup->list,
-			&req_exec_lck_resourceopen->source.conn_info->ais_ci.u.liblck_ci.resource_cleanup_list);
+	if (message_source_is_local (&req_exec_lck_resourceopen->source)) {
+		log_printf (LOG_LEVEL_DEBUG, "Lock resource opened is %p\n", resource);
+		resource_cleanup = malloc (sizeof (struct resource_cleanup));
+		if (resource_cleanup == 0) {
+			free (resource);
+			error = SA_AIS_ERR_NO_MEMORY;
+		} else {
+			list_init (&resource_cleanup->list);
+			list_init (&resource_cleanup->resource_lock_list_head);
+			resource_cleanup->resource = resource;
+			resource_cleanup->resource_handle = req_exec_lck_resourceopen->resource_handle;
+			list_add (
+				&resource_cleanup->list,
+				&req_exec_lck_resourceopen->source.conn_info->ais_ci.u.liblck_ci.resource_cleanup_list);
+		}
+		resource->refcount += 1;
 	}
-	resource->refcount += 1;
 	
 	
 	/*
@@ -1043,44 +1045,46 @@ static int message_handler_req_exec_lck_resourcelock (
 	/*
 	 * Add resource lock to cleanup handler for this api resource instance
 	 */
-	resource_cleanup = lck_resource_cleanup_find (
-		resource_lock->callback_source.conn_info,
-		req_exec_lck_resourcelock->resource_handle);
+	if (message_source_is_local (&req_exec_lck_resourcelock->source)) {
+		resource_cleanup = lck_resource_cleanup_find (
+			resource_lock->callback_source.conn_info,
+			req_exec_lck_resourcelock->resource_handle);
 
-	assert (resource_cleanup);
-		
-	list_add (&resource_lock->resource_cleanup_list,
-		&resource_cleanup->resource_lock_list_head);
+		assert (resource_cleanup);
+			
+		list_add (&resource_lock->resource_cleanup_list,
+			&resource_cleanup->resource_lock_list_head);
 
-	/*
-	 * If lock queued by lock algorithm, dont send response to library now
-	 */
-	if (resource_lock->lock_status != SA_LCK_LOCK_NO_STATUS) {
 		/*
-		 * If lock granted or denied, deliver callback or 
-		 * response to library for non-async calls
+		 * If lock queued by lock algorithm, dont send response to library now
 		 */
-		lock_response_deliver (
+		if (resource_lock->lock_status != SA_LCK_LOCK_NO_STATUS) {
+			/*
+			 * If lock granted or denied, deliver callback or 
+			 * response to library for non-async calls
+			 */
+			lock_response_deliver (
+				&req_exec_lck_resourcelock->source,
+				resource_lock,
+				SA_AIS_OK);
+		} else {
+			memcpy (&resource_lock->response_source,
+				&req_exec_lck_resourcelock->source,
+				sizeof (struct message_source));
+		}
+
+		/*
+		 * Deliver async response to library
+		 */
+		req_exec_lck_resourcelock->source.conn_info =
+			req_exec_lck_resourcelock->source.conn_info->conn_info_partner;
+		resource_lock_async_deliver (
 			&req_exec_lck_resourcelock->source,
 			resource_lock,
 			SA_AIS_OK);
-	} else {
-		memcpy (&resource_lock->response_source,
-			&req_exec_lck_resourcelock->source,
-			sizeof (struct message_source));
+		req_exec_lck_resourcelock->source.conn_info =
+			req_exec_lck_resourcelock->source.conn_info->conn_info_partner;
 	}
-
-	/*
-	 * Deliver async response to library
-	 */
-	req_exec_lck_resourcelock->source.conn_info =
-		req_exec_lck_resourcelock->source.conn_info->conn_info_partner;
-	resource_lock_async_deliver (
-		&req_exec_lck_resourcelock->source,
-		resource_lock,
-		SA_AIS_OK);
-	req_exec_lck_resourcelock->source.conn_info =
-		req_exec_lck_resourcelock->source.conn_info->conn_info_partner;
 
 error_exit:
 	return (0);
@@ -1231,7 +1235,7 @@ static int message_handler_req_lib_lck_resourceopen (struct conn_info *conn_info
 	iovec.iov_base = (char *)&req_exec_lck_resourceopen;
 	iovec.iov_len = sizeof (req_exec_lck_resourceopen);
 
-	assert (totempg_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 
 	return (0);
 }
@@ -1264,7 +1268,7 @@ static int message_handler_req_lib_lck_resourceopenasync (struct conn_info *conn
 	iovec.iov_base = (char *)&req_exec_lck_resourceopen;
 	iovec.iov_len = sizeof (req_exec_lck_resourceopen);
 
-	assert (totempg_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 
 	return (0);
 }
@@ -1294,8 +1298,8 @@ static int message_handler_req_lib_lck_resourceclose (struct conn_info *conn_inf
 		iovecs[0].iov_base = (char *)&req_exec_lck_resourceclose;
 		iovecs[0].iov_len = sizeof (req_exec_lck_resourceclose);
 
-		if (totempg_send_ok (sizeof (struct req_exec_lck_resourceclose))) {
-			assert (totempg_mcast (iovecs, 1, TOTEMPG_AGREED) == 0);
+		if (totempg_groups_send_ok_joined (openais_group_handle, iovecs, 1)) {
+			assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 1, TOTEMPG_AGREED) == 0);
 		}
 	}
 	else {
@@ -1339,7 +1343,7 @@ static int message_handler_req_lib_lck_resourcelock (struct conn_info *conn_info
 	iovecs[0].iov_base = (char *)&req_exec_lck_resourcelock;
 	iovecs[0].iov_len = sizeof (req_exec_lck_resourcelock);
 
-	assert (totempg_mcast (iovecs, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 1, TOTEMPG_AGREED) == 0);
 
 	return (0);
 }
@@ -1370,7 +1374,7 @@ static int message_handler_req_lib_lck_resourcelockasync (struct conn_info *conn
 	iovecs[0].iov_base = (char *)&req_exec_lck_resourcelock;
 	iovecs[0].iov_len = sizeof (req_exec_lck_resourcelock);
 
-	assert (totempg_mcast (iovecs, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 1, TOTEMPG_AGREED) == 0);
 
 	return (0);
 }
@@ -1401,7 +1405,7 @@ static int message_handler_req_lib_lck_resourceunlock (struct conn_info *conn_in
 	iovec.iov_base = (char *)&req_exec_lck_resourceunlock;
 	iovec.iov_len = sizeof (req_exec_lck_resourceunlock);
 
-	assert (totempg_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 
 	return (0);
 }
@@ -1432,7 +1436,7 @@ static int message_handler_req_lib_lck_resourceunlockasync (struct conn_info *co
 	iovec.iov_base = (char *)&req_exec_lck_resourceunlock;
 	iovec.iov_len = sizeof (req_exec_lck_resourceunlock);
 
-	assert (totempg_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 
 	return (0);
 }
@@ -1459,7 +1463,7 @@ static int message_handler_req_lib_lck_lockpurge (struct conn_info *conn_info, v
 	iovecs[0].iov_base = (char *)&req_exec_lck_lockpurge;
 	iovecs[0].iov_len = sizeof (req_exec_lck_lockpurge);
 
-	assert (totempg_mcast (iovecs, 1, TOTEMPG_AGREED) == 0);
+	assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 1, TOTEMPG_AGREED) == 0);
 
 	return (0);
 }
