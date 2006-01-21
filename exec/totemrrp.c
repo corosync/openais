@@ -365,7 +365,7 @@ error_exit:
 
 static void timer_function_active_token (void *context)
 {
-	struct active_instance *instance = (struct active_instance *)context;
+//	struct active_instance *instance = (struct active_instance *)context;
 }
 
 
