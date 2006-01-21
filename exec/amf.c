@@ -1488,6 +1488,7 @@ void timer_function_libamf_healthcheck (void *data) {
 		/*
 		 * Report the error to the rest of the cluster using the normal state machine
 		 */
+exit (1);
 		error_report (conn_info->component, SA_AMF_NOT_RESPONDING);
 
 		conn_info->component->healthcheck_outstanding = 2;
@@ -2241,6 +2242,7 @@ static int message_handler_req_exec_amf_errorreport (void *message, struct in_ad
 	component = findComponent (&req_exec_amf_errorreport->req_lib_amf_errorreport.erroneousComponent);
 	if (component && component->registered) {
 		component->probableCause = req_exec_amf_errorreport->req_lib_amf_errorreport.errorDescriptor.probableCause;
+		component->healthcheck_outstanding = 0;
 
 		/*
 		 * One registered component left, so transition
@@ -2682,6 +2684,10 @@ void response_handler_healthcheckcallback (struct conn_info *conn_info,
 	if (req_amf_response->error == SA_OK) {
 		log_printf (LOG_LEVEL_DEBUG, "setting healthcheck ok\n");
 		conn_info->component->healthcheck_outstanding = 0;
+	} else {
+		log_printf (LOG_LEVEL_NOTICE, "setting healthcheck ERROR(%d)\n",
+			req_amf_response->error);
+		error_report (conn_info->component, req_amf_response->error);
 	}
 }
 

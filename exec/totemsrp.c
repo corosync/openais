@@ -2973,10 +2973,6 @@ static void messages_deliver_to_app (
 	unsigned int range = 0;
 	unsigned int my_high_delivered_stored = 0;
 
-	instance->totemsrp_log_printf (instance->totemsrp_log_level_debug,
-		"Delivering %x to %x\n", instance->my_high_delivered,
-		end_point);
-
 	range = end_point - instance->my_high_delivered;
 
 	assert (range < 10240);
