@@ -31,8 +31,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef POLL_H_DEFINED
-#define POLL_H_DEFINED
+#ifndef AISPOLL_H_DEFINED
+#define AISPOLL_H_DEFINED
 
 typedef void * poll_timer_handle;
 typedef unsigned int poll_handle;
@@ -81,9 +81,7 @@ int poll_run (
 int poll_stop (
 	poll_handle handle);
 
-#ifdef COMPILE_OUT
 void poll_print_state (
 	poll_handle handle, int fd);
-#endif
 
-#endif	/* POLL_H_DEFINED */
+#endif	/* AISPOLL_H_DEFINED */

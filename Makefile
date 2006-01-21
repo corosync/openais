@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2004 MontaVista Software, Inc.
+# Copyright (c) 2002-2006 MontaVista Software, Inc.
 # 
 # All rights reserved.
 # 
@@ -29,9 +29,19 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 
 # Production mode flags
-CFLAGS = -O3 -Wall
+CFLAGS = -O3 -Wall -fomit-frame-pointer
 LDFLAGS = -lpthread
-DESTDIR=/usr/local/openais
+
+DESTDIR=/usr/local
+SBINDIR=${DESTDIR}/usr/sbin
+LIBDIR=${DESTDIR}/usr/lib
+INCLUDEDIR=${DESTDIR}/usr/include
+ETCDIR=${DESTDIR}/etc
+ifeq (${DESTDIR},//)
+MANDIR=/usr/share/man
+else
+MANDIR=$(DESTDIR)/man
+endif
 
 # Debug mode flags
 #CFLAGS = -g -DDEBUG
@@ -53,27 +63,60 @@ clean:
 
 install:
 	mkdir -p $(DESTDIR)/sbin
-	mkdir -p $(DESTDIR)/usr/include
-	mkdir -p $(DESTDIR)/usr/lib
-	mkdir -p $(DESTDIR)/etc/ais
+	mkdir -p $(SBINDIR)
+	mkdir -p $(LIBDIR)
+	mkdir -p $(INCLUDEDIR)
+	mkdir -p $(ETCDIR)/ais
+	mkdir -p $(MANDIR)/man3
+	mkdir -p $(MANDIR)/man5
+	mkdir -p $(MANDIR)/man8
 
-	cp -a lib/libais.a $(DESTDIR)/usr/lib
-	cp -a lib/libais.so* $(DESTDIR)/usr/lib
-	cp -a lib/libSa*.a $(DESTDIR)/usr/lib
-	cp -a lib/libSa*.so* $(DESTDIR)/usr/lib
-	cp -a lib/libevs.a $(DESTDIR)/usr/lib
-	cp -a lib/libevs.so* $(DESTDIR)/usr/lib
-	cp -a exec/libtotem_pg* $(DESTDIR)/usr/lib
+	install -m 755 lib/libais.a $(LIBDIR)
+	install -m 755 lib/libais.so* $(LIBDIR)
+	install -m 755 lib/libSa*.a $(LIBDIR)
+	install -m 755 lib/libSa*.so* $(LIBDIR)
+	install -m 755 lib/libevs.a $(LIBDIR)
+	install -m 755 lib/libevs.so* $(LIBDIR)
+	install -m 755 exec/libtotem_pg* $(LIBDIR)
 
-	install -m 755 exec/aisexec $(DESTDIR)/sbin
-	install -m 755 exec/keygen $(DESTDIR)/sbin/ais-keygen
-	install -m 755 conf/openais.conf $(DESTDIR)/etc
-	install -m 755 conf/groups.conf $(DESTDIR)/etc
+	install -m 755 exec/aisexec $(SBINDIR)
+	install -m 755 exec/keygen $(SBINDIR)/ais-keygen
+	install -m 755 conf/openais.conf $(ETCDIR)/openais.conf.picacho
+	install -m 755 conf/groups.conf $(ETCDIR)/groups.conf.picacho
 
-	cp -a include/saAis.h $(DESTDIR)/usr/include
-	cp -a include/ais_amf.h $(DESTDIR)/usr/include
-	cp -a include/saClm.h $(DESTDIR)/usr/include
-	cp -a include/saCkpt.h $(DESTDIR)/usr/include
-	cp -a include/saEvt.h $(DESTDIR)/usr/include
-	cp -a include/evs.h $(DESTDIR)/usr/include
-	cp -a exec/totem.h $(DESTDIR)/usr/include
+	install -m 755 include/saAis.h $(INCLUDEDIR)
+	install -m 755 include/ais_amf.h $(INCLUDEDIR)
+	install -m 755 include/saClm.h $(INCLUDEDIR)
+	install -m 755 include/saCkpt.h $(INCLUDEDIR)
+	install -m 755 include/saEvt.h $(INCLUDEDIR)
+	install -m 755 include/evs.h $(INCLUDEDIR)
+	install -m 755 exec/totem.h $(INCLUDEDIR)
+	install -m 755 exec/aispoll.h $(INCLUDEDIR)
+	install -m 755 exec/totempg.h $(INCLUDEDIR)
+
+	install -m 755 man/evs_dispatch.3 $(MANDIR)/man3
+	install -m 755 man/evs_fd_get.3 $(MANDIR)/man3
+	install -m 755 man/evs_finalize.3 $(MANDIR)/man3
+	install -m 755 man/evs_initialize.3 $(MANDIR)/man3
+	install -m 755 man/evs_join.3 $(MANDIR)/man3
+	install -m 755 man/evs_leave.3 $(MANDIR)/man3
+	install -m 755 man/evs_mcast_groups.3 $(MANDIR)/man3
+	install -m 755 man/evs_mcast_joined.3 $(MANDIR)/man3
+	install -m 755 man/evs_membership_get.3 $(MANDIR)/man3
+	install -m 755 man/evs_overview.8 $(MANDIR)/man8
+	install -m 755 man/openais.conf.5 $(MANDIR)/man5
+	install -m 755 man/openais_overview.8 $(MANDIR)/man8
+
+	gzip -f -9 $(MANDIR)/man3/evs_dispatch.3
+	gzip -f -9 $(MANDIR)/man3/evs_fd_get.3
+	gzip -f -9 $(MANDIR)/man3/evs_finalize.3
+	gzip -f -9 $(MANDIR)/man3/evs_initialize.3
+	gzip -f -9 $(MANDIR)/man3/evs_join.3
+	gzip -f -9 $(MANDIR)/man3/evs_leave.3
+	gzip -f -9 $(MANDIR)/man3/evs_mcast_groups.3
+	gzip -f -9 $(MANDIR)/man3/evs_mcast_joined.3
+	gzip -f -9 $(MANDIR)/man3/evs_membership_get.3
+	gzip -f -9 $(MANDIR)/man8/evs_overview.8
+	gzip -f -9 $(MANDIR)/man5/openais.conf.5
+	gzip -f -9 $(MANDIR)/man8/openais_overview.8
+

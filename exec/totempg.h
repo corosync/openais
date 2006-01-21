@@ -37,7 +37,6 @@
 
 #include <netinet/in.h>
 #include "aispoll.h"
-#include "totemsrp.h"
 #include "totem.h"
 
 #define TOTEMPG_AGREED			0
