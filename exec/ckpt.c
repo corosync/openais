@@ -1280,6 +1280,8 @@ int ckpt_checkpoint_close (struct saCkptCheckpoint *checkpoint) {
 
 	memcpy (&req_exec_ckpt_checkpointclose.checkpointName,
 		&checkpoint->name, sizeof (SaNameT));
+	memset (&req_exec_ckpt_checkpointclose.source, 0,
+		sizeof (struct message_source));
 
 	iovecs[0].iov_base = (char *)&req_exec_ckpt_checkpointclose;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_checkpointclose);
@@ -2344,8 +2346,6 @@ static int message_handler_req_exec_ckpt_sectiondelete (void *message, struct in
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
-printf ("delete ckptCheckpointSection name %s\n", 
-	ckptCheckpointSection->sectionDescriptor.sectionId.id);
 
 	/*
 	 * Delete checkpoint section
