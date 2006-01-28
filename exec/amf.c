@@ -1488,7 +1488,6 @@ void timer_function_libamf_healthcheck (void *data) {
 		/*
 		 * Report the error to the rest of the cluster using the normal state machine
 		 */
-exit (1);
 		error_report (conn_info->component, SA_AMF_NOT_RESPONDING);
 
 		conn_info->component->healthcheck_outstanding = 2;
