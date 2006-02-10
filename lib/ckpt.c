@@ -1404,11 +1404,11 @@ error_put_unlock:
 
 error_put_nounlock:
 	saHandleInstancePut (&ckptSectionIterationHandleDatabase, sectionIterationHandle);
-
-error_exit:
 	if (error != SA_AIS_OK) {
 		free (iteratorSectionIdListEntry);
 	}
+
+error_exit:
 	return (error);
 }
 	
