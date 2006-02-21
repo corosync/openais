@@ -215,14 +215,14 @@ saAmfDispatch (
 
 		error = saPollRetry (&ufds, 1, timeout);
 		if (error != SA_OK) {
-			goto error_nounlock;
+			goto error_put;
 		}
 
 		pthread_mutex_lock (&amfInstance->dispatch_mutex);
 
 		error = saPollRetry (&ufds, 1, 0);
 		if (error != SA_OK) {
-			goto error_nounlock;
+			goto error_put;
 		}
 
 		/*
@@ -231,6 +231,11 @@ saAmfDispatch (
 		if (amfInstance->finalize == 1) {
 			error = SA_OK;
 			pthread_mutex_unlock (&amfInstance->dispatch_mutex);
+			goto error_unlock;
+		}
+
+		if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
+			error = SA_AIS_ERR_BAD_HANDLE;
 			goto error_unlock;
 		}
 
@@ -332,7 +337,7 @@ saAmfDispatch (
 
 		default:
 			error = SA_ERR_LIBRARY;	
-			goto error_nounlock;
+			goto error_put;
 			break;
 		}
 
@@ -351,8 +356,10 @@ saAmfDispatch (
 	} while (cont);
 
 error_unlock:
+	pthread_mutex_unlock (&amfInstance->dispatch_mutex);
+error_put:
 	saHandleInstancePut (&amfHandleDatabase, *amfHandle);
-error_nounlock:
+error_exit:
 	return (error);
 }
 
