@@ -300,7 +300,7 @@ extern int openais_amf_config_read (char **error_string)
 				saAmfComponent->newReadinessState = SA_AMF_OUT_OF_SERVICE;
 				saAmfComponent->currentHAState = SA_AMF_QUIESCED;
 				saAmfComponent->newHAState = SA_AMF_QUIESCED;
-				saAmfComponent->healthcheckInterval = 100;
+				saAmfComponent->healthcheckInterval = 1000; /* ms */
 				list_init (&saAmfComponent->saAmfComponentList);
 				list_init (&saAmfComponent->saAmfProtectionGroupList);
 				list_add (&saAmfComponent->saAmfComponentList, &saAmfUnit->saAmfComponentHead);
@@ -342,6 +342,9 @@ extern int openais_amf_config_read (char **error_string)
 				} else {
 					goto parse_error;
 				}
+			} else
+			if ((loc = strstr_rs (line, "healthcheckinterval=")) != 0) {
+				saAmfComponent->healthcheckInterval = atoi (loc);
 			} else
 			if (strstr_rs (line, "}")) {
 				current_parse = AMF_UNIT;
