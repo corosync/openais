@@ -237,6 +237,7 @@ int main (void) {
 		SA_CKPT_CHECKPOINT_CREATE|SA_CKPT_CHECKPOINT_READ|SA_CKPT_CHECKPOINT_WRITE,
 		0,
 		&checkpointHandle);
+
 	printf ("%s: initial open of checkpoint\n",
 		get_test_output (error, SA_AIS_OK));
 
@@ -459,10 +460,12 @@ printf ("Please wait, testing expiry of checkpoint sections.\n");
 			(int)checkpointStatus.memoryUsed,
 			(int)checkpointStatus.numberOfSections);
 	}
+for (;;) {
 	error = saCkptSectionIterationInitialize (checkpointHandle,
 		SA_CKPT_SECTIONS_ANY,
 		0,
 		&sectionIterator);
+	printf ("error is %d\n", error);
 	printf ("%s: initialize section iterator\n",
 		get_test_output (error, SA_AIS_OK));
 
@@ -488,6 +491,8 @@ printf ("Please wait, testing expiry of checkpoint sections.\n");
 	error = saCkptSectionIterationFinalize (sectionIterator);
 	printf ("%s: Finalize iteration\n",
 		get_test_output (error, SA_AIS_OK));
+	sleep (3);
+}
 
 	error = saCkptSelectionObjectGet (ckptHandle, &sel_fd);
 

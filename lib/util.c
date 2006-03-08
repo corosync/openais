@@ -267,6 +267,9 @@ retry_recv:
 	if (result == -1 && errno == EINTR) {
 		goto retry_recv;
 	}
+	if (result == -1 && errno == EAGAIN) {
+		goto retry_recv;
+	}
 	if (result == -1 || result == 0) {
 		error = SA_AIS_ERR_LIBRARY;
 		goto error_exit;

@@ -3511,6 +3511,7 @@ static int message_handler_req_lib_ckpt_sectioniterationinitialize (struct conn_
 			ckptSectionIterator->sectionIteratorEntries = ckptSectionIteratorEntries;
 		}
 	}
+	ckptSectionIterator->iteratorPos = 0;
 	ckptSectionIterator->iteratorCount = iteratorEntries;
 
 error_exit:
