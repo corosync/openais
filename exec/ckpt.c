@@ -2708,6 +2708,7 @@ static int message_handler_req_exec_ckpt_sectionread (void *message, struct in_a
 	struct saCkptCheckpointSection *ckptCheckpointSection = 0;
 	int sectionSize = 0;
 	SaErrorT error = SA_AIS_OK;
+	res_lib_ckpt_sectionread.dataRead = 0;
 
 	log_printf (LOG_LEVEL_DEBUG, "Executive request for section read.\n");
 
@@ -2760,6 +2761,10 @@ error_exit:
 		res_lib_ckpt_sectionread.header.size = sizeof (struct res_lib_ckpt_sectionread) + sectionSize;
 		res_lib_ckpt_sectionread.header.id = MESSAGE_RES_CKPT_CHECKPOINT_SECTIONREAD;
 		res_lib_ckpt_sectionread.header.error = error;
+
+		if (sectionSize != 0) {
+			res_lib_ckpt_sectionread.dataRead = sectionSize;
+		}
 	
 		libais_send_response (req_exec_ckpt_sectionread->source.conn_info,
 			&res_lib_ckpt_sectionread,
