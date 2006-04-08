@@ -86,9 +86,9 @@
 #include "crypto.h"
 
 #define LOCALHOST_IP					inet_addr("127.0.0.1")
-#define QUEUE_RTR_ITEMS_SIZE_MAX		256 /* allow 512 retransmit items */
-#define RETRANS_MESSAGE_QUEUE_SIZE_MAX	500 /* allow 500 messages to be queued */
-#define RECEIVED_MESSAGE_QUEUE_SIZE_MAX	500 /* allow 500 messages to be queued */
+#define QUEUE_RTR_ITEMS_SIZE_MAX		256 /* allow 256 retransmit items */
+#define RETRANS_MESSAGE_QUEUE_SIZE_MAX		500 /* allow 500 messages to be queued */
+#define RECEIVED_MESSAGE_QUEUE_SIZE_MAX		500 /* allow 500 messages to be queued */
 #define MAXIOVS					5	
 #define RETRANSMIT_ENTRIES_MAX			30
 #define MISSING_MCAST_WINDOW			128
@@ -109,8 +109,20 @@
  */
 #define SEQNO_START_MSG 0x0
 #define SEQNO_START_TOKEN 0x0
-//#define SEQNO_START_MSG 0xfffffe00
-//#define SEQNO_START_TOKEN 0xfffffe00
+
+/*
+ * These can be used ot test different rollover points
+ * #define SEQNO_START_MSG 0xfffffe00 
+ * #define SEQNO_START_TOKEN 0xfffffe00
+ */
+
+/*
+ * These can be used to test the error recovery algorithms
+ * #define TEST_DROP_ORF_TOKEN_PERCENTAGE 30
+ * #define TEST_DROP_COMMIT_TOKEN_PERCENTAGE 30
+ * #define TEST_DROP_MCAST_PERCENTAGE 50
+ * #define TEST_RECOVERY_MSG_COUNT 300
+ */
 
 /*
  * we compare incoming messages to determine if their endian is
@@ -218,7 +230,7 @@ struct memb_commit_token_memb_entry {
 	struct memb_ring_id ring_id;
 	unsigned int aru;
 	unsigned int high_delivered;
-	int received_flg;
+	unsigned int received_flg;
 }__attribute__((packed));
 
 struct memb_commit_token {
@@ -566,7 +578,7 @@ void totemsrp_instance_initialize (struct totemsrp_instance *instance)
 
 	list_init (&instance->token_callback_sent_listhead);
 
-	instance->my_received_flg = 1;
+	instance->my_received_flg = 0;
 
 	instance->my_token_seq = SEQNO_START_TOKEN - 1;
 
@@ -1083,7 +1095,7 @@ static void ring_state_restore (struct totemsrp_instance *instance)
 		instance->my_ring_id.rep.s_addr = 0;
 		instance->my_aru = instance->old_ring_state_aru;
 		instance->my_high_seq_received = instance->old_ring_state_high_seq_received;
-		instance->totemsrp_log_printf (instance->totemsrp_log_level_debug,
+		instance->totemsrp_log_printf (instance->totemsrp_log_level_notice,
 			"Restoring instance->my_aru %x my high seq received %x\n",
 			instance->my_aru, instance->my_high_seq_received);
 	}
@@ -1415,6 +1427,7 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 		"entering OPERATIONAL state.\n");
 	instance->memb_state = MEMB_STATE_OPERATIONAL;
 
+	instance->my_received_flg = 0;
 	return;
 }
 
@@ -1507,15 +1520,16 @@ static void memb_state_recovery_enter (
 	struct memb_commit_token *commit_token)
 {
 	int i;
-#ifdef COMPILE_OUT
 	int local_received_flg = 1;
-#endif
 	unsigned int low_ring_aru;
 	unsigned int range = 0;
 	unsigned int messages_originated = 0;
 	char is_originated[4096];
 	char not_originated[4096];
 	char seqno_string_hex[10];
+
+	instance->totemsrp_log_printf (instance->totemsrp_log_level_notice,
+		"entering RECOVERY state.\n");
 
 	instance->my_high_ring_delivered = 0;
 
@@ -1566,23 +1580,19 @@ static void memb_state_recovery_enter (
 	/*
 	 * Determine if any received flag is false
 	 */
-#ifdef COMPILE_OUT
 	for (i = 0; i < commit_token->addr_entries; i++) {
 		if (memb_set_subset (&instance->my_new_memb_list[i], 1,
 			instance->my_trans_memb_list, instance->my_trans_memb_entries) &&
 
 			commit_token->memb_list[i].received_flg == 0) {
-#endif
 			instance->my_deliver_memb_entries = instance->my_trans_memb_entries;
 			memcpy (instance->my_deliver_memb_list, instance->my_trans_memb_list,
 				sizeof (struct in_addr) * instance->my_trans_memb_entries);
-#ifdef COMPILE_OUT
 			local_received_flg = 0;
 			break;
 		}
 	}
-#endif
-//	if (local_received_flg == 0) {
+	if (local_received_flg == 0) {
 		/*
 		 * Calculate my_low_ring_aru, instance->my_high_ring_delivered for the transitional membership
 		 */
@@ -1655,7 +1665,10 @@ static void memb_state_recovery_enter (
 		strcat (is_originated, "\n");
 		instance->totemsrp_log_printf (instance->totemsrp_log_level_notice, is_originated);
 		instance->totemsrp_log_printf (instance->totemsrp_log_level_notice, not_originated);
-//	}
+	} else {
+		instance->totemsrp_log_printf (instance->totemsrp_log_level_notice,
+			"Did not need to originate any messages in recovery.\n");
+	}
 
 	instance->my_aru = SEQNO_START_MSG;
 	instance->my_aru_count = 0;
@@ -1948,18 +1961,6 @@ static void update_aru (
 		}
 	}
 	instance->my_aru += i - 1;
-
-
-//	instance->totemsrp_log_printf (instance->totemsrp_log_level_debug,
-//		"setting received flag to FALSE %d %d\n",
-//		instance->my_aru, instance->my_high_seq_received);
-	instance->my_received_flg = 0;
-	if (instance->my_aru == instance->my_high_seq_received) {
-//		instance->totemsrp_log_printf (instance->totemsrp_log_level_debug,
-//			"setting received flag to TRUE %d %d\n",
-//			instance->my_aru, instance->my_high_seq_received);
-		instance->my_received_flg = 1;
-	}
 }
 
 /*
@@ -2084,6 +2085,7 @@ static int orf_token_rtr (
 	}
 
 	rtr_list = &orf_token->rtr_list[0];
+	
 	strcpy (retransmit_msg, "Retransmit List: ");
 	if (orf_token->rtr_list_entries) {
 		instance->totemsrp_log_printf (instance->totemsrp_log_level_debug,
@@ -2696,10 +2698,10 @@ printf ("OTHERS %0.4f ms\n", ((float)tv_diff.tv_usec) / 100.0);
 }
 #endif
 
-#ifdef RANDOM_DROP
-if (random()%100 < 10) {
-	return (0);
-}
+#ifdef TEST_DROP_ORF_TOKEN_PERCENTAGE
+	if (random()%100 < TEST_DROP_ORF_TOKEN_PERCENTAGE) {
+		return (0);
+	}
 #endif
 
 	/*
@@ -2729,6 +2731,12 @@ if (random()%100 < 10) {
 		orf_token_endian_convert (token, (struct orf_token *)token_convert);
 		token = (struct orf_token *)token_convert;
 	}
+
+#ifdef TEST_RECOVERY_MSG_COUNT
+	if (instance->memb_state == MEMB_STATE_OPERATIONAL && token->seq > TEST_RECOVERY_MSG_COUNT) {
+		return (0);
+	}
+#endif
 
 	totemrrp_recv_flush (instance->totemrrp_handle);
 
@@ -3063,14 +3071,6 @@ static void messages_deliver_to_app (
 		}
 //TODO	instance->stats_delv += 1;
 	}
-
-	instance->my_received_flg = 0;
-	if (instance->my_aru == instance->my_high_seq_received) {
-//		instance->totemsrp_log_printf (instance->totemsrp_log_level_debug,
-//			"setting received flag to TRUE %d %d\n",
-//			instance->my_aru, instance->my_high_seq_received);
-		instance->my_received_flg = 1;
-	}
 }
 
 /*
@@ -3107,11 +3107,16 @@ static int message_handler_mcast (
 		sort_queue = &instance->regular_sort_queue;
 	}
 	assert (msg_len < FRAME_SIZE_MAX);
-#ifdef RANDOM_DROP
-if (random()%100 < 50) {
-	return (0);
-}
+
+#ifdef TEST_DROP_MCAST_PERCENTAGE
+	if (random()%100 < TEST_DROP_MCAST_PERCENTAGE) {
+		printf ("dropping message %d\n", mcast_header.seq);
+		return (0);
+	} else {
+		printf ("accepting message %d\n", mcast_header.seq);
+	}
 #endif
+
 	if (system_from->s_addr != instance->my_id.sin_addr.s_addr) {
 		cancel_token_retransmit_timeout (instance);
 	}
@@ -3189,8 +3194,8 @@ if (random()%100 < 50) {
 		sq_item_add (sort_queue, &sort_queue_item, mcast_header.seq);
 	}
 
+	update_aru (instance);
 	if (instance->memb_state == MEMB_STATE_OPERATIONAL) {
-		update_aru (instance);
 		messages_deliver_to_app (instance, 0, instance->my_high_seq_received);
 	}
 
@@ -3485,11 +3490,13 @@ static int message_handler_memb_commit_token (
 		return (0);
 	}
 */
-#ifdef RANDOM_DROP
-if (random()%100 < 10) {
-	return (0);
-}
+
+#ifdef TEST_DROP_COMMIT_TOKEN_PERCENTAGE
+	if (random()%100 < TEST_DROP_COMMIT_TOKEN_PERCENTAGE) {
+		return (0);
+	}
 #endif
+
 	switch (instance->memb_state) {
 		case MEMB_STATE_OPERATIONAL:
 			/* discard token */
