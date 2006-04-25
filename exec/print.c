@@ -200,36 +200,6 @@ char *getSaNameT (SaNameT *name)
 	return (ret_name);
 }
 
-#ifdef DEBUG
-extern char *getSaClmNodeAddressT (SaClmNodeAddressT *nodeAddress) {
-	int i;
-	static char node_address[300];
-	int pos;
-
-	for (i = 0, pos = 0; i < nodeAddress->length; i++) {
-		pos += sprintf (&node_address[pos], "%d.", nodeAddress->value[i]);
-	}
-	return (node_address);
-}
-
-void printSaClmClusterNodeT (char *description, SaClmClusterNodeT *clusterNode) {
-	log_printf (LOG_LEVEL_NOTICE, "Node Information for %s:\n", description);
-
-	log_printf (LOG_LEVEL_NOTICE, "\tnode id is %x\n", (int)clusterNode->nodeId);
-
-	log_printf (LOG_LEVEL_NOTICE, "\tnode address is %s\n", getSaClmNodeAddressT (&clusterNode->nodeAddress));
-
-	log_printf (LOG_LEVEL_NOTICE, "\tnode name is %s.\n", getSaNameT (&clusterNode->nodeName));
-
-	log_printf (LOG_LEVEL_NOTICE, "\tcluster name is %s.\n", getSaNameT (&clusterNode->clusterName));
-
-	log_printf (LOG_LEVEL_NOTICE, "\tMember is %d\n", clusterNode->member);
-
-	log_printf (LOG_LEVEL_NOTICE, "\tTimestamp is %llx nanoseconds\n", clusterNode->bootTimestamp);
-}
-#endif /* DEBUG */
-
-
 #ifdef CODE_COVERAGE_COMPILE_OUT
 void saAmfPrintGroups (void)
 {

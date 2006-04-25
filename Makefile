@@ -45,7 +45,7 @@ endif
 
 # Debug mode flags
 #CFLAGS = -g -DDEBUG
-#LDFLAGS = -g
+#LDFLAGS = -g -lpthread
 
 # Profile mode flags
 #CFLAGS = -O3 -pg -DDEBUG

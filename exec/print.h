@@ -74,10 +74,6 @@ int log_setup (char **error_string, int log_mode, char *log_file);
 
 extern char *getSaNameT (SaNameT *name);
 
-extern char *getSaClmNodeAddressT (SaClmNodeAddressT *nodeAddress);
-
-extern void printSaClmClusterNodeT (char *description, SaClmClusterNodeT *clusterNode);
-
 extern void saAmfPrintGroups (void);
 
 #endif /* PRINT_H_DEFINED */

@@ -195,26 +195,53 @@ struct req_exec_clm_nodejoin {
 	SaClmClusterNodeT clusterNode;
 };
 
-static int clm_exec_init_fn (struct openais_config *openais_config)
-{
-	memset (clusterNodes, 0, sizeof (SaClmClusterNodeT) * NODE_MAX);
+#ifdef DEBUG
+static char *getSaClmNodeAddressT (SaClmNodeAddressT *nodeAddress) {
+	int i;
+	static char node_address[300];
+	int pos;
 
-	/*
-	 * Build local cluster node data structure
-	 */
-	thisClusterNode.nodeId = this_ip->sin_addr.s_addr;
-	sprintf ((char *)thisClusterNode.nodeAddress.value, "%s", inet_ntoa (this_ip->sin_addr));
-	thisClusterNode.nodeAddress.length = strlen ((char *)thisClusterNode.nodeAddress.value);
-	thisClusterNode.nodeAddress.family = SA_CLM_AF_INET;
-	sprintf ((char *)thisClusterNode.nodeName.value, "%s", inet_ntoa (this_ip->sin_addr));
-	thisClusterNode.nodeName.length = strlen ((char *)thisClusterNode.nodeName.value);
-	thisClusterNode.member = 1;
+	for (i = 0, pos = 0; i < nodeAddress->length; i++) {
+		pos += sprintf (&node_address[pos], "%d.", nodeAddress->value[i]);
+	}
+	return (node_address);
+}
+
+static void printSaClmClusterNodeT (char *description, SaClmClusterNodeT *clusterNode) {
+	log_printf (LOG_LEVEL_NOTICE, "Node Information for %s:\n", description);
+
+	log_printf (LOG_LEVEL_NOTICE, "\tnode id is %x\n", (int)clusterNode->nodeId);
+
+	log_printf (LOG_LEVEL_NOTICE, "\tnode address is %s\n", getSaClmNodeAddressT (&clusterNode->nodeAddress));
+
+	log_printf (LOG_LEVEL_NOTICE, "\tnode name is %s.\n", getSaNameT (&clusterNode->nodeName));
+
+	log_printf (LOG_LEVEL_NOTICE, "\tMember is %d\n", clusterNode->member);
+
+	log_printf (LOG_LEVEL_NOTICE, "\tTimestamp is %llx nanoseconds\n", clusterNode->bootTimestamp);
+	}
+	#endif
+
+	static int clm_exec_init_fn (struct openais_config *openais_config)
 	{
-		struct sysinfo s_info;
-		time_t current_time;
-		sysinfo (&s_info);
-		current_time = time (NULL);
-		 /* (currenttime (s) - uptime (s)) * 1 billion (ns) / 1 (s) */
+		memset (clusterNodes, 0, sizeof (SaClmClusterNodeT) * NODE_MAX);
+
+		/*
+		 * Build local cluster node data structure
+		 */
+		thisClusterNode.nodeId = this_ip->sin_addr.s_addr;
+		sprintf ((char *)thisClusterNode.nodeAddress.value, "%s", inet_ntoa (this_ip->sin_addr));
+		thisClusterNode.nodeAddress.length = strlen ((char *)thisClusterNode.nodeAddress.value);
+		thisClusterNode.nodeAddress.family = SA_CLM_AF_INET;
+		sprintf ((char *)thisClusterNode.nodeName.value, "%s", inet_ntoa (this_ip->sin_addr));
+		thisClusterNode.nodeName.length = strlen ((char *)thisClusterNode.nodeName.value);
+		thisClusterNode.member = 1;
+		{
+			struct sysinfo s_info;
+			time_t current_time;
+			sysinfo (&s_info);
+			current_time = time (NULL);
+			 /* (currenttime (s) - uptime (s)) * 1 billion (ns) / 1 (s) */
 		thisClusterNode.bootTimestamp = ((SaTimeT)(current_time - s_info.uptime)) * 1000000000;
 	}
 
