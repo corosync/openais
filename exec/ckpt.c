@@ -2757,7 +2757,7 @@ static int message_handler_req_exec_ckpt_sectionread (void *message, struct in_a
 	/*
 	 * If dataOffset is past end of data, return INVALID PARAM
 	 */
-	if (req_lib_ckpt_sectionread->dataOffset > sectionSize) {
+	if (req_lib_ckpt_sectionread->dataOffset > ckptCheckpointSection->sectionDescriptor.sectionSize) {
 		sectionSize = 0;
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
