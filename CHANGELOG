@@ -1,4 +1,9 @@
 ------------------------------------------------------------------------
+r1077 | sdake | 2006-06-21 16:03:11 -0700 (Wed, 21 Jun 2006) | 2 lines
+
+New make release in top level makefile
+
+------------------------------------------------------------------------
 r1076 | sdake | 2006-06-21 14:32:03 -0700 (Wed, 21 Jun 2006) | 2 lines
 
 Modify AMF to use new timer.c/timer.h routines properly
