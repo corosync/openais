@@ -192,8 +192,8 @@ static int libais_connection_active (struct conn_info *conn_info)
 
 static void libais_disconnect_delayed (struct conn_info *conn_info)
 {
-	conn_info->state = CONN_STATE_DISCONNECTING_DELAYED;
-	conn_info->conn_info_partner->state = CONN_STATE_DISCONNECTING_DELAYED;
+	conn_info->state = CONN_STATE_DELAYED;
+	conn_info->conn_info_partner->state = CONN_STATE_DELAYED;
 }
 
 static int libais_disconnect (struct conn_info *conn_info)
@@ -201,86 +201,86 @@ static int libais_disconnect (struct conn_info *conn_info)
 	int res = 0;
 	struct outq_item *outq_item;
 
-	if (conn_info->should_exit_fn &&
-		ais_service_handlers[conn_info->service]->libais_exit_fn) {
+	assert (conn_info);
 
-		res = ais_service_handlers[conn_info->service]->libais_exit_fn (conn_info);
-	}
-
-	if (conn_info->conn_info_partner && 
-		conn_info->conn_info_partner->should_exit_fn &&
-		ais_service_handlers[conn_info->conn_info_partner->service]->libais_exit_fn) {
-
-		res = ais_service_handlers[conn_info->conn_info_partner->service]->libais_exit_fn (conn_info->conn_info_partner);
+	if (conn_info->state == CONN_STATE_DISCONNECTED) {
+		return (-1);
 	}
 
 	/*
-	 * Close the library connection and free its
-	 * data if it hasn't already been freed
+	 * Close active connections
 	 */
-	if (conn_info->state != CONN_STATE_DISCONNECTING) {
-		conn_info->state = CONN_STATE_DISCONNECTING;
-
+	if (conn_info->state == CONN_STATE_ACTIVE || conn_info->state == CONN_STATE_DELAYED) {
 		close (conn_info->fd);
+		conn_info->state = CONN_STATE_CLOSED;
+		if (conn_info->conn_info_partner) {
+			close (conn_info->conn_info_partner->fd);
+			conn_info->conn_info_partner->state = CONN_STATE_CLOSED;
+		}
+	}
+	/*
+	 * Note we will only call the close operation once on the first time the state is set to closed
+	 */
+
+	/*
+	 * Call exit handlers as many times as needed
+	 */
+	 if (conn_info->state == CONN_STATE_CLOSED) {
+		if (conn_info->should_exit_fn &&
+			ais_service_handlers[conn_info->service]->libais_exit_fn) {
+			res = ais_service_handlers[conn_info->service]->libais_exit_fn (conn_info);
+		}
+		if (res == -1) {
+			return (0);
+		}
+
+		if (conn_info->conn_info_partner) {
+			if (conn_info->conn_info_partner->should_exit_fn &&
+				ais_service_handlers[conn_info->conn_info_partner->service]->libais_exit_fn) {
+				res = ais_service_handlers[conn_info->service]->libais_exit_fn (conn_info->conn_info_partner);
+			}
+			if (res == -1) {
+				return (0);
+			}
+		}
 
 		/*
-		 * Free the outq queued items
+		 * Note we will exit before here before freeing data structures until exit_fn returns != -1
 		 */
+
+
+		conn_info->state = CONN_STATE_DISCONNECTED;
 		while (!queue_is_empty (&conn_info->outq)) {
 			outq_item = queue_item_get (&conn_info->outq);
 			free (outq_item->msg);
 			queue_item_remove (&conn_info->outq);
 		}
-
 		queue_free (&conn_info->outq);
 		free (conn_info->inb);
-	}
-
-	/*
-	 * Close the library connection and free its
-	 * data if it hasn't already been freed
-	 */
-	if (conn_info->conn_info_partner &&
-		conn_info->conn_info_partner->state != CONN_STATE_DISCONNECTING) {
-
-		conn_info->conn_info_partner->state = CONN_STATE_DISCONNECTING;
-
-		close (conn_info->conn_info_partner->fd);
-
-		/*
-		 * Free the outq queued items
-		 */
-		while (!queue_is_empty (&conn_info->conn_info_partner->outq)) {
-			outq_item = queue_item_get (&conn_info->conn_info_partner->outq);
-			free (outq_item->msg);
-			queue_item_remove (&conn_info->conn_info_partner->outq);
-		}
-
-		queue_free (&conn_info->conn_info_partner->outq);
-		if (conn_info->conn_info_partner->inb) {
-			free (conn_info->conn_info_partner->inb);
-		}
-	}
-
-	/*
-	 * If exit_fn didn't request a retry,
-	 * free the conn_info structure
-	 */
-	if (res != -1) {
-		if (conn_info->conn_info_partner) {
-			poll_dispatch_delete (aisexec_poll_handle,
-				conn_info->conn_info_partner->fd);
-		}
 		poll_dispatch_delete (aisexec_poll_handle, conn_info->fd);
 
-		free (conn_info->conn_info_partner);
-		free (conn_info);
-	}
+		if (conn_info->conn_info_partner) {
 
-	/*
-	 * Inverse res from libais exit fn handler
-	 */
-	return (res != -1 ? -1 : 0);
+			conn_info->conn_info_partner->state = CONN_STATE_DISCONNECTED;
+			/*
+			 * Free the outq queued items
+			 */
+			while (!queue_is_empty (&conn_info->conn_info_partner->outq)) {
+				outq_item = queue_item_get (&conn_info->conn_info_partner->outq);
+				free (outq_item->msg);
+				queue_item_remove (&conn_info->conn_info_partner->outq);
+			}
+			queue_free (&conn_info->conn_info_partner->outq);
+			free (conn_info->conn_info_partner->inb);
+			poll_dispatch_delete (aisexec_poll_handle, conn_info->conn_info_partner->fd);
+			free (conn_info->conn_info_partner);
+		}
+
+		free (conn_info);
+		return (-1);
+	}
+	assert (0);
+	return (0);
 }
 
 static int cleanup_send_response (struct conn_info *conn_info) {
@@ -600,12 +600,12 @@ static int poll_handler_libais_deliver (poll_handle handle, int fd, int revent, 
 	/*
 	 * Handle delayed disconnections
 	 */
-	if (conn_info->state == CONN_STATE_DISCONNECTING_DELAYED) {
+	if (conn_info->state == CONN_STATE_DELAYED) {
 		res = libais_disconnect (conn_info);
 		return (res);
 	}
 
-	if (conn_info->state == CONN_STATE_DISCONNECTING) {
+	if (conn_info->state != CONN_STATE_ACTIVE) {
 		return (0);
 	}
 
@@ -747,6 +747,7 @@ retry_recv:
 	return (res);
 
 error_disconnect:
+printf ("A DIS\n");
 	res = libais_disconnect (conn_info);
 	return (res);
 }

@@ -423,6 +423,7 @@ retry_poll:
 				 */
 				if (res == -1) {
 					poll_instance->poll_entries[i].ufd.fd = -1; /* empty entry */
+					break; /* We had an error, break for libais_disconnect */
 				}
 			}
 		}
