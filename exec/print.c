@@ -40,7 +40,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <linux/un.h>
-
+#include <syslog.h>
 
 #include "print.h"
 #include "../include/saAis.h"
@@ -147,6 +147,7 @@ void internal_log_printf (int logclass, char *string, ...)
 	time_t curr_time;
 	int level;
 	int service;
+	int syslog_priority = 0;
 
 	va_start (ap, string);
 	
@@ -158,13 +159,31 @@ void internal_log_printf (int logclass, char *string, ...)
 		return;
 	}
 
+	switch (level) {
+	case LOG_LEVEL_SECURITY:
+		syslog_priority = LOG_ALERT | LOG_AUTHPRIV | LOG_SPECIFIED;
+		break;
+	case LOG_LEVEL_ERROR:
+		syslog_priority = LOG_ERR | LOG_SPECIFIED;
+		break;
+	case LOG_LEVEL_WARNING:
+		syslog_priority = LOG_WARNING | LOG_SPECIFIED;
+		break;
+	case LOG_LEVEL_NOTICE:
+		syslog_priority = LOG_NOTICE | LOG_SPECIFIED;
+		break;
+	case LOG_LEVEL_DEBUG:
+		syslog_priority = LOG_DEBUG | LOG_SPECIFIED;
+		break;
+	}
+
 	if (((logmode & LOG_MODE_FILE) || (logmode & LOG_MODE_STDERR)) && 
 		(logmode & LOG_MODE_TIMESTAMP)) {
 		curr_time = time (NULL);
 		strftime (char_time, sizeof (char_time), "%b %d %k:%M:%S", localtime (&curr_time));
-		sprintf (newstring, "%s %s %s %s", char_time, log_levels[level], log_services[service], string);
+		sprintf (newstring, "<%d> %s %s %s %s", syslog_priority, char_time, log_levels[level], log_services[service], string);
 	} else {
-		sprintf (newstring, "%s %s %s", log_levels[level], log_services[service], string);
+		sprintf (newstring, "<%d> %s %s %s", syslog_priority, log_levels[level], log_services[service], string);
 	}
 	vsprintf (log_string, newstring, ap);
 

@@ -64,6 +64,8 @@
 #define LOG_SERVICE_EVS		7
 #define LOG_SERVICE_SYNC	8
 
+#define LOG_SPECIFIED		LOG_LOCAL0
+
 extern void internal_log_printf (int logclass, char *format, ...);
 
 #define mklog(level,service) ((level << 16) | (service))
