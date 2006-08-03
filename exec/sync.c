@@ -411,7 +411,7 @@ static void sync_deliver_fn (
 	/*
 	 * This sync is complete so activate and start next service sync
 	 */
-	if (sync_callbacks.sync_activate) {
+	if (barrier_completed && sync_callbacks.sync_activate) {
 		sync_callbacks.sync_activate ();
 	
 		log_printf (LOG_LEVEL_NOTICE,
