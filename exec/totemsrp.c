@@ -88,6 +88,7 @@
 #define RECEIVED_MESSAGE_QUEUE_SIZE_MAX		500 /* allow 500 messages to be queued */
 #define MAXIOVS					5	
 #define RETRANSMIT_ENTRIES_MAX			30
+#define TOKEN_SIZE_MAX				64000 /* bytes */
 
 /*
  * Rollover handling:
@@ -615,7 +616,7 @@ void totemsrp_instance_initialize (struct totemsrp_instance *instance)
 
 	instance->my_commit_token_seq = SEQNO_START_TOKEN - 1;
 
-	instance->orf_token_retransmit = malloc (15000);
+	instance->orf_token_retransmit = malloc (TOKEN_SIZE_MAX);
 
 	instance->memb_state = MEMB_STATE_OPERATIONAL;
 
@@ -2399,7 +2400,6 @@ static void timer_function_token_retransmit_timeout (void *data)
 	case MEMB_STATE_GATHER:
 		break;
 	case MEMB_STATE_COMMIT:
-		break;
 	case MEMB_STATE_OPERATIONAL:
 	case MEMB_STATE_RECOVERY:
 		token_retransmit (instance);
@@ -2598,6 +2598,11 @@ static int memb_state_commit_token_send (struct totemsrp_instance *instance,
 	iovec.iov_len = sizeof (struct memb_commit_token) +
 		((sizeof (struct srp_addr) +
 			sizeof (struct memb_commit_token_memb_entry)) * commit_token->addr_entries);
+	/*
+	 * Make a copy for retransmission if necessary
+	 */
+	memcpy (instance->orf_token_retransmit, commit_token, iovec.iov_len);
+	instance->orf_token_retransmit_size = iovec.iov_len;
 
 	for (i = 0; i < instance->totem_config->interface_count; i++) {
 		totemrrp_token_target_set (
@@ -2610,6 +2615,10 @@ static int memb_state_commit_token_send (struct totemsrp_instance *instance,
 		&iovec,
 		1);
 
+	/*
+	 * Request retransmission of the commit token in case it is lost
+	 */
+	reset_token_retransmit_timeout (instance);
 	return (0);
 }
 
@@ -3621,7 +3630,7 @@ static int memb_join_process (
 	struct totemsrp_instance *instance,
 	struct memb_join *memb_join)
 {
-	unsigned char *commit_token_storage[32000];
+	unsigned char *commit_token_storage[TOKEN_SIZE_MAX];
 	struct memb_commit_token *my_commit_token =
 		(struct memb_commit_token *)commit_token_storage;
 	struct srp_addr *proc_list;
@@ -3887,6 +3896,9 @@ static int message_handler_memb_commit_token (
 
 	struct srp_addr *addr;
 	struct memb_commit_token_memb_entry *memb_list;
+
+	log_printf (instance->totemsrp_log_level_debug,
+		"got commit token\n");
 
 	if (endian_conversion_needed) {
 		memb_commit_token = memb_commit_token_convert;
