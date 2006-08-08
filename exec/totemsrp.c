@@ -1350,24 +1350,30 @@ static void timer_function_orf_token_timeout (void *data)
 {
 	struct totemsrp_instance *instance = (struct totemsrp_instance *)data;
 
-	log_printf (instance->totemsrp_log_level_notice,
-		"The token was lost in state %d from timer %p\n", instance->memb_state, data);
 	switch (instance->memb_state) {
 		case MEMB_STATE_OPERATIONAL:
+			log_printf (instance->totemsrp_log_level_notice,
+				"The token was lost in the OPERATIONAL state.\n");
 			totemrrp_iface_check (instance->totemrrp_handle);
 			memb_state_gather_enter (instance);
 			break;
 
 		case MEMB_STATE_GATHER:
+			log_printf (instance->totemsrp_log_level_notice,
+				"The consensus timeout expired.\n");
 			memb_state_consensus_timeout_expired (instance);
 			memb_state_gather_enter (instance);
 			break;
 
 		case MEMB_STATE_COMMIT:
+			log_printf (instance->totemsrp_log_level_notice,
+				"The token was lost in the COMMIT state.\n");
 			memb_state_gather_enter (instance);
 			break;
 		
 		case MEMB_STATE_RECOVERY:
+			log_printf (instance->totemsrp_log_level_notice,
+				"The token was lost in the RECOVERY state.\n");
 			ring_state_restore (instance);
 			memb_state_gather_enter (instance);
 			break;
