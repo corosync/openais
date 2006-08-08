@@ -1006,6 +1006,7 @@ static int ckpt_recovery_process (void)
 							sizeof(mar_ckpt_section_descriptor_t));
 
 					request_exec_sync_state.nodeid = this_ip->nodeid;
+					request_exec_sync_state.ckpt_id = checkpoint->ckpt_id;
 
 					for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
 
