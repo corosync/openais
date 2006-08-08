@@ -405,7 +405,7 @@ static void sync_deliver_fn (
 		}
 	}
 	if (barrier_completed) {
-		log_printf (LOG_LEVEL_NOTICE,
+		log_printf (LOG_LEVEL_DEBUG,
 			"Synchronization barrier completed\n");
 	}
 	/*
@@ -414,7 +414,7 @@ static void sync_deliver_fn (
 	if (barrier_completed && sync_callbacks.sync_activate) {
 		sync_callbacks.sync_activate ();
 	
-		log_printf (LOG_LEVEL_NOTICE,
+		log_printf (LOG_LEVEL_DEBUG,
 			"Committing synchronization for (%s)\n",
 			sync_callbacks.name);
 	
@@ -433,7 +433,9 @@ static void sync_deliver_fn (
 		 * if sync service found, execute it
 		 */
 		if (sync_processing && sync_callbacks.sync_init) {
-			log_printf (LOG_LEVEL_NOTICE,"Synchronization actions starting for (%s)\n",sync_callbacks.name);
+			log_printf (LOG_LEVEL_DEBUG,
+				"Synchronization actions starting for (%s)\n",
+				sync_callbacks.name);
 			sync_service_init (&deliver_ring_id);
 		}
 	}
