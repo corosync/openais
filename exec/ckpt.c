@@ -1351,7 +1351,7 @@ void clean_checkpoint_list(struct list_head *head)
 	struct checkpoint *checkpoint;
 
 	if (list_empty(head)) {
-		log_printf (LOG_LEVEL_NOTICE, "clean_checkpoint_list: List is empty \n");
+		log_printf (LOG_LEVEL_DEBUG, "clean_checkpoint_list: List is empty \n");
 		return;
 	}
 
@@ -1365,7 +1365,7 @@ void clean_checkpoint_list(struct list_head *head)
 		* If checkpoint has been unlinked and this is the last reference, delete it
 		*/
 		 if (checkpoint->unlinked && checkpoint->referenceCount == 1) { /*defect 1129*/
-			log_printf (LOG_LEVEL_NOTICE,"clean_checkpoint_list: deallocating checkpoint %s.\n",
+			log_printf (LOG_LEVEL_DEBUG,"clean_checkpoint_list: deallocating checkpoint %s.\n",
                                                                                                 checkpoint->name.value);
 			checkpoint_list = checkpoint_list->next;
 			checkpoint_release (checkpoint);
@@ -1373,7 +1373,7 @@ void clean_checkpoint_list(struct list_head *head)
 
 		}
 		else if ((checkpoint->expired == 0) && (checkpoint->referenceCount == 1)) { /*defect 1192*/
-			log_printf (LOG_LEVEL_NOTICE, "clean_checkpoint_list: Starting timer to release checkpoint %s.\n",
+			log_printf (LOG_LEVEL_DEBUG, "clean_checkpoint_list: Starting timer to release checkpoint %s.\n",
 				checkpoint->name.value);
 			openais_timer_delete (checkpoint->retention_timer);
 			openais_timer_add (
@@ -2562,7 +2562,7 @@ static int recovery_section_create (
 		if (section_descriptor->section_size
 			> checkpoint_section->section_descriptor.section_size) {
 
-			log_printf (LOG_LEVEL_NOTICE,
+			log_printf (LOG_LEVEL_DEBUG,
 				"recovery_section_create reallocating data. Present Size: %d, New Size: %d\n",
 				(int)checkpoint_section->section_descriptor.section_size,
 				(int)section_descriptor->section_size);
