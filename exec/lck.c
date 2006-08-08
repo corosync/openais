@@ -67,7 +67,7 @@ enum lck_message_req_types {
 	MESSAGE_REQ_EXEC_LCK_RESOURCELOCK = 2,
 	MESSAGE_REQ_EXEC_LCK_RESOURCEUNLOCK = 3,
 	MESSAGE_REQ_EXEC_LCK_RESOURCELOCKORPHAN = 4,
-	MESSAGE_REQ_EXEC_LCK_LOCKPURGE = 5 
+	MESSAGE_REQ_EXEC_LCK_LOCKPURGE = 5
 };
 
 struct resource;
@@ -292,7 +292,7 @@ struct openais_service_handler lck_service_handler = {
 	.exec_service_count		= sizeof (lck_exec_service) / sizeof (struct openais_exec_handler),
 	.exec_dump_fn			= NULL,
 	.confchg_fn			= lck_confchg_fn,
-	.sync_init			= NULL, 
+	.sync_init			= NULL,
 //	.sync_init			= lck_sync_init,
 	.sync_process			= lck_sync_process,
 	.sync_activate			= lck_sync_activate,
@@ -394,23 +394,23 @@ struct req_exec_lck_lockpurge {
 };
 
 #ifdef TODO
-static void lck_sync_init (void) 
+static void lck_sync_init (void)
 {
 	return;
 }
 #endif
 
-static int lck_sync_process (void) 
+static int lck_sync_process (void)
 {
 	return (0);
 }
 
-static void lck_sync_activate (void) 
-{		
- 	return;
+static void lck_sync_activate (void)
+{
+	return;
 }
 
-static void lck_sync_abort (void) 
+static void lck_sync_abort (void)
 {
 	return;
 }
@@ -420,7 +420,7 @@ static void lck_confchg_fn (
 	unsigned int *member_list, int member_list_entries,
 	unsigned int *left_list, int left_list_entries,
 	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id) 
+	struct memb_ring_id *ring_id)
 {
 }
 
@@ -485,7 +485,7 @@ struct resource_cleanup *lck_resource_cleanup_find (
 	}
 	return (0);
 }
-	
+
 
 int lck_resource_close (struct resource *resource)
 {
@@ -556,7 +556,7 @@ void lck_resource_cleanup_remove (
 	void *conn,
 	SaLckResourceHandleT resource_handle)
 {
-	
+
 	struct list_head *list;
 	struct resource_cleanup *resource_cleanup;
 	struct lck_pd *lck_pd = (struct lck_pd *)openais_conn_private_data_get (conn);
@@ -590,25 +590,25 @@ static int lck_lib_exit_fn (void *conn)
 	struct resource_cleanup *resource_cleanup;
 	struct list_head *cleanup_list;
 	struct lck_pd *lck_pd = (struct lck_pd *)openais_conn_private_data_get (conn);
-	
+
 	log_printf(LOG_LEVEL_NOTICE, "lck_exit_fn conn_info %p\n", conn);
-	
+
 	/*
 	 * close all resources opened on this fd
 	 */
 	cleanup_list = lck_pd->resource_cleanup_list.next;
 	while (!list_empty(cleanup_list)) {
-		
+
 		resource_cleanup = list_entry (cleanup_list, struct resource_cleanup, list);
-		
-		if (resource_cleanup->resource->name.length > 0)	{
+
+		if (resource_cleanup->resource->name.length > 0) {
 			lck_resource_cleanup_lock_remove (resource_cleanup);
 			lck_resource_close (resource_cleanup->resource);
 		}
-		
-		list_del (&resource_cleanup->list);	
+
+		list_del (&resource_cleanup->list);
 		free (resource_cleanup);
-                
+
 		cleanup_list = lck_pd->resource_cleanup_list.next;
 	}
 
@@ -695,8 +695,8 @@ static void message_handler_req_exec_lck_resourceopen (
 		}
 		resource->refcount += 1;
 	}
-	
-	
+
+
 	/*
 	 * Send error result to LCK library
 	 */
@@ -760,7 +760,7 @@ static void message_handler_req_exec_lck_resourceclose (
 	if (resource == 0) {
 		goto error_exit;
 	}
-		
+
 	resource->refcount -= 1;
 	if (resource->refcount == 0) {
 	}
@@ -880,12 +880,12 @@ void lock_queue (
 		 * Add lock to the list
 		 */
 		if (resource_lock->lock_mode == SA_LCK_PR_LOCK_MODE) {
-			list_add_tail (&resource_lock->list, 
+			list_add_tail (&resource_lock->list,
 				&resource->pr_pending_list_head);
 				waiter_notification_send (resource->ex_granted);
 		} else
 		if (resource_lock->lock_mode == SA_LCK_EX_LOCK_MODE) {
-			list_add_tail (&resource_lock->list, 
+			list_add_tail (&resource_lock->list,
 				&resource->ex_pending_list_head);
 				waiter_notification_list_send (&resource->pr_granted_list_head);
 		}
@@ -899,7 +899,7 @@ The algorithm:
 
 if ex lock granted
 	if ex pending list has locks
-		send waiter notification to ex lock granted 
+		send waiter notification to ex lock granted
 else
 	if ex pending list has locks
 		if pr granted list has locks
@@ -948,13 +948,13 @@ void lock_algorithm (
 }
 
 /*
- * 	if lock in ex, set ex to null
+ *	if lock in ex, set ex to null
  *	delete resource lock from list
- * 
+ *
  *	 if ex lock not granted
- * 		if ex pending list has locks
+ *		if ex pending list has locks
  *			grant first ex pending list lock to ex lock
- * 	if ex lock not granted
+ *	if ex lock not granted
  *		if pr pending list has locks
  *			assign all pr pending locks to pr granted lock list
  */
@@ -1006,7 +1006,7 @@ void unlock_algorithm (
 	 */
 	if (resource->ex_granted == 0) {
 		if (list_empty (&resource->pr_pending_list_head) == 0) {
- 			/*
+			/*
 			 * assign all pr pending locks to pr granted lock list
 			 */
 
@@ -1026,7 +1026,7 @@ void unlock_algorithm (
 			/*
 			 * Add pending locks to granted list
 			 */
-		   	list_p = &resource->pr_pending_list_head.next;
+			list_p = resource->pr_pending_list_head.next;
 			list_del (&resource->pr_pending_list_head);
 			list_add_tail (list_p,
 				&resource->pr_granted_list_head);
@@ -1087,7 +1087,7 @@ static void message_handler_req_exec_lck_resourcelock (
 		req_exec_lck_resourcelock->req_lib_lck_resourcelock.async_call;
 	resource_lock->invocation =
 		req_exec_lck_resourcelock->req_lib_lck_resourcelock.invocation;
-	
+
 	/*
 	 * Waiter callback source
 	 */
@@ -1106,7 +1106,7 @@ static void message_handler_req_exec_lck_resourcelock (
 			req_exec_lck_resourcelock->resource_handle);
 
 		assert (resource_cleanup);
-			
+
 		list_add (&resource_lock->resource_cleanup_list,
 			&resource_cleanup->resource_lock_list_head);
 
@@ -1115,7 +1115,7 @@ static void message_handler_req_exec_lck_resourcelock (
 		 */
 		if (resource_lock->lock_status != SA_LCK_LOCK_NO_STATUS) {
 			/*
-			 * If lock granted or denied, deliver callback or 
+			 * If lock granted or denied, deliver callback or
 			 * response to library for non-async calls
 			 */
 			lock_response_deliver (
@@ -1153,8 +1153,8 @@ static void message_handler_req_exec_lck_resourceunlock (
 	struct req_exec_lck_resourceunlock *req_exec_lck_resourceunlock = (struct req_exec_lck_resourceunlock *)message;
 	struct res_lib_lck_resourceunlock res_lib_lck_resourceunlock;
 	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
-	struct resource *resource = 0;
-	struct resource_lock *resource_lock = 0;
+	struct resource *resource = NULL;
+	struct resource_lock *resource_lock = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saLckResourceUnlock %s\n",
@@ -1243,7 +1243,7 @@ static void message_handler_req_exec_lck_lockpurge (
 	if (resource == 0) {
 		goto error_exit;
 	}
-		
+
 error_exit:
 	if (message_source_is_local(&req_exec_lck_lockpurge->source)) {
 //		lck_resource_cleanup_remove (req_exec_lck_lockpurge->source.conn,
@@ -1278,7 +1278,7 @@ static void message_handler_req_lib_lck_resourceopen (
 	memcpy (&req_exec_lck_resourceopen.resource_name,
 		&req_lib_lck_resourceopen->lockResourceName,
 		sizeof (SaNameT));
-	
+
 	req_exec_lck_resourceopen.open_flags = req_lib_lck_resourceopen->resourceOpenFlags;
 	req_exec_lck_resourceopen.async_call = 0;
 	req_exec_lck_resourceopen.invocation = 0;
@@ -1392,7 +1392,7 @@ static void message_handler_req_lib_lck_resourcelock (
 	memcpy (&req_exec_lck_resourcelock.req_lib_lck_resourcelock,
 		req_lib_lck_resourcelock,
 		sizeof (struct req_lib_lck_resourcelock));
-	
+
 	req_exec_lck_resourcelock.resource_handle = req_lib_lck_resourcelock->resourceHandle;
 	req_exec_lck_resourcelock.async_call = 0;
 	req_exec_lck_resourcelock.invocation = 0;
@@ -1425,7 +1425,7 @@ static void message_handler_req_lib_lck_resourcelockasync (
 	memcpy (&req_exec_lck_resourcelock.req_lib_lck_resourcelock,
 		req_lib_lck_resourcelock,
 		sizeof (struct req_lib_lck_resourcelock));
-	
+
 	req_exec_lck_resourcelock.resource_handle = req_lib_lck_resourcelock->resourceHandle;
 	req_exec_lck_resourcelock.async_call = 1;
 	req_exec_lck_resourcelock.invocation = req_lib_lck_resourcelock->invocation;
@@ -1521,7 +1521,7 @@ static void message_handler_req_lib_lck_lockpurge (
 	memcpy (&req_exec_lck_lockpurge.req_lib_lck_lockpurge,
 		req_lib_lck_lockpurge,
 		sizeof (struct req_lib_lck_lockpurge));
-	
+
 	iovecs[0].iov_base = (char *)&req_exec_lck_lockpurge;
 	iovecs[0].iov_len = sizeof (req_exec_lck_lockpurge);
 
