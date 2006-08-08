@@ -52,7 +52,7 @@
 int ckptinv;
 void printSaNameT (SaNameT *name)
 {
-	int i;
+	int i = 0;
 
 	for (i = 0; i < name->length; i++) {
 		printf ("%c", name->value[i]);
@@ -90,12 +90,14 @@ int main (void) {
 	SaAisErrorT error;
 	SaUint32T erroroneousVectorIndex = 0;
 	struct timespec delay;	
+	int i = 0;
+
 	delay.tv_sec = 1;
 	delay.tv_nsec = 0;
-
-
 	
 	error = saCkptInitialize (&ckptHandle, &callbacks, &version);
+	printf ("%s: initialize of checkpoint service\n",
+		get_test_output (error, SA_AIS_OK));
 	
 	error = saCkptCheckpointOpen (ckptHandle,
 		&checkpointName,

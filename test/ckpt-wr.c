@@ -67,7 +67,7 @@ SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
 	.creationFlags =        SA_CKPT_WR_ALL_REPLICAS,
 	.checkpointSize =       250000,
 	.retentionDuration =    SA_TIME_ONE_SECOND * 60,
-	.maxSections =          5,
+	.maxSections =          1,
 	.maxSectionSize =       250000,
 	.maxSectionIdSize =     10
 };
@@ -130,23 +130,6 @@ int main (void) {
 
 
     do{
-			error = saCkptCheckpointRead (checkpointHandle,
-											ReadVectorElements,
-											1,
-											&erroroneousVectorIndex);
-			if (error != SA_AIS_OK) {
-				if (error == SA_AIS_ERR_TRY_AGAIN) {
-					continue;
-				}
-				return (0);
-			}
-			
-			if (ReadVectorElements->dataBuffer == 0) {
-				printf ("Default Checkpoint has no data\n");
-			} else {
-				count = atol((char *)ReadVectorElements->dataBuffer);
-			}
-			
 			count++;
 			sprintf((char*)&data, "%d",(int)count);
 			writeElement.sectionId = (SaCkptSectionIdT)SA_CKPT_DEFAULT_SECTION_ID;
