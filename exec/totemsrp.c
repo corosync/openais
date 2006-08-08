@@ -3015,6 +3015,7 @@ static void fcc_token_update (
  * Message Handlers
  */
 
+struct timeval tv_old;
 /*
  * message handler called when TOKEN message type received
  */
@@ -3042,9 +3043,10 @@ static int message_handler_orf_token (
 	timersub (&tv_current, &tv_old, &tv_diff);
 	memcpy (&tv_old, &tv_current, sizeof (struct timeval));
 
-	if ((((float)tv_diff.tv_usec) / 100.0) > 5.0) {
-		printf ("OTHERS %0.4f ms\n", ((float)tv_diff.tv_usec) / 100.0);
-	}
+	log_printf (instance->totemsrp_log_level_notice,
+	"Time since last token %0.4f ms\n",
+		(((float)tv_diff.tv_sec) * 1000) + ((float)tv_diff.tv_usec)
+			/ 1000.0);
 #endif
 
 #ifdef TEST_DROP_ORF_TOKEN_PERCENTAGE
@@ -3288,9 +3290,9 @@ printf ("gather 1");
 			gettimeofday (&tv_current, NULL);
 			timersub (&tv_current, &tv_old, &tv_diff);
 			memcpy (&tv_old, &tv_current, sizeof (struct timeval));
-			if ((((float)tv_diff.tv_usec) / 100.0) > 5.0) {
-				printf ("I held %0.4f ms\n", ((float)tv_diff.tv_usec) / 100.0);
-			}
+			log_printf (instance->totemsrp_log_level_notice,
+				"I held %0.4f ms\n",
+				((float)tv_diff.tv_usec) / 1000.0);
 #endif
 			if (instance->memb_state == MEMB_STATE_OPERATIONAL) {
 				messages_deliver_to_app (instance, 0,
