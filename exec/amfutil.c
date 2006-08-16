@@ -48,6 +48,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "../include/saAis.h"
 #include "../include/saAmf.h"
