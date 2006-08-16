@@ -1168,6 +1168,9 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 		return SA_AIS_ERR_BAD_FLAGS;
 	}
 
+	if (timeout == 0) {
+		return (SA_AIS_ERR_TIMEOUT);
+	}
 	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
 			(void*)&evti);
 	
