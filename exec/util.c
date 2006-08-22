@@ -92,24 +92,21 @@ void openais_exit_error (enum e_ais_done err)
 
 char *getSaNameT (SaNameT *name)
 {
-#if 0
-	static char ret_name[300];
+	static char ret_name[SA_MAX_NAME_LENGTH + 1];
 
 	memset (ret_name, 0, sizeof (ret_name));
-	if (name->length > 299) {
-		memcpy (ret_name, name->value, 299);
-	} else {
+	memcpy (ret_name, name->value, name->length);
 
-		memcpy (ret_name, name->value, name->length);
-	}
 	return (ret_name);
-#endif
-// TODO
-	return ((char *)name->value);
 }
 
 char *get_mar_name_t (mar_name_t *name) {
-	return ((char *)name->value);
+	static char ret_name[SA_MAX_NAME_LENGTH + 1];
+
+	memset (ret_name, 0, sizeof (ret_name));
+	memcpy (ret_name, name->value, name->length);
+
+	return (ret_name);
 }
 
 char *strstr_rs (const char *haystack, const char *needle)
