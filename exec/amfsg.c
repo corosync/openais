@@ -141,6 +141,7 @@
 
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "amf.h"
 #include "print.h"
