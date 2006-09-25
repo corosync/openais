@@ -55,6 +55,7 @@ struct cpg_inst {
 	int response_fd;
 	int dispatch_fd;
 	int finalize;
+	cpg_flow_control_state_t flow_control_state;
 	cpg_callbacks_t callbacks;
 	pthread_mutex_t response_mutex;
 	pthread_mutex_t dispatch_mutex;
@@ -306,6 +307,7 @@ cpg_error_t cpg_dispatch (
 		case MESSAGE_RES_CPG_DELIVER_CALLBACK:
 			res_cpg_deliver_callback = (struct res_lib_cpg_deliver_callback *)&dispatch_data;
 
+			cpg_inst->flow_control_state = res_cpg_deliver_callback->flow_control_state;
 			marshall_from_mar_cpg_name_t (
 				&group_name,
 				&res_cpg_deliver_callback->group_name);
@@ -351,7 +353,6 @@ cpg_error_t cpg_dispatch (
 				joined_list,
 				res_cpg_confchg_callback->joined_list_entries);
 			break;
-
 
 		default:
 			error = SA_AIS_ERR_LIBRARY;
@@ -536,6 +537,10 @@ cpg_error_t cpg_mcast_joined (
 		goto error_exit;
 	}
 
+	cpg_inst->flow_control_state = CPG_FLOW_CONTROL_DISABLED;
+	if (res_lib_cpg_mcast.error == CPG_ERR_TRY_AGAIN) {
+		cpg_inst->flow_control_state = CPG_FLOW_CONTROL_ENABLED;
+	}
 	error = res_lib_cpg_mcast.error;
 
 error_exit:
@@ -600,4 +605,22 @@ error_exit:
 	return (error);
 }
 
+cpg_error_t cpg_flow_control_state_get (
+	cpg_handle_t handle,
+	cpg_flow_control_state_t *flow_control_state)
+{
+	cpg_error_t error;
+	struct cpg_inst *cpg_inst;
+
+	error = saHandleInstanceGet (&cpg_handle_t_db, handle, (void *)&cpg_inst);
+	if (error != SA_AIS_OK) {
+		return (error);
+	}
+
+	*flow_control_state = cpg_inst->flow_control_state;
+
+	saHandleInstancePut (&cpg_handle_t_db, handle);
+
+	return (error);
+}
 /** @} */

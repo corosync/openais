@@ -97,7 +97,7 @@ static inline int queue_is_empty (struct queue *queue) {
 	int empty;
 
 	pthread_mutex_lock (&queue->mutex);
-	empty = queue->used == 0;
+	empty = (queue->used == 0);
 	pthread_mutex_unlock (&queue->mutex);
 	return (empty);
 }
@@ -211,6 +211,16 @@ static inline int queue_used (struct queue *queue) {
 	pthread_mutex_unlock (&queue->mutex);
 
 	return (used);
+}
+
+static inline int queue_usedhw (struct queue *queue) {
+	int usedhw;
+
+	pthread_mutex_lock (&queue->mutex);
+	usedhw = queue->usedhw;
+	pthread_mutex_unlock (&queue->mutex);
+
+	return (usedhw);
 }
 
 #endif /* QUEUE_H_DEFINED */

@@ -50,7 +50,7 @@ all: testclm testamf1 \
 	testckpt ckptstress ckptbench \
 	ckptbenchth ckpt-rd ckpt-wr testevt testevs \
 	evsbench subscription publish evtbench unlink testclm2 testlck \
-	testmsg testcpg openais-cfgtool
+	testmsg testcpg cpgbench openais-cfgtool
 
 testtimer: testtimer.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testtimer testtimer.o ../exec/timer.o
@@ -138,6 +138,9 @@ testmsg: testmsg.o $(LIBRARIES)
 
 testcpg: testcpg.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testcpg testcpg.o $(LIBS)
+
+cpgbench: cpgbench.o $(LIBRARIES)
+	$(CC) $(LDFLAGS) -o cpgbench cpgbench.o $(LIBS)
 
 openais-cfgtool: openais-cfgtool.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o openais-cfgtool openais-cfgtool.o $(LIBS)

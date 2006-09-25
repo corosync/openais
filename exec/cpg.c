@@ -66,6 +66,7 @@
 #include "jhash.h"
 #include "swab.h"
 #include "ipc.h"
+#include "flow.h"
 #include "print.h"
 
 #define GROUP_HASH_SIZE 32
@@ -102,6 +103,7 @@ struct process_info {
 	void *conn;
 	void *trackerconn;
 	struct group_info *group;
+	enum openais_flow_control_state flow_control_state;
 	struct list_head list; /* on the group_info members list */
 };
 
@@ -237,6 +239,7 @@ struct openais_service_handler cpg_service_handler = {
 	.name				        = (unsigned char*)"openais cluster closed process group service v1.01",
 	.id					= CPG_SERVICE,
 	.private_data_size			= sizeof (struct process_info),
+	.flow_control				= OPENAIS_FLOW_CONTROL_REQUIRED,
 	.lib_init_fn				= cpg_lib_init_fn,
 	.lib_exit_fn				= cpg_lib_exit_fn,
 	.lib_service				= cpg_lib_service,
@@ -304,6 +307,8 @@ struct req_exec_cpg_mcast {
 	mar_cpg_name_t group_name __attribute__((aligned(8)));
 	mar_uint32_t msglen __attribute__((aligned(8)));
 	mar_uint32_t pid __attribute__((aligned(8)));
+	mar_uint32_t flow_control_state __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
 	mar_uint8_t message[] __attribute__((aligned(8)));
 };
 
@@ -608,6 +613,15 @@ static void cpg_confchg_fn (
 	}
 }
 
+static void cpg_flow_control_state_set_fn (
+	void *context,
+	enum openais_flow_control_state flow_control_state)
+{
+	struct process_info *process_info = (struct process_info *)context;
+
+	process_info->flow_control_state = flow_control_state;
+}
+
 /* Can byteswap join & leave messages */
 static void exec_cpg_procjoin_endian_convert (void *msg)
 {
@@ -640,7 +654,8 @@ static void exec_cpg_mcast_endian_convert (void *msg)
 	swab_mar_cpg_name_t (&req_exec_cpg_mcast->group_name);
 	req_exec_cpg_mcast->pid = swab32(req_exec_cpg_mcast->pid);
 	req_exec_cpg_mcast->msglen = swab32(req_exec_cpg_mcast->msglen);
-
+	req_exec_cpg_mcast->flow_control_state = swab32(req_exec_cpg_mcast->flow_control_state);
+	swab_mar_message_source_t (&req_exec_cpg_mcast->source);
 }
 
 static void do_proc_join(
@@ -787,6 +802,12 @@ static void message_handler_req_exec_cpg_mcast (
 	struct group_info *gi;
 	struct list_head *iter;
 
+	/*
+	 * Track local messages so that flow is controlled on the local node
+	 */
+	if (message_source_is_local (&req_exec_cpg_mcast->source)) {
+		openais_ipc_flow_control_local_decrement (req_exec_cpg_mcast->source.conn);
+	}
 	gi = get_group(&req_exec_cpg_mcast->group_name); /* this will always succeed ! */
 	assert(gi);
 
@@ -796,6 +817,7 @@ static void message_handler_req_exec_cpg_mcast (
 	res_lib_cpg_mcast->msglen = msglen;
 	res_lib_cpg_mcast->pid = req_exec_cpg_mcast->pid;
 	res_lib_cpg_mcast->nodeid = nodeid;
+	res_lib_cpg_mcast->flow_control_state = 0;
 	memcpy(&res_lib_cpg_mcast->group_name, &gi->group_name,
 		sizeof(mar_cpg_name_t));
 	memcpy(&res_lib_cpg_mcast->message, (char*)message+sizeof(*req_exec_cpg_mcast),
@@ -911,6 +933,14 @@ static void message_handler_req_lib_cpg_join (void *conn, void *message)
 		goto join_err;
 	}
 
+	openais_ipc_flow_control_create (
+		conn,
+		CPG_SERVICE,
+		req_lib_cpg_join->group_name.value,
+		req_lib_cpg_join->group_name.length,
+		cpg_flow_control_state_set_fn,
+		pi);
+
 	/* Add a node entry for us */
 	pi->nodeid = this_ip->nodeid;
 	pi->pid = req_lib_cpg_join->pid;
@@ -948,6 +978,12 @@ static void message_handler_req_lib_cpg_leave (void *conn, void *message)
 	cpg_node_joinleave_send(gi, pi, MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_LEAVE);
 	pi->group = NULL;
 
+	openais_ipc_flow_control_destroy (
+		conn,
+		CPG_SERVICE,
+		gi->group_name.value,
+		gi->group_name.length);
+
 leave_ret:
 	/* send return */
 	res_lib_cpg_leave.header.size = sizeof(res_lib_cpg_leave);
@@ -984,6 +1020,8 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 		MESSAGE_REQ_EXEC_CPG_MCAST);
 	req_exec_cpg_mcast.pid = pi->pid;
 	req_exec_cpg_mcast.msglen = msglen;
+	req_exec_cpg_mcast.flow_control_state = pi->flow_control_state;
+	message_source_set (&req_exec_cpg_mcast.source, conn);
 	memcpy(&req_exec_cpg_mcast.group_name, &gi->group_name,
 		sizeof(mar_cpg_name_t));
 
@@ -994,6 +1032,7 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 
 	// TODO: guarantee type...
 	result = totempg_groups_mcast_joined (openais_group_handle, req_exec_cpg_iovec, 2, TOTEMPG_AGREED);
+	openais_ipc_flow_control_local_increment (conn);
 
 	res.size = sizeof(res);
 	res.id = MESSAGE_RES_CPG_MCAST;
