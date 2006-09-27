@@ -80,7 +80,7 @@ extern void openais_ipc_flow_control_create (
 extern void openais_ipc_flow_control_destroy (
 	void *conn,
 	unsigned int service,
-	char *id,
+	unsigned char *id,
 	int id_len);
 
 extern void openais_ipc_flow_control_local_increment (

@@ -307,7 +307,6 @@ struct req_exec_cpg_mcast {
 	mar_cpg_name_t group_name __attribute__((aligned(8)));
 	mar_uint32_t msglen __attribute__((aligned(8)));
 	mar_uint32_t pid __attribute__((aligned(8)));
-	mar_uint32_t flow_control_state __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_uint8_t message[] __attribute__((aligned(8)));
 };
@@ -654,7 +653,6 @@ static void exec_cpg_mcast_endian_convert (void *msg)
 	swab_mar_cpg_name_t (&req_exec_cpg_mcast->group_name);
 	req_exec_cpg_mcast->pid = swab32(req_exec_cpg_mcast->pid);
 	req_exec_cpg_mcast->msglen = swab32(req_exec_cpg_mcast->msglen);
-	req_exec_cpg_mcast->flow_control_state = swab32(req_exec_cpg_mcast->flow_control_state);
 	swab_mar_message_source_t (&req_exec_cpg_mcast->source);
 }
 
@@ -797,6 +795,7 @@ static void message_handler_req_exec_cpg_mcast (
 {
 	struct req_exec_cpg_mcast *req_exec_cpg_mcast = (struct req_exec_cpg_mcast *)message;
 	struct res_lib_cpg_deliver_callback *res_lib_cpg_mcast;
+	struct process_info *process_info;
 	int msglen = req_exec_cpg_mcast->msglen;
 	char buf[sizeof(*res_lib_cpg_mcast) + msglen];
 	struct group_info *gi;
@@ -805,9 +804,6 @@ static void message_handler_req_exec_cpg_mcast (
 	/*
 	 * Track local messages so that flow is controlled on the local node
 	 */
-	if (message_source_is_local (&req_exec_cpg_mcast->source)) {
-		openais_ipc_flow_control_local_decrement (req_exec_cpg_mcast->source.conn);
-	}
 	gi = get_group(&req_exec_cpg_mcast->group_name); /* this will always succeed ! */
 	assert(gi);
 
@@ -817,7 +813,12 @@ static void message_handler_req_exec_cpg_mcast (
 	res_lib_cpg_mcast->msglen = msglen;
 	res_lib_cpg_mcast->pid = req_exec_cpg_mcast->pid;
 	res_lib_cpg_mcast->nodeid = nodeid;
-	res_lib_cpg_mcast->flow_control_state = 0;
+	res_lib_cpg_mcast->flow_control_state = CPG_FLOW_CONTROL_DISABLED;
+	if (message_source_is_local (&req_exec_cpg_mcast->source)) {
+		openais_ipc_flow_control_local_decrement (req_exec_cpg_mcast->source.conn);
+		process_info = (struct process_info *)openais_conn_private_data_get (req_exec_cpg_mcast->source.conn);
+		res_lib_cpg_mcast->flow_control_state = process_info->flow_control_state;
+	}
 	memcpy(&res_lib_cpg_mcast->group_name, &gi->group_name,
 		sizeof(mar_cpg_name_t));
 	memcpy(&res_lib_cpg_mcast->message, (char*)message+sizeof(*req_exec_cpg_mcast),
@@ -981,8 +982,8 @@ static void message_handler_req_lib_cpg_leave (void *conn, void *message)
 	openais_ipc_flow_control_destroy (
 		conn,
 		CPG_SERVICE,
-		gi->group_name.value,
-		gi->group_name.length);
+		(unsigned char *)gi->group_name.value,
+		(unsigned int)gi->group_name.length);
 
 leave_ret:
 	/* send return */
@@ -1000,7 +1001,7 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	struct group_info *gi = pi->group;
 	struct iovec req_exec_cpg_iovec[2];
 	struct req_exec_cpg_mcast req_exec_cpg_mcast;
-	mar_res_header_t res;
+	struct res_lib_cpg_mcast res_lib_cpg_mcast;
 	int msglen = req_lib_cpg_mcast->msglen;
 	int result;
 
@@ -1008,10 +1009,12 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 
 	/* Can't send if we're not joined */
 	if (!gi) {
-		res.size = sizeof(res);
-		res.id = MESSAGE_RES_CPG_MCAST;
-		res.error = SA_AIS_ERR_ACCESS; /* TODO Better error code ?? */
-		openais_conn_send_response(conn, &res, sizeof(res));
+		res_lib_cpg_mcast.header.size = sizeof(res_lib_cpg_mcast);
+		res_lib_cpg_mcast.header.id = MESSAGE_RES_CPG_MCAST;
+		res_lib_cpg_mcast.header.error = SA_AIS_ERR_ACCESS; /* TODO Better error code ?? */
+		res_lib_cpg_mcast.flow_control_state = CPG_FLOW_CONTROL_DISABLED;
+		openais_conn_send_response(conn, &res_lib_cpg_mcast,
+			sizeof(res_lib_cpg_mcast));
 		return;
 	}
 
@@ -1020,7 +1023,6 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 		MESSAGE_REQ_EXEC_CPG_MCAST);
 	req_exec_cpg_mcast.pid = pi->pid;
 	req_exec_cpg_mcast.msglen = msglen;
-	req_exec_cpg_mcast.flow_control_state = pi->flow_control_state;
 	message_source_set (&req_exec_cpg_mcast.source, conn);
 	memcpy(&req_exec_cpg_mcast.group_name, &gi->group_name,
 		sizeof(mar_cpg_name_t));
@@ -1034,10 +1036,12 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	result = totempg_groups_mcast_joined (openais_group_handle, req_exec_cpg_iovec, 2, TOTEMPG_AGREED);
 	openais_ipc_flow_control_local_increment (conn);
 
-	res.size = sizeof(res);
-	res.id = MESSAGE_RES_CPG_MCAST;
-	res.error = SA_AIS_OK;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	res_lib_cpg_mcast.header.size = sizeof(res_lib_cpg_mcast);
+	res_lib_cpg_mcast.header.id = MESSAGE_RES_CPG_MCAST;
+	res_lib_cpg_mcast.header.error = SA_AIS_OK;
+	res_lib_cpg_mcast.flow_control_state = pi->flow_control_state;
+	openais_conn_send_response(conn, &res_lib_cpg_mcast,
+		sizeof(res_lib_cpg_mcast));
 }
 
 static void message_handler_req_lib_cpg_membership (void *conn, void *message)

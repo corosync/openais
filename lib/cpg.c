@@ -503,7 +503,7 @@ cpg_error_t cpg_mcast_joined (
 	struct cpg_inst *cpg_inst;
 	struct iovec iov[64];
 	struct req_lib_cpg_mcast req_lib_cpg_mcast;
-	mar_res_header_t res_lib_cpg_mcast;
+	struct res_lib_cpg_mcast res_lib_cpg_mcast;
 	int msg_len = 0;
 
 	error = saHandleInstanceGet (&cpg_handle_t_db, handle, (void *)&cpg_inst);
@@ -537,11 +537,11 @@ cpg_error_t cpg_mcast_joined (
 		goto error_exit;
 	}
 
-	cpg_inst->flow_control_state = CPG_FLOW_CONTROL_DISABLED;
-	if (res_lib_cpg_mcast.error == CPG_ERR_TRY_AGAIN) {
+	cpg_inst->flow_control_state = res_lib_cpg_mcast.flow_control_state;
+	if (res_lib_cpg_mcast.header.error == CPG_ERR_TRY_AGAIN) {
 		cpg_inst->flow_control_state = CPG_FLOW_CONTROL_ENABLED;
 	}
-	error = res_lib_cpg_mcast.error;
+	error = res_lib_cpg_mcast.header.error;
 
 error_exit:
 	saHandleInstancePut (&cpg_handle_t_db, handle);

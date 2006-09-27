@@ -122,6 +122,10 @@ static inline int flow_control_xmit (
 	res = totempg_groups_mcast_joined (flow_control_handle, &iovec, 1,
 		TOTEMPG_AGREED);
 
+	flow_control_service->flow_control_state_set_fn (
+		flow_control_service->context,
+		flow_control_service->flow_control_state);
+
 	return (res);
 }
 
@@ -191,7 +195,7 @@ static void flow_control_confchg_fn (
 
 		/*
 		 * Set all of the node ids after a configuration change
-		 * Turn off all flow control after a configuration change
+		 * Turn on all flow control after a configuration change
 		 */
 		flow_control_service->processor_count = flow_control_member_list_entries;
 		flow_control_service->flow_control_state = OPENAIS_FLOW_CONTROL_STATE_ENABLED;
@@ -354,39 +358,6 @@ unsigned int openais_flow_control_destroy (
 			list_del (&flow_control_service->list_all);
 			free (flow_control_service);
 			break; /* done */
-		}
-	}
-	hdb_handle_put (&flow_control_hdb, flow_control_handle);
-
-error_exit:
-	return (res);
-}
-/*
- * If 1 is returned, flow control is enabled for this service and no
- * new messages are allowed to be sent from the library for this connection
- */
-unsigned int openais_flow_control_enabled (
-	unsigned int flow_control_handle)
-{
-	struct flow_control_instance *instance;
-	struct flow_control_service *flow_control_service;
-	struct list_head *list;
-	unsigned int res = 0;
-
-	res = hdb_handle_get (&flow_control_hdb, flow_control_handle,
-		(void *)&instance);
-	if (res != 0) {
-		goto error_exit;
-	}
-
-	for (list = instance->list_head.next;
-		list != &instance->list_head;
-		list = list->next) {
-
-		flow_control_service = list_entry (list, struct flow_control_service, list);
-		if (flow_control_service->flow_control_state == OPENAIS_FLOW_CONTROL_STATE_ENABLED) {
-			res = 1;
-			break;
 		}
 	}
 	hdb_handle_put (&flow_control_hdb, flow_control_handle);

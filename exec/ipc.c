@@ -795,16 +795,6 @@ retry_recv:
 				(send_ok_joined) &&
 				(sync_in_process() == 0)));
 
-			/*
-			 * Check if flow control on new messages is enabled
-			 * for this service
-			 */
-			if ((send_ok == 1) &&
-				((ais_service[conn_info->service]->flow_control == OPENAIS_FLOW_CONTROL_REQUIRED &&
-				openais_flow_control_enabled (conn_info->flow_control_handle) == 1)) || (conn_info->flow_control_enabled == 1) || (conn_info->conn_info_partner->flow_control_enabled == 1)) {
-				send_ok = 0;	
-			}
-
 			if (send_ok) {
 				ais_service[service]->lib_service[header->id].lib_handler_fn(conn_info, header);
 			} else {
@@ -1245,7 +1235,7 @@ void openais_ipc_flow_control_create (
 void openais_ipc_flow_control_destroy (
 	void *conn,
 	unsigned int service,
-	char *id,
+	unsigned char *id,
 	int id_len)
 {
 	struct conn_info *conn_info = (struct conn_info *)conn;

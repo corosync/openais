@@ -64,9 +64,6 @@ unsigned int openais_flow_control_destroy (
 	unsigned char *id,
 	unsigned int id_len);
 
-unsigned int openais_flow_control_enabled (
-	unsigned int flow_control_identifier);
-
 unsigned int openais_flow_control_disable (
 	unsigned int flow_control_identifier);
 
