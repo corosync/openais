@@ -191,7 +191,7 @@ static struct openais_lib_handler cpg_lib_service[] =
 	},
 	{ /* 2 */
 		.lib_handler_fn				= message_handler_req_lib_cpg_mcast,
-		.response_size				= sizeof (mar_res_header_t),
+		.response_size				= sizeof (struct res_lib_cpg_mcast),
 		.response_id				= MESSAGE_RES_CPG_MCAST,
 		.flow_control				= OPENAIS_FLOW_CONTROL_REQUIRED
 	},

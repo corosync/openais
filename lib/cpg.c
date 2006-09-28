@@ -529,7 +529,7 @@ cpg_error_t cpg_mcast_joined (
 	pthread_mutex_lock (&cpg_inst->response_mutex);
 
 	error = saSendMsgReceiveReply (cpg_inst->response_fd, iov, iov_len + 1,
-		&res_lib_cpg_mcast, sizeof (mar_res_header_t));
+		&res_lib_cpg_mcast, sizeof (res_lib_cpg_mcast));
 
 	pthread_mutex_unlock (&cpg_inst->response_mutex);
 
