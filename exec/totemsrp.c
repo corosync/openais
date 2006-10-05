@@ -321,6 +321,8 @@ struct totemsrp_instance {
 
 	struct srp_addr my_deliver_memb_list[PROCESSOR_COUNT_MAX];
 
+	struct srp_addr my_left_memb_list[PROCESSOR_COUNT_MAX];
+
 	int my_proc_list_entries;
 
 	int my_failed_list_entries;
@@ -333,7 +335,7 @@ struct totemsrp_instance {
 
 	int my_deliver_memb_entries;
 
-	int my_nodeid_lookup_entries;
+	int my_left_memb_entries;
 
 	struct memb_ring_id my_ring_id;
 
@@ -866,10 +868,25 @@ int totemsrp_ifaces_get (
 		memcpy (interfaces, &instance->my_memb_list[i],
 			sizeof (struct srp_addr));
 		*iface_count = instance->totem_config->interface_count;
+		goto finish;
+	}
+       
+	for (i = 0; i < instance->my_left_memb_entries; i++) {
+		if (instance->my_left_memb_list[i].addr[0].nodeid == nodeid) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (found) {
+		memcpy (interfaces, &instance->my_left_memb_list[i],
+			sizeof (struct srp_addr));
+		*iface_count = instance->totem_config->interface_count;
 	} else {
 		res = -1;
 	}
 
+finish:
 	totemrrp_ifaces_get (instance->totemrrp_handle, status, NULL);
 
 	hdb_handle_put (&totemsrp_instance_database, handle);
@@ -1520,13 +1537,11 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 {
 	struct srp_addr joined_list[PROCESSOR_COUNT_MAX];
 	int joined_list_entries = 0;
-	struct srp_addr left_list[PROCESSOR_COUNT_MAX];
-	int left_list_entries = 0;
 	unsigned int aru_save;
-	unsigned int left_list_totemip[PROCESSOR_COUNT_MAX];
 	unsigned int joined_list_totemip[PROCESSOR_COUNT_MAX];
 	unsigned int trans_memb_list_totemip[PROCESSOR_COUNT_MAX];
 	unsigned int new_memb_list_totemip[PROCESSOR_COUNT_MAX];
+	unsigned int left_list[PROCESSOR_COUNT_MAX];
 
 	old_ring_state_reset (instance);
 	ring_reset (instance);
@@ -1544,7 +1559,8 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 	/*
 	 * Calculate joined and left list
 	 */
-	memb_set_subtract (left_list, &left_list_entries,
+	memb_set_subtract (instance->my_left_memb_list,
+		&instance->my_left_memb_entries,
 		instance->my_memb_list, instance->my_memb_entries,
 		instance->my_trans_memb_list, instance->my_trans_memb_entries);
 
@@ -1564,12 +1580,13 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 	/*
 	 * Deliver transitional configuration to application
 	 */
-	srp_addr_to_nodeid (left_list_totemip, left_list, left_list_entries);
+	srp_addr_to_nodeid (left_list, instance->my_left_memb_list,
+		instance->my_left_memb_entries);
 	srp_addr_to_nodeid (trans_memb_list_totemip,
 		instance->my_trans_memb_list, instance->my_trans_memb_entries);
 	instance->totemsrp_confchg_fn (TOTEM_CONFIGURATION_TRANSITIONAL,
 		trans_memb_list_totemip, instance->my_trans_memb_entries,
-		left_list_totemip, left_list_entries,
+		left_list, instance->my_left_memb_entries,
 		0, 0, &instance->my_ring_id);
 		
 // TODO we need to filter to ensure we only deliver those
