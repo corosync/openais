@@ -3994,13 +3994,15 @@ static int message_handler_memb_commit_token (
 			break;
 
 		case MEMB_STATE_RECOVERY:
-			log_printf (instance->totemsrp_log_level_notice,
-				"Sending initial ORF token\n");
+			if (totemip_equal (&instance->my_id.addr[0], &instance->my_ring_id.rep)) {
+				log_printf (instance->totemsrp_log_level_notice,
+					"Sending initial ORF token\n");
 
-			// TODO convert instead of initiate
-			orf_token_send_initial (instance);
-			reset_token_timeout (instance); // REVIEWED
-			reset_token_retransmit_timeout (instance); // REVIEWED
+				// TODO convert instead of initiate
+				orf_token_send_initial (instance);
+				reset_token_timeout (instance); // REVIEWED
+				reset_token_retransmit_timeout (instance); // REVIEWED
+			}
 			break;
 	}
 	return (0);
