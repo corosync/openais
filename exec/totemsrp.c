@@ -387,7 +387,7 @@ struct totemsrp_instance {
 
 	struct list_head token_callback_sent_listhead;
 
-	char *orf_token_retransmit; // sizeof (struct orf_token) + sizeof (struct rtr_item) * RETRANSMIT_ENTRIES_MAX];
+	char *orf_token_retransmit[TOKEN_SIZE_MAX];
 
 	int orf_token_retransmit_size;
 
@@ -617,8 +617,6 @@ void totemsrp_instance_initialize (struct totemsrp_instance *instance)
 	instance->my_token_seq = SEQNO_START_TOKEN - 1;
 
 	instance->my_commit_token_seq = SEQNO_START_TOKEN - 1;
-
-	instance->orf_token_retransmit = malloc (TOKEN_SIZE_MAX);
 
 	instance->memb_state = MEMB_STATE_OPERATIONAL;
 
