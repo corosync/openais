@@ -1153,7 +1153,7 @@ static void memb_set_merge (
 			}	
 		}
 		if (found == 0) {
-			srp_addr_copy (&fullset[j], &subset[i]);
+			srp_addr_copy (&fullset[*fullset_entries], &subset[i]);
 			*fullset_entries = *fullset_entries + 1;
 		}
 		found = 0;
