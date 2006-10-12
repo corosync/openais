@@ -551,8 +551,9 @@ static int orf_token_mcast (struct totemsrp_instance *instance, struct orf_token
 	int fcc_mcasts_allowed);
 static void messages_free (struct totemsrp_instance *instance, unsigned int token_aru);
 
-static void memb_ring_id_store (struct totemsrp_instance *instance, struct memb_commit_token *commit_token);
+static void memb_ring_id_store (struct totemsrp_instance *instance);
 static void memb_state_commit_token_update (struct totemsrp_instance *instance, struct memb_commit_token *commit_token);
+static void memb_state_commit_token_target_set (struct totemsrp_instance *instance, struct memb_commit_token *commit_token);
 static int memb_state_commit_token_send (struct totemsrp_instance *instance, struct memb_commit_token *memb_commit_token);
 static void memb_state_commit_token_create (struct totemsrp_instance *instance, struct memb_commit_token *commit_token);
 static int token_hold_cancel_send (struct totemsrp_instance *instance);
@@ -1696,12 +1697,15 @@ static void memb_state_commit_enter (
 
 	old_ring_state_save (instance); 
 
-// ABC
 	memb_state_commit_token_update (instance, commit_token);
+
+	memb_state_commit_token_target_set (instance, commit_token);
 
 	memb_state_commit_token_send (instance, commit_token);
 
-	memb_ring_id_store (instance, commit_token);
+	memcpy (&instance->my_ring_id, &commit_token->ring_id,
+		sizeof (struct memb_ring_id));
+	instance->token_ring_id_seq = instance->my_ring_id.seq;
 
 	poll_timer_delete (instance->totemsrp_poll_handle, instance->memb_timer_state_gather_join_timeout);
 
@@ -1912,6 +1916,7 @@ originated:
 
 	reset_token_timeout (instance); // REVIEWED
 	reset_token_retransmit_timeout (instance); // REVIEWED
+	memb_ring_id_store (instance);
 
 	instance->memb_state = MEMB_STATE_RECOVERY;
 	return;
@@ -2575,49 +2580,60 @@ static void memb_state_commit_token_update (
 	struct totemsrp_instance *instance,
 	struct memb_commit_token *commit_token)
 {
-	int memb_index_this;
 	struct srp_addr *addr;
 	struct memb_commit_token_memb_entry *memb_list;
 
 	addr = (struct srp_addr *)commit_token->end_of_commit_token;
 	memb_list = (struct memb_commit_token_memb_entry *)(addr + commit_token->addr_entries);
 
-	memb_index_this = (commit_token->memb_index + 1) % commit_token->addr_entries;
-	memcpy (&memb_list[memb_index_this].ring_id,
+	memcpy (&memb_list[commit_token->memb_index].ring_id,
 		&instance->my_old_ring_id, sizeof (struct memb_ring_id));
 	assert (!totemip_zero_check(&instance->my_old_ring_id.rep));
 
-	memb_list[memb_index_this].aru = instance->old_ring_state_aru;
+	memb_list[commit_token->memb_index].aru = instance->old_ring_state_aru;
 	/*
 	 *  TODO high delivered is really instance->my_aru, but with safe this
 	 * could change?
 	 */
-	memb_list[memb_index_this].high_delivered = instance->my_high_delivered;
-	memb_list[memb_index_this].received_flg = instance->my_received_flg;
+	memb_list[commit_token->memb_index].high_delivered = instance->my_high_delivered;
+	memb_list[commit_token->memb_index].received_flg = instance->my_received_flg;
 
 	commit_token->header.nodeid = instance->my_id.addr[0].nodeid;
+	commit_token->memb_index += 1;
+	assert (commit_token->memb_index <= commit_token->addr_entries);
 	assert (commit_token->header.nodeid);
 }
 
-static int memb_state_commit_token_send (struct totemsrp_instance *instance,
+static void memb_state_commit_token_target_set (
+	struct totemsrp_instance *instance,
+	struct memb_commit_token *commit_token)
+{
+	struct srp_addr *addr;
+	unsigned int i;
+
+	addr = (struct srp_addr *)commit_token->end_of_commit_token;
+
+	for (i = 0; i < instance->totem_config->interface_count; i++) {
+		totemrrp_token_target_set (
+			instance->totemrrp_handle,
+			&addr[commit_token->memb_index %
+				commit_token->addr_entries].addr[i],
+			i);
+	}
+}
+
+static int memb_state_commit_token_send (
+	struct totemsrp_instance *instance,
 	struct memb_commit_token *commit_token)
 {
 	struct iovec iovec;
-	int memb_index_this;
-	int memb_index_next;
 	struct srp_addr *addr;
 	struct memb_commit_token_memb_entry *memb_list;
-	unsigned int i;
 
 	addr = (struct srp_addr *)commit_token->end_of_commit_token;
 	memb_list = (struct memb_commit_token_memb_entry *)(addr + commit_token->addr_entries);
 
 	commit_token->token_seq++;
-	memb_index_this = (commit_token->memb_index + 1) % commit_token->addr_entries;
-	memb_index_next = (memb_index_this + 1) % commit_token->addr_entries;
-	commit_token->memb_index = memb_index_this;
-
-
 	iovec.iov_base = commit_token;
 	iovec.iov_len = sizeof (struct memb_commit_token) +
 		((sizeof (struct srp_addr) +
@@ -2627,13 +2643,6 @@ static int memb_state_commit_token_send (struct totemsrp_instance *instance,
 	 */
 	memcpy (instance->orf_token_retransmit, commit_token, iovec.iov_len);
 	instance->orf_token_retransmit_size = iovec.iov_len;
-
-	for (i = 0; i < instance->totem_config->interface_count; i++) {
-		totemrrp_token_target_set (
-			instance->totemrrp_handle,
-			&addr[memb_index_next].addr[i],
-			i);
-	}
 
 	totemrrp_token_send (instance->totemrrp_handle,
 		&iovec,
@@ -2713,7 +2722,7 @@ static void memb_state_commit_token_create (
 	qsort (token_memb, token_memb_entries, sizeof (struct srp_addr),
 		srp_addr_compare);
 
-	commit_token->memb_index = token_memb_entries - 1;
+	commit_token->memb_index = 0;
 	commit_token->addr_entries = token_memb_entries;
 
 	addr = (struct srp_addr *)commit_token->end_of_commit_token;
@@ -2821,8 +2830,7 @@ static void memb_ring_id_create_or_load (
 }
 
 static void memb_ring_id_store (
-	struct totemsrp_instance *instance,
-	struct memb_commit_token *commit_token)
+	struct totemsrp_instance *instance)
 {
 	char filename[256];
 	int fd;
@@ -2838,18 +2846,16 @@ static void memb_ring_id_store (
 	if (fd == -1) {
 		log_printf (instance->totemsrp_log_level_warning,
 			"Couldn't store new ring id %llx to stable storage (%s)\n",
-				commit_token->ring_id.seq, strerror (errno));
+				instance->my_ring_id.seq, strerror (errno));
 		assert (0);
 		return;
 	}
 	log_printf (instance->totemsrp_log_level_notice,
-		"Storing new sequence id for ring %llx\n", commit_token->ring_id.seq);
+		"Storing new sequence id for ring %llx\n", instance->my_ring_id.seq);
 	//assert (fd > 0);
-	res = write (fd, &commit_token->ring_id.seq, sizeof (unsigned long long));
+	res = write (fd, &instance->my_ring_id.seq, sizeof (unsigned long long));
 	assert (res == sizeof (unsigned long long));
 	close (fd);
-	memcpy (&instance->my_ring_id, &commit_token->ring_id, sizeof (struct memb_ring_id));
-	instance->token_ring_id_seq = instance->my_ring_id.seq;
 }
 
 int totemsrp_callback_token_create (
