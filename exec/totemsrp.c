@@ -2738,6 +2738,7 @@ static void memb_join_message_send (struct totemsrp_instance *instance)
 {
 	struct memb_join memb_join;
 	struct iovec iovec[3];
+	unsigned int iovs;
 
 	memb_join.header.type = MESSAGE_TYPE_MEMB_JOIN;
 	memb_join.header.endian_detector = ENDIAN_LOCAL;
@@ -2756,9 +2757,14 @@ static void memb_join_message_send (struct totemsrp_instance *instance)
 	iovec[1].iov_base = &instance->my_proc_list;
 	iovec[1].iov_len = instance->my_proc_list_entries *
 		sizeof (struct srp_addr);
-	iovec[2].iov_base = &instance->my_failed_list;
-	iovec[2].iov_len = instance->my_failed_list_entries *
-		sizeof (struct srp_addr);
+	if (instance->my_failed_list_entries == 0) {
+		iovs = 2;
+	} else {
+		iovs = 3;
+		iovec[2].iov_base = &instance->my_failed_list;
+		iovec[2].iov_len = instance->my_failed_list_entries *
+			sizeof (struct srp_addr);
+	}
 
 	if (instance->totem_config->send_join_timeout) {
 		usleep (random() % (instance->totem_config->send_join_timeout * 1000));
@@ -2767,7 +2773,7 @@ static void memb_join_message_send (struct totemsrp_instance *instance)
 	totemrrp_mcast_flush_send (
 		instance->totemrrp_handle,
 		iovec,
-		3);
+		iovs);
 }
 
 static void memb_merge_detect_transmit (struct totemsrp_instance *instance) 
