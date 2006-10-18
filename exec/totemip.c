@@ -122,10 +122,25 @@ void totemip_copy_endian_convert(struct totem_ip_address *addr1, struct totem_ip
 int totemip_compare(const void *a, const void *b)
 {
 	int i;
-	const struct totem_ip_address *addr1 = a;
-	const struct totem_ip_address *addr2 = b;
+	struct totem_ip_address *addr1 = (struct totem_ip_address *)addr1;
+	struct totem_ip_address *addr2 = (struct totem_ip_address *)addr2;
 	struct in6_addr *sin6a;
 	struct in6_addr *sin6b;
+	struct totem_ip_address a1;
+	struct totem_ip_address a2;
+
+	/*
+	 * Align on machine sized boundaries for sparc and ia64
+	 */
+	if (((size_t)addr1 % 4) != 0) {
+		memcpy (&a1, a, sizeof (struct totem_ip_address));
+		addr1 = &a1;
+	}
+
+	if (((size_t)addr2 % 4) != 0) {
+		memcpy (&a2, a, sizeof (struct totem_ip_address));
+		addr2 = &a2;
+	}
 
 	if (addr1->family != addr2->family)
 		return (addr1->family > addr2->family);

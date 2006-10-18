@@ -336,8 +336,19 @@ static inline int group_matches (
 	char *group_name;
 	int i;
 	int j;
+        struct iovec iovec_aligned = { NULL, 0 };
 	
 	assert (iov_len == 1);
+
+	/*
+	 * Align data structure for sparc and ia64
+	 */
+	if ((size_t)iovec->iov_base % 4 != 0) {
+		iovec_aligned.iov_base = alloca(iovec->iov_len);
+		memcpy(iovec_aligned.iov_base, iovec->iov_base, iovec->iov_len);                iovec_aligned.iov_len = iovec->iov_len;
+		iovec = &iovec_aligned;
+	}
+
 
 	group_len = (unsigned short *)iovec->iov_base;
 	group_name = ((char *)iovec->iov_base) +
@@ -379,10 +390,20 @@ static inline void app_deliver_fn (
 	struct iovec stripped_iovec;
 	unsigned int adjust_iovec;
 	unsigned int res;
+        struct iovec aligned_iovec = { NULL, 0 };
 
 	if (endian_conversion_required) {
 		group_endian_convert (iovec);
 	}
+
+	/*
+	 * Align data structure for sparc and ia64
+	 */
+	aligned_iovec.iov_base = alloca(iovec->iov_len);
+	aligned_iovec.iov_len = iovec->iov_len;
+	memcpy(aligned_iovec.iov_base, iovec->iov_base, iovec->iov_len);
+	iovec = &aligned_iovec;
+
 	for (i = 0; i <= totempg_max_handle; i++) {
 		res = hdb_handle_get (&totempg_groups_instance_database,
 			i, (void *)&instance);
@@ -391,7 +412,22 @@ static inline void app_deliver_fn (
 			assert (iov_len == 1);
 			if (group_matches (iovec, iov_len, instance->groups, instance->groups_cnt, &adjust_iovec)) {
 				stripped_iovec.iov_len = iovec->iov_len - adjust_iovec;
-				stripped_iovec.iov_base = (char *)iovec->iov_base + adjust_iovec;
+//				stripped_iovec.iov_base = (char *)iovec->iov_base + adjust_iovec;
+
+				/*
+				 * Align data structure for sparc and ia64
+				 */
+				if (iovec->iov_base + adjust_iovec % 4 != 0) {
+					/*
+					 * Deal with misalignment
+					 */
+					stripped_iovec.iov_base =
+						alloca (stripped_iovec.iov_len);
+					memcpy (stripped_iovec.iov_base,
+						 iovec->iov_base + adjust_iovec,
+						stripped_iovec.iov_len);
+				}
+
 				instance->deliver_fn (
 					nodeid,
 					&stripped_iovec,
@@ -403,6 +439,7 @@ static inline void app_deliver_fn (
 		}
 	}
 }
+
 static void totempg_confchg_fn (
 	enum totem_configuration_type configuration_type,
 	unsigned int *member_list, int member_list_entries,
