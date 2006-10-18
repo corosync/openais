@@ -326,7 +326,15 @@ static inline unsigned int conn_info_create (int fd) {
 	list_add (&conn_info_list_head, &conn_info->list);
 
 	pthread_attr_init (&conn_info->thread_attr);
+/*
+ * IA64 needs more stack space then other arches
+ */
+#if defined(__ia64__)
+	pthread_attr_setstacksize (&conn_info->thread_attr, 400000);
+#else
 	pthread_attr_setstacksize (&conn_info->thread_attr, 200000);
+#endif
+
 	pthread_attr_setdetachstate (&conn_info->thread_attr, PTHREAD_CREATE_DETACHED);
 	res = pthread_create (&conn_info->thread, &conn_info->thread_attr,
 		prioritized_poll_thread, conn_info);
