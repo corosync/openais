@@ -223,6 +223,9 @@ static int dispatch_init_send_response (
 		conn_info->conn_info_partner = (struct conn_info *)cinfo;
 		conn_info->conn_info_partner->shared_mutex = conn_info->shared_mutex;
 
+		list_add (&conn_info_list_head, &conn_info->list);
+		list_add (&conn_info_list_head, &conn_info->conn_info_partner->list);
+
 		msg_conn_info = (struct conn_info *)cinfo;
 		msg_conn_info->conn_info_partner = conn_info;
 
@@ -317,13 +320,11 @@ static inline unsigned int conn_info_create (int fd) {
 	pthread_mutex_init (&conn_info->flow_control_mutex, NULL);
 	pthread_mutex_init (conn_info->shared_mutex, NULL);
 
+	list_init (&conn_info->list);
 	conn_info->state = CONN_STATE_ACTIVE;
 	conn_info->fd = fd;
 	conn_info->events = POLLIN|POLLNVAL;
 	conn_info->service = SOCKET_SERVICE_INIT;
-
-	list_init (&conn_info->list);
-	list_add (&conn_info_list_head, &conn_info->list);
 
 	pthread_attr_init (&conn_info->thread_attr);
 /*
