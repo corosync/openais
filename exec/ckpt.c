@@ -734,7 +734,6 @@ struct req_exec_ckpt_sync_checkpoint {
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 	mar_ckpt_checkpoint_creation_attributes_t checkpoint_creation_attributes __attribute__((aligned(8)));
 	mar_uint32_t checkpoint_creation_attributes_set __attribute__((aligned(8)));
-	mar_ckpt_checkpoint_open_flags_t checkpoint_open_flags __attribute__((aligned(8)));
 	mar_uint32_t active_replica_set __attribute__((aligned(8)));
 	mar_uint32_t unlinked __attribute__((aligned(8)));
 };
@@ -3461,6 +3460,15 @@ static int sync_checkpoint_section_transmit (
 	req_exec_ckpt_sync_checkpoint_section.id_len =
 		checkpoint_section->section_descriptor.section_id.id_len;
 
+	req_exec_ckpt_sync_checkpoint_section.section_size = 
+		 checkpoint_section->section_descriptor.section_size;
+
+	req_exec_ckpt_sync_checkpoint_section.section_size =
+		checkpoint_section->section_descriptor.section_size;
+
+	req_exec_ckpt_sync_checkpoint_section.expiration_time =
+		checkpoint_section->section_descriptor.expiration_time;
+
 	iovecs[0].iov_base = (char *)&req_exec_ckpt_sync_checkpoint_section;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sync_checkpoint_section);
 	iovecs[1].iov_base = checkpoint_section->section_descriptor.section_id.id;
@@ -3781,7 +3789,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 		/*
 		 * Configure checkpoint section
 		 */
-		checkpoint_section->section_descriptor.section_id.id = section_id;
+		checkpoint_section->section_descriptor.section_id.id = (unsigned char *)section_id;
 		checkpoint_section->section_descriptor.section_id.id_len =
 			req_exec_ckpt_sync_checkpoint_section->id_len;
 		checkpoint_section->section_descriptor.section_size =
