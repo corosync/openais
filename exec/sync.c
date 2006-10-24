@@ -451,6 +451,9 @@ static void sync_confchg_fn (
 {
 	sync_ring_id = ring_id;
 
+	if (sync_processing && sync_callbacks.sync_abort != NULL) {
+		sync_callbacks.sync_abort ();
+	}
 	/*
 	 * If no virtual synchrony filter configured, then start
 	 * synchronization process
