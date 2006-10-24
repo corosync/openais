@@ -2436,6 +2436,9 @@ static int ckpt_lib_exit_fn (void *conn)
 	}
 	list_del (&ckpt_pd->sectionIterator.list);
 	*/
+
+	hdb_destroy (&ckpt_pd->iteration_hdb);
+
 	return (0);
 }
 
@@ -3167,8 +3170,6 @@ static void message_handler_req_lib_ckpt_sectioniterationfinalize (
 
 	hdb_handle_destroy (&ckpt_pd->iteration_hdb,
 		req_lib_ckpt_sectioniterationfinalize->iteration_handle);
-
-	hdb_destroy (&ckpt_pd->iteration_hdb);
 
 error_exit:
 	res_lib_ckpt_sectioniterationfinalize.header.size = sizeof (struct res_lib_ckpt_sectioniterationfinalize);

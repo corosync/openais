@@ -221,6 +221,7 @@ static int dispatch_init_send_response (
 
 		cinfo = (size_t)req_lib_dispatch_init->conn_info;
 		conn_info->conn_info_partner = (struct conn_info *)cinfo;
+
 		conn_info->conn_info_partner->shared_mutex = conn_info->shared_mutex;
 
 		list_add (&conn_info_list_head, &conn_info->list);
@@ -499,6 +500,7 @@ retry_poll:
 				pthread_mutex_unlock (rel_mutex);
 			}
 			if (cinfo_partner == NULL) {
+				pthread_mutex_destroy (rel_mutex);
 				free (rel_mutex);
 			}
 			pthread_exit (0);

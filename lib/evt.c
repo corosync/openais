@@ -881,7 +881,7 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 		return error;
 	}
 
-       pthread_mutex_lock(&evti->ei_response_mutex);
+	pthread_mutex_lock(&evti->ei_response_mutex);
 
 	/*
 	 * Another thread has already started finalizing
@@ -894,7 +894,10 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 
 	evti->ei_finalize = 1;
 
-	pthread_mutex_unlock(&evti->ei_response_mutex);
+	pthread_mutex_unlock (&evti->ei_response_mutex);
+ 	pthread_mutex_destroy (&evti->ei_response_mutex);
+
+ 	pthread_mutex_destroy (&evti->ei_dispatch_mutex);
 
 	saHandleDestroy(&evt_instance_handle_db, evtHandle);
 	/*
@@ -1085,7 +1088,6 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	}
 	eci->eci_closing = 1;
 	pthread_mutex_unlock(&eci->eci_mutex);
-	
 
 	/*
 	 * Send the request to the server and wait for a response
@@ -1122,6 +1124,8 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 		goto chan_close_put2;
 	}
 
+	pthread_mutex_destroy(&eci->eci_mutex);
+    
 	saHandleInstancePut(&evt_instance_handle_db, 
 					eci->eci_instance_handle);
 	saHandleDestroy(&channel_handle_db, channelHandle);
@@ -1455,6 +1459,7 @@ saEvtEventFree(SaEvtEventHandleT eventHandle)
 	edi->edi_freeing = 1;
 
 	pthread_mutex_unlock(&edi->edi_mutex);
+	pthread_mutex_destroy(&edi->edi_mutex);
 	saHandleDestroy(&event_handle_db, eventHandle);
 	saHandleInstancePut(&event_handle_db, eventHandle);
 

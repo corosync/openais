@@ -431,9 +431,11 @@ saAmfFinalize (
 	amfInstance->finalize = 1;
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
+	pthread_mutex_destroy (&amfInstance->response_mutex);
 
 	pthread_mutex_unlock (&amfInstance->dispatch_mutex);
-
+	pthread_mutex_destroy (&amfInstance->dispatch_mutex);
+	
 	saHandleDestroy (&amfHandleDatabase, amfHandle);
 
 	if (amfInstance->response_fd != -1) {

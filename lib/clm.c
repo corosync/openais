@@ -494,6 +494,9 @@ saClmFinalize (
 	clmInstance->finalize = 1;
 
 	pthread_mutex_unlock (&clmInstance->response_mutex);
+	pthread_mutex_destroy (&clmInstance->response_mutex);
+
+	pthread_mutex_destroy (&clmInstance->dispatch_mutex);
 
 	saHandleDestroy (&clmHandleDatabase, clmHandle);
 

@@ -477,7 +477,7 @@ saMsgFinalize (
 	msgInstance->finalize = 1;
 
 	pthread_mutex_unlock (&msgInstance->response_mutex);
-
+	pthread_mutex_destroy (&msgInstance->response_mutex);
 // TODO	msgInstanceFinalize (msgInstance);
 
 	if (msgInstance->response_fd != -1) {

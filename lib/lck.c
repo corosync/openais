@@ -587,6 +587,7 @@ saLckFinalize (
 	lckInstance->finalize = 1;
 
 	pthread_mutex_unlock (&lckInstance->response_mutex);
+	pthread_mutex_destroy (&lckInstance->response_mutex);
 
 // TODO	lckInstanceFinalize (lckInstance);
 

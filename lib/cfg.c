@@ -304,9 +304,11 @@ openais_cfg_finalize (
 	}
 
 	pthread_mutex_lock (&cfg_instance->dispatch_mutex);
+	pthread_mutex_destroy (&cfg_instance->dispatch_mutex);
 
 	pthread_mutex_lock (&cfg_instance->response_mutex);
-
+	pthread_mutex_destroy (&cfg_instance->response_mutex);
+	
 	/*
 	 * Another thread has already started finalizing
 	 */
