@@ -69,9 +69,9 @@ SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
 	SA_CKPT_WR_ALL_REPLICAS,
 	100000,
 	5000000000LL,
-	10,
+	20,
 	200000,
-	10
+	20
 };
 
 SaCkptSectionIdT sectionId1 = {
