@@ -2016,6 +2016,8 @@ error_iovec:
 	for (j = 0; j < i; j++) {
 		free (message_item.iovec[j].iov_base);
 	}
+	
+	free(message_item.mcast);
 
 error_mcast:
 	hdb_handle_put (&totemsrp_instance_database, handle);

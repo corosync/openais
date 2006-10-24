@@ -177,7 +177,7 @@ static int response_init_send_response (
 	void *message)
 {
 	SaAisErrorT error = SA_AIS_ERR_ACCESS;
-	size_t cinfo = (size_t)conn_info;
+	uintptr_t cinfo = (uintptr_t)conn_info;
 	mar_req_lib_response_init_t *req_lib_response_init = (mar_req_lib_response_init_t *)message;
 	mar_res_lib_response_init_t res_lib_response_init;
 
@@ -207,7 +207,7 @@ static int dispatch_init_send_response (
 	void *message)
 {
 	SaAisErrorT error = SA_AIS_ERR_ACCESS;
-	size_t cinfo;
+	uintptr_t cinfo;
 	mar_req_lib_dispatch_init_t *req_lib_dispatch_init = (mar_req_lib_dispatch_init_t *)message;
 	mar_res_lib_dispatch_init_t res_lib_dispatch_init;
 	struct conn_info *msg_conn_info;
@@ -219,9 +219,14 @@ static int dispatch_init_send_response (
 		else
 			error = SA_AIS_OK;
 
-		cinfo = (size_t)req_lib_dispatch_init->conn_info;
+		cinfo = (uintptr_t)req_lib_dispatch_init->conn_info;
 		conn_info->conn_info_partner = (struct conn_info *)cinfo;
 
+		/* temporary fix for memory leak
+		 */
+		pthread_mutex_destroy (conn_info->conn_info_partner->shared_mutex);
+		free (conn_info->conn_info_partner->shared_mutex);
+		
 		conn_info->conn_info_partner->shared_mutex = conn_info->shared_mutex;
 
 		list_add (&conn_info_list_head, &conn_info->list);
@@ -361,6 +366,10 @@ static void conn_info_destroy (struct conn_info *conn_info)
 	if (conn_info->conn_info_partner) {
 		conn_info->conn_info_partner->conn_info_partner = NULL;
 	}
+	
+	pthread_attr_destroy (&conn_info->thread_attr);
+	pthread_mutex_destroy (&conn_info->mutex);
+	
 	list_del (&conn_info->list);
 	free (conn_info);
 }
@@ -459,6 +468,7 @@ static void *prioritized_poll_thread (void *conn)
 	pthread_mutex_t *rel_mutex;
 	unsigned int service;
 	struct conn_info *cinfo_partner;
+	void *private_data;
 
 	sched_param.sched_priority = 1;
 	res = pthread_setschedparam (conn_info->thread, SCHED_RR, &sched_param);
@@ -476,6 +486,7 @@ retry_poll:
 		switch (conn_info->state) {
 		case CONN_STATE_SECURITY:
 			conn_info_mutex_unlock (conn_info, service);
+			pthread_mutex_destroy (conn_info->shared_mutex);
 			free (conn_info->shared_mutex);
 			conn_info_destroy (conn);
 			pthread_exit (0);
@@ -492,6 +503,7 @@ retry_poll:
 
 		case CONN_STATE_DISCONNECTED:
 			rel_mutex = conn_info->shared_mutex;
+			private_data = conn_info->private_data;
 			cinfo_partner = conn_info->conn_info_partner;
 			conn_info_destroy (conn);
 			if (service == SOCKET_SERVICE_INIT) {
@@ -502,6 +514,7 @@ retry_poll:
 			if (cinfo_partner == NULL) {
 				pthread_mutex_destroy (rel_mutex);
 				free (rel_mutex);
+				free (private_data);
 			}
 			pthread_exit (0);
 			/*
