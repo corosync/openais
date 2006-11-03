@@ -3691,8 +3691,8 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 			sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
 	}
 
-	if (checkpoint->ckpt_id > global_ckpt_id) {
-		global_ckpt_id = checkpoint->ckpt_id;
+	if (checkpoint->ckpt_id >= global_ckpt_id) {
+		global_ckpt_id = checkpoint->ckpt_id + 1;
 	}
 
 	LEAVE();
