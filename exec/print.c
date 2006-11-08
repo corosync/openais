@@ -62,6 +62,11 @@
 #include "mainconfig.h"
 #include "wthread.h"
 
+struct sockaddr_un syslog_sockaddr = {
+	sun_family: AF_UNIX,
+	sun_path: "/dev/log"
+};
+
 static unsigned int logmode = LOG_MODE_BUFFER | LOG_MODE_STDERR | LOG_MODE_SYSLOG;
 
 static char *logfile = 0;
@@ -98,6 +103,8 @@ struct log_data {
 	unsigned int level;
 	char *log_string;
 };
+
+static void log_atexit (void);
 
 static int logger_init (const char *ident, int tags, int level, int mode)
 {
@@ -322,8 +329,6 @@ int log_setup (char **error_string, struct main_config *config)
 			config->logger[i].mode);
 	}
 
-	log_setup_called = 1;
-
 	worker_thread_group_init (
 		&log_thread_group,
 		1,
@@ -333,6 +338,7 @@ int log_setup (char **error_string, struct main_config *config)
 		NULL,
 		log_printf_worker_fn);
 
+	log_setup_called = 1;
 
 	/*
 	** Flush what we have buffered
@@ -341,6 +347,7 @@ int log_setup (char **error_string, struct main_config *config)
 
 	internal_log_printf(__FILE__, __LINE__, LOG_LEVEL_DEBUG, "log setup\n");
 
+	atexit (log_atexit);
 	return (0);
 }
 
@@ -404,4 +411,18 @@ void log_flush(void)
 	}
 
 	head = tail = NULL;
+}
+
+static void log_atexit (void)
+{
+	if (log_setup_called) {
+		worker_thread_group_wait (&log_thread_group);
+	}
+}
+
+void log_atsegv (void)
+{
+	log_setup_called = 0;
+	worker_thread_group_exit (&log_thread_group);
+	worker_thread_group_atsegv (&log_thread_group);
 }
