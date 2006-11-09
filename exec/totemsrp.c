@@ -602,6 +602,8 @@ struct message_handlers totemsrp_message_handlers = {
 	}
 };
 
+static char *rundir = NULL;
+
 #define log_printf(level, format, args...) \
     instance->totemsrp_log_printf (__FILE__, __LINE__, level, format, ##args)
 
@@ -685,6 +687,14 @@ int totemsrp_initialize (
 	if (res != 0) {
 		goto error_destroy;
 	}
+
+	rundir = getenv ("OPENAIS_RUN_DIR");
+	if (rundir == NULL) {
+		rundir = "/var/run/openais";
+	}
+	
+	res = mkdir (rundir, 0700);
+	chdir (rundir);
 
 	totemsrp_instance_initialize (instance);
 
@@ -2807,9 +2817,9 @@ static void memb_ring_id_create_or_load (
 	int res;
 	char filename[256];
 
-	sprintf (filename, "/tmp/ringid_%s",
-		totemip_print (&instance->my_id.addr[0]));
-	fd = open (filename, O_RDONLY, 0777);
+	sprintf (filename, "%s/ringid_%s",
+		rundir, totemip_print (&instance->my_id.addr[0]));
+	fd = open (filename, O_RDONLY, 0700);
 	if (fd > 0) {
 		res = read (fd, &memb_ring_id->seq, sizeof (unsigned long long));
 		assert (res == sizeof (unsigned long long));
@@ -2818,7 +2828,7 @@ static void memb_ring_id_create_or_load (
 	if (fd == -1 && errno == ENOENT) {
 		memb_ring_id->seq = 0;
 		umask(0);
-		fd = open (filename, O_CREAT|O_RDWR, 0777);
+		fd = open (filename, O_CREAT|O_RDWR, 0700);
 		if (fd == -1) {
 			log_printf (instance->totemsrp_log_level_warning,
 				"Couldn't create %s %s\n", filename, strerror (errno));
