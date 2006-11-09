@@ -107,8 +107,6 @@ static void sigusr2_handler (int num)
 
 static void sigsegv_handler (int num)
 {
-	unsigned int res;
-
 	signal (SIGSEGV, SIG_DFL);
 	log_atsegv ();
 	raise (SIGSEGV);
@@ -385,7 +383,6 @@ int main (int argc, char **argv)
 	char *config_iface;
 	int res;
  	int totem_log_service;
-char *a = NULL;
  	log_init ("MAIN");
 
 	aisexec_tty_detach ();
