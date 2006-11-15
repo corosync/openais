@@ -180,7 +180,7 @@ static void flow_control_confchg_fn (
 	struct memb_ring_id *ring_id)
 {
 	unsigned int i;
-	unsigned int j;
+	unsigned int j = 0;
 	struct flow_control_service *flow_control_service;
 	struct list_head *list;
 	struct flow_control_node_state flow_control_node_state_temp[PROCESSOR_COUNT_MAX];
