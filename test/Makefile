@@ -150,7 +150,7 @@ clean:
 	testamf5 testamf6 testamfth testckpt ckptstress testtimer \
 	ckptbench ckptbenchth testevt testevs ckpt-wr ckpt-rd \
 	evsbench subscription publish evtbench unlink testmsg testcpg \
-	testclm2 testlck
+	testclm2 testlck cpgbench openais-cfgtool
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
