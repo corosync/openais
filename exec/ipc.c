@@ -470,8 +470,20 @@ static void *prioritized_poll_thread (void *conn)
 	struct conn_info *cinfo_partner;
 	void *private_data;
 
-	sched_param.sched_priority = 1;
-	res = pthread_setschedparam (conn_info->thread, SCHED_RR, &sched_param);
+#if defined(OPENAIS_BSD) || defined(OPENAIS_LINUX)
+	res = sched_get_priority_max (SCHED_RR);
+	if (res != -1) {
+		sched_param.sched_priority = res;
+		res = pthread_setschedparam (conn_info->thread, SCHED_RR, &sched_param);
+		if (res == -1) {
+			log_printf (LOG_LEVEL_WARNING, "Could not set SCHED_RR at priority %d: %s\n",
+				sched_param.sched_priority, strerror (errno));
+		}
+	} else
+		log_printf (LOG_LEVEL_WARNING, "Could not get maximum scheduler priority: %s\n", strerror (errno));
+#else
+	log_printf(LOG_LEVEL_WARNING, "Scheduler priority left to default value (no OS support)\n");
+#endif
 
 	ufd.fd = conn_info->fd;
 	for (;;) {

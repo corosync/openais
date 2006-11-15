@@ -103,8 +103,20 @@ static void *prioritized_timer_thread (void *data)
 	int res;
 	unsigned int timeout;
 
-	sched_param.sched_priority = 2;
-	res = pthread_setschedparam (expiry_thread, SCHED_RR, &sched_param);
+#if defined(OPENAIS_BSD) || defined(OPENAIS_LINUX)
+	res = sched_get_priority_max (SCHED_RR);
+	if (res != -1) {
+		sched_param.sched_priority = res;
+		res = pthread_setschedparam (expiry_thread, SCHED_RR, &sched_param);
+		if (res == -1) {
+			log_printf (LOG_LEVEL_WARNING, "Could not set SCHED_RR at priority %d: %s\n",
+				sched_param.sched_priority, strerror (errno));
+		}
+	} else
+		log_printf (LOG_LEVEL_WARNING, "Could not get maximum scheduler priority: %s\n", strerror (errno));
+#else
+	log_printf(LOG_LEVEL_WARNING, "Scheduler priority left to default value (no OS support)\n");
+#endif
 
 	pthread_mutex_unlock (&timer_mutex);
 	for (;;) {
