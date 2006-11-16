@@ -243,7 +243,6 @@ static int authenticate_and_decrypt (
 	unsigned char *initial_vector = &keys[0];
 	unsigned char digest_comparison[HMAC_HASH_SIZE];
 	unsigned long len;
-	int res = 0;
 
 	/*
 	 * Generate MAC, CIPHER, IV keys from private key
@@ -278,7 +277,6 @@ static int authenticate_and_decrypt (
 
 	if (memcmp (digest_comparison, header->hash_digest, len) != 0) {
 		log_printf (instance->totemnet_log_level_security, "Received message has invalid digest... ignoring.\n");
-		res = -1;
 		return (-1);
 	}
 	
@@ -289,7 +287,6 @@ static int authenticate_and_decrypt (
 		iov->iov_len - sizeof (struct security_header),
 		&stream_prng_state);
 
-	return (res);
 	return (0);
 }
 static void encrypt_and_sign_worker (
