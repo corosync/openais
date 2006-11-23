@@ -248,7 +248,7 @@ retry_recv:
 	 * EOF is detected when recvmsg return 0.
 	 */
  	if (result == 0) {
-  		error = ERR_LIBRARY;
+  		error = SA_AIS_ERR_LIBRARY;
   		goto error_exit;
   	}
 #endif
