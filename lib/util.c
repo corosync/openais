@@ -163,6 +163,7 @@ saServiceConnect (
 /* if I comment out the 4 lines below the executive crashes */
 	callbackFD = socket (PF_UNIX, SOCK_STREAM, 0);
 	if (callbackFD == -1) {
+		close (responseFD);
 		return (SA_AIS_ERR_NO_RESOURCES);
 	}
 
@@ -242,6 +243,15 @@ retry_recv:
 	if (result == -1 && errno == EAGAIN) {
 		goto retry_recv;
 	}
+#if defined(OPENAIS_SOLARIS) || defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
+	/* On many OS poll never return POLLHUP or POLLERR.
+	 * EOF is detected when recvmsg return 0.
+	 */
+ 	if (result == 0) {
+  		error = ERR_LIBRARY;
+  		goto error_exit;
+  	}
+#endif
 	if (result == -1 || result == 0) {
 		error = SA_AIS_ERR_LIBRARY;
 		goto error_exit;
