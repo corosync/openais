@@ -690,7 +690,7 @@ int totemsrp_initialize (
 
 	rundir = getenv ("OPENAIS_RUN_DIR");
 	if (rundir == NULL) {
-		rundir = "/var/run/openais";
+		rundir = "/var/openais";
 	}
 	
 	res = mkdir (rundir, 0700);
