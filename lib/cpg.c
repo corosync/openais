@@ -541,9 +541,6 @@ cpg_error_t cpg_mcast_joined (
 	}
 
 	cpg_inst->flow_control_state = res_lib_cpg_mcast.flow_control_state;
-	if (res_lib_cpg_mcast.header.error == CPG_ERR_TRY_AGAIN) {
-		cpg_inst->flow_control_state = CPG_FLOW_CONTROL_ENABLED;
-	}
 	error = res_lib_cpg_mcast.header.error;
 
 error_exit:
@@ -614,14 +611,18 @@ cpg_error_t cpg_flow_control_state_get (
 {
 	cpg_error_t error;
 	struct cpg_inst *cpg_inst;
+	mar_req_header_t req_lib_cpg_flow_control_state_get;
+	struct res_lib_cpg_flowcontrolstateget res_lib_cpg_flowcontrolstateget;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&cpg_handle_t_db, handle, (void *)&cpg_inst);
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
-
+	
 	*flow_control_state = cpg_inst->flow_control_state;
 
+exit_put:
 	saHandleInstancePut (&cpg_handle_t_db, handle);
 
 	return (error);
