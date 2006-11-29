@@ -338,7 +338,6 @@ int log_setup (char **error_string, struct main_config *config)
 		NULL,
 		log_printf_worker_fn);
 
-	log_setup_called = 1;
 
 	/*
 	** Flush what we have buffered
@@ -348,6 +347,9 @@ int log_setup (char **error_string, struct main_config *config)
 	internal_log_printf(__FILE__, __LINE__, LOG_LEVEL_DEBUG, "log setup\n");
 
 	atexit (log_atexit);
+
+	log_setup_called = 1;
+
 	return (0);
 }
 
@@ -394,25 +396,6 @@ void trace (char *file, int line, int tag, int id, char *format, ...)
 	}
 }
 
-void log_flush(void)
-{
-	struct log_entry *entry = head;
-	struct log_entry *tmp;
-
-	/* do not buffer these printouts */
-	logmode &= ~LOG_MODE_BUFFER;
-
-	while (entry) {
-		internal_log_printf(entry->file, entry->line,
-			entry->level, entry->str);
-		tmp = entry;
-		entry = entry->next;
-		free(tmp);
-	}
-
-	head = tail = NULL;
-}
-
 static void log_atexit (void)
 {
 	if (log_setup_called) {
@@ -420,9 +403,27 @@ static void log_atexit (void)
 	}
 }
 
-void log_atsegv (void)
+void log_flush (void)
 {
-	log_setup_called = 0;
-	worker_thread_group_exit (&log_thread_group);
-	worker_thread_group_atsegv (&log_thread_group);
+	if (log_setup_called) {
+		log_setup_called = 0;
+		worker_thread_group_exit (&log_thread_group);
+		worker_thread_group_atsegv (&log_thread_group);
+	} else {
+		struct log_entry *entry = head;
+		struct log_entry *tmp;
+
+		/* do not buffer these printouts */
+		logmode &= ~LOG_MODE_BUFFER;
+
+		while (entry) {
+			internal_log_printf(entry->file, entry->line,
+				entry->level, entry->str);
+			tmp = entry;
+			entry = entry->next;
+			free(tmp);
+		}
+
+		head = tail = NULL;
+	}
 }
