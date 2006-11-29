@@ -612,7 +612,6 @@ cpg_error_t cpg_flow_control_state_get (
 	cpg_error_t error;
 	struct cpg_inst *cpg_inst;
 	mar_req_header_t req_lib_cpg_flow_control_state_get;
-	struct res_lib_cpg_flowcontrolstateget res_lib_cpg_flowcontrolstateget;
 	struct iovec iov;
 
 	error = saHandleInstanceGet (&cpg_handle_t_db, handle, (void *)&cpg_inst);
