@@ -46,7 +46,7 @@
  * Size of the queue (entries) for I/O's to the API over socket IPC.
  */
 
-#define SIZEQUEUE 800
+#define SIZEQUEUE 5000
 
 #define SOCKET_SERVICE_INIT 254
 
