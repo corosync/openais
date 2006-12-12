@@ -247,10 +247,10 @@ retry_recv:
 	/* On many OS poll never return POLLHUP or POLLERR.
 	 * EOF is detected when recvmsg return 0.
 	 */
- 	if (result == 0) {
-  		error = SA_AIS_ERR_LIBRARY;
-  		goto error_exit;
-  	}
+	if (result == 0) {
+		error = SA_AIS_ERR_LIBRARY;
+		goto error_exit;
+	}
 #endif
 	if (result == -1 || result == 0) {
 		error = SA_AIS_ERR_LIBRARY;
