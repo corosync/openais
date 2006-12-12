@@ -138,7 +138,6 @@ retry_poll:
 	}
 
 	pthread_exit (0);
-	return (0);
 }
 
 static void sigusr1_handler (int num) {
