@@ -280,11 +280,13 @@ int openais_main_config_read (
 	}
 
 	/* Default user/group */
-	if (main_config->user == NULL)
-		main_config->user = strdup("ais");
+	if (main_config->user == NULL) {
+		main_config->user = "ais";
+	}
 
-	if (main_config->group == NULL)
-		main_config->group = strdup("ais");
+	if (main_config->group == NULL) {
+		main_config->group = "ais";
+	}
 
 	if ((main_config->logmode & LOG_MODE_FILE) && main_config->logfile == 0) {
 		error_reason = "logmode set to 'file' but no logfile specified";
