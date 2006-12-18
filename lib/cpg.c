@@ -611,8 +611,6 @@ cpg_error_t cpg_flow_control_state_get (
 {
 	cpg_error_t error;
 	struct cpg_inst *cpg_inst;
-	mar_req_header_t req_lib_cpg_flow_control_state_get;
-	struct iovec iov;
 
 	error = saHandleInstanceGet (&cpg_handle_t_db, handle, (void *)&cpg_inst);
 	if (error != SA_AIS_OK) {
@@ -621,7 +619,6 @@ cpg_error_t cpg_flow_control_state_get (
 	
 	*flow_control_state = cpg_inst->flow_control_state;
 
-exit_put:
 	saHandleInstancePut (&cpg_handle_t_db, handle);
 
 	return (error);
