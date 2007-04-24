@@ -2853,8 +2853,8 @@ static void memb_ring_id_store (
 	int fd;
 	int res;
 
-	sprintf (filename, "/tmp/ringid_%s",
-		totemip_print (&instance->my_id.addr[0]));
+	sprintf (filename, "%s/ringid_%s",
+		rundir, totemip_print (&instance->my_id.addr[0]));
 
 	fd = open (filename, O_WRONLY, 0777);
 	if (fd == -1) {
