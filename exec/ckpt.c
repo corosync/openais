@@ -1361,6 +1361,12 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 			checkpoint_section->expiration_timer = 0;
 		}
 	} else {
+        /*
+         * We have to ignore the retention_duration attribute
+         */
+        req_exec_ckpt_checkpointopen->checkpoint_creation_attributes.retention_duration =
+            checkpoint->checkpoint_creation_attributes.retention_duration;
+        
 		if (req_exec_ckpt_checkpointopen->checkpoint_creation_attributes_set &&
 			memcmp (&checkpoint->checkpoint_creation_attributes,
 				&req_exec_ckpt_checkpointopen->checkpoint_creation_attributes,
