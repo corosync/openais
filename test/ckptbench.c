@@ -52,8 +52,16 @@
 
 #include "saAis.h"
 #include "saCkpt.h"
+#include "sa_error.h"
 
 int alarm_notice;
+
+void fail_on_error(SaAisErrorT error, char* opName) {
+	if (error != SA_AIS_OK) {
+        printf ("%s: result %s\n", opName, get_sa_error_b(error));
+        exit (1);
+	}
+}
 
 void printSaNameT (SaNameT *name)
 {
@@ -79,7 +87,7 @@ SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
         .retentionDuration =    0,
         .maxSections =          5,
         .maxSectionSize =       250000,
-        .maxSectionIdSize =     10
+        .maxSectionIdSize =     15
 };
 
 SaCkptSectionIdT sectionId1 = {
@@ -182,10 +190,7 @@ retry:
 		if (error == SA_AIS_ERR_TRY_AGAIN) {
 			goto retry;
 		}
-		if (error != SA_AIS_OK) {
-			printf ("saCkptCheckpointWrite result %d (should be 1)\n", error);
-			exit (1);
-		}
+		fail_on_error(error, "saCkptCheckpointWrite");
 		write_count += 1;
 	} while (alarm_notice == 0);
 	gettimeofday (&tv2, NULL);
@@ -216,21 +221,25 @@ int main (void) {
 	signal (SIGALRM, sigalrm_handler);
 
     error = saCkptInitialize (&ckptHandle, &callbacks, &version);
-
+	fail_on_error(error, "saCkptInitialize");
+	
 	error = saCkptCheckpointOpen (ckptHandle,
 		&checkpointName,
 		&checkpointCreationAttributes,
 		SA_CKPT_CHECKPOINT_CREATE|SA_CKPT_CHECKPOINT_READ|SA_CKPT_CHECKPOINT_WRITE,
 		0,
 		&checkpointHandle);
+	fail_on_error(error, "saCkptCheckpointOpen");
 	error = saCkptSectionCreate (checkpointHandle,
 		&sectionCreationAttributes1,
 		"Initial Data #0",
 		strlen ("Initial Data #0") + 1);
+	fail_on_error(error, "saCkptCheckpointSectionCreate");
 	error = saCkptSectionCreate (checkpointHandle,
 		&sectionCreationAttributes2,
 		"Initial Data #0",
 		strlen ("Initial Data #0") + 1);
+	fail_on_error(error, "saCkptCheckpointSectionCreate");
 
 	size = 1;
 
