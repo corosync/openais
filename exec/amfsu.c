@@ -1,19 +1,13 @@
 /** @file exec/amfsu.c
  * 
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
- * Author: Steven Dake (sdake@mvista.com)
- *
+ * Copyright (c) 2006-2007 Red Hat, Inc.
  * Copyright (c) 2006 Ericsson AB.
- *  Author: Hans Feldt
- * - Introduced AMF B.02 information model
- * - Use DN in API and multicast messages
- * - (Re-)Introduction of event based multicast messages
- * - Refactoring of code into several AMF files
- *  Author: Anders Eriksson, Lars Holm
- *  - Component/SU restart, SU failover
+ *
+ * Author: Steven Dake (sdake@redhat.com)
+ * Author: Hans Feldt
  *
  * All rights reserved.
- *
  *
  * This software licensed under BSD license, the text of which follows:
  * 

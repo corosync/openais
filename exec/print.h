@@ -1,13 +1,11 @@
 /*
  * Copyright (c) 2002-2004 MontaVista Software, Inc.
- * Author: Steven Dake (sdake@mvista.com)
- *
+ * Copyright (c) 2006-2007 Red Hat, Inc.
  * Copyright (c) 2006 Ericsson AB.
- *		Author: Hans Feldt
- *      Description: Added support for runtime installed loggers, tags tracing,
- *                   and file & line printing.
- *
  * Copyright (c) 2006 Sun Microsystems, Inc.
+ *
+ * Author: Steven Dake (sdake@redhat.com)
+ * Author: Hans Feldt
  *
  * All rights reserved.
  *

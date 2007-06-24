@@ -1,13 +1,12 @@
 /*
  * Copyright (c) 2002-2005 MontaVista Software, Inc.
- * Author: Steven Dake (sdake@mvista.com)
+ * Copyright (c) 2006-2007 Red Hat, Inc.
  *
- * Copyright (c) 2006 Ericsson AB.
+ * Author: Steven Dake (sdake@redhat.com)
  * Author: Hans Feldt
- * Description: - Reworked to match AMF B.02 information model
- *              - New state machine design
  *
  * All rights reserved.
+ *
  * This software licensed under BSD license, the text of which follows:
  * 
  * Redistribution and use in source and binary forms, with or without

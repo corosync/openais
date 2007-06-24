@@ -1,13 +1,10 @@
 /*
  * Copyright (c) 2002-2004 MontaVista Software, Inc.
  * Copyright (c) 2006 Ericsson AB.
+ * Copyright (c) 2006-2007 Red Hat, Inc.
  *
  * Author: Steven Dake (sdake@redhat.com)
- *	original work, Add worker thread to avoid blocking syslog
- *
  * Author: Hans Feldt
- *      Added support for runtime installed loggers, tags tracing, 
- *	and file & line printing.
  *
  * All rights reserved.
  *

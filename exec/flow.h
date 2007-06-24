@@ -1,10 +1,9 @@
 /*
- * Copyright (c) 2006 Red Hat, Inc.
- *
+ * Copyright (c) 2006-2007 Red Hat, Inc.
  *
  * All rights reserved.
  *
- * Author: Steven Dake (sdake@mvista.com)
+ * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
  * 

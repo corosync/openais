@@ -1,15 +1,11 @@
 /** @file exec/amf.c
  * 
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
- * Author: Steven Dake (sdake@mvista.com)
- *
+ * Copyright (c) 2006-2007 Red Hat, Inc.
  * Copyright (c) 2006 Ericsson AB.
+ *
+ * Author: Steven Dake (sdake@redhat.com)
  * Author: Hans Feldt
- * Description:
- * - Introduced AMF B.02 information model
- * - Use DN in API and multicast messages
- * - (Re-)Introduction of event based multicast messages
- * - Refactoring of code into several AMF files
  *
  * All rights reserved.
  *

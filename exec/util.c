@@ -1,10 +1,12 @@
 /*
  * Copyright (c) 2002-2004 MontaVista Software, Inc.
  * Copyright (c) 2004 Open Source Development Lab
+ * Copyright (c) 2006-2007 Red Hat, Inc.
  *
  * All rights reserved.
  *
- * Author: Steven Dake (sdake@mvista.com), Mark Haverkamp (markh@osdl.org)
+ * Author: Steven Dake (sdake@redhat.com)
+ * Author: Mark Haverkamp (markh@osdl.org)
  *
  * This software licensed under BSD license, the text of which follows:
  * 

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2004-2006 Mark Haverkamp
  * Copyright (c) 2004-2006 Open Source Development Lab
- *
+ * Copyright (c) 2006-2007 Red Hat, Inc.  
  * Copyright (c) 2006 Sun Microsystems, Inc.
  *
  * All rights reserved.

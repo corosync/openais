@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2002-2003 MontaVista Software, Inc.
+ * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006 Ericsson AB.
  *
  * All rights reserved.
  *
- * Author: Steven Dake (sdake@mvista.com)
- *
- * Copyright (c) 2006 Ericsson AB.
- *  Author: Hans Feldt
+ * Author: Steven Dake (sdake@redhat.com)
+ * Author: Hans Feldt
  *
  * This software licensed under BSD license, the text of which follows:
  * 

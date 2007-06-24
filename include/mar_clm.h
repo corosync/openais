@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Red Hat, Inc.
+ * Copyright (C) 2006-2007 Red Hat, Inc.
  * Copyright (C) 2006 Sun Microsystems, Inc.
  *
  * All rights reserved.
