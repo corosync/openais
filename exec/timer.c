@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
+ * Copyright (c) 2006 Sun Microsystems, Inc.
  * Copyright (c) 2006-2007 Red Hat, Inc.
  *
  * All rights reserved.
  *
- * Author: Steven Dake (sdake@redhat.com)
+ * Author: Steven Dake (sdake@mvista.com)
  *
  * This software licensed under BSD license, the text of which follows:
  *
@@ -55,6 +56,7 @@
 #include <sched.h>
 #include <time.h>
 
+#include "swab.h"
 #include "../include/saAis.h"
 #include "../include/list.h"
 #include "../include/queue.h"
@@ -93,36 +95,32 @@ static void (*timer_serialize_unlock_fn) (void);
 
 static void *prioritized_timer_thread (void *data);
 
+extern void pthread_exit(void *) __attribute__((noreturn));
+
 /*
  * This thread runs at the highest priority to run system wide timers
  */
 static void *prioritized_timer_thread (void *data)
 {
 	int fds;
+	unsigned long long timeout;
+
+#if ! defined(TS_CLASS) && (defined(OPENAIS_BSD) || defined(OPENAIS_LINUX) || defined(OPENAIS_SOLARIS))
 	struct sched_param sched_param;
 	int res;
-	unsigned int timeout;
 
-#if defined(OPENAIS_BSD) || defined(OPENAIS_LINUX)
-	res = sched_get_priority_max (SCHED_RR);
-	if (res != -1) {
-		sched_param.sched_priority = res;
-		res = pthread_setschedparam (expiry_thread, SCHED_RR, &sched_param);
-		if (res == -1) {
-			log_printf (LOG_LEVEL_WARNING, "Could not set SCHED_RR at priority %d: %s\n",
-				sched_param.sched_priority, strerror (errno));
-		}
-	} else
-		log_printf (LOG_LEVEL_WARNING, "Could not get maximum scheduler priority: %s\n", strerror (errno));
-#else
-	log_printf(LOG_LEVEL_WARNING, "Scheduler priority left to default value (no OS support)\n");
+	sched_param.sched_priority = 2;
+	res = pthread_setschedparam (expiry_thread, SCHED_RR, &sched_param);
 #endif
 
 	pthread_mutex_unlock (&timer_mutex);
 	for (;;) {
 retry_poll:
 		timer_serialize_lock_fn ();
-		timeout = timerlist_timeout_msec (&timers_timerlist);
+		timeout = timerlist_msec_duration_to_expire (&timers_timerlist);
+		if (timeout != -1 && timeout > 0xFFFFFFFF) {
+			timeout = 0xFFFFFFFE;
+		}
 		timer_serialize_unlock_fn ();
 		fds = poll (NULL, 0, timeout);
 		if (fds == -1) {
@@ -141,6 +139,10 @@ retry_poll:
 }
 
 static void sigusr1_handler (int num) {
+#ifdef OPENAIS_SOLARIS
+	/* Rearm the signal facility */
+        signal (num, sigusr1_handler);
+#endif
 }
 
 int openais_timer_init (
@@ -162,13 +164,12 @@ int openais_timer_init (
 	pthread_attr_setdetachstate (&thread_attr, PTHREAD_CREATE_DETACHED);
 	res = pthread_create (&expiry_thread, &thread_attr,
 		prioritized_timer_thread, NULL);
-	pthread_attr_destroy(&thread_attr);
 
 	return (res);
 }
 
-int openais_timer_add (
-	unsigned int msec_in_future,
+int openais_timer_add_absolute (
+	unsigned long long nanosec_from_epoch,
 	void *data,
 	void (*timer_fn) (void *data),
 	timer_handle *handle)
@@ -183,11 +184,43 @@ int openais_timer_add (
 		pthread_mutex_lock (&timer_mutex);
 	}
 
-	res = timerlist_add_future (
+	res = timerlist_add_absolute (
 		&timers_timerlist,
 		timer_fn,
 		data,
-		msec_in_future,
+		nanosec_from_epoch,
+		handle);
+
+	if (unlock) {
+		pthread_mutex_unlock (&timer_mutex);
+	}
+
+	pthread_kill (expiry_thread, SIGUSR1);
+
+	return (res);
+}
+
+int openais_timer_add_duration (
+	unsigned long long nanosec_duration,
+	void *data,
+	void (*timer_fn) (void *data),
+	timer_handle *handle)
+{
+	int res;
+	int unlock;
+
+	if (pthread_equal (pthread_self(), expiry_thread) == 0) {
+		unlock = 0;
+	} else {
+		unlock = 1;
+		pthread_mutex_lock (&timer_mutex);
+	}
+
+	res = timerlist_add_duration (
+		&timers_timerlist,
+		timer_fn,
+		data,
+		nanosec_duration,
 		handle);
 
 	if (unlock) {
@@ -216,28 +249,6 @@ void openais_timer_delete (
 	}
 
 	timerlist_del (&timers_timerlist, timer_handle);
-
-	if (unlock) {
-		pthread_mutex_unlock (&timer_mutex);
-	}
-}
-
-void openais_timer_delete_data (
-	timer_handle timer_handle)
-{
-	int unlock;
-
-	if (timer_handle == 0) {
-		return;
-	}
-	if (pthread_equal (pthread_self(), expiry_thread) == 0) {
-		unlock = 0;
-	} else {
-		unlock = 1;
-		pthread_mutex_lock (&timer_mutex);
-	}
-
-	timerlist_del_data (&timers_timerlist, timer_handle);
 
 	if (unlock) {
 		pthread_mutex_unlock (&timer_mutex);

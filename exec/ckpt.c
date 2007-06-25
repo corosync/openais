@@ -791,8 +791,8 @@ void clean_checkpoint_list(struct list_head *head)
 			log_printf (LOG_LEVEL_DEBUG, "clean_checkpoint_list: Starting timer to release checkpoint %s.\n",
 				checkpoint->name.value);
 			openais_timer_delete (checkpoint->retention_timer);
-			openais_timer_add (
-				checkpoint->checkpoint_creation_attributes.retention_duration / 1000000,
+			openais_timer_add_duration (
+				checkpoint->checkpoint_creation_attributes.retention_duration,
 				checkpoint,
 				timer_function_retention,
 				&checkpoint->retention_timer);
@@ -950,6 +950,7 @@ static struct checkpoint_section *checkpoint_section_find (
 	else {
 		log_printf (LOG_LEVEL_DEBUG, "Finding default checkpoint section\n");
 	}
+
 	for (checkpoint_section_list = checkpoint->sections_list_head.next;
 		checkpoint_section_list != &checkpoint->sections_list_head;
 		checkpoint_section_list = checkpoint_section_list->next) {
@@ -993,14 +994,9 @@ static struct checkpoint_section *checkpoint_section_find (
 	return 0;
 }
 
-/*
- * defect 1112: We need to be able to call section release without
- * having to to delete the timer as in the case of release being called
- * from timer_function_section_expire where the expiry already takes care
- * of the timer and its data
- */
-void checkpoint_section_and_associate_timer_cleanup (struct checkpoint_section *section,int deleteTimer)
+void checkpoint_section_release (struct checkpoint_section *section)
 {
+	log_printf (LOG_LEVEL_DEBUG, "checkpoint_section_release expiration timer = 0x%p\n", section->expiration_timer);
 	list_del (&section->list);
 	if (section->section_descriptor.section_id.id) {
 		free (section->section_descriptor.section_id.id);
@@ -1008,19 +1004,7 @@ void checkpoint_section_and_associate_timer_cleanup (struct checkpoint_section *
 	if (section->section_data) {
 		free (section->section_data);
 	}
-	/*
-	 * defect 1112 on a section release we need to delete the timer AND its data or memory leaks
-	 */
-	if (deleteTimer) {
-		openais_timer_delete_data (section->expiration_timer);
-	}
 	free (section);
-}
-
-void checkpoint_section_release (struct checkpoint_section *section)
-{
-	log_printf (LOG_LEVEL_DEBUG, "checkpoint_section_release expiration timer = 0x%p\n", section->expiration_timer);
-	checkpoint_section_and_associate_timer_cleanup (section, 1);
 }
 
 
@@ -1042,6 +1026,7 @@ void checkpoint_release (struct checkpoint *checkpoint)
 
 		list = list->next;
 		checkpoint->section_count -= 1;
+		openais_timer_delete (section->expiration_timer);
 		checkpoint_section_release (section);
 	}
 	list_del (&checkpoint->list);
@@ -1519,12 +1504,8 @@ void timer_function_section_expire (void *data)
                         ckpt_id->ckpt_name.value);
 
 	checkpoint->section_count -= 1;
-	/*
-	 * defect id 1112 "memory leak in checkpoint service" Dont try
-	 * to delete the timer as the timer mechanism takes care of that.
-	 * Just delete the data after this call
-	 */
-	checkpoint_section_and_associate_timer_cleanup (checkpoint_section, 0);
+	checkpoint_section_release (checkpoint_section);
+
 free_mem :
 	free (ckpt_id);
 
@@ -1592,11 +1573,13 @@ static void message_handler_req_exec_ckpt_checkpointclose (
 		release_checkpoint = 1;
 	} else
 	if (checkpoint->reference_count == 0) {
-		openais_timer_add (
-			checkpoint->checkpoint_creation_attributes.retention_duration / 1000000,
-			checkpoint,
-			timer_function_retention,
-			&checkpoint->retention_timer);
+		if (checkpoint->checkpoint_creation_attributes.retention_duration != SA_TIME_END) {
+			openais_timer_add_duration (
+				checkpoint->checkpoint_creation_attributes.retention_duration,
+				checkpoint,
+				timer_function_retention,
+				&checkpoint->retention_timer);
+		}
 	}
 
 error_exit:
@@ -1691,8 +1674,8 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationset (
 			if (checkpoint->reference_count == 0) {
 				openais_timer_delete (checkpoint->retention_timer);
 
-				openais_timer_add (
-					checkpoint->checkpoint_creation_attributes.retention_duration / 1000000,
+				openais_timer_add_duration (
+					checkpoint->checkpoint_creation_attributes.retention_duration,
 					checkpoint,
 					timer_function_retention,
 					&checkpoint->retention_timer);
@@ -1729,8 +1712,10 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationexpire (
 		&checkpoint_list_head,
 		&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name,
 		req_exec_ckpt_checkpointretentiondurationexpire->ckpt_id);
+		log_printf (LOG_LEVEL_NOTICE, "Expiring checkpoint %s\n",
+			get_mar_name_t (&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name));
 	if (checkpoint && (checkpoint->reference_count == 0)) {
-		log_printf (LOG_LEVEL_DEBUG, "Expiring checkpoint %s\n",
+		log_printf (LOG_LEVEL_NOTICE, "Expiring checkpoint %s\n",
 			get_mar_name_t (&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name));
 
 		req_exec_ckpt_checkpointunlink.header.size =
@@ -1887,12 +1872,13 @@ static void message_handler_req_exec_ckpt_sectioncreate (
 		log_printf (LOG_LEVEL_DEBUG, "req_exec_ckpt_sectioncreate Enqueuing Timer to Expire section %s in ckpt %s\n",
 			ckpt_id->ckpt_section_id.id,
 			ckpt_id->ckpt_name.value);
-		openais_timer_add (
-			abstime_to_msec (checkpoint_section->section_descriptor.expiration_time),
+		openais_timer_add_absolute (
+			checkpoint_section->section_descriptor.expiration_time,
 			ckpt_id,
 			timer_function_section_expire,
 			&checkpoint_section->expiration_timer);
-		log_printf (LOG_LEVEL_DEBUG, "req_exec_ckpt_sectionicreate expiration timer = 0x%p\n",
+		log_printf (LOG_LEVEL_DEBUG,
+			"req_exec_ckpt_sectionicreate expiration timer = 0x%p\n",
 			checkpoint_section->expiration_timer);
 	}
 
@@ -2055,8 +2041,8 @@ static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
 			ckpt_id->ckpt_section_id.id,
 			ckpt_id->ckpt_name.value,
 			ckpt_id);
-		openais_timer_add (
-			abstime_to_msec (checkpoint_section->section_descriptor.expiration_time),
+		openais_timer_add_absolute (
+			checkpoint_section->section_descriptor.expiration_time,
 			ckpt_id,
 			timer_function_section_expire,
 			&checkpoint_section->expiration_timer);
