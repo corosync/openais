@@ -14,8 +14,6 @@ prog="aisexec"
 exec="/usr/sbin/$prog"
 lockfile="/var/lock/subsys/$prog"
 
-[ -x "$exec" ] || exit 0
-
 start() {
     echo -n $"Starting OpenAIS daemon ($prog): "
     daemon $exec

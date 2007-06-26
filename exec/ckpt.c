@@ -1714,10 +1714,8 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationexpire (
 		&checkpoint_list_head,
 		&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name,
 		req_exec_ckpt_checkpointretentiondurationexpire->ckpt_id);
-		log_printf (LOG_LEVEL_NOTICE, "Expiring checkpoint %s\n",
-			get_mar_name_t (&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name));
 	if (checkpoint && (checkpoint->reference_count == 0)) {
-		log_printf (LOG_LEVEL_NOTICE, "Expiring checkpoint %s\n",
+		log_printf (LOG_LEVEL_DEBUG, "Expiring checkpoint %s\n",
 			get_mar_name_t (&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name));
 
 		req_exec_ckpt_checkpointunlink.header.size =
