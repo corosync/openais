@@ -1548,6 +1548,8 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 	unsigned int new_memb_list_totemip[PROCESSOR_COUNT_MAX];
 	unsigned int left_list[PROCESSOR_COUNT_MAX];
 
+	memb_consensus_reset (instance);
+
 	old_ring_state_reset (instance);
 	ring_reset (instance);
 	deliver_messages_from_recovery_to_regular (instance);
