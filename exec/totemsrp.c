@@ -549,7 +549,8 @@ static int orf_token_mcast (struct totemsrp_instance *instance, struct orf_token
 	int fcc_mcasts_allowed);
 static void messages_free (struct totemsrp_instance *instance, unsigned int token_aru);
 
-static void memb_ring_id_store (struct totemsrp_instance *instance);
+static void memb_ring_id_set_and_store (struct totemsrp_instance *instance,
+	struct memb_ring_id *ring_id);
 static void memb_state_commit_token_update (struct totemsrp_instance *instance, struct memb_commit_token *commit_token);
 static void memb_state_commit_token_target_set (struct totemsrp_instance *instance, struct memb_commit_token *commit_token);
 static int memb_state_commit_token_send (struct totemsrp_instance *instance, struct memb_commit_token *memb_commit_token);
@@ -1707,10 +1708,10 @@ static void memb_state_commit_enter (
 
 	memb_state_commit_token_target_set (instance, commit_token);
 
+	memb_ring_id_set_and_store (instance, &commit_token->ring_id);
+
 	memb_state_commit_token_send (instance, commit_token);
 
-	memcpy (&instance->my_ring_id, &commit_token->ring_id,
-		sizeof (struct memb_ring_id));
 	instance->token_ring_id_seq = instance->my_ring_id.seq;
 
 	poll_timer_delete (instance->totemsrp_poll_handle, instance->memb_timer_state_gather_join_timeout);
@@ -1920,7 +1921,6 @@ originated:
 
 	reset_token_timeout (instance); // REVIEWED
 	reset_token_retransmit_timeout (instance); // REVIEWED
-	memb_ring_id_store (instance);
 
 	instance->memb_state = MEMB_STATE_RECOVERY;
 	return;
@@ -2829,6 +2829,7 @@ static void memb_ring_id_create_or_load (
 		}
 		res = write (fd, &memb_ring_id->seq, sizeof (unsigned long long));
 		assert (res == sizeof (unsigned long long));
+		fsync (fd);
 		close (fd);
 	} else {
 		log_printf (instance->totemsrp_log_level_warning,
@@ -2840,12 +2841,15 @@ static void memb_ring_id_create_or_load (
 	instance->token_ring_id_seq = memb_ring_id->seq;
 }
 
-static void memb_ring_id_store (
-	struct totemsrp_instance *instance)
+static void memb_ring_id_set_and_store (
+	struct totemsrp_instance *instance,
+	struct memb_ring_id *ring_id)
 {
 	char filename[256];
 	int fd;
 	int res;
+
+	memcpy (&instance->my_ring_id, ring_id, sizeof (struct memb_ring_id));
 
 	sprintf (filename, "%s/ringid_%s",
 		rundir, totemip_print (&instance->my_id.addr[0]));
@@ -2866,6 +2870,7 @@ static void memb_ring_id_store (
 	//assert (fd > 0);
 	res = write (fd, &instance->my_ring_id.seq, sizeof (unsigned long long));
 	assert (res == sizeof (unsigned long long));
+	fsync (fd);
 	close (fd);
 }
 
