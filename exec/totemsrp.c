@@ -393,8 +393,6 @@ struct totemsrp_instance {
 
 	unsigned int my_token_seq;
 
-	unsigned int my_commit_token_seq;
-
 	/*
 	 * Timers
 	 */
@@ -618,8 +616,6 @@ void totemsrp_instance_initialize (struct totemsrp_instance *instance)
 	instance->my_received_flg = 0;
 
 	instance->my_token_seq = SEQNO_START_TOKEN - 1;
-
-	instance->my_commit_token_seq = SEQNO_START_TOKEN - 1;
 
 	instance->memb_state = MEMB_STATE_OPERATIONAL;
 
@@ -1646,8 +1642,6 @@ static void memb_state_gather_enter (
 	struct totemsrp_instance *instance,
 	int gather_from)
 {
-	instance->my_commit_token_seq = SEQNO_START_TOKEN - 1;
-
 	memb_set_merge (
 		&instance->my_id, 1,
 		instance->my_proc_list, &instance->my_proc_list_entries);
@@ -1732,8 +1726,6 @@ static void memb_state_commit_enter (
 		"entering COMMIT state.\n");
 
 	instance->memb_state = MEMB_STATE_COMMIT;
-
-	instance->my_commit_token_seq = SEQNO_START_TOKEN - 1;
 
 	/*
 	 * reset all flow control variables since we are starting a new ring
@@ -3961,16 +3953,6 @@ static int message_handler_memb_commit_token (
 	addr = (struct srp_addr *)memb_commit_token->end_of_commit_token;
 	memb_list = (struct memb_commit_token_memb_entry *)(addr + memb_commit_token->addr_entries);
 
-	if (sq_lte_compare (memb_commit_token->token_seq,
-		instance->my_commit_token_seq)) {
-		/*
-		 * discard token
-		 */
-		return (0);
-	}
-	instance->my_commit_token_seq = memb_commit_token->token_seq;
-
-
 #ifdef TEST_DROP_COMMIT_TOKEN_PERCENTAGE
 	if (random()%100 < TEST_DROP_COMMIT_TOKEN_PERCENTAGE) {
 		return (0);
@@ -3998,9 +3980,15 @@ static int message_handler_memb_commit_token (
 			break;
 
 		case MEMB_STATE_COMMIT:
-//			if (memcmp (&memb_commit_token->ring_id, &instance->my_ring_id,
-//				sizeof (struct memb_ring_id)) == 0) {
-			 if (memb_commit_token->ring_id.seq == instance->my_ring_id.seq) {
+			/*
+			 * If retransmitted commit tokens are sent on this ring
+			 * filter them out and only enter recovery once the
+			 * commit token has traversed the array.  This is
+			 * determined by :
+		 	 * memb_commit_token->memb_index == memb_commit_token->addr_entries) {
+			 */
+			 if (memb_commit_token->ring_id.seq == instance->my_ring_id.seq &&
+				memb_commit_token->memb_index == memb_commit_token->addr_entries) {
 				memb_state_recovery_enter (instance, memb_commit_token);
 			}
 			break;
