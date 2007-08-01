@@ -870,13 +870,14 @@ static int mcast_msg (
 /*
  * Determine if a message of msg_size could be queued
  */
+#define FUZZY_AVAIL_SUBTRACT 5
 static int send_ok (
 	int msg_size)
 {
 	int avail = 0;
 	int total;
 
-	avail = totemmrp_avail ();
+	avail = totemmrp_avail () - FUZZY_AVAIL_SUBTRACT;
 	
 	/*
 	 * msg size less then totempg_totem_config->net_mtu - 25 will take up
