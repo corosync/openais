@@ -245,6 +245,9 @@ static void evtHandleInstanceDestructor(void *instance)
 		saHandleDestroy(&channel_handle_db, handle);
 		saHandleInstancePut(&channel_handle_db, handle);
 	}
+
+	pthread_mutex_destroy(&evti->ei_dispatch_mutex);
+	pthread_mutex_destroy(&evti->ei_response_mutex);
 }
 
 /*
@@ -272,6 +275,7 @@ static void chanHandleInstanceDestructor(void *instance)
 		saEvtEventFree(handle);
 	}
 
+	pthread_mutex_destroy(&eci->eci_mutex);
 }
 
 /*
@@ -296,6 +300,8 @@ static void eventHandleInstanceDestructor(void *instance)
 	if (edi->edi_event_data) {
 		free(edi->edi_event_data);
 	}
+
+	pthread_mutex_destroy(&edi->edi_mutex);
 }
 
 static SaAisErrorT evt_recv_event(int fd, struct lib_event_data **msg)
