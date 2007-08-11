@@ -2272,13 +2272,13 @@ static int orf_token_mcast (
 		 * Delete item from pending queue
 		 */
 		queue_item_remove (mcast_queue);
+
+		/*
+		 * If messages mcasted, deliver any new messages to totempg
+		 */
+		instance->my_high_seq_received = token->seq;
 	}
 
-	/*
-	 * If messages mcasted, deliver any new messages to totempg
-	 */
-	instance->my_high_seq_received = token->seq;
-		
 	update_aru (instance);
 
 	/*
