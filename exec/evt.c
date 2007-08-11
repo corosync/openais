@@ -1987,6 +1987,7 @@ deliver_event(struct event_data *evt,
 		if (!ep) {
 			log_printf(LOG_LEVEL_WARNING,
 						"5Memory allocation error, can't deliver event\n");
+			free (ed);
 			return;
 		}
 		ep->cel_chan_handle = eco->eco_lib_handle;
