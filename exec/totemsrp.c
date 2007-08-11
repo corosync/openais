@@ -3385,9 +3385,10 @@ static void messages_deliver_to_app (
 	struct sort_queue_item *sort_queue_item_p;
 	unsigned int i;
 	int res;
-	struct mcast *mcast;
+	struct mcast *mcast_in;
+	struct mcast mcast_header;
 	unsigned int range = 0;
-	int endian_conversion_required = 0 ;
+	int endian_conversion_required;
 	unsigned int my_high_delivered_stored = 0;
 
 
@@ -3435,18 +3436,27 @@ static void messages_deliver_to_app (
 
 		sort_queue_item_p = ptr;
 
-		mcast = sort_queue_item_p->iovec[0].iov_base;
-		assert (mcast != (struct mcast *)0xdeadbeef);
+		mcast_in = sort_queue_item_p->iovec[0].iov_base;
+		assert (mcast_in != (struct mcast *)0xdeadbeef);
+
+		endian_conversion_required = 0;
+		if (mcast_in->header.endian_detector != ENDIAN_LOCAL) {
+			endian_conversion_required = 1;
+			mcast_endian_convert (mcast_in, &mcast_header);
+		} else {
+			memcpy (&mcast_header, mcast_in, sizeof (struct mcast));
+		}
 
 		/*
 		 * Skip messages not originated in instance->my_deliver_memb
 		 */
 		if (skip &&
-			memb_set_subset (&mcast->system_from,
+			memb_set_subset (&mcast_header.system_from,
 				1,
 				instance->my_deliver_memb_list,
 				instance->my_deliver_memb_entries) == 0) {
-		instance->my_high_delivered = my_high_delivered_stored + i;
+
+			instance->my_high_delivered = my_high_delivered_stored + i;
 
 			continue;
 		}
@@ -3456,12 +3466,7 @@ static void messages_deliver_to_app (
 		 */
 		log_printf (instance->totemsrp_log_level_debug,
 			"Delivering MCAST message with seq %x to pending delivery queue\n",
-			mcast->seq);
-
-		if (mcast->header.endian_detector != ENDIAN_LOCAL) {
-			endian_conversion_required = 1;
-			mcast_endian_convert (mcast, mcast);
-		}
+			mcast_header.seq);
 
 		/*
 		 * Message is locally originated multicast
@@ -3469,7 +3474,7 @@ static void messages_deliver_to_app (
 	 	if (sort_queue_item_p->iov_len > 1 &&
 			sort_queue_item_p->iovec[0].iov_len == sizeof (struct mcast)) {
 			instance->totemsrp_deliver_fn (
-				mcast->header.nodeid,
+				mcast_header.header.nodeid,
 				&sort_queue_item_p->iovec[1],
 				sort_queue_item_p->iov_len - 1,
 				endian_conversion_required);
@@ -3478,7 +3483,7 @@ static void messages_deliver_to_app (
 			sort_queue_item_p->iovec[0].iov_base += sizeof (struct mcast);
 
 			instance->totemsrp_deliver_fn (
-				mcast->header.nodeid,
+				mcast_header.header.nodeid,
 				sort_queue_item_p->iovec,
 				sort_queue_item_p->iov_len,
 				endian_conversion_required);
