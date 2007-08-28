@@ -452,6 +452,9 @@ static void sync_confchg_fn (
 {
 	sync_ring_id = ring_id;
 
+	if (configuration_type != TOTEM_CONFIGURATION_REGULAR) {
+		return;
+	}
 	if (sync_processing && sync_callbacks.sync_abort != NULL) {
 		sync_callbacks.sync_abort ();
 	}
