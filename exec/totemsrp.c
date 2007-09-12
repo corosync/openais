@@ -678,10 +678,7 @@ int totemsrp_initialize (
 {
 	struct totemsrp_instance *instance;
 	unsigned int res;
-struct orf_token suck;
 
-printf ("%p %p size is %d %d\n", &suck, &suck.rtr_list[0], sizeof (struct orf_token), (sizeof (struct rtr_item) * RETRANSMIT_ENTRIES_MAX));
-exit (1);
 	res = hdb_handle_create (&totemsrp_instance_database,
 		sizeof (struct totemsrp_instance), handle);
 	if (res != 0) {
