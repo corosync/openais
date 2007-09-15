@@ -198,9 +198,10 @@ void sync_callbacks_load (void)
 {
 	int res;
 
-// TODO rewrite this to get rid of the for (;;)
 	for (;;) {
-		res = sync_callbacks_retrieve (sync_recovery_index, &sync_callbacks);
+		res = sync_callbacks_retrieve (sync_recovery_index,
+			&sync_callbacks);
+
 		/*
 		 * No more service handlers have sync callbacks at this time
 	`	 */
@@ -418,7 +419,6 @@ static void sync_deliver_fn (
 		log_printf (LOG_LEVEL_DEBUG,
 			"Committing synchronization for (%s)\n",
 			sync_callbacks.name);
-	
 	}
 
 	/*
