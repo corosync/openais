@@ -1129,11 +1129,14 @@ SaAisErrorT amf_comp_register (struct amf_comp *comp)
 
 	if (comp->saAmfCompPresenceState == SA_AMF_PRESENCE_RESTARTING) {
 		comp_presence_state_set (comp, SA_AMF_PRESENCE_INSTANTIATED);
-	} else if (comp->saAmfCompPresenceState == SA_AMF_PRESENCE_INSTANTIATING) {
+	} else
+	if (comp->saAmfCompPresenceState == SA_AMF_PRESENCE_INSTANTIATING) {
 		amf_comp_operational_state_set (comp, SA_AMF_OPERATIONAL_ENABLED);
 		comp_presence_state_set (comp, SA_AMF_PRESENCE_INSTANTIATED);
-	}
-	else {
+	} else 
+	if (comp->saAmfCompPresenceState == SA_AMF_PRESENCE_UNINSTANTIATED) {
+		return SA_AIS_ERR_INVALID_PARAM;
+     	} else {
 		assert (0);
 	}
 
