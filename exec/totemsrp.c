@@ -1779,14 +1779,9 @@ static void memb_state_recovery_enter (
 	/*
 	 * Build regular configuration
 	 */
-	instance->my_new_memb_entries = commit_token->addr_entries;
-
  	totemrrp_processor_count_set (
 		instance->totemrrp_handle,
 		commit_token->addr_entries);
-
-	memcpy (instance->my_new_memb_list, addr,
-		sizeof (struct srp_addr) * instance->my_new_memb_entries);
 
 	/*
 	 * Build transitional configuration
@@ -2597,6 +2592,11 @@ static void memb_state_commit_token_update (
 
 	addr = (struct srp_addr *)commit_token->end_of_commit_token;
 	memb_list = (struct memb_commit_token_memb_entry *)(addr + commit_token->addr_entries);
+
+	memcpy (instance->my_new_memb_list, addr,
+		sizeof (struct srp_addr) * commit_token->addr_entries);
+
+	instance->my_new_memb_entries = commit_token->addr_entries;
 
 	memcpy (&memb_list[commit_token->memb_index].ring_id,
 		&instance->my_old_ring_id, sizeof (struct memb_ring_id));
