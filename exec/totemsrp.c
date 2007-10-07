@@ -2838,7 +2838,6 @@ static void memb_ring_id_create_or_load (
 		}
 		res = write (fd, &memb_ring_id->seq, sizeof (unsigned long long));
 		assert (res == sizeof (unsigned long long));
-		fsync (fd);
 		close (fd);
 	} else {
 		log_printf (instance->totemsrp_log_level_warning,
@@ -2879,7 +2878,6 @@ static void memb_ring_id_set_and_store (
 	//assert (fd > 0);
 	res = write (fd, &instance->my_ring_id.seq, sizeof (unsigned long long));
 	assert (res == sizeof (unsigned long long));
-	fsync (fd);
 	close (fd);
 }
 
