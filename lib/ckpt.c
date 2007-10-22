@@ -1036,7 +1036,7 @@ saCkptSectionCreate (
 	SaCkptCheckpointHandleT checkpointHandle,
 	SaCkptSectionCreationAttributesT *sectionCreationAttributes,
 	const void *initialData,
-	SaUint32T initialDataSize)
+	SaSizeT initialDataSize)
 {
 	SaAisErrorT error;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
