@@ -91,6 +91,7 @@
 #include <assert.h>
 #include <pthread.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "../include/hdb.h"
 #include "../include/list.h"
@@ -279,7 +280,7 @@ void assembly_deref (struct assembly *assembly)
 	list_add (&assembly->list, &assembly_list_free);
 }
 
-static inline void app_confchg_fn (
+static void app_confchg_fn (
 	enum totem_configuration_type configuration_type,
 	unsigned int *member_list, int member_list_entries,
 	unsigned int *left_list, int left_list_entries,
@@ -312,7 +313,7 @@ static inline void app_confchg_fn (
 	}
 }
 
-static inline void group_endian_convert (
+static void group_endian_convert (
 	struct iovec *iovec)
 {
 	unsigned short *group_len;
@@ -323,10 +324,9 @@ static inline void group_endian_convert (
 	for (i = 1; i < group_len[0] + 1; i++) {
 		group_len[i] = swab16(group_len[i]);
 	}
-
 }
 
-static inline int group_matches (
+static int group_matches (
 	struct iovec *iovec,
 	unsigned int iov_len,
 	struct totempg_group *groups_b,
@@ -346,7 +346,8 @@ static inline int group_matches (
 	 */
 	if ((size_t)iovec->iov_base % 4 != 0) {
 		iovec_aligned.iov_base = alloca(iovec->iov_len);
-		memcpy(iovec_aligned.iov_base, iovec->iov_base, iovec->iov_len);                iovec_aligned.iov_len = iovec->iov_len;
+		memcpy(iovec_aligned.iov_base, iovec->iov_base, iovec->iov_len);
+        iovec_aligned.iov_len = iovec->iov_len;
 		iovec = &iovec_aligned;
 	}
 
@@ -380,7 +381,7 @@ static inline int group_matches (
 }
 	
 
-static inline void app_deliver_fn (
+static void app_deliver_fn (
 	unsigned int nodeid,
 	struct iovec *iovec,
 	unsigned int iov_len,
@@ -393,17 +394,17 @@ static inline void app_deliver_fn (
 	unsigned int res;
         struct iovec aligned_iovec = { NULL, 0 };
 
-	if (endian_conversion_required) {
-		group_endian_convert (iovec);
-	}
-
 	/*
 	 * Align data structure for sparc and ia64
 	 */
 	aligned_iovec.iov_base = alloca(iovec->iov_len);
 	aligned_iovec.iov_len = iovec->iov_len;
+	assert (aligned_iovec.iov_base != NULL);
 	memcpy(aligned_iovec.iov_base, iovec->iov_base, iovec->iov_len);
 	iovec = &aligned_iovec;
+	if (endian_conversion_required) {
+		group_endian_convert (&aligned_iovec);
+	}
 
 	for (i = 0; i <= totempg_max_handle; i++) {
 		res = hdb_handle_get (&totempg_groups_instance_database,
@@ -411,9 +412,9 @@ static inline void app_deliver_fn (
 
 		if (res == 0) {
 			assert (iov_len == 1);
-			if (group_matches (iovec, iov_len, instance->groups, instance->groups_cnt, &adjust_iovec)) {
-				stripped_iovec.iov_len = iovec->iov_len - adjust_iovec;
-//				stripped_iovec.iov_base = (char *)iovec->iov_base + adjust_iovec;
+			if (group_matches (&aligned_iovec, iov_len, instance->groups, instance->groups_cnt, &adjust_iovec)) {
+				stripped_iovec.iov_len = aligned_iovec.iov_len - adjust_iovec;
+//				stripped_iovec.iov_base = (char *)aligned_iovec.iov_base + adjust_iovec;
 
 				/*
 				 * Align data structure for sparc and ia64
@@ -463,11 +464,11 @@ static void totempg_deliver_fn (
 	int endian_conversion_required)
 {
 	struct totempg_mcast *mcast;
-	unsigned short *msg_lens;
+	unsigned short *msg_lens_from_msg;
+	unsigned short msg_lens[1500];
+	unsigned short mcast_msg_count;
 	int i;
 	struct assembly *assembly;
-	char header[FRAME_SIZE_MAX];
-	int h_index;
 	int a_i = 0;
 	int msg_count;
 	int continuation;
@@ -476,8 +477,15 @@ static void totempg_deliver_fn (
 	assembly = assembly_ref (nodeid);
 	assert (assembly);
 
+	mcast = (struct totempg_mcast *)iovec[0].iov_base;
+	if (endian_conversion_required) {
+		mcast_msg_count = swab16 (mcast->msg_count);
+	} else {
+		mcast_msg_count = mcast->msg_count;
+	}
+	msg_count = mcast_msg_count;
+
 	/*
-	 * Assemble the header into one block of data and
 	 * assemble the packet contents into one block of data to simplify delivery
 	 */
 	if (iov_len == 1) {
@@ -488,44 +496,36 @@ static void totempg_deliver_fn (
 		char *data;
 		int datasize;
 
-		mcast = (struct totempg_mcast *)iovec[0].iov_base;
-		if (endian_conversion_required) {
-			mcast->msg_count = swab16 (mcast->msg_count);
+		msg_lens_from_msg = (unsigned short *) (iovec[0].iov_base +
+			sizeof (struct totempg_mcast));
+		for (i = 0; i < mcast_msg_count; i++) {
+			msg_lens[i] = swab16 (msg_lens_from_msg[i]);
 		}
 
-		msg_count = mcast->msg_count;
 		datasize = sizeof (struct totempg_mcast) +
-			msg_count * sizeof (unsigned short);
+			mcast_msg_count * sizeof (unsigned short);
 		
-		memcpy (header, iovec[0].iov_base, datasize);
 		assert(iovec);
 		data = iovec[0].iov_base;
-
-		msg_lens = (unsigned short *) (header + sizeof (struct totempg_mcast));
-		if (endian_conversion_required) {
-			for (i = 0; i < mcast->msg_count; i++) {
-				msg_lens[i] = swab16 (msg_lens[i]);
-			}
-		}
 
 		memcpy (&assembly->data[assembly->index], &data[datasize],
 			iovec[0].iov_len - datasize);
 	} else {
-		/* 
-		 * The message originated from local processor  
-		 * becasue there is greater than one iovec for then full msg.
-		 */
-		h_index = 0;
-		for (i = 0; i < 2; i++) {
-			memcpy (&header[h_index], iovec[i].iov_base, iovec[i].iov_len);
-			h_index += iovec[i].iov_len;
+		msg_lens_from_msg = (unsigned short *)iovec[1].iov_base;
+		if (endian_conversion_required) {
+			for (i = 0; i < mcast_msg_count; i++) {
+				msg_lens[i] = swab16 (msg_lens_from_msg[i]);
+			}
+		} else {
+			for (i = 0; i < mcast_msg_count; i++) {
+				msg_lens[i] = msg_lens_from_msg[i];
+			}
 		}
 
-		mcast = (struct totempg_mcast *)header;
-// TODO make sure we are using a copy of mcast not the actual data itself
-
-		msg_lens = (unsigned short *) (header + sizeof (struct totempg_mcast));
-
+		/* 
+		 * The message originated from local processor  
+		 * because there is greater than one iovec for the full msg.
+		 */
 		for (i = 2; i < iov_len; i++) {
 			a_i = assembly->index;
 			assert (iovec[i].iov_len + a_i <= MESSAGE_SIZE_MAX);
@@ -541,7 +541,7 @@ static void totempg_deliver_fn (
 	 * then adjust the assembly buffer so we can add the rest of the 
 	 * fragment when it arrives.
 	 */
-	msg_count = mcast->fragmented ? mcast->msg_count - 1 : mcast->msg_count;
+	msg_count = mcast->fragmented ? mcast_msg_count - 1 : mcast_msg_count;
 	continuation = mcast->continuation;
 	iov_delv.iov_base = &assembly->data[0];
 	iov_delv.iov_len = assembly->index + msg_lens[0];
@@ -567,7 +567,8 @@ static void totempg_deliver_fn (
 		}
 
 		if ((assembly->index == 0) ||
-							(!continuation && assembly->index)) {
+			(!continuation && assembly->index)) {
+
 			log_printf (totempg_log_level_error,
 				"Throwing away broken message: continuation %u, index %u\n",
 				continuation, assembly->index);
@@ -609,7 +610,7 @@ static void totempg_deliver_fn (
 		 * Message is fragmented, keep around assembly list
 		 */
 		assembly->last_frag_num = mcast->fragmented;
-		if (mcast->msg_count > 1) {
+		if (mcast_msg_count > 1) {
 			memmove (&assembly->data[0],
 				&assembly->data[assembly->index],
 				msg_lens[msg_count]);
