@@ -1243,3 +1243,12 @@ char *totempg_ifaces_print (unsigned int nodeid)
 	return (iface_string);
 }
 
+int totempg_my_nodeid_get (void)
+{
+	return (totemmrp_my_nodeid_get());
+}
+
+int totempg_my_family_get (void)
+{
+	return (totemmrp_my_family_get());
+}

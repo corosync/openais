@@ -104,6 +104,12 @@ extern int totemsrp_ifaces_get (
 	char ***status,
 	unsigned int *iface_count);
 
+extern int totemsrp_my_nodeid_get (
+	totemsrp_handle handle);
+
+extern int totemsrp_my_family_get (
+	totemsrp_handle handle);
+
 extern int totemsrp_ring_reenable (
 	totemsrp_handle handle);
 

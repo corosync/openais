@@ -298,7 +298,7 @@ static void message_handler_req_lib_cfg_ringstatusget (
 	res_lib_cfg_ringstatusget.header.error = SA_AIS_OK;
 
 	totempg_ifaces_get (
-		this_ip->nodeid,
+		totempg_my_nodeid_get(),
 		interfaces,
 		&status,
 		&iface_count);

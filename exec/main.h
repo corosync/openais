@@ -53,8 +53,6 @@
 
 #define SIZEINB MESSAGE_SIZE_MAX
 
-extern struct totem_ip_address *this_ip;
-
 extern struct totempg_group openais_group;
 
 extern totempg_groups_handle openais_group_handle;

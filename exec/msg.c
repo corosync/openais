@@ -675,9 +675,6 @@ static int msg_exec_init_fn (struct objdb_iface_ver0 *objdb)
 	/*
 	 *  Initialize the saved ring ID.
 	 */
-//	saved_ring_id.seq = 0;
-//	saved_ring_id.rep.s_addr = this_ip->sin_addr.s_addr;		
-	
 	return (0);
 }
 

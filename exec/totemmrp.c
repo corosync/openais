@@ -191,6 +191,16 @@ int totemmrp_ifaces_get (
 	return (res);
 }
 
+int totemmrp_my_nodeid_get (void)
+{
+	return (totemsrp_my_nodeid_get (totemsrp_handle_in));
+}
+
+int totemmrp_my_family_get (void)
+{
+	return (totemsrp_my_family_get (totemsrp_handle_in));
+}
+
 extern int totemmrp_ring_reenable (void)
 {
 	int res;

@@ -481,7 +481,7 @@ static int cpg_lib_exit_fn (void *conn)
 
 	if (gi) {
 		notify_info.pid = pi->pid;
-		notify_info.nodeid = this_ip->nodeid;
+		notify_info.nodeid = totempg_my_nodeid_get();
 		notify_info.reason = CONFCHG_CPG_REASON_PROCDOWN;
 		cpg_node_joinleave_send(gi, pi, MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_PROCDOWN);
 		list_del(&pi->list);
@@ -627,8 +627,8 @@ static void cpg_confchg_fn (
 				lowest_nodeid = member_list[i];
 		}
 
-		log_printf(LOG_LEVEL_DEBUG, "confchg, low nodeid=%d, us = %d\n", lowest_nodeid, this_ip->nodeid);
-		if (lowest_nodeid == this_ip->nodeid) {
+		log_printf(LOG_LEVEL_DEBUG, "confchg, low nodeid=%d, us = %d\n", lowest_nodeid, totempg_my_nodeid_get());
+		if (lowest_nodeid == totempg_my_nodeid_get()) {
 
 			req_exec_cpg_downlist.header.id = SERVICE_ID_MAKE(CPG_SERVICE, MESSAGE_REQ_EXEC_CPG_DOWNLIST);
 			req_exec_cpg_downlist.header.size = sizeof(struct req_exec_cpg_downlist);
@@ -729,7 +729,7 @@ static void do_proc_join(
 		if (pi->pid == pid && pi->nodeid == nodeid) {
 
 			/* It could be a local join message */
-			if ((nodeid == this_ip->nodeid) &&
+			if ((nodeid == totempg_my_nodeid_get()) &&
 				(!pi->flags & PI_FLAG_MEMBER)) {
 				goto local_join;
 			} else {
@@ -864,7 +864,7 @@ static void message_handler_req_exec_cpg_joinlist (
 		nodeid);
 
 	/* Ignore our own messages */
-	if (nodeid == this_ip->nodeid) {
+	if (nodeid == totempg_my_nodeid_get()) {
 		return;
 	}
 
@@ -943,7 +943,7 @@ static int cpg_exec_send_joinlist(void)
 			gi = list_entry(iter, struct group_info, list);
 			for (iter2 = gi->members.next; iter2 != &gi->members; iter2 = iter2->next) {
 				struct process_info *pi = list_entry(iter2, struct process_info, list);
-				if (pi->pid && pi->nodeid == this_ip->nodeid) {
+				if (pi->pid && pi->nodeid == totempg_my_nodeid_get()) {
 					count++;
 				}
 			}
@@ -970,7 +970,7 @@ static int cpg_exec_send_joinlist(void)
 			for (iter2 = gi->members.next; iter2 != &gi->members; iter2 = iter2->next) {
 
 				struct process_info *pi = list_entry(iter2, struct process_info, list);
-				if (pi->pid && pi->nodeid == this_ip->nodeid) {
+				if (pi->pid && pi->nodeid == totempg_my_nodeid_get()) {
 					memcpy(&jle->group_name, &gi->group_name, sizeof(mar_cpg_name_t));
 					jle->pid = pi->pid;
 					jle++;
@@ -1029,7 +1029,7 @@ static void message_handler_req_lib_cpg_join (void *conn, void *message)
 		pi);
 
 	/* Add a node entry for us */
-	pi->nodeid = this_ip->nodeid;
+	pi->nodeid = totempg_my_nodeid_get();
 	pi->pid = req_lib_cpg_join->pid;
 	pi->group = gi;
 	list_add(&pi->list, &gi->members);
@@ -1213,7 +1213,7 @@ static void message_handler_req_lib_cpg_local_get (void *conn, void *message)
 	res_lib_cpg_local_get.header.size = sizeof(res_lib_cpg_local_get);
 	res_lib_cpg_local_get.header.id = MESSAGE_RES_CPG_LOCAL_GET;
 	res_lib_cpg_local_get.header.error = SA_AIS_OK;
-	res_lib_cpg_local_get.local_nodeid = this_ip->nodeid;
+	res_lib_cpg_local_get.local_nodeid = totempg_my_nodeid_get();
 
 	openais_conn_send_response(conn, &res_lib_cpg_local_get,
 		sizeof(res_lib_cpg_local_get));

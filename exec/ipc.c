@@ -94,8 +94,6 @@
 
 static unsigned int g_gid_valid = 0;
 
-static struct totem_ip_address *my_ip;
-
 static totempg_groups_handle ipc_handle;
 
 DECLARE_LIST_INIT (conn_info_list_head);
@@ -962,7 +960,7 @@ int message_source_is_local(mar_message_source_t *source)
 	int ret = 0;
 
 	assert (source != NULL);
-	if (source->nodeid == my_ip->nodeid) {
+	if (source->nodeid == totempg_my_nodeid_get ()) {
 		ret = 1;
 	}
 	return ret;
@@ -974,7 +972,7 @@ void message_source_set (
 {
 	assert ((source != NULL) && (conn != NULL));
 	memset (source, 0, sizeof (mar_message_source_t));
-	source->nodeid = my_ip->nodeid;
+	source->nodeid = totempg_my_nodeid_get ();
 	source->conn = conn;
 }
 
@@ -990,8 +988,7 @@ static void ipc_confchg_fn (
 void openais_ipc_init (
 	void (*serialize_lock_fn) (void),
 	void (*serialize_unlock_fn) (void),
-	unsigned int gid_valid,
-	struct totem_ip_address *my_ip_in)
+	unsigned int gid_valid)
 {
 	int libais_server_fd;
 	struct sockaddr_un un_addr;
@@ -1047,8 +1044,6 @@ void openais_ipc_init (
                 POLLIN, 0, poll_handler_libais_accept);
 
 	g_gid_valid = gid_valid;
-
-	my_ip = my_ip_in;
 
 	/*
 	 * Reset internal state of flow control when

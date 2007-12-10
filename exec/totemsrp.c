@@ -907,6 +907,43 @@ error_exit:
 	return (res);
 }
 
+int totemsrp_my_nodeid_get (
+	totemsrp_handle handle)
+{
+	struct totemsrp_instance *instance;
+	int res;
+
+	res = hdb_handle_get (&totemsrp_instance_database, handle,
+		(void *)&instance);
+	if (res != 0) {
+		return (0);
+	}
+
+	res = instance->totem_config->interfaces[0].boundto.nodeid;
+
+	hdb_handle_put (&totemsrp_instance_database, handle);
+	return (res);
+}
+
+int totemsrp_my_family_get (
+	totemsrp_handle handle)
+{
+	struct totemsrp_instance *instance;
+	int res;
+
+	res = hdb_handle_get (&totemsrp_instance_database, handle,
+		(void *)&instance);
+	if (res != 0) {
+		return (0);
+	}
+
+	res = instance->totem_config->interfaces[0].boundto.family;
+
+	hdb_handle_put (&totemsrp_instance_database, handle);
+	return (res);
+}
+
+
 int totemsrp_ring_reenable (
         totemsrp_handle handle)
 {
