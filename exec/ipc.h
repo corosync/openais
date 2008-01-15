@@ -42,11 +42,15 @@ extern void message_source_set (mar_message_source_t *source, void *conn);
 
 extern int message_source_is_local (mar_message_source_t *source);
 
-extern void *openais_conn_partner_get (void *conn);
-
 extern void *openais_conn_private_data_get (void *conn);
 
-extern int openais_conn_send_response (void *conn, void *msg, int mlen);
+extern int openais_response_send (void *conn, void *msg, int mlen);
+
+extern int openais_dispatch_send (void *conn, void *msg, int mlen);
+
+extern void openais_conn_info_refcnt_dec (void *conn);
+
+extern void openais_conn_info_refcnt_inc (void *conn);
 
 extern void openais_ipc_init (
         void (*serialize_lock_fn) (void),

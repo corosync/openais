@@ -719,12 +719,12 @@ error_exit:
 				&req_exec_lck_resourceopen->source,
 				sizeof (mar_message_source_t));
 
-			openais_conn_send_response (
+			openais_response_send (
 				req_exec_lck_resourceopen->source.conn,
 				&res_lib_lck_resourceopenasync,
 				sizeof (struct res_lib_lck_resourceopenasync));
-			openais_conn_send_response (
-				openais_conn_partner_get (req_exec_lck_resourceopen->source.conn),
+			openais_dispatch_send (
+				req_exec_lck_resourceopen->source.conn,
 				&res_lib_lck_resourceopenasync,
 				sizeof (struct res_lib_lck_resourceopenasync));
 		} else {
@@ -738,7 +738,7 @@ error_exit:
 				&req_exec_lck_resourceopen->source,
 				sizeof (mar_message_source_t));
 
-			openais_conn_send_response (req_exec_lck_resourceopen->source.conn,
+			openais_response_send (req_exec_lck_resourceopen->source.conn,
 				&res_lib_lck_resourceopen,
 				sizeof (struct res_lib_lck_resourceopen));
 		}
@@ -774,7 +774,7 @@ error_exit:
 		res_lib_lck_resourceclose.header.size = sizeof (struct res_lib_lck_resourceclose);
 		res_lib_lck_resourceclose.header.id = MESSAGE_RES_LCK_RESOURCECLOSE;
 		res_lib_lck_resourceclose.header.error = error;
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_lck_resourceclose->source.conn,
 			&res_lib_lck_resourceclose, sizeof (struct res_lib_lck_resourceclose));
 	}
@@ -801,8 +801,8 @@ void waiter_notification_send (struct resource_lock *resource_lock)
 		res_lib_lck_lockwaitercallback.mode_held = SA_LCK_PR_LOCK_MODE;
 	}
 
-	openais_conn_send_response (
-		openais_conn_partner_get (resource_lock->callback_source.conn),
+	openais_dispatch_send (
+		resource_lock->callback_source.conn,
 		&res_lib_lck_lockwaitercallback,
 		sizeof (struct res_lib_lck_lockwaitercallback));
 }
@@ -837,8 +837,8 @@ void resource_lock_async_deliver (
 			res_lib_lck_resourcelockasync.lockStatus = resource_lock->lock_status;
 			res_lib_lck_resourcelockasync.invocation = resource_lock->invocation;
 			res_lib_lck_resourcelockasync.lockId = resource_lock->lock_id;
-			openais_conn_send_response (
-				openais_conn_partner_get (source->conn),
+			openais_dispatch_send (
+				source->conn,
 				&res_lib_lck_resourcelockasync,
 				sizeof (struct res_lib_lck_resourcelockasync));
 		}
@@ -861,7 +861,7 @@ void lock_response_deliver (
 			res_lib_lck_resourcelock.header.error = error;
 			res_lib_lck_resourcelock.resource_lock = (void *)resource_lock;
 			res_lib_lck_resourcelock.lockStatus = resource_lock->lock_status;
-			openais_conn_send_response (source->conn,
+			openais_response_send (source->conn,
 				&res_lib_lck_resourcelock,
 				sizeof (struct res_lib_lck_resourcelock));
 		}
@@ -1133,14 +1133,11 @@ static void message_handler_req_exec_lck_resourcelock (
 		 * Deliver async response to library
 		 */
 		req_exec_lck_resourcelock->source.conn =
-			openais_conn_partner_get (req_exec_lck_resourcelock->source.conn);
+			req_exec_lck_resourcelock->source.conn;
 		resource_lock_async_deliver (
 			&req_exec_lck_resourcelock->source,
 			resource_lock,
 			SA_AIS_OK);
-// TODO why is this twice ?
-		req_exec_lck_resourcelock->source.conn =
-			openais_conn_partner_get (req_exec_lck_resourcelock->source.conn);
 	}
 
 error_exit:
@@ -1184,11 +1181,11 @@ error_exit:
 			res_lib_lck_resourceunlockasync.invocation =
 				req_exec_lck_resourceunlock->invocation;
 
-			openais_conn_send_response (
-				openais_conn_partner_get(req_exec_lck_resourceunlock->source.conn),
+			openais_dispatch_send (
+				req_exec_lck_resourceunlock->source.conn,
 				&res_lib_lck_resourceunlockasync,
 				sizeof (struct res_lib_lck_resourceunlockasync));
-			openais_conn_send_response (
+			openais_response_send (
 				resource_lock->callback_source.conn,
 				&res_lib_lck_resourceunlockasync,
 				sizeof (struct res_lib_lck_resourceunlockasync));
@@ -1196,8 +1193,10 @@ error_exit:
 			res_lib_lck_resourceunlock.header.size = sizeof (struct res_lib_lck_resourceunlock);
 			res_lib_lck_resourceunlock.header.id = MESSAGE_RES_LCK_RESOURCEUNLOCK;
 			res_lib_lck_resourceunlock.header.error = error;
-			openais_conn_send_response (req_exec_lck_resourceunlock->source.conn,
-				&res_lib_lck_resourceunlock, sizeof (struct res_lib_lck_resourceunlock));
+			openais_response_send (
+				req_exec_lck_resourceunlock->source.conn,
+				&res_lib_lck_resourceunlock,
+				sizeof (struct res_lib_lck_resourceunlock));
 		}
 	}
 }
@@ -1253,8 +1252,10 @@ error_exit:
 		res_lib_lck_lockpurge.header.size = sizeof (struct res_lib_lck_lockpurge);
 		res_lib_lck_lockpurge.header.id = MESSAGE_RES_LCK_LOCKPURGE;
 		res_lib_lck_lockpurge.header.error = error;
-		openais_conn_send_response (req_exec_lck_lockpurge->source.conn,
-			&res_lib_lck_lockpurge, sizeof (struct res_lib_lck_lockpurge));
+		openais_response_send (
+			req_exec_lck_lockpurge->source.conn,
+			&res_lib_lck_lockpurge,
+			sizeof (struct res_lib_lck_lockpurge));
 	}
 }
 
@@ -1366,7 +1367,8 @@ static void message_handler_req_lib_lck_resourceclose (
 		res_lib_lck_resourceclose.header.id = MESSAGE_RES_LCK_RESOURCECLOSE;
 		res_lib_lck_resourceclose.header.error = SA_AIS_ERR_NOT_EXIST;
 
-		openais_conn_send_response (conn,
+		openais_response_send (
+			conn,
 			&res_lib_lck_resourceclose,
 			sizeof (struct res_lib_lck_resourceclose));
 	}

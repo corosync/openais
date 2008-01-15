@@ -244,7 +244,8 @@ static void evs_confchg_fn (
 	 */
 	for (list = confchg_notify.next; list != &confchg_notify; list = list->next) {
 		evs_pd = list_entry (list, struct evs_pd, list);
-		openais_conn_send_response (evs_pd->conn,
+		openais_dispatch_send (
+			evs_pd->conn,
 			&res_evs_confchg_callback,
 			sizeof (res_evs_confchg_callback));
 	}
@@ -262,7 +263,9 @@ static int evs_lib_init_fn (void *conn)
 	list_init (&evs_pd->list);
 	list_add (&evs_pd->list, &confchg_notify);
 
-	openais_conn_send_response (conn, &res_evs_confchg_callback,
+	openais_dispatch_send (
+		conn,
+		&res_evs_confchg_callback,
 		sizeof (res_evs_confchg_callback));
 
 	return (0);
@@ -308,7 +311,9 @@ exit_error:
 	res_lib_evs_join.header.id = MESSAGE_RES_EVS_JOIN;
 	res_lib_evs_join.header.error = error;
 
-	openais_conn_send_response (conn, &res_lib_evs_join,
+	openais_response_send (
+		conn,
+		&res_lib_evs_join,
 		sizeof (struct res_lib_evs_join));
 }
 
@@ -354,7 +359,9 @@ static void message_handler_req_evs_leave (void *conn, void *msg)
 	res_lib_evs_leave.header.id = MESSAGE_RES_EVS_LEAVE;
 	res_lib_evs_leave.header.error = error;
 
-	openais_conn_send_response (conn, &res_lib_evs_leave,
+	openais_response_send (
+		conn,
+		&res_lib_evs_leave,
 		sizeof (struct res_lib_evs_leave));
 }
 
@@ -397,7 +404,9 @@ static void message_handler_req_evs_mcast_joined (void *conn, void *msg)
 	res_lib_evs_mcast_joined.header.id = MESSAGE_RES_EVS_MCAST_JOINED;
 	res_lib_evs_mcast_joined.header.error = error;
 
-	openais_conn_send_response (conn, &res_lib_evs_mcast_joined,
+	openais_response_send (
+		conn,
+		&res_lib_evs_mcast_joined,
 		sizeof (struct res_lib_evs_mcast_joined));
 }
 
@@ -443,7 +452,9 @@ static void message_handler_req_evs_mcast_groups (void *conn, void *msg)
 	res_lib_evs_mcast_groups.header.id = MESSAGE_RES_EVS_MCAST_GROUPS;
 	res_lib_evs_mcast_groups.header.error = error;
 
-	openais_conn_send_response (conn, &res_lib_evs_mcast_groups,
+	openais_response_send (
+		conn,
+		&res_lib_evs_mcast_groups,
 		sizeof (struct res_lib_evs_mcast_groups));
 }
 
@@ -462,7 +473,9 @@ static void message_handler_req_evs_membership_get (void *conn, void *msg)
 	res_lib_evs_membership_get.member_list_entries =
 		res_evs_confchg_callback.member_list_entries;
 
-	openais_conn_send_response (conn, &res_lib_evs_membership_get,
+	openais_response_send (
+		conn,
+		&res_lib_evs_membership_get,
 		sizeof (struct res_lib_evs_membership_get));
 }
 
@@ -487,8 +500,10 @@ static void message_handler_req_exec_mcast (
 	int i, j;
 	struct evs_pd *evs_pd;
 
-	res_evs_deliver_callback.header.size = sizeof (struct res_evs_deliver_callback) +
-		req_exec_evs_mcast->msg_len;
+	res_evs_deliver_callback.header.size =
+		sizeof (struct res_evs_deliver_callback) +
+			req_exec_evs_mcast->msg_len;
+
 	res_evs_deliver_callback.header.id = MESSAGE_RES_EVS_DELIVER_CALLBACK;
 	res_evs_deliver_callback.header.error = SA_AIS_OK;
 	res_evs_deliver_callback.msglen = req_exec_evs_mcast->msg_len;
@@ -517,9 +532,13 @@ static void message_handler_req_exec_mcast (
 
 		if (found) {
 			res_evs_deliver_callback.local_nodeid = nodeid;
-			openais_conn_send_response (evs_pd->conn, &res_evs_deliver_callback,
+			openais_dispatch_send (
+				evs_pd->conn,
+				&res_evs_deliver_callback,
 				sizeof (struct res_evs_deliver_callback));
-			openais_conn_send_response (evs_pd->conn, msg_addr,
+			openais_dispatch_send (
+				evs_pd->conn,
+				msg_addr,
 				req_exec_evs_mcast->msg_len);
 		}
 	}

@@ -807,12 +807,12 @@ error_exit:
 				&req_exec_msg_queueopen->source,
 				sizeof (mar_message_source_t));
 
-			openais_conn_send_response (
+			openais_response_send (
 				req_exec_msg_queueopen->source.conn,
 				&res_lib_msg_queueopenasync,
 				sizeof (struct res_lib_msg_queueopenasync));
-			openais_conn_send_response (
-				openais_conn_partner_get (req_exec_msg_queueopen->source.conn),
+			openais_dispatch_send (
+				req_exec_msg_queueopen->source.conn,
 				&res_lib_msg_queueopenasync,
 				sizeof (struct res_lib_msg_queueopenasync));
 		} else {
@@ -826,7 +826,7 @@ error_exit:
 				&req_exec_msg_queueopen->source,
 				sizeof (mar_message_source_t));
 
-			openais_conn_send_response (
+			openais_dispatch_send (
 				req_exec_msg_queueopen->source.conn,
 				&res_lib_msg_queueopen,
 				sizeof (struct res_lib_msg_queueopen));
@@ -865,8 +865,10 @@ error_exit:
 		res_lib_msg_queueclose.header.size = sizeof (struct res_lib_msg_queueclose);
 		res_lib_msg_queueclose.header.id = MESSAGE_RES_MSG_QUEUECLOSE;
 		res_lib_msg_queueclose.header.error = error;
-		openais_conn_send_response (req_exec_msg_queueclose->source.conn,
-			&res_lib_msg_queueclose, sizeof (struct res_lib_msg_queueclose));
+		openais_dispatch_send (
+			req_exec_msg_queueclose->source.conn,
+			&res_lib_msg_queueclose,
+			sizeof (struct res_lib_msg_queueclose));
 	}
 }
 
@@ -927,7 +929,7 @@ error_exit:
 		res_lib_msg_queuegroupcreate.header.id = MESSAGE_RES_MSG_QUEUEGROUPCREATE;
 		res_lib_msg_queuegroupcreate.header.error = error;
 
-		openais_conn_send_response (
+		openais_dispatch_send (
 			req_exec_msg_queuegroupcreate->source.conn,
 			&res_lib_msg_queuegroupcreate,
 			sizeof (struct res_lib_msg_queuegroupcreate));
@@ -974,7 +976,7 @@ error_exit:
 		res_lib_msg_queuegroupinsert.header.id = MESSAGE_RES_MSG_QUEUEGROUPCREATE;
 		res_lib_msg_queuegroupinsert.header.error = error;
 
-		openais_conn_send_response (
+		openais_dispatch_send (
 			req_exec_msg_queuegroupinsert->source.conn,
 			&res_lib_msg_queuegroupinsert,
 			sizeof (struct res_lib_msg_queuegroupinsert));
@@ -1018,7 +1020,7 @@ error_exit:
 		res_lib_msg_queuegroupremove.header.id = MESSAGE_RES_MSG_QUEUEGROUPCREATE;
 		res_lib_msg_queuegroupremove.header.error = error;
 
-		openais_conn_send_response (
+		openais_dispatch_send (
 			req_exec_msg_queuegroupremove->source.conn,
 			&res_lib_msg_queuegroupremove,
 			sizeof (struct res_lib_msg_queuegroupremove));
@@ -1049,7 +1051,7 @@ static void message_handler_req_exec_msg_queuegroupdelete (
 		res_lib_msg_queuegroupdelete.header.id = MESSAGE_RES_MSG_QUEUEGROUPCREATE;
 		res_lib_msg_queuegroupdelete.header.error = error;
 
-		openais_conn_send_response (
+		openais_dispatch_send (
 			req_exec_msg_queuegroupdelete->source.conn,
 			&res_lib_msg_queuegroupdelete,
 			sizeof (struct res_lib_msg_queuegroupdelete));

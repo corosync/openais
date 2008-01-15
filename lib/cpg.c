@@ -107,8 +107,7 @@ cpg_error_t cpg_initialize (
 		goto error_destroy;
 	}
 
-	error = saServiceConnect (&cpg_inst->dispatch_fd,
-				     &cpg_inst->response_fd,
+	error = saServiceConnect (&cpg_inst->response_fd, &cpg_inst->dispatch_fd,
 		CPG_SERVICE);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
@@ -461,7 +460,7 @@ cpg_error_t cpg_join (
 	iov[0].iov_base = &req_lib_cpg_trackstart;
 	iov[0].iov_len = sizeof (struct req_lib_cpg_trackstart);
 
-	error = saSendMsgReceiveReply (cpg_inst->dispatch_fd, iov, 1,
+	error = saSendMsgReceiveReply (cpg_inst->response_fd, iov, 1,
 		&res_lib_cpg_trackstart, sizeof (struct res_lib_cpg_trackstart));
 
 	if (error != SA_AIS_OK) {

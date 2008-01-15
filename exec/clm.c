@@ -407,7 +407,7 @@ static void library_notification_send (
 		/*
 		 * Send notifications to all CLM listeners
 		 */
-		openais_conn_send_response (
+		openais_dispatch_send (
 			clm_pd->conn,
 			&res_lib_clm_clustertrack,
 			sizeof (struct res_lib_clm_clustertrack));
@@ -667,14 +667,16 @@ static void message_handler_req_lib_clm_clustertrack (void *conn, void *msg)
 		list_add (&clm_pd->list, &library_notification_send_listhead);
 	}
 
-	openais_conn_send_response (conn, &res_lib_clm_clustertrack,
+	openais_response_send (
+		conn,
+		&res_lib_clm_clustertrack,
 		sizeof (struct res_lib_clm_clustertrack));
 
 	if (req_lib_clm_clustertrack->return_in_callback) {
 		res_lib_clm_clustertrack.header.id = MESSAGE_RES_CLM_TRACKCALLBACK;
 
-		openais_conn_send_response (
-			openais_conn_partner_get (conn),
+		openais_dispatch_send (
+			conn,
 			&res_lib_clm_clustertrack,
 			sizeof (struct res_lib_clm_clustertrack));
 	}
@@ -699,7 +701,9 @@ static void message_handler_req_lib_clm_trackstop (void *conn, void *msg)
 	list_del (&clm_pd->list);
 	list_init (&clm_pd->list);
 
-	openais_conn_send_response (conn, &res_lib_clm_trackstop,
+	openais_response_send (
+		conn,
+		&res_lib_clm_trackstop,
 		sizeof (struct res_lib_clm_trackstop));
 }
 
@@ -735,7 +739,11 @@ static void message_handler_req_lib_clm_nodeget (void *conn, void *msg)
 	if (valid) {
 		memcpy (&res_clm_nodeget.cluster_node, cluster_node, sizeof (mar_clm_cluster_node_t));
 	}
-	openais_conn_send_response (conn, &res_clm_nodeget, sizeof (struct res_clm_nodeget));
+
+	openais_response_send (
+		conn,
+		&res_clm_nodeget,
+		sizeof (struct res_clm_nodeget));
 }
 
 static void message_handler_req_lib_clm_nodegetasync (void *conn, void *msg)
@@ -770,7 +778,9 @@ static void message_handler_req_lib_clm_nodegetasync (void *conn, void *msg)
 	res_clm_nodegetasync.header.id = MESSAGE_RES_CLM_NODEGETASYNC;
 	res_clm_nodegetasync.header.error = SA_AIS_OK;
 
-	openais_conn_send_response (conn, &res_clm_nodegetasync,
+	openais_response_send (
+		conn,
+		&res_clm_nodegetasync,
 		sizeof (struct res_clm_nodegetasync));
 
 	/*
@@ -784,7 +794,8 @@ static void message_handler_req_lib_clm_nodegetasync (void *conn, void *msg)
 		memcpy (&res_clm_nodegetcallback.cluster_node, cluster_node,
 			sizeof (mar_clm_cluster_node_t));
 	}
-	openais_conn_send_response (openais_conn_partner_get (conn),
+	openais_dispatch_send (
+		conn,
 		&res_clm_nodegetcallback,
 		sizeof (struct res_clm_nodegetcallback));
 }

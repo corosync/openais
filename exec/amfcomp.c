@@ -547,8 +547,8 @@ static int lib_comp_terminate_request (struct amf_comp *comp)
 		AMF_RESPONSE_COMPONENTTERMINATECALLBACK,
 		component_terminate_callback_data);
 				        
-	openais_conn_send_response (
-		openais_conn_partner_get (comp->conn),
+	openais_dispatch_send (
+		comp->conn,
 		&res_lib,
 		sizeof (struct res_lib_amf_componentterminatecallback));
 
@@ -817,8 +817,8 @@ static void lib_csi_remove_request (struct amf_comp *comp,
 
 	res_lib_amf_csiremovecallback.csiFlags = 0;
 				        
-	openais_conn_send_response (
-		openais_conn_partner_get (comp->conn),
+	openais_dispatch_send (
+		comp->conn,
 		&res_lib_amf_csiremovecallback,
 		sizeof (struct res_lib_amf_csiremovecallback));
 }
@@ -1011,8 +1011,8 @@ static void lib_healthcheck_request (struct amf_healthcheck *healthcheck)
 
 	TRACE8 ("sending healthcheck request to component %s",
 			res_lib.compName.value);
-	openais_conn_send_response (
-		openais_conn_partner_get (healthcheck->comp->conn),
+	openais_dispatch_send (
+		healthcheck->comp->conn,
 		&res_lib, sizeof (struct res_lib_amf_healthcheckcallback));
 }
 
@@ -1117,8 +1117,7 @@ static void lib_csi_set_request (
 	res_lib->invocation =
 		invocation_create (AMF_RESPONSE_CSISETCALLBACK, csi_assignment);
 
-	openais_conn_send_response (
-		openais_conn_partner_get (comp->conn), res_lib,	res_lib->header.size);
+	openais_dispatch_send (comp->conn, res_lib, res_lib->header.size);
 
 	free(p);
 }
@@ -1154,7 +1153,7 @@ void amf_comp_error_report (
 		res_lib.header.size = sizeof (struct res_lib_amf_componenterrorreport);
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTERRORREPORT;
 		res_lib.header.error = SA_AIS_OK;
-		openais_conn_send_response (comp->conn, &res_lib, sizeof (res_lib));
+		openais_dispatch_send (comp->conn, &res_lib, sizeof (res_lib));
 	}
 
 	/* report to SU and let it handle the problem */

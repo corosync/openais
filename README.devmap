@@ -1221,3 +1221,91 @@ If this document is wrong or incomplete, complain so we can get it fixed
 for other people.
 
 Have fun!
+
+---
+IPC state machine
+
+lib_exit_fn may not use openais_response_send or openais_dispatch_send
+
+state INITIALIZING
+------------------
+receive response end of a library request
+	create conn_io data structure
+	if the connection's UID/GID is invalid
+		conn_io_disconnect
+	send response to conn_io with conn_io's address
+	set conn_io refcnt to 1
+
+receive dispatch end of a library connection with response end conn_io address
+	find matching connection
+	if the connection's UID/GID is invalid
+		conn_io_disconnect
+	send reponse to conn_io
+	create conn_info data structure
+	if conn_io response end is valid
+		store dispatch end of conn_io into conn_info data structure
+		store response conn_io into conn_info data structure
+	set conn_io refcnt to 1
+	call lib_init_fn for service type
+	set conn_info refcnt to 1
+	set state to ACTIVE
+
+event response disconnects and conn_info not bound
+	disconnect connection
+event receive connects and response connection not found
+	disconnect dispatch
+event no dispatch connection within 5 seconds
+	disconnect dispatch
+event disconnect_request
+	set state to DISCONNECT_REQUESTED
+	decrement response conn_io refcnt by 1
+	decrement dispatch conn_io refcnt by 1
+
+state ACTIVE
+------------
+do {
+	increment conn_io refcnt by 1
+	poll
+	if invalid poll set state internal_disconnect_request
+	dispatch library handler functions
+	flush any output that can be flushed
+	decrement conn_io refcnt by 1
+	if state set to DISCONNECT_REQUESTED
+		execute algorithm for disconnect requested state
+}
+
+event internal_disconnect_request
+	set state to DISCONNECT_REQUESTED
+	decrement response conn_io refcnt by 1
+	decrement dispatch conn_io refcnt by 1
+event openais_conn_refcnt_increment
+	increase conn_info reference count by 1
+event openais_conn_refcnt_decrement
+	decrease conn_info reference count by 1
+
+state DISCONNECT_REQUESTED
+--------------------------
+if this is the response conn_io data
+do {
+	if response conn_io refcnt is 0
+		destroy conn_io data structure
+		decrement conn_info reference count
+		exit thread
+	sleep configurable short duration
+}
+
+if this is the dispatch conn_io data
+do {
+	if dispatch conn_io refcnt is 0
+		call lib_exit_fn
+		if successful
+			destroy conn_io data structure
+			decrement conn_info reference count
+			exit thread
+	sleep configurable short duration
+}
+
+when conn_info reference count equals 0
+	free conn_info data structure
+
+

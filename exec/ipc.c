@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2002-2006 MontaVista Software, Inc.
  * Copyright (c) 2006-2007 Red Hat, Inc.
  *
  * All rights reserved.
@@ -54,7 +53,11 @@
 #include <signal.h>
 #include <sched.h>
 #include <time.h>
+#if defined(OPENAIS_SOLARIS) && defined(HAVE_GETPEERUCRED)
+#include <ucred.h>
+#endif
 
+#include "swab.h"
 #include "../include/saAis.h"
 #include "../include/list.h"
 #include "../include/queue.h"
@@ -66,6 +69,8 @@
 #include "mainconfig.h"
 #include "totemconfig.h"
 #include "main.h"
+#include "flow.h"
+#include "tlist.h"
 #include "ipc.h"
 #include "flow.h"
 #include "service.h"
@@ -78,6 +83,10 @@
 #include "print.h"
 
 #include "util.h"
+
+#ifdef OPENAIS_SOLARIS
+#define MSG_NOSIGNAL 0
+#endif
 
 #define SERVER_BACKLOG 5
 
@@ -96,7 +105,9 @@ static unsigned int g_gid_valid = 0;
 
 static totempg_groups_handle ipc_handle;
 
-DECLARE_LIST_INIT (conn_info_list_head);
+static pthread_mutex_t conn_io_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+DECLARE_LIST_INIT (conn_io_list_head);
 
 static void (*ipc_serialize_lock_fn) (void);
 
@@ -107,148 +118,282 @@ struct outq_item {
 	size_t mlen;
 };
 
-enum conn_state {
-	CONN_STATE_ACTIVE,
-	CONN_STATE_SECURITY,
-	CONN_STATE_REQUESTED,
-	CONN_STATE_CLOSED,
-	CONN_STATE_DISCONNECTED
+enum conn_io_state {
+	CONN_IO_STATE_INITIALIZING,
+	CONN_IO_STATE_AUTHENTICATED,
+	CONN_IO_STATE_INIT_FAILED
 };
 
-struct conn_info {
-	int fd;			/* File descriptor  */
-	unsigned int events;	/* events polled for by file descriptor */
-	enum conn_state state;	/* State of this connection */
-	pthread_t thread;	/* thread identifier */
+enum conn_info_state {
+	CONN_INFO_STATE_INITIALIZING,
+	CONN_INFO_STATE_ACTIVE,
+	CONN_INFO_STATE_DISCONNECT_REQUESTED,
+	CONN_INFO_STATE_DISCONNECTED
+};
+
+struct conn_info;
+
+struct conn_io {
+	int fd;				/* File descriptor  */
+	unsigned int events;		/* events polled for by file descriptor */
+	pthread_t thread;		/* thread identifier */
 	pthread_attr_t thread_attr;	/* thread attribute */
-	char *inb;		/* Input buffer for non-blocking reads */
-	int inb_nextheader;	/* Next message header starts here */
-	int inb_start;		/* Start location of input buffer */
-	int inb_inuse;		/* Bytes currently stored in input buffer */
-	struct queue outq;	/* Circular queue for outgoing requests */
-	int byte_start;		/* Byte to start sending from in head of queue */
-	enum service_types service;/* Type of service so dispatch knows how to route message */
-	int authenticated;	/* Is this connection authenticated? */
-	void *private_data;	/* library connection private data */
-	struct conn_info *conn_info_partner;	/* partner connection dispatch<->response */
-	unsigned int flow_control_handle;	/* flow control identifier */
-	unsigned int flow_control_enabled;	/* flow control enabled bit */
-	unsigned int flow_control_local_count;	/* flow control local count */
-	enum openais_flow_control flow_control;	/* Does this service use IPC flow control */
-	pthread_mutex_t flow_control_mutex;
-        int (*lib_exit_fn) (void *conn);
-	struct timerlist timerlist;
+	char *inb;			/* Input buffer for non-blocking reads */
+	int inb_nextheader;		/* Next message header starts here */
+	int inb_start;			/* Start location of input buffer */
+	int inb_inuse;			/* Bytes currently stored in input buffer */
+	struct queue outq;		/* Circular queue for outgoing requests */
+	int byte_start;			/* Byte to start sending from in head of queue */
+	unsigned int fcc;		/* flow control local count */
+	enum conn_io_state state;	/* state of this conn_io connection */
+	struct conn_info *conn_info;	/* connection information combining multiple conn_io structs */
+	unsigned int refcnt;		/* reference count for conn_io data structure */
 	pthread_mutex_t mutex;
-	pthread_mutex_t *shared_mutex;
+	unsigned int service;
 	struct list_head list;
 };
 
-static void *prioritized_poll_thread (void *conn);
-static int conn_info_outq_flush (struct conn_info *conn_info);
-static void libais_deliver (struct conn_info *conn_info);
-static void ipc_flow_control (struct conn_info *conn_info);
+
+struct conn_info {
+	enum conn_info_state state;			/* State of this connection */
+	enum service_types service;		/* Type of service so dispatch knows how to route message */
+	void *private_data;			/* library connection private data */
+	unsigned int flow_control_handle;	/* flow control identifier */
+	unsigned int flow_control_enabled;	/* flow control enabled bit */
+	enum openais_flow_control flow_control;	/* Does this service use IPC flow control */
+	pthread_mutex_t flow_control_mutex;
+	unsigned int flow_control_local_count;		/* flow control local count */
+        int (*lib_exit_fn) (void *conn);
+	pthread_mutex_t mutex;
+	struct conn_io *conn_io_response;
+	struct conn_io *conn_io_dispatch;
+	unsigned int refcnt;
+};
+
+static void *prioritized_poll_thread (void *conn_io_in);
+static int conn_io_outq_flush (struct conn_io *conn_io);
+static void conn_io_deliver (struct conn_io *conn_io);
+//static void ipc_flow_control (struct conn_info *conn_info);
+static inline void conn_info_destroy (struct conn_info *conn_info);
+static void conn_io_destroy (struct conn_io *conn_io);
+static int conn_io_send (struct conn_io *conn_io, void *msg, int mlen); 
+static inline struct conn_info *conn_info_create (void);
+static int conn_io_found (struct conn_io *conn_io_to_match);
+
+static int response_init_send (struct conn_io *conn_io, void *message);
+static int dispatch_init_send (struct conn_io *conn_io, void *message);
 
  /*
   * IPC Initializers
   */
 
-static int response_init_send_response (
-	struct conn_info *conn_info,
-	void *message);
-static int dispatch_init_send_response (
-	struct conn_info *conn_info,
-	void *message);
-
-static int (*ais_init_service[]) (struct conn_info *conn_info, void *message) = {
-	response_init_send_response,
-	dispatch_init_send_response
-};
-
-static void libais_disconnect_security (struct conn_info *conn_info)
+static int conn_io_refcnt_value (struct conn_io *conn_io)
 {
-	conn_info->state = CONN_STATE_SECURITY;
-	close (conn_info->fd);
+	unsigned int refcnt;
+
+	pthread_mutex_lock (&conn_io->mutex);
+	refcnt = conn_io->refcnt;
+	pthread_mutex_unlock (&conn_io->mutex);
+
+	return (refcnt);
 }
 
-static int response_init_send_response (
-	struct conn_info *conn_info,
+static void conn_io_refcnt_inc (struct conn_io *conn_io)
+{
+	pthread_mutex_lock (&conn_io->mutex);
+	conn_io->refcnt += 1;
+	pthread_mutex_unlock (&conn_io->mutex);
+}
+
+static int conn_io_refcnt_dec (struct conn_io *conn_io)
+{
+	unsigned int refcnt;
+
+	pthread_mutex_lock (&conn_io->mutex);
+	conn_io->refcnt -= 1;
+	refcnt = conn_io->refcnt;
+	pthread_mutex_unlock (&conn_io->mutex);
+
+	return (refcnt);
+}
+
+static void conn_info_refcnt_inc (struct conn_info *conn_info)
+{
+	/*
+	 * Connection not fully initialized yet
+	 */
+	if (conn_info == NULL) {
+		return;
+	}
+	pthread_mutex_lock (&conn_info->mutex);
+	conn_info->refcnt += 1;
+	pthread_mutex_unlock (&conn_info->mutex);
+}
+
+static void conn_info_refcnt_dec (struct conn_info *conn_info)
+{
+	int refcnt;
+
+	/*
+	 * Connection not fully initialized yet
+	 */
+	if (conn_info == NULL) {
+		return;
+	}
+	pthread_mutex_lock (&conn_info->mutex);
+	conn_info->refcnt -= 1;
+	refcnt = conn_info->refcnt;
+	assert (refcnt >= 0);
+	pthread_mutex_unlock (&conn_info->mutex);
+
+	if (refcnt == 0) {
+		conn_info_destroy (conn_info);
+	}
+}
+
+void openais_conn_info_refcnt_dec (void *conn)
+{
+	struct conn_info *conn_info = (struct conn_info *)conn;
+
+	conn_info_refcnt_dec (conn_info);
+}
+
+void openais_conn_info_refcnt_inc (void *conn)
+{
+	struct conn_info *conn_info = (struct conn_info *)conn;
+
+	conn_info_refcnt_inc (conn_info);
+}
+	
+static int (*ais_init_service[]) (struct conn_io *conn_io, void *message) = {
+	response_init_send,
+	dispatch_init_send
+};
+
+static void disconnect_request (struct conn_info *conn_info)
+{
+unsigned int res;
+	/*
+	 * connection not fully active yet
+	 */
+	if (conn_info == NULL) {
+		return;
+	}
+	/*
+	 * We only want to decrement the reference count on these two
+	 * conn_io contexts one time
+	 */
+	if (conn_info->state != CONN_INFO_STATE_ACTIVE) {
+		return;
+	}
+	res = conn_io_refcnt_dec (conn_info->conn_io_response);
+	res = conn_io_refcnt_dec (conn_info->conn_io_dispatch);
+	conn_info->state = CONN_INFO_STATE_DISCONNECT_REQUESTED;
+}
+
+static int response_init_send (
+	struct conn_io *conn_io,
 	void *message)
 {
 	SaAisErrorT error = SA_AIS_ERR_ACCESS;
-	uintptr_t cinfo = (uintptr_t)conn_info;
+	uintptr_t cinfo = (uintptr_t)conn_io;
 	mar_req_lib_response_init_t *req_lib_response_init = (mar_req_lib_response_init_t *)message;
 	mar_res_lib_response_init_t res_lib_response_init;
 
-	if (conn_info->authenticated) {
-		conn_info->service = req_lib_response_init->resdis_header.service;
+	if (conn_io->state == CONN_IO_STATE_AUTHENTICATED) {
 		error = SA_AIS_OK;
+		conn_io->service = req_lib_response_init->resdis_header.service;
 	}
 	res_lib_response_init.header.size = sizeof (mar_res_lib_response_init_t);
 	res_lib_response_init.header.id = MESSAGE_RES_INIT;
 	res_lib_response_init.header.error = error;
 	res_lib_response_init.conn_info = (mar_uint64_t)cinfo;
 
-	openais_conn_send_response (
-		conn_info,
+	conn_io_send (
+		conn_io,
 		&res_lib_response_init,
 		sizeof (res_lib_response_init));
 
 	if (error == SA_AIS_ERR_ACCESS) {
-		libais_disconnect_security (conn_info);
+		conn_io_destroy (conn_io);
 		return (-1);
 	}
+
 	return (0);
 }
 
-static int dispatch_init_send_response (
-	struct conn_info *conn_info,
+/*
+ * This is called iwth ipc_serialize_lock_fn() called
+ * Therefore there are no races with the destruction of the conn_io
+ * data structure
+ */
+static int dispatch_init_send (
+	struct conn_io *conn_io,
 	void *message)
 {
 	SaAisErrorT error = SA_AIS_ERR_ACCESS;
 	uintptr_t cinfo;
 	mar_req_lib_dispatch_init_t *req_lib_dispatch_init = (mar_req_lib_dispatch_init_t *)message;
 	mar_res_lib_dispatch_init_t res_lib_dispatch_init;
-	struct conn_info *msg_conn_info;
+	struct conn_io *msg_conn_io;
+	struct conn_info *conn_info;
+	unsigned int service;
 
-	if (conn_info->authenticated) {
-		conn_info->service = req_lib_dispatch_init->resdis_header.service;
-		if (!ais_service[req_lib_dispatch_init->resdis_header.service])
-			error = SA_AIS_ERR_NOT_SUPPORTED;
-		else
-			error = SA_AIS_OK;
+	service = req_lib_dispatch_init->resdis_header.service;
+	cinfo = (uintptr_t)req_lib_dispatch_init->conn_info;
+	msg_conn_io = (struct conn_io *)cinfo;
 
-		cinfo = (uintptr_t)req_lib_dispatch_init->conn_info;
-		conn_info->conn_info_partner = (struct conn_info *)cinfo;
-
-		/* temporary fix for memory leak
+	/*
+	 * The response IPC connection has disconnected already for
+	 * some reason and is no longer referenceable in the system
+	 */
+	if (conn_io->state == CONN_IO_STATE_AUTHENTICATED) {
+		/*
+		 * If the response conn_io isn't found, it disconnected.
+		 * Hence, a full connection cannot be made and this connection
+		 * should be aborted by the poll thread
 		 */
-		pthread_mutex_destroy (conn_info->conn_info_partner->shared_mutex);
-		free (conn_info->conn_info_partner->shared_mutex);
-		
-		conn_info->conn_info_partner->shared_mutex = conn_info->shared_mutex;
+		if (conn_io_found (msg_conn_io) == 0) {
+			error = SA_AIS_ERR_TRY_AGAIN;
+			conn_io->state = CONN_IO_STATE_INIT_FAILED;
+		} else
+		/*
+		 * If no service is found for the requested library service,
+		 * the proper service handler isn't loaded and this connection
+		 * should be aborted by the poll thread
+		 */
+		if (ais_service[service] == NULL) {
+			error = SA_AIS_ERR_NOT_SUPPORTED;
+			conn_io->state = CONN_IO_STATE_INIT_FAILED;
+		} else {
+			error = SA_AIS_OK;
+		}
 
-		list_add (&conn_info_list_head, &conn_info->list);
-		list_add (&conn_info_list_head, &conn_info->conn_info_partner->list);
-
-		msg_conn_info = (struct conn_info *)cinfo;
-		msg_conn_info->conn_info_partner = conn_info;
-
+		/*
+		 * The response and dispatch conn_io structures are available.
+		 * Attempt to allocate the appropriate memory for the private
+		 * data area
+		 */
 		if (error == SA_AIS_OK) {
 			int private_data_size;
 
-			private_data_size = ais_service[req_lib_dispatch_init->resdis_header.service]->private_data_size;
+			conn_info = conn_info_create ();
+			private_data_size = ais_service[service]->private_data_size;
 			if (private_data_size) {
 				conn_info->private_data = malloc (private_data_size);
 
-				conn_info->conn_info_partner->private_data = conn_info->private_data;
+				/*
+				 * No private data could be allocated so
+				 * request the poll thread to abort
+				 */
 				if (conn_info->private_data == NULL) {
+					conn_io->state = CONN_IO_STATE_INIT_FAILED;
 					error = SA_AIS_ERR_NO_MEMORY;
 				} else {
 					memset (conn_info->private_data, 0, private_data_size);
 				}
 			} else {
 				conn_info->private_data = NULL;
-				conn_info->conn_info_partner->private_data = NULL;
 			}
 		}
 	}
@@ -257,318 +402,317 @@ static int dispatch_init_send_response (
 	res_lib_dispatch_init.header.id = MESSAGE_RES_INIT;
 	res_lib_dispatch_init.header.error = error;
 
-	openais_conn_send_response (
-		conn_info,
-		&res_lib_dispatch_init,
-		sizeof (res_lib_dispatch_init));
-
-	if (error == SA_AIS_ERR_ACCESS) {
-		libais_disconnect_security (conn_info);
-		return (-1);
-	}
 	if (error != SA_AIS_OK) {
+		conn_io_send (
+			conn_io,
+			&res_lib_dispatch_init,
+			sizeof (res_lib_dispatch_init));
+
 		return (-1);
 	}
 
-	conn_info->state = CONN_STATE_ACTIVE;
-	conn_info->conn_info_partner->state = CONN_STATE_ACTIVE;
-	conn_info->lib_exit_fn = ais_service[conn_info->service]->lib_exit_fn;
+	/*
+	 * connect both dispatch and response conn_ios into the conn_info
+	 * data structure
+	 */
+	conn_info->state = CONN_INFO_STATE_ACTIVE;
+	conn_info->lib_exit_fn = ais_service[service]->lib_exit_fn;
+	conn_info->conn_io_response = msg_conn_io;
+	conn_info->conn_io_response->conn_info = conn_info;
+	conn_info->conn_io_dispatch = conn_io;
+	conn_info->service = service;
+	conn_io->service = service;
+	conn_io->conn_info = conn_info;
 	ais_service[conn_info->service]->lib_init_fn (conn_info);
 
 	conn_info->flow_control = ais_service[conn_info->service]->flow_control;
-	conn_info->conn_info_partner->flow_control = ais_service[conn_info->service]->flow_control;
 	if (ais_service[conn_info->service]->flow_control == OPENAIS_FLOW_CONTROL_REQUIRED) {
 		openais_flow_control_ipc_init (
 			&conn_info->flow_control_handle,
 			conn_info->service);
 
 	}
+
+	/*
+	 * Tell the library the IPC connections are configured
+	 */
+	conn_io_send (
+		conn_io,
+		&res_lib_dispatch_init,
+		sizeof (res_lib_dispatch_init));
 	return (0);
 }
 
 /*
  * Create a connection data structure
  */
-static inline unsigned int conn_info_create (int fd) {
+static inline struct conn_info *conn_info_create (void)
+{
 	struct conn_info *conn_info;
-	int res;
 
 	conn_info = malloc (sizeof (struct conn_info));
 	if (conn_info == 0) {
-		return (ENOMEM);
+		return (NULL);
 	}
 
 	memset (conn_info, 0, sizeof (struct conn_info));
 
-	res = queue_init (&conn_info->outq, SIZEQUEUE,
+	conn_info->refcnt = 2;
+	pthread_mutex_init (&conn_info->mutex, NULL);
+	conn_info->state = CONN_INFO_STATE_INITIALIZING;
+
+	return (conn_info);
+}
+
+static inline void conn_info_destroy (struct conn_info *conn_info)
+{
+	if (conn_info->private_data) {
+		free (conn_info->private_data);
+	}
+	pthread_mutex_destroy (&conn_info->mutex);
+	free (conn_info);
+}
+
+static int conn_io_create (int fd)
+{
+	int res;
+	struct conn_io *conn_io;
+
+	conn_io = malloc (sizeof (struct conn_io));
+	if (conn_io == NULL) {
+		return (-1);
+	}
+	memset (conn_io, 0, sizeof (struct conn_io));
+
+	res = queue_init (&conn_io->outq, SIZEQUEUE,
 		sizeof (struct outq_item));
 	if (res != 0) {
-		free (conn_info);
-		return (ENOMEM);
-	}
-	conn_info->inb = malloc (sizeof (char) * SIZEINB);
-	if (conn_info->inb == NULL) {
-		queue_free (&conn_info->outq);
-		free (conn_info);
-		return (ENOMEM);
-	}
-	conn_info->shared_mutex = malloc (sizeof (pthread_mutex_t));
-	if (conn_info->shared_mutex == NULL) {
-		free (conn_info->inb);
-		queue_free (&conn_info->outq);
-		free (conn_info);
-		return (ENOMEM);
+		return (-1);
 	}
 
-	pthread_mutex_init (&conn_info->mutex, NULL);
-	pthread_mutex_init (&conn_info->flow_control_mutex, NULL);
-	pthread_mutex_init (conn_info->shared_mutex, NULL);
+	conn_io->inb = malloc (sizeof (char) * SIZEINB);
+	if (conn_io->inb == NULL) {
+		queue_free (&conn_io->outq);
+		return (-1);
+	}
 
-	list_init (&conn_info->list);
-	conn_info->state = CONN_STATE_ACTIVE;
-	conn_info->fd = fd;
-	conn_info->events = POLLIN|POLLNVAL;
-	conn_info->service = SOCKET_SERVICE_INIT;
+	conn_io->fd = fd;
+	conn_io->events = POLLIN|POLLNVAL;
+	conn_io->refcnt = 1;
+	conn_io->service = SOCKET_SERVICE_INIT;
+	conn_io->state = CONN_IO_STATE_INITIALIZING;
 
-	pthread_attr_init (&conn_info->thread_attr);
-/*
- * IA64 needs more stack space then other arches
- */
+	pthread_attr_init (&conn_io->thread_attr);
+
+	pthread_mutex_init (&conn_io->mutex, NULL);
+
+	/*
+	 * IA64 needs more stack space then other arches
+	 */
 #if defined(__ia64__)
-	pthread_attr_setstacksize (&conn_info->thread_attr, 400000);
+	pthread_attr_setstacksize (&conn_io->thread_attr, 400000);
 #else
-	pthread_attr_setstacksize (&conn_info->thread_attr, 200000);
+	pthread_attr_setstacksize (&conn_io->thread_attr, 200000);
 #endif
 
-	pthread_attr_setdetachstate (&conn_info->thread_attr, PTHREAD_CREATE_DETACHED);
-	res = pthread_create (&conn_info->thread, &conn_info->thread_attr,
-		prioritized_poll_thread, conn_info);
+	pthread_attr_setdetachstate (&conn_io->thread_attr, PTHREAD_CREATE_DETACHED);
+
+	res = pthread_create (&conn_io->thread, &conn_io->thread_attr,
+		prioritized_poll_thread, conn_io);
+
+	list_init (&conn_io->list);
+
+	pthread_mutex_lock (&conn_io_list_mutex);
+	list_add (&conn_io->list, &conn_io_list_head);
+	pthread_mutex_unlock (&conn_io_list_mutex);
 	return (res);
 }
 
-static void conn_info_destroy (struct conn_info *conn_info)
+static void conn_io_destroy (struct conn_io *conn_io)
 {
 	struct outq_item *outq_item;
 
 	/*
 	 * Free the outq queued items
 	 */
-	while (!queue_is_empty (&conn_info->outq)) {
-		outq_item = queue_item_get (&conn_info->outq);
+	while (!queue_is_empty (&conn_io->outq)) {
+		outq_item = queue_item_get (&conn_io->outq);
 		free (outq_item->msg);
-		queue_item_remove (&conn_info->outq);
+		queue_item_remove (&conn_io->outq);
 	}
 
-	queue_free (&conn_info->outq);
-	free (conn_info->inb);
-	if (conn_info->conn_info_partner) {
-		conn_info->conn_info_partner->conn_info_partner = NULL;
-	}
+	queue_free (&conn_io->outq);
+	free (conn_io->inb);
+	close (conn_io->fd);
+	pthread_mutex_lock (&conn_io_list_mutex);
+	list_del (&conn_io->list);
+	pthread_mutex_unlock (&conn_io_list_mutex);
 	
-	pthread_attr_destroy (&conn_info->thread_attr);
-	pthread_mutex_destroy (&conn_info->mutex);
-	pthread_mutex_destroy (&conn_info->flow_control_mutex);
-
-	list_del (&conn_info->list);
-	free (conn_info);
+	pthread_attr_destroy (&conn_io->thread_attr);
+	pthread_mutex_destroy (&conn_io->mutex);
+	free (conn_io);
 }
 
-static int libais_connection_active (struct conn_info *conn_info)
+static int conn_io_found (struct conn_io *conn_io_to_match)
 {
-	return (conn_info->state == CONN_STATE_ACTIVE);
-}
+	struct list_head *list;
+	struct conn_io *conn_io;
 
-static void libais_disconnect_request (struct conn_info *conn_info)
-{
-	if (conn_info->state == CONN_STATE_ACTIVE) {
-		conn_info->state = CONN_STATE_REQUESTED;
-		conn_info->conn_info_partner->state = CONN_STATE_REQUESTED;
-	}
-}
-
-static int libais_disconnect (struct conn_info *conn_info)
-{
-	int res = 0;
-
-	assert (conn_info->state != CONN_STATE_ACTIVE);
-
-	if (conn_info->state == CONN_STATE_DISCONNECTED) {
-		assert (0);
-	}
-
-	/*
-	 * Close active connections
-	 */
-	if (conn_info->state == CONN_STATE_ACTIVE || conn_info->state == CONN_STATE_REQUESTED) {
-		close (conn_info->fd);
-		conn_info->state = CONN_STATE_CLOSED;
-		close (conn_info->conn_info_partner->fd);
-		conn_info->conn_info_partner->state = CONN_STATE_CLOSED;
-	}
-
-	/*
-	 * Note we will only call the close operation once on the first time
-	 * one of the connections is closed
-	 */	
-	if (conn_info->state == CONN_STATE_CLOSED) {
-		if (conn_info->lib_exit_fn) {
-			res = conn_info->lib_exit_fn (conn_info);
-		}
-		if (res == -1) {
-			return (-1);
-		}
-		if (conn_info->conn_info_partner->lib_exit_fn) {
-			res = conn_info->conn_info_partner->lib_exit_fn (conn_info);
-		}
-		if (res == -1) {
-			return (-1);
+	for (list = conn_io_list_head.next; list != &conn_io_list_head;
+		list = list->next) {
+	
+		conn_io = list_entry (list, struct conn_io, list);
+		if (conn_io == conn_io_to_match) {
+			return (1);
 		}
 	}
-	conn_info->state = CONN_STATE_DISCONNECTED;
-	conn_info->conn_info_partner->state = CONN_STATE_DISCONNECTED;
-	if (conn_info->flow_control_enabled == 1) {
-		openais_flow_control_disable (conn_info->flow_control_handle);
-	}
+
 	return (0);
-}
-
-static inline void conn_info_mutex_lock (
-	struct conn_info *conn_info,
-	unsigned int service)
-{
-	if (service == SOCKET_SERVICE_INIT) {
-		pthread_mutex_lock (&conn_info->mutex);
-	} else {
-		pthread_mutex_lock (conn_info->shared_mutex);
-	}
-}
-static inline void conn_info_mutex_unlock (
-	struct conn_info *conn_info,
-	unsigned int service)
-{
-	if (service == SOCKET_SERVICE_INIT) {
-		pthread_mutex_unlock (&conn_info->mutex);
-	} else {
-		pthread_mutex_unlock (conn_info->shared_mutex);
-	}
 }
 
 /*
  * This thread runs in a specific thread priority mode to handle
- * I/O requests from the library
+ * I/O requests from or to the library
  */
-static void *prioritized_poll_thread (void *conn)
+static void *prioritized_poll_thread (void *conn_io_in)
 {
-	struct conn_info *conn_info = (struct conn_info *)conn;
+	struct conn_io *conn_io = (struct conn_io *)conn_io_in;
+	struct conn_info *conn_info = NULL;
 	struct pollfd ufd;
 	int fds;
 	struct sched_param sched_param;
 	int res;
-	pthread_mutex_t *rel_mutex;
-	unsigned int service;
-	struct conn_info *cinfo_partner;
-	void *private_data;
 
-#if defined(OPENAIS_BSD) || defined(OPENAIS_LINUX)
-	res = sched_get_priority_max (SCHED_RR);
-	if (res != -1) {
-		sched_param.sched_priority = res;
-		res = pthread_setschedparam (conn_info->thread, SCHED_RR, &sched_param);
-		if (res == -1) {
-			log_printf (LOG_LEVEL_WARNING, "Could not set SCHED_RR at priority %d: %s\n",
-				sched_param.sched_priority, strerror (errno));
-		}
-	} else
-		log_printf (LOG_LEVEL_WARNING, "Could not get maximum scheduler priority: %s\n", strerror (errno));
-#else
-	log_printf(LOG_LEVEL_WARNING, "Scheduler priority left to default value (no OS support)\n");
-#endif
+	sched_param.sched_priority = 1;
+//	res = pthread_setschedparam (conn_io->thread, SCHED_RR, &sched_param);
 
-	ufd.fd = conn_info->fd;
+	ufd.fd = conn_io->fd;
 	for (;;) {
 retry_poll:
-		service = conn_info->service;
-		ufd.events = conn_info->events;
+		conn_info = conn_io->conn_info;
+		conn_io_refcnt_inc (conn_io);
+		conn_info_refcnt_inc (conn_info);
+
+		ufd.events = conn_io->events;
 		ufd.revents = 0;
 		fds = poll (&ufd, 1, -1);
-		
-		conn_info_mutex_lock (conn_info, service);
-		
-		switch (conn_info->state) {
-		case CONN_STATE_SECURITY:
-			conn_info_mutex_unlock (conn_info, service);
-			pthread_mutex_destroy (conn_info->shared_mutex);
-			free (conn_info->shared_mutex);
-			conn_info_destroy (conn);
-			pthread_exit (0);
-			break;
-
-		case CONN_STATE_REQUESTED:
-		case CONN_STATE_CLOSED:
-			res = libais_disconnect (conn);
-			if (res != 0) {
-				conn_info_mutex_unlock (conn_info, service);
-				goto retry_poll;
-			}
-			break;
-
-		case CONN_STATE_DISCONNECTED:
-			rel_mutex = conn_info->shared_mutex;
-			private_data = conn_info->private_data;
-			cinfo_partner = conn_info->conn_info_partner;
-			conn_info_destroy (conn);
-			if (service == SOCKET_SERVICE_INIT) {
-				pthread_mutex_unlock (&conn_info->mutex);
-			} else {
-				pthread_mutex_unlock (rel_mutex);
-			}
-			if (cinfo_partner == NULL) {
-				pthread_mutex_destroy (rel_mutex);
-				free (rel_mutex);
-				free (private_data);
-			}
-			pthread_exit (0);
-			/*
-			 * !! NOTE !! this is the exit point for this thread
-			 */
-			break;
-
-		default:
-			break;
-		}
-
 		if (fds == -1) {
-			conn_info_mutex_unlock (conn_info, service);
+			conn_io_refcnt_dec (conn_io);
+			conn_info_refcnt_dec (conn_info);
 			goto retry_poll;
 		}
 
 		ipc_serialize_lock_fn ();
 
 		if (fds == 1 && ufd.revents) {
-			if (ufd.revents & (POLLERR|POLLHUP)) {
+			if ((ufd.revents & (POLLERR|POLLHUP)) ||
+				(conn_info &&
+					conn_info->state == CONN_INFO_STATE_DISCONNECT_REQUESTED)) {
+				disconnect_request (conn_info);
 
-				libais_disconnect_request (conn_info);
-
-				conn_info_mutex_unlock (conn_info, service);
+				conn_io_refcnt_dec (conn_io);
+				conn_info_refcnt_dec (conn_info);
 				ipc_serialize_unlock_fn ();
-				continue;
+				break; /* from for */
 			}
 			
 			if (ufd.revents & POLLOUT) {
-				conn_info_outq_flush (conn_info);
+				conn_io_outq_flush (conn_io);
 			}
 
 			if ((ufd.revents & POLLIN) == POLLIN) {
-				libais_deliver (conn_info);
+				conn_io_deliver (conn_io);
 			}
 
-			ipc_flow_control (conn_info);
+			/*
+			 * IPC initializiation failed because response fd
+			 * disconnected before it was linked to dispatch fd
+			 */
+			if (conn_io->state == CONN_IO_STATE_INIT_FAILED) {
+				conn_io_destroy (conn_io);
+				conn_info_refcnt_dec (conn_info);
+				ipc_serialize_unlock_fn ();
+				pthread_exit (0);
+			}
+			/*
+			 * IPC initializiation failed because response fd
+			 * disconnected before it was linked to dispatch fd
+			 */
+			if (conn_io->state == CONN_IO_STATE_INIT_FAILED) {
+				break;
+			}
+
+//			ipc_flow_control (conn_info);
 
 		}
 
 		ipc_serialize_unlock_fn ();
-		conn_info_mutex_unlock (conn_info, service);
+
+		conn_io_refcnt_dec (conn_io);
+		conn_info_refcnt_dec (conn_info);
 	}
+
+	ipc_serialize_lock_fn ();
+
+	/*
+	 * IPC initializiation failed because response fd
+	 * disconnected before it was linked to dispatch fd
+	 */
+	if (conn_io->conn_info == NULL || conn_io->state == CONN_IO_STATE_INIT_FAILED) {
+		conn_io_destroy (conn_io);
+		conn_info_refcnt_dec (conn_info);
+		ipc_serialize_unlock_fn ();
+		pthread_exit (0);
+	}
+
+	conn_info = conn_io->conn_info;
+
+	/*
+	 * This is the response conn_io
+	 */
+	if (conn_info->conn_io_response == conn_io) {
+		for (;;) {
+			if (conn_io_refcnt_value (conn_io) == 0) {
+				conn_io->conn_info = NULL;
+				conn_io_destroy (conn_io);
+				conn_info_refcnt_dec (conn_info);
+				ipc_serialize_unlock_fn ();
+				pthread_exit (0);
+			}
+		usleep (1000);
+	printf ("sleep 1\n");
+		}
+	} /* response conn_io */
+
+	/*
+	 * This is the dispatch conn_io
+	 */
+	if (conn_io->conn_info->conn_io_dispatch == conn_io) {
+		for (;;) {
+			if (conn_io_refcnt_value (conn_io) == 0) {
+				res = 0; // TODO
+				/*
+				 * Execute the library exit function
+				 */
+				if (conn_io->conn_info->lib_exit_fn) {
+					res = conn_io->conn_info->lib_exit_fn (conn_info);
+				}
+				if (res == 0) {
+					if (conn_io->conn_info->flow_control_enabled == 1) {
+//						openais_flow_control_disable (
+//							conn_info->flow_control_handle);
+					}
+					conn_io->conn_info = NULL;
+					conn_io_destroy (conn_io);
+					conn_info_refcnt_dec (conn_info);
+					ipc_serialize_unlock_fn ();
+					pthread_exit (0);
+				}
+			} /* refcnt == 0 */
+			usleep (1000);
+	printf ("sleep 2\n");
+		} /* for (;;) */
+	} /* dispatch conn_io */
 
 	/*
 	 * This code never reached
@@ -576,19 +720,22 @@ retry_poll:
 	return (0);
 }
 
-#if defined(OPENAIS_LINUX)
+#if defined(OPENAIS_LINUX) || defined(OPENAIS_SOLARIS)
 /* SUN_LEN is broken for abstract namespace
  */
 #define AIS_SUN_LEN(a) sizeof(*(a))
-
-char *socketname = "libais.socket";
 #else
 #define AIS_SUN_LEN(a) SUN_LEN(a)
+#endif
 
+#if defined(OPENAIS_LINUX)
+char *socketname = "libais.socket";
+#else
 char *socketname = "/var/run/libais.socket";
 #endif
 
 
+#ifdef COMPILOE_OUT
 static void ipc_flow_control (struct conn_info *conn_info)
 {
 	unsigned int entries_used;
@@ -646,8 +793,9 @@ static void ipc_flow_control (struct conn_info *conn_info)
 		}
 	}
 }
+#endif
 
-static int conn_info_outq_flush (struct conn_info *conn_info) {
+static int conn_io_outq_flush (struct conn_io *conn_io) {
 	struct queue *outq;
 	int res = 0;
 	struct outq_item *queue_item;
@@ -655,46 +803,51 @@ static int conn_info_outq_flush (struct conn_info *conn_info) {
 	struct iovec iov_send;
 	char *msg_addr;
 
-	if (!libais_connection_active (conn_info)) {
-		return (-1);
-	}
-	outq = &conn_info->outq;
+	outq = &conn_io->outq;
 
 	msg_send.msg_iov = &iov_send;
 	msg_send.msg_name = 0;
 	msg_send.msg_namelen = 0;
 	msg_send.msg_iovlen = 1;
+#ifndef OPENAIS_SOLARIS
 	msg_send.msg_control = 0;
 	msg_send.msg_controllen = 0;
 	msg_send.msg_flags = 0;
+#else
+	msg_send.msg_accrights = 0;
+	msg_send.msg_accrightslen = 0;
+#endif
 
+	pthread_mutex_lock (&conn_io->mutex);
 	while (!queue_is_empty (outq)) {
 		queue_item = queue_item_get (outq);
 		msg_addr = (char *)queue_item->msg;
-		msg_addr = &msg_addr[conn_info->byte_start];
+		msg_addr = &msg_addr[conn_io->byte_start];
 
 		iov_send.iov_base = msg_addr;
-		iov_send.iov_len = queue_item->mlen - conn_info->byte_start;
+		iov_send.iov_len = queue_item->mlen - conn_io->byte_start;
 
 retry_sendmsg:
-		res = sendmsg (conn_info->fd, &msg_send, MSG_NOSIGNAL);
+		res = sendmsg (conn_io->fd, &msg_send, MSG_NOSIGNAL);
 		if (res == -1 && errno == EINTR) {
 			goto retry_sendmsg;
 		}
 		if (res == -1 && errno == EAGAIN) {
+			pthread_mutex_unlock (&conn_io->mutex);
 			return (0);
 		}
 		if (res == -1 && errno == EPIPE) {
-			libais_disconnect_request (conn_info);
+			disconnect_request (conn_io->conn_info);
+			pthread_mutex_unlock (&conn_io->mutex);
 			return (0);
 		}
 		if (res == -1) {
-			printf ("ERRNO is %d\n", errno);
 			assert (0); /* some other unhandled error here */
 		}
-		if (res + conn_info->byte_start != queue_item->mlen) {
-			conn_info->byte_start += res;
+		if (res + conn_io->byte_start != queue_item->mlen) {
+			conn_io->byte_start += res;
 
+			pthread_mutex_unlock (&conn_io->mutex);
 			return (0);
 		}
 
@@ -702,14 +855,15 @@ retry_sendmsg:
 		 * Message sent, try sending another message
 		 */
 		queue_item_remove (outq);
-		conn_info->byte_start = 0;
+		conn_io->byte_start = 0;
 		free (queue_item->msg);
 	} /* while queue not empty */
 
 	if (queue_is_empty (outq)) {
-		conn_info->events = POLLIN|POLLNVAL;
+		conn_io->events = POLLIN|POLLNVAL;
 	}
 
+	pthread_mutex_unlock (&conn_io->mutex);
 	return (0);
 }
 
@@ -720,7 +874,7 @@ struct res_overlay {
 	char buf[4096];
 };
 
-static void libais_deliver (struct conn_info *conn_info)
+static void conn_io_deliver (struct conn_io *conn_io)
 {
 	int res;
 	mar_req_header_t *header;
@@ -732,9 +886,6 @@ static void libais_deliver (struct conn_info *conn_info)
 	char cmsg_cred[CMSG_SPACE (sizeof (struct ucred))];
 	struct ucred *cred;
 	int on = 0;
-#else
-	uid_t euid;
-	gid_t egid;
 #endif
 	int send_ok = 0;
 	int send_ok_joined = 0;
@@ -745,9 +896,10 @@ static void libais_deliver (struct conn_info *conn_info)
 	msg_recv.msg_iovlen = 1;
 	msg_recv.msg_name = 0;
 	msg_recv.msg_namelen = 0;
+#ifndef OPENAIS_SOLARIS
 	msg_recv.msg_flags = 0;
 
-	if (conn_info->authenticated) {
+	if (conn_io->state == CONN_IO_STATE_AUTHENTICATED) {
 		msg_recv.msg_control = 0;
 		msg_recv.msg_controllen = 0;
 	} else {
@@ -756,24 +908,54 @@ static void libais_deliver (struct conn_info *conn_info)
 		msg_recv.msg_controllen = sizeof (cmsg_cred);
 #else
 		euid = -1; egid = -1;
-		if (getpeereid(conn_info->fd, &euid, &egid) != -1 &&
+		if (getpeereid(conn_io->fd, &euid, &egid) != -1 &&
 		    (euid == 0 || egid == g_gid_valid)) {
-				conn_info->authenticated = 1;
+				conn_io->state = CONN_IO_STATE_AUTHENTICATED;
 		}
-		if (conn_info->authenticated == 0) {
+		if (conn_io->state == CONN_IO_STATE_INITIALIZING) {
 			log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", egid, g_gid_valid);
 		}
 #endif
 	}
 
-	iov_recv.iov_base = &conn_info->inb[conn_info->inb_start];
-	iov_recv.iov_len = (SIZEINB) - conn_info->inb_start;
-	if (conn_info->inb_inuse == SIZEINB) {
+	#else /* OPENAIS_SOLARIS */
+	msg_recv.msg_accrights = 0;
+	msg_recv.msg_accrightslen = 0;
+
+
+	if (! conn_info->authenticated) {
+	#ifdef HAVE_GETPEERUCRED
+	ucred_t *uc;
+	uid_t euid = -1;
+	gid_t egid = -1;
+	if (getpeerucred(conn_info->fd, &uc) == 0) {
+	euid = ucred_geteuid(uc);
+	egid = ucred_getegid(uc);
+	if ((euid == 0) || (egid == g_gid_valid)) {
+		conn_info->authenticated = 1;
+	}
+		ucred_free(uc);
+	}
+	if (conn_info->authenticated == 0) {
+		log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", (int)egid, g_gid_valid);
+ 		}
+ #else
+ 		log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated "
+ 			"because platform does not support "
+ 			"authentication with sockets, continuing "
+ 			"with a fake authentication\n");
+ 		conn_info->authenticated = 1;
+ #endif
+ 	}
+ #endif
+	iov_recv.iov_base = &conn_io->inb[conn_io->inb_start];
+	iov_recv.iov_len = (SIZEINB) - conn_io->inb_start;
+	if (conn_io->inb_inuse == SIZEINB) {
 		return;
 	}
 
 retry_recv:
-	res = recvmsg (conn_info->fd, &msg_recv, MSG_NOSIGNAL);
+	res = recvmsg (conn_io->fd, &msg_recv, MSG_NOSIGNAL);
 	if (res == -1 && errno == EINTR) {
 		goto retry_recv;
 	} else
@@ -794,17 +976,17 @@ retry_recv:
 	 * Authenticate if this connection has not been authenticated
 	 */
 #ifdef OPENAIS_LINUX
-	if (conn_info->authenticated == 0) {
+	if (conn_io->state == CONN_IO_STATE_INITIALIZING) {
 		cmsg = CMSG_FIRSTHDR (&msg_recv);
 		assert (cmsg);
 		cred = (struct ucred *)CMSG_DATA (cmsg);
 		if (cred) {
 			if (cred->uid == 0 || cred->gid == g_gid_valid) {
-				setsockopt(conn_info->fd, SOL_SOCKET, SO_PASSCRED, &on, sizeof (on));
-				conn_info->authenticated = 1;
+				setsockopt(conn_io->fd, SOL_SOCKET, SO_PASSCRED, &on, sizeof (on));
+				conn_io->state = CONN_IO_STATE_AUTHENTICATED;
 			}
 		}
-		if (conn_info->authenticated == 0) {
+		if (conn_io->state == CONN_IO_STATE_INITIALIZING) {
 			log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", cred->gid, g_gid_valid);
 		}
 	}
@@ -813,23 +995,23 @@ retry_recv:
 	 * Dispatch all messages received in recvmsg that can be dispatched
 	 * sizeof (mar_req_header_t) needed at minimum to do any processing
 	 */
-	conn_info->inb_inuse += res;
-	conn_info->inb_start += res;
+	conn_io->inb_inuse += res;
+	conn_io->inb_start += res;
 
-	while (conn_info->inb_inuse >= sizeof (mar_req_header_t) && res != -1) {
-		header = (mar_req_header_t *)&conn_info->inb[conn_info->inb_start - conn_info->inb_inuse];
+	while (conn_io->inb_inuse >= sizeof (mar_req_header_t) && res != -1) {
+		header = (mar_req_header_t *)&conn_io->inb[conn_io->inb_start - conn_io->inb_inuse];
 
-		if (header->size > conn_info->inb_inuse) {
+		if (header->size > conn_io->inb_inuse) {
 			break;
 		}
-		service = conn_info->service;
+		service = conn_io->service;
 
 		/*
 		 * If this service is in init phase, initialize service
 		 * else handle message using service service
 		 */
-		if (service == SOCKET_SERVICE_INIT) {
-			res = ais_init_service[header->id] (conn_info, header);
+		if (conn_io->service == SOCKET_SERVICE_INIT) {
+			res = ais_init_service[header->id] (conn_io, header);
 		} else  {
 			/*
 			 * Not an init service, but a standard service
@@ -846,7 +1028,7 @@ retry_recv:
 			 * to queue a message, otherwise tell the library we are busy and to
 			 * try again later
 			 */
-			send_ok_joined_iovec.iov_base = header;
+			send_ok_joined_iovec.iov_base = (char *)header;
 			send_ok_joined_iovec.iov_len = header->size;
 			send_ok_joined = totempg_groups_send_ok_joined (openais_group_handle,
 				&send_ok_joined_iovec, 1);
@@ -859,7 +1041,7 @@ retry_recv:
 				(sync_in_process() == 0)));
 
 			if (send_ok) {
-				ais_service[service]->lib_service[header->id].lib_handler_fn(conn_info, header);
+				ais_service[service]->lib_service[header->id].lib_handler_fn(conn_io->conn_info, header);
 			} else {
 
 				/*
@@ -870,33 +1052,33 @@ retry_recv:
 				res_overlay.header.id =
 					ais_service[service]->lib_service[header->id].response_id;
 				res_overlay.header.error = SA_AIS_ERR_TRY_AGAIN;
-				openais_conn_send_response (
-					conn_info,
+				conn_io_send (
+					conn_io,
 					&res_overlay,
 					res_overlay.header.size);
 			}
 		}
-		conn_info->inb_inuse -= header->size;
+		conn_io->inb_inuse -= header->size;
 	} /* while */
 
-	if (conn_info->inb_inuse == 0) {
-		conn_info->inb_start = 0;
+	if (conn_io->inb_inuse == 0) {
+		conn_io->inb_start = 0;
 	} else
-// BUG	if (connections[conn_info->fd].inb_start + connections[conn_info->fd].inb_inuse >= SIZEINB) {
-	if (conn_info->inb_start >= SIZEINB) {
+// BUG	if (connections[conn_io->fd].inb_start + connections[conn_io->fd].inb_inuse >= SIZEINB) {
+	if (conn_io->inb_start >= SIZEINB) {
 		/*
 		 * If in buffer is full, move it back to start
 		 */
-		memmove (conn_info->inb,
-			&conn_info->inb[conn_info->inb_start - conn_info->inb_inuse],
-			sizeof (char) * conn_info->inb_inuse);
-		conn_info->inb_start = conn_info->inb_inuse;
+		memmove (conn_io->inb,
+			&conn_io->inb[conn_io->inb_start - conn_io->inb_inuse],
+			sizeof (char) * conn_io->inb_inuse);
+		conn_io->inb_start = conn_io->inb_inuse;
 	}
 
 	return;
 }
 
-static int poll_handler_libais_accept (
+static int poll_handler_accept (
 	poll_handle handle,
 	int fd,
 	int revent,
@@ -944,7 +1126,7 @@ retry_accept:
 
 	log_printf (LOG_LEVEL_DEBUG, "connection received from libais client %d.\n", new_fd);
 
-	res = conn_info_create (new_fd);
+	res = conn_io_create (new_fd);
 	if (res != 0) {
 		close (new_fd);
 	}
@@ -994,8 +1176,6 @@ void openais_ipc_init (
 	struct sockaddr_un un_addr;
 	int res;
 
-	log_init ("IPC");
-
 	ipc_serialize_lock_fn = serialize_lock_fn;
 
 	ipc_serialize_unlock_fn = serialize_unlock_fn;
@@ -1009,7 +1189,7 @@ void openais_ipc_init (
 		openais_exit_error (AIS_DONE_LIBAIS_SOCKET);
 	};
 
-	totemip_nosigpipe(libais_server_fd);
+	totemip_nosigpipe (libais_server_fd);
 	res = fcntl (libais_server_fd, F_SETFL, O_NONBLOCK);
 	if (res == -1) {
 		log_printf (LOG_LEVEL_ERROR, "Could not set non-blocking operation on server socket: %s\n", strerror (errno));
@@ -1041,7 +1221,7 @@ void openais_ipc_init (
          * Setup libais connection dispatch routine
          */
         poll_dispatch_add (aisexec_poll_handle, libais_server_fd,
-                POLLIN, 0, poll_handler_libais_accept);
+                POLLIN, 0, poll_handler_accept);
 
 	g_gid_valid = gid_valid;
 
@@ -1063,33 +1243,14 @@ void *openais_conn_private_data_get (void *conn)
 {
 	struct conn_info *conn_info = (struct conn_info *)conn;
 
-	if (conn != NULL) {
-		return ((void *)conn_info->private_data);
-	} else {
-		return NULL;
-	}
+	return (conn_info->private_data);
 }
 
-/*
- * Get the conn info partner connection
- */
-void *openais_conn_partner_get (void *conn)
-{
-	struct conn_info *conn_info = (struct conn_info *)conn;
-
-	if (conn != NULL) {
-		return ((void *)conn_info->conn_info_partner);
-	} else {
-		return NULL;
-	}
-}
-
-int openais_conn_send_response (
-	void *conn,
+static int conn_io_send (
+	struct conn_io *conn_io,
 	void *msg,
 	int mlen)
 {
-	struct queue *outq;
 	char *cmsg;
 	int res = 0;
 	int queue_empty;
@@ -1098,47 +1259,47 @@ int openais_conn_send_response (
 	struct msghdr msg_send;
 	struct iovec iov_send;
 	char *msg_addr;
-	struct conn_info *conn_info = (struct conn_info *)conn;
 
-	if (conn_info == NULL) {
-		return -1;
+	if (conn_io == NULL) {
+		assert (0);
 	}
 
-	if (!libais_connection_active (conn_info)) {
-		return (-1);
-	}
-
-	ipc_flow_control (conn_info);
-
-	outq = &conn_info->outq;
+//	ipc_flow_control (conn_info);
 
 	msg_send.msg_iov = &iov_send;
 	msg_send.msg_name = 0;
 	msg_send.msg_namelen = 0;
 	msg_send.msg_iovlen = 1;
+#ifndef OPENAIS_SOLARIS
 	msg_send.msg_control = 0;
 	msg_send.msg_controllen = 0;
 	msg_send.msg_flags = 0;
+#else
+	msg_send.msg_accrights = 0;
+	msg_send.msg_accrightslen = 0;
+#endif
 
-	if (queue_is_full (outq)) {
+	pthread_mutex_lock (&conn_io->mutex);
+	if (queue_is_full (&conn_io->outq)) {
 		/*
 		 * Start a disconnect if we have not already started one
 		 * and report that the outgoing queue is full
 		 */
 		log_printf (LOG_LEVEL_ERROR, "Library queue is full, disconnecting library connection.\n");
-		libais_disconnect_request (conn_info);
+		disconnect_request (conn_io->conn_info);
+		pthread_mutex_unlock (&conn_io->mutex);
 		return (-1);
 	}
-	while (!queue_is_empty (outq)) {
-		queue_item = queue_item_get (outq);
+	while (!queue_is_empty (&conn_io->outq)) {
+		queue_item = queue_item_get (&conn_io->outq);
 		msg_addr = (char *)queue_item->msg;
-		msg_addr = &msg_addr[conn_info->byte_start];
+		msg_addr = &msg_addr[conn_io->byte_start];
 
 		iov_send.iov_base = msg_addr;
-		iov_send.iov_len = queue_item->mlen - conn_info->byte_start;
+		iov_send.iov_len = queue_item->mlen - conn_io->byte_start;
 
 retry_sendmsg:
-		res = sendmsg (conn_info->fd, &msg_send, MSG_NOSIGNAL);
+		res = sendmsg (conn_io->fd, &msg_send, MSG_NOSIGNAL);
 		if (res == -1 && errno == EINTR) {
 			goto retry_sendmsg;
 		}
@@ -1146,29 +1307,30 @@ retry_sendmsg:
 			break; /* outgoing kernel queue full */
 		}
 		if (res == -1 && errno == EPIPE) {
-			libais_disconnect_request (conn_info);
+			disconnect_request (conn_io->conn_info);
+			pthread_mutex_unlock (&conn_io->mutex);
 			return (0);
 		}
 		if (res == -1) {
-			assert (0);
+//			assert (0);
 			break; /* some other error, stop trying to send message */
 		}
-		if (res + conn_info->byte_start != queue_item->mlen) {
-			conn_info->byte_start += res;
+		if (res + conn_io->byte_start != queue_item->mlen) {
+			conn_io->byte_start += res;
 			break;
 		}
 
 		/*
 		 * Message sent, try sending another message
 		 */
-		queue_item_remove (outq);
-		conn_info->byte_start = 0;
+		queue_item_remove (&conn_io->outq);
+		conn_io->byte_start = 0;
 		free (queue_item->msg);
 	} /* while queue not empty */
 
 	res = -1;
 
-	queue_empty = queue_is_empty (outq);
+	queue_empty = queue_is_empty (&conn_io->outq);
 	/*
 	 * Send request message
 	 */
@@ -1177,21 +1339,21 @@ retry_sendmsg:
 		iov_send.iov_base = msg;
 		iov_send.iov_len = mlen;
 retry_sendmsg_two:
-		res = sendmsg (conn_info->fd, &msg_send, MSG_NOSIGNAL);
+		res = sendmsg (conn_io->fd, &msg_send, MSG_NOSIGNAL);
 		if (res == -1 && errno == EINTR) {
 			goto retry_sendmsg_two;
 		}
 		if (res == -1 && errno == EAGAIN) {
-			conn_info->byte_start = 0;
-			conn_info->events = POLLIN|POLLNVAL;
+			conn_io->byte_start = 0;
+			conn_io->events = POLLIN|POLLNVAL;
 		}
 		if (res != -1) {
 			if (res != mlen) {
-				conn_info->byte_start += res;
+				conn_io->byte_start += res;
 				res = -1;
 			} else {
-				conn_info->byte_start = 0;
-				conn_info->events = POLLIN|POLLNVAL;
+				conn_io->byte_start = 0;
+				conn_io->events = POLLIN|POLLNVAL;
 			}
 		}
 	}
@@ -1203,21 +1365,23 @@ retry_sendmsg_two:
 		cmsg = malloc (mlen);
 		if (cmsg == 0) {
 			log_printf (LOG_LEVEL_ERROR, "Library queue couldn't allocate a message, disconnecting library connection.\n");
-			libais_disconnect_request (conn_info);
+			disconnect_request (conn_io->conn_info);
+			pthread_mutex_unlock (&conn_io->mutex);
 			return (-1);
 		}
 		queue_item_out.msg = cmsg;
 		queue_item_out.mlen = mlen;
 		memcpy (cmsg, msg, mlen);
-		queue_item_add (outq, &queue_item_out);
+		queue_item_add (&conn_io->outq, &queue_item_out);
 
 		/*
 		 * Send a pthread_kill to interrupt the poll syscall
 		 * and start a new poll operation in the thread
 		 */
-		conn_info->events = POLLIN|POLLOUT|POLLNVAL;
-		pthread_kill (conn_info->thread, SIGUSR1);
+		conn_io->events = POLLIN|POLLOUT|POLLNVAL;
+		pthread_kill (conn_io->thread, SIGUSR1);
 	}
+	pthread_mutex_unlock (&conn_io->mutex);
 	return (0);
 }
 
@@ -1238,7 +1402,6 @@ void openais_ipc_flow_control_create (
 		id_len,
 		flow_control_state_set_fn,
 		context);	
-	conn_info->conn_info_partner->flow_control_handle = conn_info->flow_control_handle;
 }
 
 void openais_ipc_flow_control_destroy (
@@ -1278,4 +1441,19 @@ void openais_ipc_flow_control_local_decrement (
 	conn_info->flow_control_local_count--;
 
 	pthread_mutex_unlock (&conn_info->flow_control_mutex);
+}
+
+
+int openais_response_send (void *conn, void *msg, int mlen)
+{
+	struct conn_info *conn_info = (struct conn_info *)conn;
+	
+	return (conn_io_send (conn_info->conn_io_response, msg, mlen));
+}
+
+int openais_dispatch_send (void *conn, void *msg, int mlen)
+{
+	struct conn_info *conn_info = (struct conn_info *)conn;
+	
+	return (conn_io_send (conn_info->conn_io_dispatch, msg, mlen));
 }

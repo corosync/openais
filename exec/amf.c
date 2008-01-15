@@ -480,7 +480,7 @@ static void message_handler_req_exec_amf_comp_register (
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = error;
-		openais_conn_send_response (
+		openais_response_send (
 			comp->conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 	}
 }
@@ -544,7 +544,7 @@ static void message_handler_req_exec_amf_response (
 		res_lib.header.id = MESSAGE_RES_AMF_RESPONSE;
 		res_lib.header.size = sizeof (struct res_lib_amf_response);
 		res_lib.header.error = retval;
-		openais_conn_send_response (comp->conn, &res_lib, sizeof (res_lib));
+		openais_response_send (comp->conn, &res_lib, sizeof (res_lib));
 	}
 }
 
@@ -583,7 +583,7 @@ static void message_handler_req_lib_amf_componentregister (
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = SA_AIS_ERR_INVALID_PARAM;
-		openais_conn_send_response (
+		openais_response_send (
 			conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 	}
 }
@@ -658,12 +658,13 @@ static void message_handler_req_lib_amf_healthcheckstart (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKSTART;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib,
+	openais_response_send (conn, &res_lib,
 		sizeof (struct res_lib_amf_healthcheckstart));
 }
 
 static void message_handler_req_lib_amf_healthcheckconfirm (
-	void *conn,	void *msg)
+	void *conn,
+	void *msg)
 {
 	struct req_lib_amf_healthcheckconfirm *req_lib = msg;
 	struct res_lib_amf_healthcheckconfirm res_lib;
@@ -683,7 +684,7 @@ static void message_handler_req_lib_amf_healthcheckconfirm (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKCONFIRM;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	openais_response_send (conn, &res_lib, sizeof (res_lib));
 }
 
 static void message_handler_req_lib_amf_healthcheckstop (
@@ -706,7 +707,7 @@ static void message_handler_req_lib_amf_healthcheckstop (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKSTOP;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	openais_response_send (conn, &res_lib, sizeof (res_lib));
 }
 
 static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
@@ -732,7 +733,7 @@ static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
 	res_lib.header.size = sizeof (struct res_lib_amf_hastateget);
 	res_lib.header.error = error;
 
-	openais_conn_send_response (conn, &res_lib,
+	openais_response_send (conn, &res_lib,
 		sizeof (struct res_lib_amf_hastateget));
 }
 
@@ -788,7 +789,7 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 	if (amfProtectionGroup) {
 		res_lib_amf_protectiongrouptrack.header.error = SA_AIS_OK;
 	}
-	openais_conn_send_response (conn, &res_lib_amf_protectiongrouptrack,
+	openais_response_send (conn, &res_lib_amf_protectiongrouptrack,
 		sizeof (struct res_lib_amf_protectiongrouptrack));
 
 	if (amfProtectionGroup &&
@@ -848,7 +849,7 @@ static void message_handler_req_lib_amf_protectiongrouptrackstop (
 	if (track) {
 		res_lib_amf_protectiongrouptrackstop.header.error = SA_AIS_OK;
 	}
-	openais_conn_send_response (conn, &res_lib_amf_protectiongrouptrackstop,
+	openais_response_send (conn, &res_lib_amf_protectiongrouptrackstop,
 		sizeof (struct res_lib_amf_protectiongrouptrackstop));
 
 #endif
@@ -896,7 +897,7 @@ static void message_handler_req_lib_amf_componenterrorreport (
 		res_lib.header.size = sizeof (struct res_lib_amf_componenterrorreport);
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTERRORREPORT;
 		res_lib.header.error = SA_AIS_ERR_NOT_EXIST;
-		openais_conn_send_response (conn, &res_lib,
+		openais_response_send (conn, &res_lib,
 			sizeof (struct res_lib_amf_componenterrorreport));
 	}
 }
@@ -963,7 +964,7 @@ static void message_handler_req_lib_amf_response (void *conn, void *msg)
 		res_lib.header.id = MESSAGE_RES_AMF_RESPONSE;
 		res_lib.header.size = sizeof (struct res_lib_amf_response);
 		res_lib.header.error = retval;
-		openais_conn_send_response (conn, &res_lib, sizeof (res_lib));
+		openais_response_send (conn, &res_lib, sizeof (res_lib));
 	}
 }
 

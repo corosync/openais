@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006 Red Hat, Inc.
  * Copyright (c) 2006 Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -32,6 +32,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef OPENAIS_BSD
+#include <alloca.h>
+#endif
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -60,8 +63,11 @@
 #include "totempg.h"
 #include "totemip.h"
 #include "main.h"
+#include "flow.h"
+#include "tlist.h"
 #include "ipc.h"
 #include "mempool.h"
+#include "objdb.h"
 #include "service.h"
 #include "jhash.h"
 #include "swab.h"
@@ -255,7 +261,7 @@ static struct openais_exec_handler cpg_exec_service[] =
 };
 
 struct openais_service_handler cpg_service_handler = {
-	.name				        = (unsigned char*)"openais cluster closed process group service v1.01",
+	.name				        = (unsigned char *)"openais cluster closed process group service v1.01",
 	.id					= CPG_SERVICE,
 	.private_data_size			= sizeof (struct process_info),
 	.flow_control				= OPENAIS_FLOW_CONTROL_REQUIRED,
@@ -434,14 +440,14 @@ static int notify_lib_joinlist(
 	}
 
 	if (conn) {
-		openais_conn_send_response(conn, buf, size);
+		openais_dispatch_send(conn, buf, size);
 	}
 	else {
 		/* Send it to all listeners */
 		for (iter = gi->members.next, tmp=iter->next; iter != &gi->members; iter = tmp, tmp=iter->next) {
 			struct process_info *pi = list_entry(iter, struct process_info, list);
 			if (pi->trackerconn && (pi->flags & PI_FLAG_MEMBER)) {
-				if (openais_conn_send_response(pi->trackerconn, buf, size) == -1) {
+				if (openais_dispatch_send(pi->trackerconn, buf, size) == -1) {
 					// Error ??
 				}
 			}
@@ -477,14 +483,17 @@ static int cpg_lib_exit_fn (void *conn)
 	struct group_info *gi = pi->group;
 	mar_cpg_address_t notify_info;
 
-	log_printf(LOG_LEVEL_DEBUG, "exit_fn for conn=%p\n", conn);
-
 	if (gi) {
 		notify_info.pid = pi->pid;
 		notify_info.nodeid = totempg_my_nodeid_get();
 		notify_info.reason = CONFCHG_CPG_REASON_PROCDOWN;
 		cpg_node_joinleave_send(gi, pi, MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_PROCDOWN);
 		list_del(&pi->list);
+		openais_ipc_flow_control_destroy (
+			conn,
+			CPG_SERVICE,
+			(unsigned char *)gi->group_name.value,
+			(unsigned int)gi->group_name.length);
 	}
 	return (0);
 }
@@ -531,7 +540,7 @@ static int cpg_node_joinleave_send (struct group_info *gi, struct process_info *
 	req_exec_cpg_procjoin.header.size = sizeof(req_exec_cpg_procjoin);
 	req_exec_cpg_procjoin.header.id = SERVICE_ID_MAKE(CPG_SERVICE, fn);
 
-	req_exec_cpg_iovec.iov_base = &req_exec_cpg_procjoin;
+	req_exec_cpg_iovec.iov_base = (char *)&req_exec_cpg_procjoin;
 	req_exec_cpg_iovec.iov_len = sizeof(req_exec_cpg_procjoin);
 
 	result = totempg_groups_mcast_joined (openais_group_handle, &req_exec_cpg_iovec, 1, TOTEMPG_AGREED);
@@ -544,15 +553,17 @@ static void remove_node_from_groups(
 	struct list_head *remlist)
 {
 	int i;
-	struct list_head *iter, *iter2, *tmp;
+	struct list_head *iter, *iter2;
 	struct process_info *pi;
 	struct group_info *gi;
 
 	for (i=0; i < GROUP_HASH_SIZE; i++) {
-		for (iter = group_lists[i].next; iter != &group_lists[i]; iter = iter->next) {
+		for (iter = group_lists[i].next; iter != &group_lists[i];) {
 			gi = list_entry(iter, struct group_info, list);
-			for (iter2 = gi->members.next, tmp = iter2->next; iter2 != &gi->members; iter2 = tmp, tmp = iter2->next) {
+			iter = iter->next;
+			for (iter2 = gi->members.next; iter2 != &gi->members;) {
 				pi = list_entry(iter2, struct process_info, list);
+				iter2 = iter2->next;
 
 				if (pi->nodeid == nodeid) {
 
@@ -643,7 +654,7 @@ static void cpg_confchg_fn (
 
 	/* Don't send this message until we get the final configuration message */
 	if (configuration_type == TOTEM_CONFIGURATION_REGULAR && req_exec_cpg_downlist.left_nodes) {
-		req_exec_cpg_iovec.iov_base = &req_exec_cpg_downlist;
+		req_exec_cpg_iovec.iov_base = (char *)&req_exec_cpg_downlist;
 		req_exec_cpg_iovec.iov_len = req_exec_cpg_downlist.header.size;
 
 		totempg_groups_mcast_joined (openais_group_handle, &req_exec_cpg_iovec, 1, TOTEMPG_AGREED);
@@ -816,7 +827,7 @@ static void message_handler_req_exec_cpg_procleave (
 	struct req_exec_cpg_procjoin *req_exec_cpg_procjoin = (struct req_exec_cpg_procjoin *)message;
 	struct group_info *gi;
 	struct process_info *pi;
-	struct list_head *iter;
+	volatile struct list_head *iter;
 	mar_cpg_address_t notify_info;
 
 	log_printf(LOG_LEVEL_DEBUG, "got procleave message from cluster node %d\n", nodeid);
@@ -833,19 +844,28 @@ static void message_handler_req_exec_cpg_procleave (
 			    1, &notify_info,
 			    MESSAGE_RES_CPG_CONFCHG_CALLBACK);
 
-        /* Find the node/PID to remove */
-	for (iter = gi->members.next; iter != &gi->members; iter = iter->next) {
+        /*
+	 * Find the node/PID to remove
+	 */
+	for (iter = gi->members.next; iter != &gi->members;) {
 		pi = list_entry(iter, struct process_info, list);
+
+		iter = iter->next;
+
 		if (pi->pid == req_exec_cpg_procjoin->pid &&
 		    pi->nodeid == nodeid) {
-
-			list_del(&pi->list);
-			if (!pi->conn)
-				free(pi);
 
 			if (list_empty(&gi->members)) {
 				remove_group(gi);
 			}
+			
+			list_del(&pi->list);
+			if (pi->conn) {
+				openais_conn_info_refcnt_dec(pi->conn);
+			} else {
+				free(pi);
+			}
+
 			break;
 		}
 	}
@@ -904,6 +924,7 @@ static void message_handler_req_exec_cpg_mcast (
 		openais_ipc_flow_control_local_decrement (req_exec_cpg_mcast->source.conn);
 		process_info = (struct process_info *)openais_conn_private_data_get (req_exec_cpg_mcast->source.conn);
 		res_lib_cpg_mcast->flow_control_state = process_info->flow_control_state;
+		openais_conn_info_refcnt_dec (req_exec_cpg_mcast->source.conn);
 	}
 	memcpy(&res_lib_cpg_mcast->group_name, &gi->group_name,
 		sizeof(mar_cpg_name_t));
@@ -914,7 +935,7 @@ static void message_handler_req_exec_cpg_mcast (
 	for (iter = gi->members.next; iter != &gi->members; iter = iter->next) {
 		struct process_info *pi = list_entry(iter, struct process_info, list);
 		if (pi->trackerconn) {
-			openais_conn_send_response(
+			openais_dispatch_send (
 				pi->trackerconn,
 				buf,
 				res_lib_cpg_mcast->header.size);
@@ -993,6 +1014,7 @@ static int cpg_lib_init_fn (void *conn)
 	struct process_info *pi = (struct process_info *)openais_conn_private_data_get (conn);
 	pi->conn = conn;
 
+	openais_conn_info_refcnt_inc (conn);
 	log_printf(LOG_LEVEL_DEBUG, "lib_init_fn: conn=%p, pi=%p\n", conn, pi);
 	return (0);
 }
@@ -1041,7 +1063,7 @@ join_err:
 	res_lib_cpg_join.header.size = sizeof(res_lib_cpg_join);
 	res_lib_cpg_join.header.id = MESSAGE_RES_CPG_JOIN;
 	res_lib_cpg_join.header.error = error;
-	openais_conn_send_response(conn, &res_lib_cpg_join, sizeof(res_lib_cpg_join));
+	openais_response_send(conn, &res_lib_cpg_join, sizeof(res_lib_cpg_join));
 }
 
 /* Leave message from the library */
@@ -1051,8 +1073,6 @@ static void message_handler_req_lib_cpg_leave (void *conn, void *message)
 	struct res_lib_cpg_leave res_lib_cpg_leave;
 	struct group_info *gi;
 	SaAisErrorT error = SA_AIS_OK;
-
-	log_printf(LOG_LEVEL_DEBUG, "got leave request on %p\n", conn);
 
 	if (!pi || !pi->pid || !pi->group) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -1076,7 +1096,7 @@ leave_ret:
 	res_lib_cpg_leave.header.size = sizeof(res_lib_cpg_leave);
 	res_lib_cpg_leave.header.id = MESSAGE_RES_CPG_LEAVE;
 	res_lib_cpg_leave.header.error = error;
-	openais_conn_send_response(conn, &res_lib_cpg_leave, sizeof(res_lib_cpg_leave));
+	openais_response_send(conn, &res_lib_cpg_leave, sizeof(res_lib_cpg_leave));
 }
 
 /* Mcast message from the library */
@@ -1099,7 +1119,7 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 		res_lib_cpg_mcast.header.id = MESSAGE_RES_CPG_MCAST;
 		res_lib_cpg_mcast.header.error = SA_AIS_ERR_ACCESS; /* TODO Better error code ?? */
 		res_lib_cpg_mcast.flow_control_state = CPG_FLOW_CONTROL_DISABLED;
-		openais_conn_send_response(conn, &res_lib_cpg_mcast,
+		openais_response_send(conn, &res_lib_cpg_mcast,
 			sizeof(res_lib_cpg_mcast));
 		return;
 	}
@@ -1107,15 +1127,16 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	req_exec_cpg_mcast.header.size = sizeof(req_exec_cpg_mcast) + msglen;
 	req_exec_cpg_mcast.header.id = SERVICE_ID_MAKE(CPG_SERVICE,
 		MESSAGE_REQ_EXEC_CPG_MCAST);
+	openais_conn_info_refcnt_inc (conn);
 	req_exec_cpg_mcast.pid = pi->pid;
 	req_exec_cpg_mcast.msglen = msglen;
 	message_source_set (&req_exec_cpg_mcast.source, conn);
 	memcpy(&req_exec_cpg_mcast.group_name, &gi->group_name,
 		sizeof(mar_cpg_name_t));
 
-	req_exec_cpg_iovec[0].iov_base = &req_exec_cpg_mcast;
+	req_exec_cpg_iovec[0].iov_base = (char *)&req_exec_cpg_mcast;
 	req_exec_cpg_iovec[0].iov_len = sizeof(req_exec_cpg_mcast);
-	req_exec_cpg_iovec[1].iov_base = &req_lib_cpg_mcast->message;
+	req_exec_cpg_iovec[1].iov_base = (char *)&req_lib_cpg_mcast->message;
 	req_exec_cpg_iovec[1].iov_len = msglen;
 
 	// TODO: guarantee type...
@@ -1126,7 +1147,7 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	res_lib_cpg_mcast.header.id = MESSAGE_RES_CPG_MCAST;
 	res_lib_cpg_mcast.header.error = SA_AIS_OK;
 	res_lib_cpg_mcast.flow_control_state = pi->flow_control_state;
-	openais_conn_send_response(conn, &res_lib_cpg_mcast,
+	openais_response_send(conn, &res_lib_cpg_mcast,
 		sizeof(res_lib_cpg_mcast));
 }
 
@@ -1140,7 +1161,7 @@ static void message_handler_req_lib_cpg_membership (void *conn, void *message)
 		res.size = sizeof(res);
 		res.id = MESSAGE_RES_CPG_MEMBERSHIP;
 		res.error = SA_AIS_ERR_ACCESS; /* TODO Better error code */
-		openais_conn_send_response(conn, &res, sizeof(res));
+		openais_response_send(conn, &res, sizeof(res));
 		return;
 	}
 
@@ -1154,7 +1175,6 @@ static void message_handler_req_lib_cpg_trackstart (void *conn, void *message)
 	struct res_lib_cpg_trackstart res_lib_cpg_trackstart;
 	struct group_info *gi;
 	struct process_info *otherpi;
-	void *otherconn;
 	SaAisErrorT error = SA_AIS_OK;
 
 	log_printf(LOG_LEVEL_DEBUG, "got trackstart request on %p\n", conn);
@@ -1166,7 +1186,6 @@ static void message_handler_req_lib_cpg_trackstart (void *conn, void *message)
 	}
 
 	/* Find the partner connection and add us to it's process_info struct */
-	otherconn = openais_conn_partner_get (conn);
 	otherpi = (struct process_info *)openais_conn_private_data_get (conn);
 	otherpi->trackerconn = conn;
 
@@ -1174,7 +1193,7 @@ tstart_ret:
 	res_lib_cpg_trackstart.header.size = sizeof(res_lib_cpg_trackstart);
 	res_lib_cpg_trackstart.header.id = MESSAGE_RES_CPG_TRACKSTART;
 	res_lib_cpg_trackstart.header.error = SA_AIS_OK;
-	openais_conn_send_response(conn, &res_lib_cpg_trackstart, sizeof(res_lib_cpg_trackstart));
+	openais_response_send(conn, &res_lib_cpg_trackstart, sizeof(res_lib_cpg_trackstart));
 }
 
 static void message_handler_req_lib_cpg_trackstop (void *conn, void *message)
@@ -1182,7 +1201,6 @@ static void message_handler_req_lib_cpg_trackstop (void *conn, void *message)
 	struct req_lib_cpg_trackstop *req_lib_cpg_trackstop = (struct req_lib_cpg_trackstop *)message;
 	struct res_lib_cpg_trackstop res_lib_cpg_trackstop;
 	struct process_info *otherpi;
-	void *otherconn;
 	struct group_info *gi;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -1195,7 +1213,6 @@ static void message_handler_req_lib_cpg_trackstop (void *conn, void *message)
 	}
 
 	/* Find the partner connection and add us to it's process_info struct */
-	otherconn = openais_conn_partner_get (conn);
 	otherpi = (struct process_info *)openais_conn_private_data_get (conn);
 	otherpi->trackerconn = NULL;
 
@@ -1203,7 +1220,7 @@ tstop_ret:
 	res_lib_cpg_trackstop.header.size = sizeof(res_lib_cpg_trackstop);
 	res_lib_cpg_trackstop.header.id = MESSAGE_RES_CPG_TRACKSTOP;
 	res_lib_cpg_trackstop.header.error = SA_AIS_OK;
-	openais_conn_send_response(conn, &res_lib_cpg_trackstop.header, sizeof(res_lib_cpg_trackstop));
+	openais_response_send(conn, &res_lib_cpg_trackstop.header, sizeof(res_lib_cpg_trackstop));
 }
 
 static void message_handler_req_lib_cpg_local_get (void *conn, void *message)
@@ -1213,8 +1230,8 @@ static void message_handler_req_lib_cpg_local_get (void *conn, void *message)
 	res_lib_cpg_local_get.header.size = sizeof(res_lib_cpg_local_get);
 	res_lib_cpg_local_get.header.id = MESSAGE_RES_CPG_LOCAL_GET;
 	res_lib_cpg_local_get.header.error = SA_AIS_OK;
-	res_lib_cpg_local_get.local_nodeid = totempg_my_nodeid_get();
+	res_lib_cpg_local_get.local_nodeid = totempg_my_nodeid_get ();
 
-	openais_conn_send_response(conn, &res_lib_cpg_local_get,
+	openais_response_send(conn, &res_lib_cpg_local_get,
 		sizeof(res_lib_cpg_local_get));
 }

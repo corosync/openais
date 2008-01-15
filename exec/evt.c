@@ -1853,8 +1853,10 @@ static void __notify_event(void	*conn)
 		res.evd_head.size = sizeof(res);
 		res.evd_head.id = MESSAGE_RES_EVT_AVAILABLE;
 		res.evd_head.error = SA_AIS_OK;
-		openais_conn_send_response(openais_conn_partner_get(conn),
-				&res, sizeof(res));
+		openais_dispatch_send (
+				conn,
+				&res,
+				sizeof(res));
 	}
 
 }
@@ -2265,7 +2267,7 @@ open_return:
 	res.ico_head.size = sizeof(res);
 	res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 	res.ico_head.error = error;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2322,7 +2324,7 @@ open_return:
 	res.ico_head.size = sizeof(res);
 	res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 	res.ico_head.error = error;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_dispatch_send(conn, &res, sizeof(res));
 }
 
 
@@ -2415,7 +2417,7 @@ chan_close_done:
 	res.icc_head.size = sizeof(res);
 	res.icc_head.id = MESSAGE_RES_EVT_CLOSE_CHANNEL;
 	res.icc_head.error = ((ret == 0) ? SA_AIS_OK : SA_AIS_ERR_BAD_HANDLE);
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2487,7 +2489,7 @@ evt_unlink_err:
 	res.iuc_head.size = sizeof(res);
 	res.iuc_head.id = MESSAGE_RES_EVT_UNLINK_CHANNEL;
 	res.iuc_head.error = error;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2591,7 +2593,7 @@ static void lib_evt_event_subscribe(void *conn, void *message)
 	res.ics_head.size = sizeof(res);
 	res.ics_head.id = MESSAGE_RES_EVT_SUBSCRIBE;
 	res.ics_head.error = error;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 
 	/*
 	 * See if an existing event with a retention time
@@ -2624,7 +2626,7 @@ subr_done:
 	res.ics_head.size = sizeof(res);
 	res.ics_head.id = MESSAGE_RES_EVT_SUBSCRIBE;
 	res.ics_head.error = error;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2691,7 +2693,7 @@ unsubr_done:
 	res.icu_head.size = sizeof(res);
 	res.icu_head.id = MESSAGE_RES_EVT_UNSUBSCRIBE;
 	res.icu_head.error = error;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2763,7 +2765,7 @@ pub_done:
 	res.iep_head.id = MESSAGE_RES_EVT_PUBLISH;
 	res.iep_head.error = error;
 	res.iep_event_id = event_id;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2827,7 +2829,7 @@ evt_ret_clr_err:
 	res.iec_head.size = sizeof(res);
 	res.iec_head.id = MESSAGE_RES_EVT_CLEAR_RETENTIONTIME;
 	res.iec_head.error = error;
-	openais_conn_send_response(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 
 }
 
@@ -2866,7 +2868,7 @@ static void lib_evt_event_data_get(void *conn, void *message)
 			edp->ed_event.led_head.id = MESSAGE_RES_EVT_EVENT_DATA;
 			edp->ed_event.led_head.error = SA_AIS_OK;
 			free(cel);
-			openais_conn_send_response(conn, &edp->ed_event,
+			openais_response_send(conn, &edp->ed_event,
 											edp->ed_event.led_head.size);
 			free_event_data(edp);
 			goto data_get_done;
@@ -2876,7 +2878,7 @@ static void lib_evt_event_data_get(void *conn, void *message)
 	res.led_head.size = sizeof(res.led_head);
 	res.led_head.id = MESSAGE_RES_EVT_EVENT_DATA;
 	res.led_head.error = SA_AIS_ERR_NOT_EXIST;
-	openais_conn_send_response(conn, &res, res.led_head.size);
+	openais_response_send(conn, &res, res.led_head.size);
 
 	/*
 	 * See if there are any events that the app doesn't know about
@@ -3038,7 +3040,7 @@ static int evt_lib_exit(void *conn)
 	struct unlink_chan_pending *ucp;
 	struct retention_time_clear_pending *rtc;
 	struct libevt_pd *esip =
-		openais_conn_private_data_get(openais_conn_partner_get(conn));
+		openais_conn_private_data_get(conn);
 
 	log_printf(LOG_LEVEL_DEBUG, "saEvtFinalize (Event exit request)\n");
 	log_printf(LOG_LEVEL_DEBUG, "saEvtFinalize %d evts on list\n",
@@ -3431,7 +3433,7 @@ static void chan_open_timeout(void *data)
 	res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 	res.ico_head.error = SA_AIS_ERR_TIMEOUT;
 	ocp->ocp_invocation = OPEN_TIMED_OUT;
-	openais_conn_send_response(ocp->ocp_conn, &res, sizeof(res));
+	openais_response_send(ocp->ocp_conn, &res, sizeof(res));
 }
 
 /*
@@ -3521,15 +3523,14 @@ open_return:
 		resa.ica_channel_handle = handle;
 		resa.ica_c_handle = ocp->ocp_c_handle;
 		resa.ica_invocation = ocp->ocp_invocation;
-		openais_conn_send_response(openais_conn_partner_get(ocp->ocp_conn),
-				&resa, sizeof(resa));
+		openais_dispatch_send(ocp->ocp_conn, &resa, sizeof(resa));
 	} else {
 		struct res_evt_channel_open res;
 		res.ico_head.size = sizeof(res);
 		res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 		res.ico_head.error = (ret == 0 ? SA_AIS_OK : SA_AIS_ERR_BAD_HANDLE);
 		res.ico_channel_handle = handle;
-		openais_conn_send_response(ocp->ocp_conn, &res, sizeof(res));
+		openais_response_send(ocp->ocp_conn, &res, sizeof(res));
 	}
 
 	if (timer_del_status == 0) {
@@ -3554,7 +3555,7 @@ static void evt_chan_unlink_finish(struct unlink_chan_pending *ucp)
 	res.iuc_head.size = sizeof(res);
 	res.iuc_head.id = MESSAGE_RES_EVT_UNLINK_CHANNEL;
 	res.iuc_head.error = SA_AIS_OK;
-	openais_conn_send_response(ucp->ucp_conn, &res, sizeof(res));
+	openais_response_send(ucp->ucp_conn, &res, sizeof(res));
 
 	free(ucp);
 }
@@ -3574,7 +3575,7 @@ static void evt_ret_time_clr_finish(struct retention_time_clear_pending *rtc,
 	res.iec_head.size = sizeof(res);
 	res.iec_head.id = MESSAGE_RES_EVT_CLEAR_RETENTIONTIME;
 	res.iec_head.error = ret;
-	openais_conn_send_response(rtc->rtc_conn, &res, sizeof(res));
+	openais_response_send(rtc->rtc_conn, &res, sizeof(res));
 
 	list_del(&rtc->rtc_entry);
 	free(rtc);

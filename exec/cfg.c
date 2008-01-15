@@ -268,7 +268,7 @@ static void message_handler_req_exec_cfg_ringreenable (
 		res_lib_cfg_ringreenable.header.id = MESSAGE_RES_CFG_RINGREENABLE;
 		res_lib_cfg_ringreenable.header.size = sizeof (struct res_lib_cfg_ringreenable);
 		res_lib_cfg_ringreenable.header.error = SA_AIS_OK;
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_cfg_ringreenable->source.conn,
 			&res_lib_cfg_ringreenable,
 			sizeof (struct res_lib_cfg_ringreenable));
@@ -312,7 +312,7 @@ static void message_handler_req_lib_cfg_ringstatusget (
 		strcpy ((char *)&res_lib_cfg_ringstatusget.interface_name[i],
 			totem_ip_string);
 	}
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_cfg_ringstatusget,
 		sizeof (struct res_lib_cfg_ringstatusget));

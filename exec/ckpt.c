@@ -1401,12 +1401,12 @@ error_exit:
 				res_lib_ckpt_checkpointopenasync.ckpt_id = checkpoint->ckpt_id;
 			}
 
-			openais_conn_send_response (
+			openais_response_send (
 				req_exec_ckpt_checkpointopen->source.conn,
 				&res_lib_ckpt_checkpointopenasync,
 				sizeof (struct res_lib_ckpt_checkpointopenasync));
-			openais_conn_send_response (
-				openais_conn_partner_get (req_exec_ckpt_checkpointopen->source.conn),
+			openais_dispatch_send (
+				req_exec_ckpt_checkpointopen->source.conn,
 				&res_lib_ckpt_checkpointopenasync,
 				sizeof (struct res_lib_ckpt_checkpointopenasync));
 		} else {
@@ -1420,7 +1420,7 @@ error_exit:
 			}
 			res_lib_ckpt_checkpointopen.header.error = error;
 
-			openais_conn_send_response (
+			openais_response_send (
 				req_exec_ckpt_checkpointopen->source.conn,
 				&res_lib_ckpt_checkpointopen,
 				sizeof (struct res_lib_ckpt_checkpointopen));
@@ -1593,8 +1593,10 @@ error_exit:
 		res_lib_ckpt_checkpointclose.header.size = sizeof (struct res_lib_ckpt_checkpointclose);
 		res_lib_ckpt_checkpointclose.header.id = MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTCLOSE;
 		res_lib_ckpt_checkpointclose.header.error = error;
-		openais_conn_send_response (req_exec_ckpt_checkpointclose->source.conn,
-			&res_lib_ckpt_checkpointclose, sizeof (struct res_lib_ckpt_checkpointclose));
+		openais_response_send (
+			req_exec_ckpt_checkpointclose->source.conn,
+			&res_lib_ckpt_checkpointclose,
+			sizeof (struct res_lib_ckpt_checkpointclose));
 	}
 
 	/*
@@ -1646,7 +1648,7 @@ error_exit:
 		res_lib_ckpt_checkpointunlink.header.size = sizeof (struct res_lib_ckpt_checkpointunlink);
 		res_lib_ckpt_checkpointunlink.header.id = MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTUNLINK;
 		res_lib_ckpt_checkpointunlink.header.error = error;
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_ckpt_checkpointunlink->source.conn,
 			&res_lib_ckpt_checkpointunlink,
 			sizeof (struct res_lib_ckpt_checkpointunlink));
@@ -1694,7 +1696,7 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationset (
 		res_lib_ckpt_checkpointretentiondurationset.header.id = MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTRETENTIONDURATIONSET;
 		res_lib_ckpt_checkpointretentiondurationset.header.error = error;
 
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_ckpt_checkpointretentiondurationset->source.conn,
 			&res_lib_ckpt_checkpointretentiondurationset,
 			sizeof (struct res_lib_ckpt_checkpointretentiondurationset));
@@ -1900,7 +1902,8 @@ error_exit:
 		res_lib_ckpt_sectioncreate.header.id = MESSAGE_RES_CKPT_CHECKPOINT_SECTIONCREATE;
 		res_lib_ckpt_sectioncreate.header.error = error;
 
-		openais_conn_send_response (req_exec_ckpt_sectioncreate->source.conn,
+		openais_response_send (
+			req_exec_ckpt_sectioncreate->source.conn,
 			&res_lib_ckpt_sectioncreate,
 			sizeof (struct res_lib_ckpt_sectioncreate));
 	}
@@ -1965,7 +1968,7 @@ error_exit:
 		res_lib_ckpt_sectiondelete.header.id = MESSAGE_RES_CKPT_CHECKPOINT_SECTIONDELETE;
 		res_lib_ckpt_sectiondelete.header.error = error;
 
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_ckpt_sectiondelete->source.conn,
 			&res_lib_ckpt_sectiondelete,
 			sizeof (struct res_lib_ckpt_sectiondelete));
@@ -2058,7 +2061,7 @@ error_exit:
 			 MESSAGE_RES_CKPT_CHECKPOINT_SECTIONEXPIRATIONTIMESET;
 		res_lib_ckpt_sectionexpirationtimeset.header.error = error;
 
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_ckpt_sectionexpirationtimeset->source.conn,
 			&res_lib_ckpt_sectionexpirationtimeset,
 			sizeof (struct res_lib_ckpt_sectionexpirationtimeset));
@@ -2168,7 +2171,7 @@ error_exit:
 			MESSAGE_RES_CKPT_CHECKPOINT_SECTIONWRITE;
 		res_lib_ckpt_sectionwrite.header.error = error;
 
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_ckpt_sectionwrite->source.conn,
 			&res_lib_ckpt_sectionwrite,
 			sizeof (struct res_lib_ckpt_sectionwrite));
@@ -2265,7 +2268,7 @@ error_exit:
 			MESSAGE_RES_CKPT_CHECKPOINT_SECTIONOVERWRITE;
 		res_lib_ckpt_sectionoverwrite.header.error = error;
 
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_ckpt_sectionoverwrite->source.conn,
 			&res_lib_ckpt_sectionoverwrite,
 			sizeof (struct res_lib_ckpt_sectionoverwrite));
@@ -2358,7 +2361,7 @@ error_exit:
 			res_lib_ckpt_sectionread.data_read = section_size;
 		}
 
-		openais_conn_send_response (
+		openais_response_send (
 			req_exec_ckpt_sectionread->source.conn,
 			&res_lib_ckpt_sectionread,
 			sizeof (struct res_lib_ckpt_sectionread));
@@ -2369,7 +2372,7 @@ error_exit:
 		if (error == SA_AIS_OK) {
 			char *sd;
 			sd = (char *)checkpoint_section->section_data;
-			openais_conn_send_response (
+			openais_response_send (
 				req_exec_ckpt_sectionread->source.conn,
 				&sd[req_exec_ckpt_sectionread->data_offset],
 				section_size);
@@ -2578,7 +2581,7 @@ static void message_handler_req_lib_ckpt_activereplicaset (
 	res_lib_ckpt_activereplicaset.header.id = MESSAGE_RES_CKPT_ACTIVEREPLICASET;
 	res_lib_ckpt_activereplicaset.header.error = error;
 
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_ckpt_activereplicaset,
 		sizeof (struct res_lib_ckpt_activereplicaset));
@@ -2641,7 +2644,7 @@ static void message_handler_req_lib_ckpt_checkpointstatusget (
 		res_lib_ckpt_checkpointstatusget.header.id = MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTSTATUSGET;
 		res_lib_ckpt_checkpointstatusget.header.error = SA_AIS_ERR_NOT_EXIST;
 	}
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_ckpt_checkpointstatusget,
 		sizeof (struct res_lib_ckpt_checkpointstatusget));
@@ -2967,7 +2970,7 @@ static void message_handler_req_lib_ckpt_checkpointsynchronize (
 	res_lib_ckpt_checkpointsynchronize.header.size = sizeof (struct res_lib_ckpt_checkpointsynchronize);
 	res_lib_ckpt_checkpointsynchronize.header.id = MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTSYNCHRONIZE;
 
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_ckpt_checkpointsynchronize,
 		sizeof (struct res_lib_ckpt_checkpointsynchronize));
@@ -2998,13 +3001,13 @@ static void message_handler_req_lib_ckpt_checkpointsynchronizeasync (
 	res_lib_ckpt_checkpointsynchronizeasync.header.id = MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTSYNCHRONIZEASYNC;
 	res_lib_ckpt_checkpointsynchronizeasync.invocation = req_lib_ckpt_checkpointsynchronizeasync->invocation;
 
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_ckpt_checkpointsynchronizeasync,
 		sizeof (struct res_lib_ckpt_checkpointsynchronizeasync));
 
-	openais_conn_send_response (
-		openais_conn_partner_get (conn),
+	openais_dispatch_send (
+		conn,
 		&res_lib_ckpt_checkpointsynchronizeasync,
 		sizeof (struct res_lib_ckpt_checkpointsynchronizeasync));
 }
@@ -3133,7 +3136,7 @@ error_exit:
 	res_lib_ckpt_sectioniterationinitialize.max_section_id_size =
 		checkpoint->checkpoint_creation_attributes.max_section_id_size;
 
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_ckpt_sectioniterationinitialize,
 		sizeof (struct res_lib_ckpt_sectioniterationinitialize));
@@ -3174,7 +3177,7 @@ error_exit:
 	res_lib_ckpt_sectioniterationfinalize.header.id = MESSAGE_RES_CKPT_SECTIONITERATIONFINALIZE;
 	res_lib_ckpt_sectioniterationfinalize.header.error = error;
 
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_ckpt_sectioniterationfinalize,
 		sizeof (struct res_lib_ckpt_sectioniterationfinalize));
@@ -3262,13 +3265,13 @@ error_exit:
 	res_lib_ckpt_sectioniterationnext.header.id = MESSAGE_RES_CKPT_SECTIONITERATIONNEXT;
 	res_lib_ckpt_sectioniterationnext.header.error = error;
 
-	openais_conn_send_response (
+	openais_response_send (
 		conn,
 		&res_lib_ckpt_sectioniterationnext,
 		sizeof (struct res_lib_ckpt_sectioniterationnext));
 
 	if (error == SA_AIS_OK) {
-		openais_conn_send_response (
+		openais_response_send (
 			conn,
 			checkpoint_section->section_descriptor.section_id.id,
 			checkpoint_section->section_descriptor.section_id.id_len);
