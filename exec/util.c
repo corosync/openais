@@ -84,10 +84,88 @@ SaTimeT clust_time_now(void)
 	return time_now;
 }
 
+struct error_code_entry {
+	enum e_ais_done code;
+	char *string;
+};
+
+static struct error_code_entry error_code_map[] = {
+        {
+		.code = AIS_DONE_EXIT, 
+		.string = "finished, exiting normally"
+	},
+        {
+		.code = AIS_DONE_UID_DETERMINE,
+		.string = "could not determine the process UID"
+	},
+        {
+		.code = AIS_DONE_GID_DETERMINE,
+		.string = "could not determine the process GID"
+	},
+        {
+		.code = AIS_DONE_MEMPOOL_INIT,
+		.string = "could not initialize the memory pools"
+	},
+        {
+		.code = AIS_DONE_FORK,
+		.string = "could not fork"
+	},
+        {
+		.code = AIS_DONE_LIBAIS_SOCKET,
+		.string = "could not create a socket"
+	},
+        {
+		.code = AIS_DONE_LIBAIS_BIND,
+		.string = "could not bind to an address"
+	},
+        {
+		.code = AIS_DONE_READKEY,
+		.string = "could not read the security key"
+	},
+        {
+		.code = AIS_DONE_MAINCONFIGREAD,
+		.string = "could not read the main configuration file"
+	},
+        {
+		.code = AIS_DONE_LOGSETUP,
+		.string = "could not setup the logging system"
+	},
+        {
+		.code = AIS_DONE_AMFCONFIGREAD,
+		.string = "could not read the AMF configuration"
+	},
+        {
+		.code = AIS_DONE_DYNAMICLOAD,
+		.string = "could not load a dynamic object"
+	},
+        {	.code = AIS_DONE_OBJDB,
+		.string = "could not use the object database"
+	},
+        {
+		.code = AIS_DONE_INIT_SERVICES,
+		.string = "could not initlalize services"
+	},
+        {
+		.code = AIS_DONE_OUT_OF_MEMORY,
+		.string = "Out of memory"
+	},
+        {
+		.code =  AIS_DONE_FATAL_ERR,
+		.string = "Unknown fatal error"
+	},
+};
 
 void openais_exit_error (enum e_ais_done err)
 {
-	log_printf (LOG_LEVEL_ERROR, "AIS Executive exiting (%d).\n", err);
+	char *error_string = "Error code not available";
+	int i;
+
+	for (i = 0; i < (sizeof (error_code_map) / sizeof (struct error_code_entry)); i++) {
+		if (err == error_code_map[i].code) {
+			error_string = error_code_map[i].string;
+		}
+	}
+	log_printf (LOG_LEVEL_ERROR, "AIS Executive exiting (reason: %s).\n", error_string);
 	log_flush();
 	exit (err);
 }
