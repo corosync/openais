@@ -270,7 +270,6 @@ static void aisexec_mempool_init (void)
 
 static void aisexec_tty_detach (void)
 {
-#ifndef DEBUG
 	/*
 	 * Disconnect from TTY if this is not a debug run
 	 */
@@ -287,7 +286,6 @@ static void aisexec_tty_detach (void)
 			exit (0);
 			break;
 	}
-#endif
 }
 
 static void aisexec_setscheduler (void)
@@ -400,8 +398,26 @@ int main (int argc, char **argv)
 	int res;
  	int totem_log_service;
  	log_init ("MAIN");
+	unsigned int background;
+	int ch;
 
-	aisexec_tty_detach ();
+	background = 1;
+
+	while ((ch = getopt (argc, argv, "fp")) != EOF) {
+		switch (ch) {
+			case 'f':
+				background = 0;
+				break;
+			default:
+				fprintf (stderr, "Usage:\n");
+				fprintf (stderr, "	-f	: Start application in forground.\n");
+				return EXIT_FAILURE;
+		}
+	}
+
+	if (background) {
+		aisexec_tty_detach ();
+	}
 
 	log_printf (LOG_LEVEL_NOTICE, "AIS Executive Service RELEASE '%s'\n", RELEASE_VERSION);
 	log_printf (LOG_LEVEL_NOTICE, "Copyright (C) 2002-2006 MontaVista Software, Inc and contributors.\n");
