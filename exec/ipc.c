@@ -605,15 +605,28 @@ retry_poll:
 		ipc_serialize_lock_fn ();
 
 		if (fds == 1 && ufd.revents) {
-			if ((ufd.revents & (POLLERR|POLLHUP)) ||
-				(conn_info &&
-					conn_info->state == CONN_INFO_STATE_DISCONNECT_REQUESTED)) {
+			if (ufd.revents & (POLLERR|POLLHUP)) {
 				disconnect_request (conn_info);
-
-				conn_io_refcnt_dec (conn_io);
 				conn_info_refcnt_dec (conn_info);
+				conn_io_refcnt_dec (conn_io);
+				/*
+				 * If conn_info not set, wait for it to be set
+				 * else break out of for loop
+				 */
+				if (conn_info == NULL) {
+					ipc_serialize_unlock_fn ();
+					continue;
+				} else {
+					ipc_serialize_unlock_fn ();
+					break;
+				}
+			}
+
+			if (conn_info && conn_info->state == CONN_INFO_STATE_DISCONNECT_REQUESTED) {
+				conn_info_refcnt_dec (conn_info);
+				conn_io_refcnt_dec (conn_io);
 				ipc_serialize_unlock_fn ();
-				break; /* from for */
+				break;
 			}
 			
 			if (ufd.revents & POLLOUT) {
