@@ -934,7 +934,7 @@ static void message_handler_req_exec_cpg_mcast (
 	/* Send to all interested members */
 	for (iter = gi->members.next; iter != &gi->members; iter = iter->next) {
 		struct process_info *pi = list_entry(iter, struct process_info, list);
-		if (pi->trackerconn) {
+		if (pi->trackerconn && (pi->flags & PI_FLAG_MEMBER)) {
 			openais_dispatch_send (
 				pi->trackerconn,
 				buf,
