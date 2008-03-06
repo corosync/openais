@@ -377,11 +377,11 @@ static struct list_head *my_iteration_state_checkpoint;
 
 static struct list_head *my_iteration_state_section;
 
-static unsigned int my_member_list[PROCESSOR_COUNT_MAX];
+static unsigned int my_old_member_list[PROCESSOR_COUNT_MAX];
 
-static unsigned int my_member_list_entries = 0;
+static unsigned int my_old_member_list_entries = 0;
 
-static unsigned int my_lowest_nodeid = 0;
+static unsigned int my_should_sync = 0;
 
 struct checkpoint_cleanup {
 	struct list_head list;
@@ -809,38 +809,33 @@ static void ckpt_confchg_fn (
 	struct memb_ring_id *ring_id)
 {
 	unsigned int i, j;
+	unsigned int lowest_nodeid;
 
-	/*
-	 * Determine lowest nodeid in old regular configuration for the
-	 * purpose of executing the synchronization algorithm
-	 */
-	if (configuration_type == TOTEM_CONFIGURATION_TRANSITIONAL) {
-		for (i = 0; i < left_list_entries; i++) {
-			for (j = 0; j < my_member_list_entries; j++) {
-				if (left_list[i] == my_member_list[j]) {
-					my_member_list[j] = 0;
-				}
-			}
-		}	
-	}
-	
-	my_lowest_nodeid = 0xffffffff;
+	my_should_sync = 0;
 
 	/*
 	 * Handle regular configuration
 	 */
+	lowest_nodeid = 0xffffffff;
+
 	if (configuration_type == TOTEM_CONFIGURATION_REGULAR) {
-		memcpy (my_member_list, member_list,
-			sizeof (unsigned int) * member_list_entries);
-		my_member_list_entries = member_list_entries;
+		for (i = 0; i < my_old_member_list_entries; i++) {
+			for (j = 0; j < member_list_entries; j++) {
+				if (my_old_member_list[i] == member_list[j]) {
+					if (lowest_nodeid > member_list[j]) {
+						lowest_nodeid = member_list[j];
+					}
+				}
+			}
+		}
 		memcpy (&my_saved_ring_id, ring_id,
 			sizeof (struct memb_ring_id));
-		for (i = 0; i < my_member_list_entries; i++) {
-			if ((my_member_list[i] != 0) &&
-				(my_member_list[i] < my_lowest_nodeid)) {
+		memcpy (my_old_member_list, member_list,
+			sizeof (unsigned int) * member_list_entries);
+		my_old_member_list_entries = member_list_entries;
 
-				my_lowest_nodeid = my_member_list[i];
-			}
+		if (lowest_nodeid == totempg_my_nodeid_get()) {
+			my_should_sync = 1;
 		}
 	}
 }
@@ -2658,8 +2653,6 @@ static void message_handler_req_lib_ckpt_sectioncreate (
 	struct req_exec_ckpt_sectioncreate req_exec_ckpt_sectioncreate;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_DEBUG, "Section create from conn %p\n", conn);
-
 	req_exec_ckpt_sectioncreate.header.id =
 		SERVICE_ID_MAKE (CKPT_SERVICE,
 			MESSAGE_REQ_EXEC_CKPT_SECTIONCREATE);
@@ -2695,7 +2688,6 @@ static void message_handler_req_lib_ckpt_sectioncreate (
 	}
 
 	if (iovecs[1].iov_len > 0) {
-		log_printf (LOG_LEVEL_DEBUG, "IOV_BASE is %p\n", iovecs[1].iov_base);
 		assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 2, TOTEMPG_AGREED) == 0);
 	} else {
 		assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 1, TOTEMPG_AGREED) == 0);
@@ -3575,7 +3567,7 @@ static int ckpt_sync_process (void)
 
 	switch (my_sync_state) {
 	case SYNC_STATE_CHECKPOINT:
-		if (my_lowest_nodeid == totempg_my_nodeid_get()) {
+		if (my_should_sync) {
 			TRACE1 ("should transmit checkpoints because lowest member in old configuration.\n");
 			res = sync_checkpoints_iterate ();
 
@@ -3595,7 +3587,7 @@ static int ckpt_sync_process (void)
 
 	case SYNC_STATE_REFCOUNT:
 		done_queueing = 1;
-		if (my_lowest_nodeid == totempg_my_nodeid_get()) {
+		if (my_should_sync) {
 			TRACE1 ("transmit refcounts because this processor is the lowest member in old configuration.\n");
 			res = sync_refcounts_iterate ();
 		}
