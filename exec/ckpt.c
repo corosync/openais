@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2003-2006 MontaVista Software, Inc.
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006-2008 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -373,9 +373,9 @@ static enum sync_state my_sync_state;
 
 static enum iteration_state my_iteration_state;
 
-static struct list_head *my_iteration_state_checkpoint;
+static struct list_head *my_iteration_state_checkpoint_list;
 
-static struct list_head *my_iteration_state_section;
+static struct list_head *my_iteration_state_section_list;
 
 static unsigned int my_old_member_list[PROCESSOR_COUNT_MAX];
 
@@ -759,48 +759,6 @@ struct req_exec_ckpt_sync_checkpoint_refcount {
 /*
  * Implementation
  */
-
-void clean_checkpoint_list(struct list_head *head)
-{
-	struct list_head *checkpoint_list;
-	struct checkpoint *checkpoint;
-
-	if (list_empty(head)) {
-		log_printf (LOG_LEVEL_DEBUG, "clean_checkpoint_list: List is empty \n");
-		return;
-	}
-
-	checkpoint_list = head->next;
-        while (checkpoint_list != head) {
-		checkpoint = list_entry (checkpoint_list,
-                                struct checkpoint, list);
-                assert (checkpoint > 0);
-
-		/*
-		* If checkpoint has been unlinked and this is the last reference, delete it
-		*/
-		 if (checkpoint->unlinked && checkpoint->reference_count == 0) {
-			log_printf (LOG_LEVEL_DEBUG,"clean_checkpoint_list: deallocating checkpoint %s.\n",
-                                                                                                checkpoint->name.value);
-			checkpoint_list = checkpoint_list->next;
-			checkpoint_release (checkpoint);
-			continue;
-
-		}
-		else if (checkpoint->reference_count == 0) {
-			log_printf (LOG_LEVEL_DEBUG, "clean_checkpoint_list: Starting timer to release checkpoint %s.\n",
-				checkpoint->name.value);
-			openais_timer_delete (checkpoint->retention_timer);
-			openais_timer_add_duration (
-				checkpoint->checkpoint_creation_attributes.retention_duration,
-				checkpoint,
-				timer_function_retention,
-				&checkpoint->retention_timer);
-		}
-		checkpoint_list = checkpoint_list->next;
-        }
-}
-
 static void ckpt_confchg_fn (
 	enum totem_configuration_type configuration_type,
 	unsigned int *member_list, int member_list_entries,
@@ -3369,11 +3327,11 @@ static inline void sync_checkpoints_enter (void)
 
 	my_sync_state = SYNC_STATE_CHECKPOINT;
 	my_iteration_state = ITERATION_STATE_CHECKPOINT;
-	my_iteration_state_checkpoint = checkpoint_list_head.next;
+	my_iteration_state_checkpoint_list = checkpoint_list_head.next;
 
 	checkpoint = list_entry (checkpoint_list_head.next, struct checkpoint,
 		list);
-	my_iteration_state_section = checkpoint->sections_list_head.next;
+	my_iteration_state_section_list = checkpoint->sections_list_head.next;
 
 	LEAVE();
 }
@@ -3381,6 +3339,8 @@ static inline void sync_checkpoints_enter (void)
 static inline void sync_refcounts_enter (void)
 {
 	my_sync_state = SYNC_STATE_REFCOUNT;
+
+	my_iteration_state_checkpoint_list = checkpoint_list_head.next;
 }
 
 static void ckpt_sync_init (void)
@@ -3516,25 +3476,62 @@ unsigned int sync_checkpoints_iterate (void)
 	struct list_head *section_list;
 	unsigned int res = 0;
 
-	for (checkpoint_list = checkpoint_list_head.next;
+	/*
+	 * iterate through all checkpoints or sections
+	 * from the last successfully transmitted checkpoint or sectoin
+	 */
+	for (checkpoint_list = my_iteration_state_checkpoint_list;
 		checkpoint_list != &checkpoint_list_head;
 		checkpoint_list = checkpoint_list->next) {
 
 		checkpoint = list_entry (checkpoint_list, struct checkpoint, list);
 
-		res = sync_checkpoint_transmit (checkpoint);
-		if (res != 0) {
-			break;
+		/*
+		 * Synchronize a checkpoint if there is room in the totem
+		 * buffers and we didn't previously synchronize a checkpoint
+		 */
+		if (my_iteration_state == ITERATION_STATE_CHECKPOINT) {
+			res = sync_checkpoint_transmit (checkpoint);
+			if (res != 0) {
+				/*
+				 * Couldn't sync this checkpoint keep processing
+				 */
+				return (-1);
+			}
+			my_iteration_state_section_list = checkpoint->sections_list_head.next;
+			my_iteration_state = ITERATION_STATE_SECTION;
 		}
-		for (section_list = checkpoint->sections_list_head.next;
+
+		/*
+		 * Synchronize a checkpoint section if there is room in the
+		 * totem buffers
+		 */
+		for (section_list = my_iteration_state_section_list;
 			section_list != &checkpoint->sections_list_head;
 			section_list = section_list->next) {
 
 			checkpoint_section = list_entry (section_list, struct checkpoint_section, list);
 			res = sync_checkpoint_section_transmit (checkpoint, checkpoint_section);
+			if (res != 0) {
+				/*
+				 * Couldn't sync this section keep processing
+				 */
+				return (-1);
+			}
+			my_iteration_state_section_list = section_list->next;
 		}
+
+		/*
+		 * Continue to iterating checkpoints
+		 */
+		my_iteration_state = ITERATION_STATE_CHECKPOINT;
+		my_iteration_state_checkpoint_list = checkpoint_list->next;
 	}
-	return (res);
+
+	/*
+	 * all checkpoints and sections iterated
+	 */
+	return (0);
 }
 
 unsigned int sync_refcounts_iterate (void)
@@ -3543,7 +3540,7 @@ unsigned int sync_refcounts_iterate (void)
 	struct list_head *list;
 	unsigned int res = 0;
 
-	for (list = checkpoint_list_head.next;
+	for (list = my_iteration_state_checkpoint_list;
 		list != &checkpoint_list_head;
 		list = list->next) {
 
@@ -3553,46 +3550,49 @@ unsigned int sync_refcounts_iterate (void)
 		if (res != 0) {
 			break;
 		}
+		my_iteration_state_checkpoint_list = list->next;
 	}
 	return (res);
 }
 
 static int ckpt_sync_process (void)
 {
-	unsigned int done_queueing = 1;
-	unsigned int continue_processing = 0;
+	unsigned int done_queueing;
+	unsigned int continue_processing;
 	unsigned int res;
 
 	ENTER();
 
+	continue_processing = 0;
+
 	switch (my_sync_state) {
 	case SYNC_STATE_CHECKPOINT:
+		done_queueing = 1;
+		continue_processing = 1;
+
 		if (my_should_sync) {
 			TRACE1 ("should transmit checkpoints because lowest member in old configuration.\n");
 			res = sync_checkpoints_iterate ();
 
-			if (res == 0) { 
-				done_queueing = 1;
+			/*
+			 * Not done iterating checkpoints
+			 */
+			if (res != 0) { 
+				done_queueing = 0;
 			}
 		}
 		if (done_queueing) {
 			sync_refcounts_enter ();
 		}
-
-		/*
-		 * TODO recover current iteration state
-		 */
-		continue_processing = 1;
 		break;
 
 	case SYNC_STATE_REFCOUNT:
-		done_queueing = 1;
 		if (my_should_sync) {
 			TRACE1 ("transmit refcounts because this processor is the lowest member in old configuration.\n");
 			res = sync_refcounts_iterate ();
-		}
-		if (done_queueing) {
-			continue_processing = 0;
+			if (res != 0) { 
+				continue_processing = 1;
+			}
 		}
 		break;
 	}
