@@ -200,8 +200,6 @@ static void ckptSectionIterationInstanceFinalize (struct ckptSectionIterationIns
 
 	saHandleDestroy (&ckptSectionIterationHandleDatabase,
 		ckptSectionIterationInstance->sectionIterationHandle);
-
-	pthread_mutex_destroy (&ckptSectionIterationInstance->response_mutex);
 }
 
 static void ckptCheckpointInstanceFinalize (struct ckptCheckpointInstance *ckptCheckpointInstance)
@@ -225,8 +223,6 @@ static void ckptCheckpointInstanceFinalize (struct ckptCheckpointInstance *ckptC
 	list_del (&ckptCheckpointInstance->list);
 
 	saHandleDestroy (&checkpointHandleDatabase, ckptCheckpointInstance->checkpointHandle);
-
-	pthread_mutex_destroy (&ckptCheckpointInstance->response_mutex);
 }
 
 static void ckptInstanceFinalize (struct ckptInstance *ckptInstance)
