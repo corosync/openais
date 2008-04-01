@@ -166,9 +166,6 @@ evs_error_t evs_finalize (
 	evs_inst->finalize = 1;
 
 	pthread_mutex_unlock (&evs_inst->response_mutex);
-	pthread_mutex_destroy (&evs_inst->response_mutex);
-
-	pthread_mutex_destroy (&evs_inst->dispatch_mutex);
 
 	saHandleDestroy (&evs_handle_t_db, handle);
     /*
