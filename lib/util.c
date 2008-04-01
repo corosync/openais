@@ -543,7 +543,7 @@ saHandleCreate (
 		handleDatabase->handleCount += 1;
 		newHandles = (struct saHandle *)realloc (handleDatabase->handles,
 			sizeof (struct saHandle) * handleDatabase->handleCount);
-		if (newHandles == 0) {
+		if (newHandles == NULL) {
 			pthread_mutex_unlock (&handleDatabase->mutex);
 			return (SA_AIS_ERR_NO_MEMORY);
 		}
