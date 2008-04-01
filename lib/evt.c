@@ -904,9 +904,6 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 	evti->ei_finalize = 1;
 
 	pthread_mutex_unlock (&evti->ei_response_mutex);
- 	pthread_mutex_destroy (&evti->ei_response_mutex);
-
- 	pthread_mutex_destroy (&evti->ei_dispatch_mutex);
 
 	saHandleDestroy(&evt_instance_handle_db, evtHandle);
 	/*
