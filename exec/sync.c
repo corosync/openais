@@ -429,6 +429,7 @@ static void sync_deliver_fn (
 			sizeof (barrier_data_confchg));
 
 		sync_callbacks_load();
+log_printf (LOG_LEVEL_NOTICE, "sync_callbacks_load\n");
 
 		/*
 		 * if sync service found, execute it
@@ -457,6 +458,7 @@ static void sync_confchg_fn (
 	}
 	if (sync_processing && sync_callbacks.sync_abort != NULL) {
 		sync_callbacks.sync_abort ();
+		sync_callbacks.sync_activate = NULL;
 	}
 	/*
 	 * If no virtual synchrony filter configured, then start
