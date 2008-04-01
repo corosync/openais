@@ -1,7 +1,7 @@
 /*
  * vi: set autoindent tabstop=4 shiftwidth=4 :
  *
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006-2008 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -156,9 +156,6 @@ cpg_error_t cpg_finalize (
 	cpg_inst->finalize = 1;
 
 	pthread_mutex_unlock (&cpg_inst->response_mutex);
-	pthread_mutex_destroy (&cpg_inst->response_mutex);
-
-	pthread_mutex_destroy (&cpg_inst->dispatch_mutex);
 
 	saHandleDestroy (&cpg_handle_t_db, handle);
 
