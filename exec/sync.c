@@ -429,7 +429,6 @@ static void sync_deliver_fn (
 			sizeof (barrier_data_confchg));
 
 		sync_callbacks_load();
-log_printf (LOG_LEVEL_NOTICE, "sync_callbacks_load\n");
 
 		/*
 		 * if sync service found, execute it
