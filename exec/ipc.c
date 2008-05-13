@@ -56,7 +56,7 @@
 #include <signal.h>
 #include <sched.h>
 #include <time.h>
-#if defined(OPENAIS_SOLARIS) && defined(HAVE_GETPEERUCRED)
+#if defined(HAVE_GETPEERUCRED)
 #include <ucred.h>
 #endif
 
@@ -923,37 +923,43 @@ static void conn_io_deliver (struct conn_io *conn_io)
 		msg_recv.msg_control = (void *)cmsg_cred;
 		msg_recv.msg_controllen = sizeof (cmsg_cred);
 #else
-		euid = -1; egid = -1;
-		if (getpeereid(conn_io->fd, &euid, &egid) != -1 &&
-		    (euid == 0 || egid == g_gid_valid)) {
-				conn_io->state = CONN_IO_STATE_AUTHENTICATED;
-		}
-		if (conn_io->state == CONN_IO_STATE_INITIALIZING) {
-			log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", egid, g_gid_valid);
+		{
+			uid_t euid;
+			gid_t egid;
+			                
+			euid = -1; egid = -1;
+			if (getpeereid(conn_io->fd, &euid, &egid) != -1 &&
+			    (euid == 0 || egid == g_gid_valid)) {
+					conn_io->state = CONN_IO_STATE_AUTHENTICATED;
+			}
+			if (conn_io->state == CONN_IO_STATE_INITIALIZING) {
+				log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", egid, g_gid_valid);
+			}
 		}
 #endif
 	}
 
-	#else /* OPENAIS_SOLARIS */
+#else /* OPENAIS_SOLARIS */
 	msg_recv.msg_accrights = 0;
 	msg_recv.msg_accrightslen = 0;
 
 
 	if (! conn_info->authenticated) {
-	#ifdef HAVE_GETPEERUCRED
-	ucred_t *uc;
-	uid_t euid = -1;
-	gid_t egid = -1;
-	if (getpeerucred(conn_info->fd, &uc) == 0) {
-	euid = ucred_geteuid(uc);
-	egid = ucred_getegid(uc);
-	if ((euid == 0) || (egid == g_gid_valid)) {
-		conn_info->authenticated = 1;
-	}
-		ucred_free(uc);
-	}
-	if (conn_info->authenticated == 0) {
-		log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", (int)egid, g_gid_valid);
+#ifdef HAVE_GETPEERUCRED
+		ucred_t *uc;
+		uid_t euid = -1;
+		gid_t egid = -1;
+
+		if (getpeerucred (conn_info->fd, &uc) == 0) {
+			euid = ucred_geteuid (uc);
+			egid = ucred_getegid (uc);
+			if ((euid == 0) || (egid == g_gid_valid)) {
+				conn_info->authenticated = 1;
+			}
+			ucred_free(uc);
+		}
+		if (conn_info->authenticated == 0) {
+			log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", (int)egid, g_gid_valid);
  		}
  #else
  		log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated "
@@ -983,7 +989,7 @@ retry_recv:
 		/* On many OS poll never return POLLHUP or POLLERR.
 		 * EOF is detected when recvmsg return 0.
 		 */
-  		libais_disconnect_request (conn_info);
+		disconnect_request (conn_io);
 #endif
 		return;
 	}
