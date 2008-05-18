@@ -65,6 +65,8 @@
 #include "totempg.h"
 #include "print.h"
 
+#define GLOBALID_CHECKPOINT_NAME "global_checkpoint_name_do_not_use_in_an_application"
+
 #define CKPT_MAX_SECTION_DATA_SEND (1024*400)
 
 enum ckpt_message_req_types {
@@ -92,6 +94,7 @@ struct checkpoint_section {
 };
 
 enum sync_state {
+	SYNC_STATE_GLOBALID,
 	SYNC_STATE_CHECKPOINT,
 	SYNC_STATE_REFCOUNT
 };
@@ -768,6 +771,7 @@ static void ckpt_confchg_fn (
 {
 	unsigned int i, j;
 	unsigned int lowest_nodeid;
+	static int first_configuration = 1;
 
 	my_should_sync = 0;
 
@@ -792,9 +796,12 @@ static void ckpt_confchg_fn (
 			sizeof (unsigned int) * member_list_entries);
 		my_old_member_list_entries = member_list_entries;
 
-		if (lowest_nodeid == totempg_my_nodeid_get()) {
+		if ((first_configuration) ||
+			(lowest_nodeid == totempg_my_nodeid_get())) {
+
 			my_should_sync = 1;
 		}
+		first_configuration = 0;
 	}
 }
 
@@ -3319,19 +3326,29 @@ void sync_checkpoints_free (struct list_head *ckpt_list_head)
 	list_init (ckpt_list_head);
 }
 
-static inline void sync_checkpoints_enter (void)
+static inline void sync_gloalid_enter (void)
 {
 	struct checkpoint *checkpoint;
 
 	ENTER();
 
-	my_sync_state = SYNC_STATE_CHECKPOINT;
-	my_iteration_state = ITERATION_STATE_CHECKPOINT;
+	my_sync_state = SYNC_STATE_GLOBALID;
+
 	my_iteration_state_checkpoint_list = checkpoint_list_head.next;
 
 	checkpoint = list_entry (checkpoint_list_head.next, struct checkpoint,
 		list);
 	my_iteration_state_section_list = checkpoint->sections_list_head.next;
+
+	LEAVE();
+}
+
+static inline void sync_checkpoints_enter (void)
+{
+	ENTER();
+
+	my_sync_state = SYNC_STATE_CHECKPOINT;
+	my_iteration_state = ITERATION_STATE_CHECKPOINT;
 
 	LEAVE();
 }
@@ -3347,7 +3364,7 @@ static void ckpt_sync_init (void)
 {
 	ENTER();
 
-	sync_checkpoints_enter();
+	sync_gloalid_enter();
 
 	LEAVE();
 }
@@ -3386,6 +3403,19 @@ static int sync_checkpoint_transmit (struct checkpoint *checkpoint)
 
 	return (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED));
 }
+
+static int sync_checkpoint_globalid_transmit (void)
+{
+	struct checkpoint checkpoint;
+
+	strcpy ((char *)checkpoint.name.value, GLOBALID_CHECKPOINT_NAME);
+
+	checkpoint.name.length = strlen (GLOBALID_CHECKPOINT_NAME);
+	checkpoint.ckpt_id = global_ckpt_id;
+
+	return (sync_checkpoint_transmit(&checkpoint));
+}
+
 
 static int sync_checkpoint_section_transmit (
 	struct checkpoint *checkpoint,
@@ -3566,6 +3596,20 @@ static int ckpt_sync_process (void)
 	continue_processing = 0;
 
 	switch (my_sync_state) {
+        case SYNC_STATE_GLOBALID:
+		done_queueing = 1;
+		continue_processing = 1;
+		if (my_should_sync) {
+			res = sync_checkpoint_globalid_transmit ();
+			if (res != 0) {
+				done_queueing = 0;
+			}
+		}
+		if (done_queueing) {
+			sync_checkpoints_enter ();
+		}
+		break;
+
 	case SYNC_STATE_CHECKPOINT:
 		done_queueing = 1;
 		continue_processing = 1;
@@ -3640,6 +3684,22 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 	 */
 	if (memcmp (&req_exec_ckpt_sync_checkpoint->ring_id,
 		&my_saved_ring_id, sizeof (struct memb_ring_id)) != 0) {
+		return;
+	}
+
+	/*
+	 * Discard checkpoints that are used to synchronize the global_ckpt_id
+	 * also setting the global ckpt_id as well.
+	 */
+	if (memcmp (&req_exec_ckpt_sync_checkpoint->checkpoint_name.value, 
+		GLOBALID_CHECKPOINT_NAME,
+		req_exec_ckpt_sync_checkpoint->checkpoint_name.length) == 0) {
+
+		if (req_exec_ckpt_sync_checkpoint->ckpt_id >= global_ckpt_id) {
+			global_ckpt_id = req_exec_ckpt_sync_checkpoint->ckpt_id + 1;
+		}
+
+		LEAVE();
 		return;
 	}
 
