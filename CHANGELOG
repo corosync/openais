@@ -1,4 +1,14 @@
 ------------------------------------------------------------------------
+r1545 | sdake | 2008-05-12 08:57:42 -0700 (Mon, 12 May 2008) | 2 lines
+
+Repair invalid commit.
+
+------------------------------------------------------------------------
+r1544 | sdake | 2008-05-12 08:52:11 -0700 (Mon, 12 May 2008) | 2 lines
+
+Add ckpt service back in from incorrect patch that was committed found during tesitng of rpm of 0.83-1.fc10.
+
+------------------------------------------------------------------------
 r1541 | sdake | 2008-05-12 06:48:06 -0700 (Mon, 12 May 2008) | 2 lines
 
 Change all email addresses that were sdake@mvista.com to sdake@redhat.com.
