@@ -72,7 +72,7 @@ ifeq (ia64,$(ARCH))
 LIBDIR=$(PREFIX)/lib/openais
 endif
 
-SUBDIRS:=$(builddir)lcr $(builddir)lib $(builddir)exec $(builddir)test
+SUBDIRS:=$(builddir)lcr $(builddir)lib $(builddir)test
 sub_make = srcdir=$(srcdir) builddir=$(builddir) subdir=$(1)/ $(MAKE) -I$(srcdir)$(1) -f $(srcdir)$(1)/Makefile $(2)
 
 all: $(SUBDIRS)
