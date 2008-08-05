@@ -118,7 +118,8 @@ clean:
 	(cd $(builddir)test; echo ==== `pwd` ===; $(call sub_make,test,clean));
 	rm -rf $(builddir)doc/api
 
-AIS_LIBS	= SaAmf SaClm SaCkpt SaEvt SaLck SaMsg
+# AIS_LIBS	= SaAmf SaClm SaCkpt SaEvt SaLck SaMsg
+AIS_LIBS	= SaClm SaCkpt SaEvt SaLck SaMsg
 
 AIS_HEADERS	= saAis.h saAmf.h saClm.h saCkpt.h saEvt.h saEvt.h saLck.h \
 		  saMsg.h

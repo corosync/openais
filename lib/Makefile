@@ -70,19 +70,19 @@ libSaLck.so.2.0.0: util.o lck.o
 else
 
 libSaClm.so.2.0.0: util.o clm.o
-	$(CC) -shared -Wl,-soname,libclm.so.2,-version-script=libSaClm.versions util.o clm.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libclm.so.2,-version-script=libSaClm.versions util.o clm.o -o $@
 
 libSaCkpt.so.2.0.0: util.o ckpt.o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=libSaCkpt.versions util.o ckpt.o -o $@
 
 libSaEvt.so.2.0.0: util.o evt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=libSaEvt.versions util.o evt.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=libSaEvt.versions util.o evt.o -o $@
 
 libSaMsg.so.2.0.0: util.o msg.o
-	$(CC) -shared -Wl,-soname,libmsg.so.2,-version-script=libSaMsg.versions util.o msg.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libmsg.so.2,-version-script=libSaMsg.versions util.o msg.o -o $@
 
 libSaLck.so.2.0.0: util.o lck.o
-	$(CC) -shared -Wl,-soname,libSaLck.so.2,-version-script=libSaLck.versions util.o lck.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=libSaLck.versions util.o lck.o -o $@
 
 endif
 
