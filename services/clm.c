@@ -68,6 +68,7 @@
 #include "../include/saClm.h"
 #include "../include/ipc_clm.h"
 #include "../include/mar_clm.h"
+#include "clm.h"
 
 LOGSYS_DECLARE_SUBSYS ("CLM", LOG_INFO);
 
@@ -92,7 +93,7 @@ static unsigned long long view_initial = 0;
 
 static DECLARE_LIST_INIT (library_notification_send_listhead);
 
-SaClmClusterNodeT *clm_get_by_nodeid (unsigned int node_id)
+static SaClmClusterNodeT *clm_services_api_nodeid_saf_get (unsigned int node_id)
 {
 	static SaClmClusterNodeT cluster_node;
 	int i;
@@ -231,9 +232,24 @@ static struct corosync_service_engine_iface_ver0 clm_service_engine_iface = {
 	.corosync_get_service_engine_ver0	= clm_get_service_engine_ver0
 };
 
-static struct lcr_iface openais_clm_ver0[1] = {
+static struct openais_clm_services_api_ver1 clm_services_api_ver1 = {
+	.nodeid_saf_get	=	clm_services_api_nodeid_saf_get
+};
+
+static struct lcr_iface openais_clm_ver0[2] = {
 	{
 		.name			= "openais_clm",
+		.version		= 0,
+		.versions_replace	= 0,
+		.versions_replace_count = 0,
+		.dependencies		= 0,
+		.dependency_count	= 0,
+		.constructor		= NULL,
+		.destructor		= NULL,
+		.interfaces		= NULL
+	},
+	{
+		.name			= "openais_clm_services_api",
 		.version		= 0,
 		.versions_replace	= 0,
 		.versions_replace_count = 0,
@@ -246,7 +262,7 @@ static struct lcr_iface openais_clm_ver0[1] = {
 };
 
 static struct lcr_comp clm_comp_ver0 = {
-	.iface_count			= 1,
+	.iface_count			= 2,
 	.ifaces				= openais_clm_ver0
 };
 
@@ -257,6 +273,7 @@ static struct corosync_service_engine *clm_get_service_engine_ver0 (void)
 
 __attribute__ ((constructor)) static void clm_comp_register (void) {
 	lcr_interfaces_set (&openais_clm_ver0[0], &clm_service_engine_iface);
+	lcr_interfaces_set (&openais_clm_ver0[1], &clm_services_api_ver1);
 
 	lcr_component_register (&clm_comp_ver0);
 }

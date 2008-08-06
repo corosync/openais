@@ -60,6 +60,7 @@
 #include "../include/saAis.h"
 #include "../include/saEvt.h"
 #include "../include/ipc_evt.h"
+#include "clm.h"
 
 LOGSYS_DECLARE_SUBSYS ("EVT", LOG_INFO);
 /*
@@ -117,6 +118,7 @@ static void evt_conf_change(
 static int evt_lib_init(void *conn);
 static int evt_lib_exit(void *conn);
 static int evt_exec_init(struct corosync_api_v1 *);
+static int evt_exec_exit(void);
 
 /*
  * Recovery sync functions
@@ -130,6 +132,10 @@ static void convert_event(void *msg);
 static void convert_chan_packet(void *msg);
 
 struct corosync_api_v1 *api;
+
+static struct openais_clm_services_api_ver1 *clmapi;
+
+static unsigned int clm_services_api_handle;
 
 static struct corosync_lib_handler evt_lib_engine[] = {
 	{
@@ -218,6 +224,7 @@ struct corosync_service_engine evt_service_engine = {
 	.lib_engine					= evt_lib_engine,
 	.lib_engine_count			= sizeof(evt_lib_engine) / sizeof(struct corosync_lib_handler),
 	.exec_init_fn				= evt_exec_init,
+	.exec_exit_fn				= evt_exec_exit,
 	.exec_engine				= evt_exec_engine,
 	.exec_engine_count			= sizeof(evt_exec_engine) / sizeof(struct corosync_exec_handler),
 	.exec_dump_fn				= NULL,
@@ -1448,14 +1455,13 @@ static int check_last_event(
 	struct member_node_data *nd;
 	SaClmClusterNodeT *cn;
 
-#ifdef TODO
 	nd = evt_find_node(nodeid);
 	if (!nd) {
 		log_printf(LOG_LEVEL_DEBUG,
 				"Node ID %s not found for event %llx\n",
 				api->totem_ifaces_print (evtpkt->led_publisher_node_id),
 				(unsigned long long)evtpkt->led_event_id);
-		cn = main_clm_get_by_nodeid(nodeid);
+		cn = clmapi->nodeid_saf_get(nodeid);
 		if (!cn) {
 			log_printf(LOG_LEVEL_DEBUG,
 					"Cluster Node 0x%s not found for event %llx\n",
@@ -1475,7 +1481,6 @@ static int check_last_event(
 		nd->mn_last_msg_id = evtpkt->led_msg_id;
 		return 0;
 	}
-	#endif
 	return 1;
 }
 
@@ -3119,6 +3124,7 @@ static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 
 	api = corosync_api;
 
+	clmapi = openais_clm_services_api_reference (api, &clm_services_api_handle);
 	log_printf(LOG_LEVEL_DEBUG, "Evt exec init request\n");
 
 	api->object_find_create (
@@ -3180,6 +3186,12 @@ static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 	memcpy(&dropped_event->ed_event.led_body[0],
 					&dropped_pattern, sizeof(dropped_pattern));
 	return 0;
+}
+
+static int evt_exec_exit(void)
+{
+	openais_clm_services_api_release (api, clm_services_api_handle);
+	return (0);
 }
 
 static int
@@ -3246,8 +3258,7 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 	 * See where the message came from so that we can set the
 	 * publishing node id in the message before delivery.
 	 */
-#ifdef TODO 
-	cn = main_clm_get_by_nodeid(nodeid);
+	cn = clmapi->nodeid_saf_get(nodeid);
 	if (!cn) {
 			/*
 			 * Not sure how this can happen...
@@ -3263,7 +3274,6 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 	evtpkt->led_publisher_node_id = nodeid;
 	evtpkt->led_nodeid = nodeid;
 	evtpkt->led_receive_time = clust_time_now();
-#endif
 
 	if (evtpkt->led_chan_unlink_id != EVT_CHAN_ACTIVE) {
 		log_printf(CHAN_UNLINK_DEBUG,
@@ -3681,14 +3691,13 @@ static void evt_remote_chan_op(void *msg, unsigned int nodeid)
 	struct member_node_data *mn;
 	struct event_svr_channel_instance *eci;
 
-#ifdef TODO
 	log_printf(REMOTE_OP_DEBUG, "Remote channel operation request\n");
-	my_node = main_clm_get_by_nodeid(local_node);
+	my_node = clmapi->nodeid_saf_get(local_node);
 	log_printf(REMOTE_OP_DEBUG, "my node ID: 0x%x\n", my_node->nodeId);
 
 	mn = evt_find_node(nodeid);
 	if (mn == NULL) {
-		cn = main_clm_get_by_nodeid(nodeid);
+		cn = clmapi->nodeid_saf_get(nodeid);
 		if (cn == NULL) {
 			log_printf(LOG_LEVEL_WARNING,
 				"Evt remote channel op: Node data for nodeid %d is NULL\n",
@@ -3699,7 +3708,6 @@ static void evt_remote_chan_op(void *msg, unsigned int nodeid)
 			mn = evt_find_node(nodeid);
 		}
 	}
-#endif
 
 	switch (cpkt->chc_op) {
 		/*
@@ -4032,15 +4040,13 @@ static void evt_sync_init(void)
 	/*
 	 * Set the base event id
 	 */
- #ifdef TODO
 	if (!my_node_id) {
-		cn = main_clm_get_by_nodeid(my_node);
+		cn = clmapi->nodeid_saf_get(my_node);
 		log_printf(RECOVERY_DEBUG, "My node ID %s\n",
 			api->totem_ifaces_print (cn->nodeId));
 		my_node_id = cn->nodeId;
 		set_event_id(my_node_id);
 	}
-#endif
 
 	/*
 	 * account for nodes that left the membership
@@ -4170,8 +4176,7 @@ static int evt_sync_process(void)
 				/*
 				 * Not seen before, add it to our list of nodes.
 				 */
-#ifdef TODO
-				cn = main_clm_get_by_nodeid(*add_list);
+				cn = clmapi->nodeid_saf_get(*add_list);
 				if (!cn) {
 					/*
 					 * Error: shouldn't happen
@@ -4183,7 +4188,6 @@ static int evt_sync_process(void)
 				} else {
 					evt_add_node(*add_list, cn);
 				}
-#endif
 			}
 
 			add_list++;
