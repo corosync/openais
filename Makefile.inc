@@ -84,7 +84,7 @@ endif
 #
 ifeq (${OPENAIS_COMPAT}, LINUX) 
 	override CFLAGS += -DOPENAIS_LINUX
-	override LDFLAGS += -ldl -lpthread
+	override LDFLAGS += -lpthread
 	override DYFLAGS += -rdynamic
 endif
 ifeq (${OPENAIS_COMPAT}, BSD)

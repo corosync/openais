@@ -40,7 +40,7 @@ override CFLAGS += -I$(srcdir)include
 LDFLAGS += -L./
 
 ifeq (${OPENAIS_COMPAT}, LINUX) 
-	override LDFLAGS += -ldl
+	override LDFLAGS += 
 endif
 
 ifeq (${OPENAIS_COMPAT}, SOLARIS) 
