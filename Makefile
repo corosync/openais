@@ -129,7 +129,6 @@ install: all
 	mkdir -p $(DESTDIR)$(LIBDIR)
 	mkdir -p $(DESTDIR)$(LCRSODIR)
 	mkdir -p $(DESTDIR)$(ETCDIR)/ais
-	mkdir -p $(DESTDIR)$(MANDIR)/man3
 	mkdir -p $(DESTDIR)$(MANDIR)/man5
 	mkdir -p $(DESTDIR)$(MANDIR)/man8
 	mkdir -p $(DESTDIR)$(ETCDIR)/ld.so.conf.d
@@ -164,6 +163,8 @@ install: all
 	for aHeader in $(AIS_HEADERS); do				\
 	    install -m 644 $(srcdir)include/$$aHeader $(DESTDIR)$(INCLUDEDIR);	\
 	done
+	install -m 644 $(srcdir)man/*.5 $(DESTDIR)$(MANDIR)/man5
+	install -m 644 $(srcdir)man/*.8 $(DESTDIR)$(MANDIR)/man8
 
 doxygen:
 	mkdir -p doc/api && doxygen
