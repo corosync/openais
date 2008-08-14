@@ -1,12 +1,17 @@
-echo "Application Interface Specification Implementation Lines Of Code"
-echo -n "services LOC    "
-cat services/*.c services/*.h | wc -l
+echo "OpenAIS Project LOC"
+echo "---------------------------"
+echo -n "services LOC "
+printf "%7.7s\n" `find services -name *.[ch] -exec cat {} \; | wc -l`
 
-echo -n "lib LOC     "
-cat lib/*.c | wc -l
+echo -n "lib LOC      "
+printf "%7.7s\n" `find lib -name *.[ch] -exec cat {} \; | wc -l`
 
-echo -n "include LOC "
-cat include/*.h | wc -l
+echo -n "include LOC  "
+printf "%7.7s\n" `find include -name *.[ch] -exec cat {} \; | wc -l`
 
-echo -n "total LOC   "
-cat services/*.c services/*.h lib/*.c include/*.h | wc -l
+echo -n "test LOC     "
+printf "%7.7s\n" `find test -name *.[ch] -exec cat {} \; | wc -l`
+
+echo "---------------------------"
+echo -n "total LOC    "
+printf "%7.7s\n" `find . -name *.[ch] -exec cat {} \; | wc -l`
