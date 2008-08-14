@@ -36,7 +36,7 @@
 #ifndef AIS_MAR_CLM_H_DEFINED
 #define AIS_MAR_CLM_H_DEFINED
 
-#include <corosync/engine/swab.h>
+#include <corosync/swab.h>
 #include "saAis.h"
 #include "saClm.h"
 #include <corosync/mar_gen.h>

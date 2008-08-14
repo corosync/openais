@@ -64,34 +64,34 @@ all: openaisparser.lcrso service_clm.lcrso service_ckpt.lcrso \
 ifeq (${OPENAIS_COMPAT}, DARWIN)
 
 service_evs.lcrso: evs.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load evs.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load evs.o -o $@
 
 service_clm.lcrso: clm.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load clm.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load clm.o -o $@
 
 service_amf.lcrso: $(AMF_OBJS)
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load $(AMF_OBJS) -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load $(AMF_OBJS) -o $@
 
 service_ckpt.lcrso: ckpt.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load ckpt.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load ckpt.o -o $@
 
 service_evt.lcrso: evt.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load evt.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load evt.o -o $@
 
 service_lck.lcrso: lck.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load lck.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load lck.o -o $@
 
 service_msg.lcrso: msg.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load msg.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load msg.o -o $@
 
 service_cfg.lcrso: cfg.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load cfg.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load cfg.o -o $@
 
 openaisparser.lcrso: openaisparser.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load openaisparser.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load openaisparser.o -o $@
 
 vsf_ykd.lcrso: vsf_ykd.o
-	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load vsf_ykd.o -o $@
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load vsf_ykd.o -o $@
 
 
 else

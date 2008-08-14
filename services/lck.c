@@ -52,7 +52,7 @@
 #include <corosync/mar_gen.h>
 #include <corosync/list.h>
 #include <corosync/lcr/lcr_comp.h>
-#include <corosync/engine/swab.h>
+#include <corosync/swab.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
 #include "../include/saAis.h"

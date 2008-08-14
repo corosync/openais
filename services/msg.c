@@ -49,7 +49,7 @@
 
 #include <corosync/ipc_gen.h>
 #include <corosync/mar_gen.h>
-#include <corosync/engine/swab.h>
+#include <corosync/swab.h>
 #include <corosync/list.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>

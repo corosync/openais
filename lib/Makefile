@@ -35,7 +35,6 @@ srcdir ?= $(CURDIR)/../
 
 include $(srcdir)Makefile.inc
 
-
 override CFLAGS += -I$(srcdir)include
 override LDFLAGS += -L./
 
@@ -58,7 +57,7 @@ libSaClm.so.2.0.0: util.o clm.o
 libSaCkpt.so.2.0.0: util.o ckpt.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o ckpt.o -o $@
 
-libSaEvt.so.2.0.0: util.o evt.o sa-evt.o
+libSaEvt.so.2.0.0: util.o evt.o 
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o
 
 libSaMsg.so.2.0.0: util.o msg.o

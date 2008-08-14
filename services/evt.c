@@ -52,7 +52,7 @@
 #include <corosync/ipc_gen.h>
 #include <corosync/mar_gen.h>
 #include <corosync/hdb.h>
-#include <corosync/engine/swab.h>
+#include <corosync/swab.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
 #include <corosync/lcr/lcr_comp.h>

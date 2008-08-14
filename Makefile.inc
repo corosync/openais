@@ -45,9 +45,14 @@ endif
 
 # default CFLAGS, LDFLAGS
 #
-CFLAGS = -DCOROSYNC_EXTERNAL_ENGINE
+CFLAGS =
 LDFLAGS =
 DYFLAGS =
+
+# using -I on corosync directory is necessary for "saAis.h", ...
+ifdef COROSYNC_INC
+	CFLAGS += -I$(COROSYNC_INC) -I$(COROSYNC_INC)/corosync
+endif
 
 # Adding the TS_CLASS flag enables not being scheduled RR
 #CFLAGS += -DTS_CLASS
@@ -110,4 +115,3 @@ endif
 endif
 
 VPATH:=. $(srcdir) $(srcdir)$(subdir)
-
