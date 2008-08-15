@@ -52,14 +52,14 @@ AMF_SRC = amf.c amfutil.c amfnode.c amfcluster.c amfapp.c amfsg.c amfsu.c amfcom
 AMF_OBJS = amf.o amfutil.o amfnode.o amfcluster.o amfapp.o amfsg.o amfsu.o amfcomp.o amfsi.o
 
 # LCR objects
-LCR_SRC = openaisparser.c clm.c ckpt.c evt.c lck.c msg.c cfg.c openaisparser.c $(AMF_SRC)
-LCR_OBJS = openaisparser.o clm.o ckpt.o evt.o lck.o msg.o cfg.o openaisparser.o $(AMF_OBJS)
+LCR_SRC = openaisparser.c openaisserviceenable.c clm.c ckpt.c evt.c lck.c msg.c cfg.c $(AMF_SRC)
+LCR_OBJS = openaisparser.o openaisserviceenable.o clm.o ckpt.o evt.o lck.o msg.o cfg.o o $(AMF_OBJS)
 
 override CFLAGS += -fPIC
 
-all: openaisparser.lcrso service_clm.lcrso service_ckpt.lcrso \
-	service_evt.lcrso service_lck.lcrso service_msg.lcrso \
-	openais-instantiate
+all: openaisparser.lcrso openaisserviceenable.lcrso service_clm.lcrso \
+	service_ckpt.lcrso service_evt.lcrso service_lck.lcrso \
+	service_msg.lcrso openais-instantiate
 
 ifeq (${OPENAIS_COMPAT}, DARWIN)
 
@@ -89,6 +89,9 @@ service_cfg.lcrso: cfg.o
 
 openaisparser.lcrso: openaisparser.o
 	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load openaisparser.o -o $@
+
+openaisserviceenable.lcrso: openaisserviceenable.o
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load openaisserviceenable.o -o $@
 
 vsf_ykd.lcrso: vsf_ykd.o
 	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load vsf_ykd.o -o $@
@@ -120,6 +123,9 @@ service_cfg.lcrso: cfg.o
 openaisparser.lcrso: openaisparser.o
 	$(CC) -shared -Wl,-soname,openaisparser.lcrso openaisparser.o -o $@
 
+openaisserviceenable.lcrso: openaisserviceenable.o
+	$(CC) -shared -Wl,-soname,openaisserviceenable.lcrso openaisserviceenable.o -o $@
+
 vsf_ykd.lcrso: vsf_ykd.o
 	$(CC) -shared -Wl,-soname,vsf_ykd.lcrso vsf_ykd.o -o $@
 
@@ -132,7 +138,7 @@ openais-instantiate: openais-instantiate.o
 	$(CC) $(LDFLAGS) openais-instantiate.o -o openais-instantiate
 
 clean:
-	rm -f aisexec $(OBJS) *.o *.lcrso libtotem_pg.so* libtotem_pg.a gmon.out 
+	rm -f $(OBJS) *.o *.lcrso libtotem_pg.so* libtotem_pg.a gmon.out 
 	rm -f keygen keygen.o openais-instantiate *.da *.bb *.bbg liblogsys.so* liblogsys.a
 
 depend:

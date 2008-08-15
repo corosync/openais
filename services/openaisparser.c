@@ -197,56 +197,6 @@ static int read_config_file_into_objdb(
 
 	fclose(fp);
 
-	/*
-	 * Load clm module
-	 */
-        objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
-		"service", strlen("service"));
-	objdb->object_key_create(object_handle, "name", strlen("name"),
-		"openais_clm", strlen("openais_clm") + 1);
-	objdb->object_key_create(object_handle, "ver", strlen("ver"),
-		"0", 2);
-
-	/*
-	 * Load ckpt module
-	 */
-        objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
-		"service", strlen("service"));
-	objdb->object_key_create(object_handle, "name", strlen("name"),
-		"openais_ckpt", strlen("openais_ckpt") + 1);
-	objdb->object_key_create(object_handle, "ver", strlen("ver"),
-		"0", 2);
-
-	/*
-	 * Load evt module
-	 */
-        objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
-		"service", strlen("service"));
-	objdb->object_key_create(object_handle, "name", strlen("name"),
-		"openais_evt", strlen("openais_evt") + 1);
-	objdb->object_key_create(object_handle, "ver", strlen("ver"),
-		"0", 2);
-
-	/*
-	 * Load msg module
-	 */
-        objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
-		"service", strlen("service"));
-	objdb->object_key_create(object_handle, "name", strlen("name"),
-		"openais_msg", strlen("openais_msg") + 1);
-	objdb->object_key_create(object_handle, "ver", strlen("ver"),
-		"0", 2);
-
-	/*
-	 * Load lck module
-	 */
-        objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
-		"service", strlen("service"));
-	objdb->object_key_create(object_handle, "name", strlen("name"),
-		"openais_lck", strlen("openais_lck") + 1);
-	objdb->object_key_create(object_handle, "ver", strlen("ver"),
-		"0", 2);
-
 	sprintf (error_reason, "Successfully read main configuration file '%s'.\n", filename);
 	*error_string = error_reason;
 
