@@ -98,6 +98,7 @@ struct queue_group {
 	SaNameT name;
 	SaUint8T track_flags;
 	SaMsgQueueGroupPolicyT policy;
+	struct message_queue *rr_queue;
 	struct list_head group_list;
 	struct list_head queue_head;
 };
@@ -687,6 +688,7 @@ static void msg_confchg_fn (
 	return;
 }
 
+#if 0
 static void print_message_list (struct message_queue *queue)
 {
 	struct list_head *list;
@@ -703,7 +705,9 @@ static void print_message_list (struct message_queue *queue)
 			    (unsigned long long)(message->time));
 	}
 }
+#endif
 
+#if 0
 static void print_queue_group_list (struct queue_group *group)
 {
 	struct list_head *list;
@@ -720,6 +724,7 @@ static void print_queue_group_list (struct queue_group *group)
 			    (unsigned int)(queue->change));
 	}
 }
+#endif
 
 static struct message_queue *queue_find (SaNameT *name)
 {
@@ -757,6 +762,7 @@ static struct queue_group *group_find (SaNameT *name)
 	return (0);
 }
 
+#if 0
 static struct message_queue *group_queue_find (struct queue_group *group, SaNameT *name)
 {
 	struct list_head *list;
@@ -774,6 +780,7 @@ static struct message_queue *group_queue_find (struct queue_group *group, SaName
 	}
 	return (0);
 }
+#endif
 
 static unsigned int queue_group_member_count (struct queue_group *group)
 {
@@ -862,6 +869,23 @@ static unsigned int queue_group_track (
 	}
 
 	return (i);
+}
+
+static struct message_queue *next_rr_queue (struct queue_group *group)
+{
+	struct message_queue *queue;
+
+	if (group->rr_queue->group_list.next == &group->queue_head) {
+		queue = list_entry (group->queue_head.next,
+				    struct message_queue,
+				    group_list);
+	} else {
+		queue =	list_entry (group->rr_queue->group_list.next,
+				    struct message_queue,
+				    group_list);
+	}
+
+	return (queue);
 }
 
 static int msg_exec_init_fn (struct corosync_api_v1 *corosync_api)
@@ -1144,6 +1168,8 @@ static void message_handler_req_exec_msg_queuegroupcreate (
 			&req_exec_msg_queuegroupcreate->queue_group_name,
 			sizeof (SaNameT));
 
+		queue_group->policy = req_exec_msg_queuegroupcreate->policy;
+
 		list_init (&queue_group->group_list);
 		list_init (&queue_group->queue_head);
 		list_add (&queue_group->group_list, &group_list_head);
@@ -1176,8 +1202,7 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
 	struct message_queue *queue;
 	struct queue_group *queue_group;
-	/* struct queue_group_entry *queue_group_entry; */
-	SaMsgQueueGroupNotificationT *notification;
+	SaMsgQueueGroupNotificationT *notification = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 	SaAisErrorT error_cb = SA_AIS_OK;
 
@@ -1201,19 +1226,18 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 	}
 
 	/*
-	queue_group_entry = malloc (sizeof (struct queue_group_entry));
-	if (queue_group_entry == 0) {
-		error = SA_AIS_ERR_NO_MEMORY;
-		goto error_exit;
+	 * If the policy is SA_MSG_QUEUE_GROUP_ROUND_ROBIN and the
+	 * rr_queue is NULL, then this is the first queue in the group.
+	 */
+	if ((queue_group->policy == SA_MSG_QUEUE_GROUP_ROUND_ROBIN) &&
+	    (queue_group->rr_queue == NULL))
+	{
+		queue_group->rr_queue = queue;
 	}
-	*/
 
 	list_init (&queue->group_list);
 	list_add (&queue->group_list, &queue_group->queue_head);
 	list_add (&queue->queue_list, &queue_list_head);
-
-	/* queue_group_entry->message_queue = queue; */
-	/* queue_group_entry->change = SA_MSG_QUEUE_GROUP_ADDED; */
 
 	queue->change = SA_MSG_QUEUE_GROUP_ADDED;
 
@@ -1256,11 +1280,11 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 	}
 
 error_track:
-	/* queue_group_entry->change = SA_MSG_QUEUE_GROUP_NO_CHANGE; */
 
 	queue->change = SA_MSG_QUEUE_GROUP_NO_CHANGE;
 
 error_exit:
+
 	if (api->ipc_source_is_local(&req_exec_msg_queuegroupinsert->source)) {
 		res_lib_msg_queuegroupinsert.header.size =
 			sizeof (struct res_lib_msg_queuegroupinsert);
@@ -1317,8 +1341,7 @@ static void message_handler_req_exec_msg_queuegroupremove (
 	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
 	struct queue_group *queue_group;
 	struct message_queue *queue;
-	/* struct queue_group_entry *queue_group_entry; */
-	SaMsgQueueGroupNotificationT *notification;
+	SaMsgQueueGroupNotificationT *notification = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 	SaAisErrorT error_cb = SA_AIS_OK;
 
@@ -1342,14 +1365,18 @@ static void message_handler_req_exec_msg_queuegroupremove (
 	}
 
 	/*
-	queue_group_entry = queue_group_entry_find (queue_group, queue);
-	if (queue_group_entry == 0) {
+	 * FIXME: Need to verify that queue being removed
+	 * is actually a member of the queue group.
+	 */
+
+	/*
+	queue = group_queue_find (queue_group,
+				  &req_exec_msg_queuegroupremove->queue_name);
+	if (queue == 0) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 	*/
-
-	/* queue_group_entry->change = SA_MSG_QUEUE_GROUP_REMOVED; */
 
 	queue->change = SA_MSG_QUEUE_GROUP_REMOVED;
 
@@ -1392,13 +1419,21 @@ static void message_handler_req_exec_msg_queuegroupremove (
 	}
 
 error_track:
-	/* queue_group_entry->change = SA_MSG_QUEUE_GROUP_NO_CHANGE; */
 
 	queue->change = SA_MSG_QUEUE_GROUP_NO_CHANGE;
+
+	/*
+	 * If the queue we are removing is also the next rr_queue,
+	 * we should set rr_queue to the next queue on the list.
+	 */
+	if (queue_group->rr_queue == queue) {
+		queue_group->rr_queue = next_rr_queue (queue_group);
+	}
 
 	list_del (&queue->group_list);
 
 error_exit:
+
 	if (api->ipc_source_is_local(&req_exec_msg_queuegroupremove->source)) {
 		res_lib_msg_queuegroupremove.header.size =
 			sizeof (struct res_lib_msg_queuegroupremove);
@@ -1494,7 +1529,7 @@ static void message_handler_req_exec_msg_queuegrouptrack (
 	unsigned int change_count = 0;
 	unsigned int member_count = 0;
 
-	SaMsgQueueGroupNotificationT *notification;
+	SaMsgQueueGroupNotificationT *notification = NULL;
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrack %s\n",
 		getSaNameT (&req_exec_msg_queuegrouptrack->queue_group_name));
@@ -1641,8 +1676,9 @@ static void message_handler_req_exec_msg_messagesend (
 		(struct req_exec_msg_messagesend *)message;
 	struct res_lib_msg_messagesend res_lib_msg_messagesend;
 	struct res_lib_msg_messagesendasync res_lib_msg_messagesendasync;
-	struct message_queue *queue;
-	struct message_entry *entry;
+	struct queue_group *group;
+	struct message_queue *queue = NULL;
+	struct message_entry *entry = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
 	char *data = ((char *)(req_exec_msg_messagesend) +
@@ -1651,10 +1687,13 @@ static void message_handler_req_exec_msg_messagesend (
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageSend %s\n",
 		getSaNameT (&req_exec_msg_messagesend->destination));
 
-	queue = queue_find (&req_exec_msg_messagesend->destination);
-	if (queue == NULL) {
-		error = SA_AIS_ERR_NOT_EXIST;
-		goto error_exit;
+	group = group_find (&req_exec_msg_messagesend->destination);
+	if (group == NULL) {
+		queue = queue_find (&req_exec_msg_messagesend->destination);
+		if (queue == NULL) {
+			error = SA_AIS_ERR_NOT_EXIST;
+			goto error_exit;
+		}
 	}
 
 	entry = malloc (sizeof (struct message_entry));
@@ -1678,7 +1717,13 @@ static void message_handler_req_exec_msg_messagesend (
 
 	entry->time = clust_time_now();
 
-	list_add_tail (&entry->list, &queue->message_head);
+	if (group != NULL) {
+		/* if (group->policy == SA_MSG_QUEUE_GROUP_ROUND_ROBIN) */
+		list_add_tail (&entry->list, &group->rr_queue->message_head);
+		group->rr_queue = next_rr_queue (group);
+	} else {
+		list_add_tail (&entry->list, &queue->message_head);
+	}
 
 error_exit:
 
@@ -1732,7 +1777,7 @@ static void message_handler_req_exec_msg_messageget (
 		(struct req_exec_msg_messageget *)message;
 	struct res_lib_msg_messageget res_lib_msg_messageget;
 	struct message_queue *queue;
-	struct message_entry *entry;
+	struct message_entry *entry = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageGet %s\n",
@@ -1766,8 +1811,14 @@ error_exit:
 			MESSAGE_RES_MSG_MESSAGEGET;
 		res_lib_msg_messageget.header.error = error;
 
-		memcpy (&res_lib_msg_messageget.message, &entry->message,
-			sizeof (SaMsgMessageT));
+		if (error == SA_AIS_OK) {
+			memcpy (&res_lib_msg_messageget.message, &entry->message,
+				sizeof (SaMsgMessageT));
+		} else {
+			memset (&res_lib_msg_messageget.message, 0,
+				sizeof (SaMsgMessageT));
+		}
+
 		memcpy (&res_lib_msg_messageget.source,
 			&req_exec_msg_messageget->source,
 			sizeof (mar_message_source_t));

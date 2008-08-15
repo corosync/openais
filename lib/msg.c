@@ -54,7 +54,6 @@
 #include "../include/ipc_msg.h"
 #include "util.h"
 
-
 struct message_overlay {
 	mar_res_header_t header __attribute__((aligned(8)));
 	char data[4096];
@@ -942,6 +941,10 @@ saMsgQueueGroupCreate (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
+	if (queueGroupPolicy != SA_MSG_QUEUE_GROUP_ROUND_ROBIN) {
+		return (SA_AIS_ERR_NOT_SUPPORTED);
+	}
+
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupCreate { queueGroupName = %s }\n",
 		(char *) queueGroupName->value);
@@ -1232,7 +1235,7 @@ saMsgQueueGroupTrack (
 
 error_exit:
 	pthread_mutex_unlock (&msgInstance->response_mutex);
-error_put_msg:
+/* error_put_msg: */
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
 	return (error == SA_AIS_OK ? res_lib_msg_queuegrouptrack.header.error : error);
@@ -1370,7 +1373,7 @@ saMsgMessageSend (
 
 error_exit:
 	pthread_mutex_unlock (&msgInstance->response_mutex);
-error_put_msg:
+/* error_put_msg: */
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
 	return (error == SA_AIS_OK ? res_lib_msg_messagesend.header.error : error);
@@ -1441,7 +1444,7 @@ saMsgMessageSendAsync (
 
 error_exit:
 	pthread_mutex_unlock (&msgInstance->response_mutex);
-error_put_msg:
+/* error_put_msg: */
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
 	return (error == SA_AIS_OK ? res_lib_msg_messagesendasync.header.error : error);
@@ -1521,7 +1524,7 @@ saMsgMessageGet (
 
 error_exit:
 	pthread_mutex_unlock (msgQueueInstance->response_mutex);
-error_put_msg:
+/* error_put_msg: */
 	saHandleInstancePut (&queueHandleDatabase, queueHandle);
 
 	if (error == SA_AIS_OK)

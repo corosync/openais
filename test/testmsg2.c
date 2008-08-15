@@ -128,6 +128,15 @@ void setSaNameT (SaNameT *name, char *str) {
 	strcpy (name->value, str);
 }
 
+void setSaMsgMessageT (SaMsgMessageT *message, char *data) {
+	message->type = 1;
+	message->version = 2;
+	message->size = strlen (data) + 1;
+	message->senderName = NULL;
+	message->data = strdup (data);
+	message->priority = 0;
+}
+
 int main (void)
 {
 	int result;
@@ -135,6 +144,7 @@ int main (void)
 	SaSelectionObjectT select_obj;
 
 	SaMsgHandleT handle;
+	SaMsgMessageT message;
 
 	SaMsgQueueHandleT queue_handle_a;
 	SaMsgQueueHandleT queue_handle_b;
@@ -295,12 +305,120 @@ int main (void)
 	printf ("[DEBUG]: (%d) saMsgDispatch\n", result);
 
 	/*
-	* Remove queues from GROUP_ONE
+	* Send messages to GROUP_ONE
+	*/
+
+	setSaMsgMessageT (&message, "test_msg_01a");
+	result = saMsgMessageSend (handle, &queue_group_one, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(message.data));
+
+	setSaMsgMessageT (&message, "test_msg_01b");
+	result = saMsgMessageSend (handle, &queue_group_one, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(message.data));
+
+	setSaMsgMessageT (&message, "test_msg_01c");
+	result = saMsgMessageSend (handle, &queue_group_one, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(message.data));
+
+	/*
+	* Remove QUEUE_A (next rr_queue) from GROUP_ONE
 	*/
 
 	result = saMsgQueueGroupRemove (handle, &queue_group_one, &queue_name_a);
 	printf ("[DEBUG]: (%d) saMsgQueueGroupRemove { group: %s - queue: %s }\n",
 		result, (char *)(queue_group_one.value), (char *)(queue_name_a.value));
+
+	setSaMsgMessageT (&message, "test_msg_01d");
+	result = saMsgMessageSend (handle, &queue_group_one, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(message.data));
+
+	setSaMsgMessageT (&message, "test_msg_01e");
+	result = saMsgMessageSend (handle, &queue_group_one, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(message.data));
+
+	/*
+	* Send messages to GROUP_TWO
+	*/
+
+	setSaMsgMessageT (&message, "test_msg_02a");
+	result = saMsgMessageSend (handle, &queue_group_two, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(message.data));
+
+	setSaMsgMessageT (&message, "test_msg_02b");
+	result = saMsgMessageSend (handle, &queue_group_two, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(message.data));
+
+	setSaMsgMessageT (&message, "test_msg_02c");
+	result = saMsgMessageSend (handle, &queue_group_two, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(message.data));
+
+	/*
+	* Remove QUEUE_X (next rr_queue from GROUP_TWO
+	*/
+
+	result = saMsgQueueGroupRemove (handle, &queue_group_two, &queue_name_x);
+	printf ("[DEBUG]: (%d) saMsgQueueGroupRemove { group: %s - queue: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(queue_name_x.value));
+
+	setSaMsgMessageT (&message, "test_msg_02d");
+	result = saMsgMessageSend (handle, &queue_group_two, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(message.data));
+
+	setSaMsgMessageT (&message, "test_msg_02e");
+	result = saMsgMessageSend (handle, &queue_group_two, &message,
+				   SA_TIME_ONE_SECOND);
+	printf ("[DEBUG]: (%d) saMsgMessageSend { group: %s + message: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(message.data));
+
+	/*
+	* Attempt to remove a queue from GROUP_ONE that is not a member.
+	* Should return SA_AIS_ERR_NOT_EXIST (12).
+	*/
+
+	/*
+	result = saMsgQueueGroupRemove (handle, &queue_group_one, &queue_name_z);
+	printf ("[DEBUG]: (%d)=12 saMsgQueueGroupRemove { group: %s - queue: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(queue_name_z.value));
+	*/
+
+	/*
+	* Attempt to remove a queue from GROUP_TWO that is not a member.
+	* Should return SA_AIS_ERR_NOT_EXIST (12).
+	*/
+
+	/*
+	result = saMsgQueueGroupRemove (handle, &queue_group_two, &queue_name_c);
+	printf ("[DEBUG]: (%d)=12 saMsgQueueGroupRemove { group: %s - queue: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(queue_name_c.value));
+	*/
+
+	/*
+	* Remove queues from GROUP_ONE
+	*/
+
+	/*
+	result = saMsgQueueGroupRemove (handle, &queue_group_one, &queue_name_a);
+	printf ("[DEBUG]: (%d) saMsgQueueGroupRemove { group: %s - queue: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(queue_name_a.value));
+	*/
 
 	result = saMsgQueueGroupRemove (handle, &queue_group_one, &queue_name_b);
 	printf ("[DEBUG]: (%d) saMsgQueueGroupRemove { group: %s - queue: %s }\n",
@@ -314,9 +432,11 @@ int main (void)
 	* Remove queues from GROUP_TWO
 	*/
 
+	/*
 	result = saMsgQueueGroupRemove (handle, &queue_group_two, &queue_name_x);
 	printf ("[DEBUG]: (%d) saMsgQueueGroupRemove { group: %s - queue: %s }\n",
 		result, (char *)(queue_group_two.value), (char *)(queue_name_x.value));
+	*/
 
 	result = saMsgQueueGroupRemove (handle, &queue_group_two, &queue_name_y);
 	printf ("[DEBUG]: (%d) saMsgQueueGroupRemove { group: %s - queue: %s }\n",

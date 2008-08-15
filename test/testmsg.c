@@ -105,7 +105,7 @@ SaMsgQueueCreationAttributesT creation_attributes = {
 
 void setSaNameT (SaNameT *name, char *str) {
 	name->length = strlen (str);
-	strcpy (name->value, str);
+	strcpy ((char *)name->value, str);
 }
 
 void setSaMsgMessageT (SaMsgMessageT *message, char *data) {
@@ -128,7 +128,6 @@ int main (void) {
 	SaSelectionObjectT select_fd;
 	SaInvocationT invocation = 3;
 
-	fd_set read_fds;
 	int result;
 
 	SaNameT async_name;
