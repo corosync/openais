@@ -125,7 +125,7 @@ SaMsgQueueCreationAttributesT creation_attributes = {
 
 void setSaNameT (SaNameT *name, char *str) {
 	name->length = strlen (str);
-	strcpy (name->value, str);
+	strcpy ((char *)name->value, str);
 }
 
 void setSaMsgMessageT (SaMsgMessageT *message, char *data) {
