@@ -1,0 +1,29 @@
+#! /bin/sh
+#
+# Application Interface Specification Startup 
+# chkconfig: 2345 20 20
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+test -f /usr/sbin/corosync | exit 0
+
+case "$1" in 
+	start)
+ 		echo -n "Starting OpenAIS: " 
+		export COROSYNC_DEFAULT_CONFIG_IFACE="openaisserviceenable:openaisparser"
+		start-stop-daemon --start --quiet --exec /usr/sbin/corosync
+		echo "."
+
+		;;
+       	stop)
+		echo -n "Stopping OpenAIS: " 
+		start-stop-daemon --stop --quiet --exec /usr/sbin/corosync
+		echo "."
+               	;;
+       	*)
+               echo "Usage: /etc/init.d/openais {start|stop}" >&2
+               exit 1
+               ;;
+esac
+
+

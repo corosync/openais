@@ -1,0 +1,5 @@
+This directory contains init scripts used to start and stop openais.
+
+redhat contains an init script for Red Hat systems.
+mvlcge contains an init script for MontaVista Linux systems.
+generic contains an init script for Generic Systems.
