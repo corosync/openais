@@ -45,9 +45,9 @@
 #include <signal.h>
 #include <string.h>
 
-#include <corosync/engine/config.h>
 #include <corosync/lcr/lcr_comp.h>
 #include <corosync/engine/objdb.h>
+#include <corosync/engine/config.h>
 
 static int read_config_file_into_objdb(
 	struct objdb_iface_ver0 *objdb,
@@ -183,7 +183,6 @@ static int read_config_file_into_objdb(
 	char *filename = "/etc/ais/openais.conf";
 	char *error_reason = error_string_response;
 	int res;
-	unsigned int object_handle;
 
 	fp = fopen (filename, "r");
 	if (fp == 0) {
@@ -208,8 +207,8 @@ static int read_config_file_into_objdb(
  */
 
 struct config_iface_ver0 aisparser_iface_ver0 = {
-	.config_readconfig        = aisparser_readconfig,
-	.config_writeconfig = NULL
+	.config_readconfig	= aisparser_readconfig,
+	.config_writeconfig	= NULL
 };
 
 struct lcr_iface openais_aisparser_ver0[1] = {

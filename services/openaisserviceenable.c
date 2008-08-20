@@ -45,9 +45,9 @@
 #include <signal.h>
 #include <string.h>
 
-#include <corosync/engine/config.h>
 #include <corosync/lcr/lcr_comp.h>
 #include <corosync/engine/objdb.h>
+#include <corosync/engine/config.h>
 
 static char error_reason[512];
 
