@@ -1321,6 +1321,14 @@ saMsgMessageSend (
 	struct req_lib_msg_messagesend req_lib_msg_messagesend;
 	struct res_lib_msg_messagesend res_lib_msg_messagesend;
 
+	if (destination == NULL) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	if (message == NULL) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageSend { msgHandle = %llx }\n",
 		(unsigned long long) msgHandle);
