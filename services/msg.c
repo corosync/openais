@@ -948,6 +948,9 @@ static int sync_queue_transmit (
 	struct req_exec_msg_sync_queue req_exec_msg_sync_queue;
 	struct iovec iovec;
 
+	memset (&req_exec_msg_sync_queue, 0,
+		sizeof (struct req_exec_msg_sync_queue));
+
 	req_exec_msg_sync_queue.header.size =
 		sizeof (struct req_exec_msg_sync_queue);
 	req_exec_msg_sync_queue.header.id =
@@ -972,6 +975,9 @@ static int sync_queue_entry_transmit (
 {
 	struct req_exec_msg_sync_queue_entry req_exec_msg_sync_queue_entry;
 	struct iovec iovec[2];
+
+	memset (&req_exec_msg_sync_queue_entry, 0,
+		sizeof (struct req_exec_msg_sync_queue_entry));
 
 	req_exec_msg_sync_queue_entry.header.size =
 		sizeof (struct req_exec_msg_sync_queue_entry);
@@ -1001,8 +1007,11 @@ static int sync_group_transmit (
 	struct req_exec_msg_sync_group req_exec_msg_sync_group;
 	struct iovec iovec;
 
+	memset (&req_exec_msg_sync_group, 0,
+		sizeof (struct req_exec_msg_sync_group));
+
 	req_exec_msg_sync_group.header.size =
-		sizeof (req_exec_msg_sync_group);
+		sizeof (struct req_exec_msg_sync_group);
 	req_exec_msg_sync_group.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_GROUP);
 
@@ -1010,6 +1019,11 @@ static int sync_group_transmit (
 		&my_saved_ring_id, sizeof (struct memb_ring_id));
 	memcpy (&req_exec_msg_sync_group.group_name,
 		&group->name, sizeof (SaNameT));
+
+	if (group->rr_queue != NULL) {
+		memcpy (&req_exec_msg_sync_group.rr_queue_name,
+			&group->rr_queue->name, sizeof (SaNameT));
+	}
 
 	req_exec_msg_sync_group.policy = group->policy;
 	req_exec_msg_sync_group.track_flags = group->track_flags;
@@ -1026,6 +1040,9 @@ static int sync_group_entry_transmit (
 {
 	struct req_exec_msg_sync_group_entry req_exec_msg_sync_group_entry;
 	struct iovec iovec;
+
+	memset (&req_exec_msg_sync_group_entry, 0,
+		sizeof (struct  req_exec_msg_sync_group_entry));
 
 	req_exec_msg_sync_group_entry.header.size =
 		sizeof (struct req_exec_msg_sync_group_entry);
@@ -1446,7 +1463,7 @@ static void message_handler_req_exec_msg_queueopen (
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueOpen %s\n",
 		getSaNameT (&req_exec_msg_queueopen->queue_name));
-	
+
 	queue = queue_find (&req_exec_msg_queueopen->queue_name);
 
 	/*
@@ -2459,6 +2476,7 @@ static void message_handler_req_exec_msg_sync_group (
 	struct req_exec_msg_sync_group *req_exec_msg_sync_group =
 		(struct req_exec_msg_sync_group *)message;
 	struct queue_group *group = NULL;
+	struct message_queue *queue = NULL;
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync group %s\n",
 		getSaNameT (&req_exec_msg_sync_group->group_name));
@@ -2487,7 +2505,12 @@ static void message_handler_req_exec_msg_sync_group (
 
 		group->track_flags = req_exec_msg_sync_group->policy;
 
-		group->rr_queue = NULL; /* FIXME */
+		if (req_exec_msg_sync_group->rr_queue_name.length != 0) {
+			queue = sync_queue_find (&req_exec_msg_sync_group->rr_queue_name);
+			assert (queue != NULL);
+		}
+
+		group->rr_queue = queue;
 
 		list_init (&group->group_list);
 		list_init (&group->queue_head);
