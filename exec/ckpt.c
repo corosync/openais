@@ -975,6 +975,7 @@ void checkpoint_release (struct checkpoint *checkpoint)
 	struct list_head *list;
 	struct checkpoint_section *section;
 
+printf ("releasing checkpoint %s\n", checkpoint->name.value);
 	openais_timer_delete (checkpoint->retention_timer);
 
 	/*
@@ -1017,9 +1018,7 @@ int ckpt_checkpoint_close (
 	iovec.iov_base = (char *)&req_exec_ckpt_checkpointclose;
 	iovec.iov_len = sizeof (req_exec_ckpt_checkpointclose);
 
-	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
-
-	return (-1);
+	return (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1,			TOTEMPG_AGREED));
 }
 
 static int ckpt_exec_init_fn (struct objdb_iface_ver0 *objdb)
@@ -2357,6 +2356,7 @@ static int ckpt_lib_exit_fn (void *conn)
 	struct checkpoint_cleanup *checkpoint_cleanup;
 	struct list_head *list;
 	struct ckpt_pd *ckpt_pd = (struct ckpt_pd *)openais_conn_private_data_get (conn);
+	unsigned int res;
 
 	log_printf (LOG_LEVEL_DEBUG, "checkpoint exit conn %p\n", conn);
 
@@ -2370,9 +2370,16 @@ static int ckpt_lib_exit_fn (void *conn)
 			struct checkpoint_cleanup, list);
 
 		assert (checkpoint_cleanup->checkpoint_name.length != 0);
-		ckpt_checkpoint_close (
+		res = ckpt_checkpoint_close (
 			&checkpoint_cleanup->checkpoint_name,
 			checkpoint_cleanup->ckpt_id);
+		/*
+		 * If checkpoint_close fails because of full totem queue
+		 * return -1 ande try again later
+		 */
+		if (res == -1) {
+			return (-1);
+		}
 
 		list_del (&checkpoint_cleanup->list);
 		free (checkpoint_cleanup);
