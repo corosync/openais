@@ -126,13 +126,13 @@ retry_poll:
 		if (fds == -1) {
 			goto retry_poll;
 		}
-		pthread_mutex_lock (&timer_mutex);
 		timer_serialize_lock_fn ();
+		pthread_mutex_lock (&timer_mutex);
 
 		timerlist_expire (&timers_timerlist);
 		
-		timer_serialize_unlock_fn ();
 		pthread_mutex_unlock (&timer_mutex);
+		timer_serialize_unlock_fn ();
 	}
 
 	pthread_exit (0);
