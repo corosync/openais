@@ -159,6 +159,7 @@ static inline void swab_mar_refcount_set_t (mar_refcount_set_t *to_swab)
 
 struct checkpoint {
 	struct list_head list;
+	struct list_head expiry_list;
 	mar_name_t name;
 	mar_uint32_t ckpt_id;
 	mar_ckpt_checkpoint_creation_attributes_t checkpoint_creation_attributes;
@@ -370,6 +371,8 @@ DECLARE_LIST_INIT(checkpoint_iteration_list_head);
 
 DECLARE_LIST_INIT(checkpoint_recovery_list_head);
 
+DECLARE_LIST_INIT(my_checkpoint_expiry_list_head);
+
 static mar_uint32_t global_ckpt_id = 0;
 
 static enum sync_state my_sync_state;
@@ -385,6 +388,10 @@ static unsigned int my_old_member_list[PROCESSOR_COUNT_MAX];
 static unsigned int my_old_member_list_entries = 0;
 
 static unsigned int my_should_sync = 0;
+
+static unsigned int my_token_callback_active = 0;
+
+static void * my_token_callback_handle;
 
 struct checkpoint_cleanup {
 	struct list_head list;
@@ -1260,6 +1267,7 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 		checkpoint->unlinked = 0;
 		list_init (&checkpoint->list);
 		list_init (&checkpoint->sections_list_head);
+		list_init (&checkpoint->expiry_list);
 		list_add (&checkpoint->list, &checkpoint_list_head);
 		checkpoint->reference_count = 1;
 		checkpoint->retention_timer = 0;
@@ -1472,29 +1480,67 @@ free_mem :
 
 }
 
+int callback_expiry (enum totem_callback_token_type type, void *data)
+{
+	struct checkpoint *checkpoint = (struct checkpoint *)data;
+	struct req_exec_ckpt_checkpointunlink req_exec_ckpt_checkpointunlink;
+	struct iovec iovec;
+	unsigned int res;
+	struct list_head *list;
+
+	list = my_checkpoint_expiry_list_head.next;
+	while (!list_empty(&my_checkpoint_expiry_list_head)) {
+		checkpoint = list_entry (list,
+			struct checkpoint, expiry_list);
+
+		if (checkpoint->reference_count == 0) {
+			req_exec_ckpt_checkpointunlink.header.size =
+				sizeof (struct req_exec_ckpt_checkpointunlink);
+			req_exec_ckpt_checkpointunlink.header.id =
+				SERVICE_ID_MAKE (CKPT_SERVICE,
+					MESSAGE_REQ_EXEC_CKPT_CHECKPOINTUNLINK);
+
+			req_exec_ckpt_checkpointunlink.source.conn = 0;
+			req_exec_ckpt_checkpointunlink.source.nodeid = 0;
+
+			memcpy (&req_exec_ckpt_checkpointunlink.checkpoint_name,
+				&checkpoint->name,
+				sizeof (mar_name_t));
+
+			iovec.iov_base = (char *)&req_exec_ckpt_checkpointunlink;
+			iovec.iov_len = sizeof (req_exec_ckpt_checkpointunlink);
+
+			res = totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED);
+			if (res == -1) {
+				return (-1);
+			}
+			log_printf (LOG_LEVEL_NOTICE,
+				"Expiring checkpoint %s\n",
+				get_mar_name_t (&checkpoint->name));
+		}
+
+		list_del (&checkpoint->expiry_list);
+		list = my_checkpoint_expiry_list_head.next;
+	}
+	my_token_callback_active = 0;
+	return (0);
+}
+
 void timer_function_retention (void *data)
 {
 	struct checkpoint *checkpoint = (struct checkpoint *)data;
-	struct req_exec_ckpt_checkpointretentiondurationexpire req_exec_ckpt_checkpointretentiondurationexpire;
-	struct iovec iovec;
-
 	checkpoint->retention_timer = 0;
-	req_exec_ckpt_checkpointretentiondurationexpire.header.size =
-		sizeof (struct req_exec_ckpt_checkpointretentiondurationexpire);
-	req_exec_ckpt_checkpointretentiondurationexpire.header.id =
-		SERVICE_ID_MAKE (CKPT_SERVICE,
-			MESSAGE_REQ_EXEC_CKPT_CHECKPOINTRETENTIONDURATIONEXPIRE);
+	list_add (&checkpoint->expiry_list, &my_checkpoint_expiry_list_head);
 
-	memcpy (&req_exec_ckpt_checkpointretentiondurationexpire.checkpoint_name,
-		&checkpoint->name,
-		sizeof (mar_name_t));
-	req_exec_ckpt_checkpointretentiondurationexpire.ckpt_id =
-		checkpoint->ckpt_id;
-
-	iovec.iov_base = (char *)&req_exec_ckpt_checkpointretentiondurationexpire;
-	iovec.iov_len = sizeof (req_exec_ckpt_checkpointretentiondurationexpire);
-
-	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
+	if (my_token_callback_active == 0) {
+		totempg_callback_token_create (
+			&my_token_callback_handle,
+			TOTEM_CALLBACK_TOKEN_SENT,
+			1,
+			callback_expiry,
+			NULL);
+		my_token_callback_active = 1;
+	}
 }
 
 static void message_handler_req_exec_ckpt_checkpointclose (
