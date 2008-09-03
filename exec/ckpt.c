@@ -982,7 +982,6 @@ void checkpoint_release (struct checkpoint *checkpoint)
 	struct list_head *list;
 	struct checkpoint_section *section;
 
-printf ("releasing checkpoint %s\n", checkpoint->name.value);
 	openais_timer_delete (checkpoint->retention_timer);
 
 	/*
@@ -1514,7 +1513,7 @@ int callback_expiry (enum totem_callback_token_type type, void *data)
 			if (res == -1) {
 				return (-1);
 			}
-			log_printf (LOG_LEVEL_NOTICE,
+			log_printf (LOG_LEVEL_DEBUG,
 				"Expiring checkpoint %s\n",
 				get_mar_name_t (&checkpoint->name));
 		}
