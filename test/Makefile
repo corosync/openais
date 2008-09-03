@@ -49,7 +49,7 @@ TEST_SRC =  testclm.c testamf1.c \
 
 all: testclm testamf1 \
 	testckpt ckptstress ckptbench \
-	ckptbenchth ckpt-rd ckpt-wr testevt testevs \
+	ckptbenchth ckpt-rd ckpt-wr ckpt-overload-exit testevt testevs \
 	evsbench subscription publish evtbench unlink testclm2 testlck \
 	testmsg testcpg testcpg2 cpgbench openais-cfgtool
 
@@ -127,6 +127,9 @@ ckpt-rd: ckpt-rd.o sa_error.o $(LIBRARIES)
 
 ckpt-wr: ckpt-wr.o sa_error.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o ckpt-wr ckpt-wr.o sa_error.o $(LIBS)
+
+ckpt-overload-exit: ckpt-overload-exit.o sa_error.o $(LIBRARIES)
+	$(CC) $(LDFLAGS) -o ckpt-overload-exit ckpt-overload-exit.o sa_error.o $(LIBS)
 
 testclm2: testclm2.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testclm2 testclm2.o $(LIBS)
