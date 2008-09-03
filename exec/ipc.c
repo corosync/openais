@@ -704,7 +704,9 @@ retry_poll:
 	 * This is the dispatch conn_io
 	 */
 	if (conn_io->conn_info->conn_io_dispatch == conn_io) {
+		ipc_serialize_unlock_fn ();
 		for (;;) {
+			ipc_serialize_lock_fn ();
 			if (conn_io_refcnt_value (conn_io) == 0) {
 				res = 0; // TODO
 				/*
@@ -725,8 +727,8 @@ retry_poll:
 					pthread_exit (0);
 				}
 			} /* refcnt == 0 */
+			ipc_serialize_unlock_fn ();
 			usleep (1000);
-	printf ("sleep 2\n");
 		} /* for (;;) */
 	} /* dispatch conn_io */
 
