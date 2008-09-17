@@ -45,9 +45,9 @@
 #include <signal.h>
 #include <string.h>
 
+#include <corosync/engine/config.h>
 #include <corosync/lcr/lcr_comp.h>
 #include <corosync/engine/objdb.h>
-#include <corosync/engine/config.h>
 
 static char error_reason[512];
 
@@ -60,6 +60,7 @@ static struct service_engine service_engines[] = {
 	{ "openais_clm", "0" },
 	{ "openais_evt", "0" },
 	{ "openais_ckpt", "0" },
+	{ "openais_amf", "0" },
 	{ "openais_msg", "0" },
 	{ "openais_lck", "0" }
 };

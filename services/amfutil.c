@@ -53,24 +53,26 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <regex.h>
+#include <netinet/in.h>
 
-#include "../include/saAis.h"
-#include "../include/saAmf.h"
-#include "../include/ipc_amf.h"
-#include "../include/list.h"
-#include "util.h"
+#include <corosync/ipc_gen.h>
+#include <corosync/mar_gen.h>
+#include <corosync/engine/coroapi.h>
+#include <corosync/list.h>
+#include <corosync/engine/logsys.h>
+#include <corosync/lcr/lcr_comp.h>
+#include <saAis.h>
+#include "saAmf.h"
+#include "ipc_amf.h"
 #include "amf.h"
-#include "totem.h"
-#include "logsys.h"
-#include "aispoll.h"
-#include "main.h"
-#include "service.h"
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 
-#ifndef OPENAIS_CLUSTER_STARTUP_TIMEOUT
-#define OPENAIS_CLUSTER_STARTUP_TIMEOUT 5000
+#ifndef COROSYNC_CLUSTER_STARTUP_TIMEOUT
+#define COROSYNC_CLUSTER_STARTUP_TIMEOUT 5000
 #endif
+
+extern char *strstr_rs (const char *haystack, const char *needle);
 
 struct req_exec_amf_msg {
 	mar_req_header_t header;
@@ -121,6 +123,34 @@ static const char *assignment_state_text[] = {
 	"FULLY-ASSIGNED",
 	"PARTIALLY-ASSIGNED"
 };
+
+char *strstr_rs (const char *haystack, const char *needle)
+{
+	char *end_address;
+	char *new_needle;
+
+	new_needle = (char *)strdup (needle);
+	new_needle[strlen (new_needle) - 1] = '\0';
+
+	end_address = strstr (haystack, new_needle);
+	if (end_address) {
+		end_address += strlen (new_needle);
+		end_address = strstr (end_address, needle + strlen (new_needle));
+	}
+	if (end_address) {
+		end_address += 1; /* skip past { or = */
+		do {
+			if (*end_address == '\t' || *end_address == ' ') {
+				end_address++;
+			} else {
+				break;
+			}
+		} while (*end_address != '\0');
+	}
+
+	free (new_needle);
+	return (end_address);
+}
 
 static int init_category (struct amf_comp *comp, char *loc)
 {
@@ -271,7 +301,7 @@ struct amf_cluster *amf_config_read (char **error_string)
 	int                       csi_dependencies_cnt = 0;
 	char                     *error_reason = NULL;
 	char                     *value;
-	filename = getenv ("OPENAIS_AMF_CONFIG_FILE");
+	filename = getenv ("COROSYNC_AMF_CONFIG_FILE");
 	if (!filename) {
 		filename = "/etc/ais/amf.conf";
 	}
@@ -344,7 +374,7 @@ struct amf_cluster *amf_config_read (char **error_string)
 				}
 				/* spec: set to default value if zero */
 				if (cluster->saAmfClusterStartupTimeout == 0) {
-					cluster->saAmfClusterStartupTimeout = OPENAIS_CLUSTER_STARTUP_TIMEOUT;
+					cluster->saAmfClusterStartupTimeout = COROSYNC_CLUSTER_STARTUP_TIMEOUT;
 				}
 				current_parse = AMF_NONE;
 			} else {
@@ -1006,25 +1036,25 @@ void amf_runtime_attributes_print (struct amf_cluster *cluster)
 }
 
 /* to be removed... */
-int amf_enabled (struct objdb_iface_ver0 *objdb)
+int amf_enabled (struct corosync_api_v1 *coroapi)
 {
 	unsigned int object_service_handle;
 	char *value;
 	int enabled = 0;
 	unsigned int object_find_handle;
 
-	objdb->object_find_create (
+	coroapi->object_find_create (
 		OBJECT_PARENT_HANDLE,
 		"amf",
 		strlen ("amf"),
 		&object_find_handle);
 
-	if (objdb->object_find_next (
+	if (coroapi->object_find_next (
 		object_find_handle,
 		&object_service_handle) == 0) {
 
 		value = NULL;
-		if (!objdb->object_key_get (object_service_handle,
+		if (!coroapi->object_key_get (object_service_handle,
 			"mode",
 			strlen ("mode"),
 			(void *)&value,
@@ -1039,7 +1069,7 @@ int amf_enabled (struct objdb_iface_ver0 *objdb)
 		}
 	}
 
-	objdb->object_find_destroy (object_find_handle);
+	coroapi->object_find_destroy (object_find_handle);
 
 	return enabled;
 }
@@ -1084,7 +1114,7 @@ char *amf_serialize_SaNameT (char *buf, int *size, int *offset, SaNameT *name)
 		*size += sizeof (SaNameT);
 		tmp = realloc (buf, *size);
 		if (tmp == NULL) {
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			api->error_memory_failure ();
 		}
 	}
 
@@ -1116,7 +1146,7 @@ char *amf_serialize_SaUint16T (char *buf, int *size, int *offset, SaUint16T num)
 		*size += sizeof (SaUint16T);
 		tmp = realloc (buf, *size);
 		if (tmp == NULL) {
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			api->error_memory_failure ();
 		}
 	}
 
@@ -1134,7 +1164,7 @@ char *amf_serialize_SaUint32T (char *buf, int *size, int *offset, SaUint32T num)
 		*size += sizeof (SaUint32T);
 		tmp = realloc (buf, *size);
 		if (tmp == NULL) {
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			api->error_memory_failure ();
 		}
 	}
 
@@ -1156,7 +1186,7 @@ char *amf_serialize_opaque (
 		*size += required_size;
 		tmp = realloc (buf, *size);
 		if (tmp == NULL) {
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			api->error_memory_failure ();
 		}
 	}
 
@@ -1221,7 +1251,7 @@ void *_amf_malloc (size_t size, const char *file, unsigned int line)
 
 	if (tmp == NULL) {
 		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		api->error_memory_failure ();
 	}
 
 	return tmp;
@@ -1233,7 +1263,7 @@ void *_amf_calloc (size_t nmemb, size_t size, const char *file, unsigned int lin
 
 	if (tmp == NULL) {
 		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		api->error_memory_failure ();
 	}
 
 	return tmp;
@@ -1245,7 +1275,7 @@ void *_amf_realloc (void* ptr, size_t size, const char *file, unsigned int line)
 
 	if (tmp == NULL) {
 		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		api->error_memory_failure ();
 	}
 
 	return tmp;
@@ -1257,7 +1287,7 @@ char *_amf_strdup (const char *in_str, const char *file, unsigned int line)
 
 	if (out_str == NULL) {
 		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		api->error_memory_failure ();
 	}
 
 	return out_str;
@@ -1377,12 +1407,11 @@ int amf_msg_mcast (int msg_id, void *buf, size_t len)
 		iov_cnt = 2;
 	}
 
-	res = totempg_groups_mcast_joined (
-		openais_group_handle, iov, iov_cnt, TOTEMPG_AGREED);
+	res = api->totem_mcast (iov, iov_cnt, TOTEM_AGREED);
 
 	if (res != 0) {
 		dprintf("Unable to send %d bytes\n", msg.header.size);
-		openais_exit_error (AIS_DONE_FATAL_ERR);
+		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 
 	return res;
@@ -1441,8 +1470,9 @@ int amf_fifo_get (amf_fifo_t **root, void *data)
 void amf_call_function_asynchronous (async_func_t async_func, void *func_param)
 {
 	
-	static poll_timer_handle async_func_timer_handle;
-	poll_timer_add (aisexec_poll_handle, 0, func_param, async_func, 
+	static corosync_timer_handle_t async_func_timer_handle;
+	api->timer_add_duration (
+		0, func_param, async_func, 
 		&async_func_timer_handle);
 }
 

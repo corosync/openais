@@ -140,23 +140,18 @@
 #include <netdb.h>
 #include <sys/stat.h>
 
-#include "../include/saAis.h"
-#include "../include/saAmf.h"
-#include "../include/ipc_gen.h"
-#include "../include/ipc_amf.h"
-#include "../include/list.h"
-#include "../lcr/lcr_comp.h"
-#include "totempg.h"
-#include "util.h"
+#include <corosync/ipc_gen.h>
+#include <corosync/mar_gen.h>
+#include <corosync/hdb.h>
+#include <corosync/swab.h>
+#include <corosync/engine/coroapi.h>
+#include <corosync/list.h>
+#include <corosync/engine/logsys.h>
+#include <corosync/lcr/lcr_comp.h>
+#include <saAis.h>
+#include "saAmf.h"
+#include "ipc_amf.h"
 #include "amf.h"
-#include "main.h"
-#include "tlist.h"
-#include "flow.h"
-#include "ipc.h"
-#include "service.h"
-#include "objdb.h"
-#include "logsys.h"
-#include "sync.h"
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 
@@ -178,9 +173,10 @@ LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
  * node to start.
  */
 #ifndef AMF_SYNC_TIMEOUT
-#define AMF_SYNC_TIMEOUT 3000
+#define AMF_SYNC_TIMEOUT 3000ULL
 #endif
 
+struct corosync_api_v1 *api;
 static void amf_confchg_fn (
 	enum totem_configuration_type configuration_type,
 	unsigned int *member_list, int member_list_entries,
@@ -188,7 +184,7 @@ static void amf_confchg_fn (
 	unsigned int *joined_list, int joined_list_entries,
 	struct memb_ring_id *ring_id);
 static int amf_lib_exit_fn (void *conn);
-static int amf_exec_init_fn (struct objdb_iface_ver0 *objdb);
+static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api);
 static int amf_lib_init_fn (void *conn);
 static void message_handler_req_lib_amf_componentregister (void *conn, void *msg);
 static void message_handler_req_lib_amf_componentunregister (void *conn, void *msg);
@@ -242,98 +238,98 @@ struct amf_pd {
 /*
  * Service Handler Definition
  */
-static struct openais_lib_handler amf_lib_service[] =
+static struct corosync_lib_handler amf_lib_engine[] =
 {
 	{ /* 0 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componentregister,
 		.response_size		= sizeof (struct res_lib_amf_componentregister),
 		.response_id		= MESSAGE_RES_AMF_COMPONENTREGISTER,
-		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 1 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componentunregister,
 		.response_size		= sizeof (struct res_lib_amf_componentunregister),
 		.response_id		= MESSAGE_RES_AMF_COMPONENTUNREGISTER,
-		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 2 */
 		.lib_handler_fn		= message_handler_req_lib_amf_pmstart,
 		.response_size		= sizeof (struct res_lib_amf_pmstart),
 		.response_id		= MESSAGE_RES_AMF_PMSTART,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 3 */
 		.lib_handler_fn		= message_handler_req_lib_amf_pmstop,
 		.response_size		= sizeof (struct res_lib_amf_pmstop),
 		.response_id		= MESSAGE_RES_AMF_PMSTOP,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 4 */
 		.lib_handler_fn		= message_handler_req_lib_amf_healthcheckstart,
 		.response_size		= sizeof (struct res_lib_amf_healthcheckstart),
 		.response_id		= MESSAGE_RES_AMF_HEALTHCHECKSTART,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 5 */
 		.lib_handler_fn		= message_handler_req_lib_amf_healthcheckconfirm,
 		.response_size		= sizeof (struct res_lib_amf_healthcheckconfirm),
 		.response_id		= MESSAGE_RES_AMF_HEALTHCHECKCONFIRM,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 6 */
 		.lib_handler_fn		= message_handler_req_lib_amf_healthcheckstop,
 		.response_size		= sizeof (struct res_lib_amf_healthcheckstop),
 		.response_id		= MESSAGE_RES_AMF_HEALTHCHECKSTOP,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 7 */
 		.lib_handler_fn		= message_handler_req_lib_amf_hastateget,
 		.response_size		= sizeof (struct res_lib_amf_hastateget),
 		.response_id		= MESSAGE_RES_AMF_HASTATEGET,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 8 */
 		.lib_handler_fn		= message_handler_req_lib_amf_csiquiescingcomplete,
 		.response_size		= sizeof (struct res_lib_amf_csiquiescingcomplete),
 		.response_id		= MESSAGE_RES_AMF_CSIQUIESCINGCOMPLETE,
-		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 9 */
 		.lib_handler_fn		= message_handler_req_lib_amf_protectiongrouptrack,
 		.response_size		= sizeof (struct res_lib_amf_protectiongrouptrack),
 		.response_id		= MESSAGE_RES_AMF_PROTECTIONGROUPTRACK,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 10 */
 		.lib_handler_fn		= message_handler_req_lib_amf_protectiongrouptrackstop,
 		.response_size		= sizeof (struct res_lib_amf_protectiongrouptrackstop),
 		.response_id		= MESSAGE_RES_AMF_PROTECTIONGROUPTRACKSTOP,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 11 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componenterrorreport,
 		.response_size		= sizeof (struct res_lib_amf_componenterrorreport),
 		.response_id		= MESSAGE_RES_AMF_COMPONENTERRORREPORT,
-		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 12 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componenterrorclear,
 		.response_size		= sizeof (struct res_lib_amf_componenterrorclear),
 		.response_id		= MESSAGE_RES_AMF_COMPONENTERRORCLEAR,
-		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 13 */
 		.lib_handler_fn		= message_handler_req_lib_amf_response,
 		.response_size		= sizeof (struct res_lib_amf_response),
 		.response_id		= MESSAGE_RES_AMF_RESPONSE,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 };
 
 /*
  * Multicast message handlers
  */
-static struct openais_exec_handler amf_exec_service[] = {
+static struct corosync_exec_handler amf_exec_engine[] = {
 	{
 		.exec_handler_fn = message_handler_req_exec_amf_comp_register,
 	},
@@ -375,33 +371,33 @@ static struct openais_exec_handler amf_exec_service[] = {
 /*
  * Exports the interface for the service
  */
-static struct openais_service_handler amf_service_handler = {
+static struct corosync_service_engine amf_service_engine = {
 	.name				= "openais availability management framework B.01.01",
 	.id					= AMF_SERVICE,
 	.private_data_size	= sizeof (struct amf_pd),
-	.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED,
+	.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED,
 	.lib_init_fn		= amf_lib_init_fn,
 	.lib_exit_fn		= amf_lib_exit_fn,
-	.lib_service		= amf_lib_service,
-	.lib_service_count	= sizeof (amf_lib_service) / sizeof (struct openais_lib_handler),
+	.lib_engine		= amf_lib_engine,
+	.lib_engine_count	= sizeof (amf_lib_engine) / sizeof (struct corosync_lib_handler),
 	.exec_init_fn		= amf_exec_init_fn,
-	.exec_service		= amf_exec_service,
-	.exec_service_count	= sizeof (amf_exec_service) / sizeof (struct openais_exec_handler),
-	.confchg_fn			= amf_confchg_fn,
+	.exec_engine		= amf_exec_engine,
+	.exec_engine_count	= sizeof (amf_exec_engine) / sizeof (struct corosync_exec_handler),
+	.confchg_fn		= amf_confchg_fn,
 	.exec_dump_fn		= amf_dump_fn,
-	.sync_init          = amf_sync_init,
-	.sync_process       = amf_sync_process,
-	.sync_activate      = amf_sync_activate,
-	.sync_abort         = amf_sync_abort,
+	.sync_init         	= amf_sync_init,
+	.sync_process      	= amf_sync_process,
+	.sync_activate     	= amf_sync_activate,
+	.sync_abort        	= amf_sync_abort
 };
 
 struct amf_node *this_amf_node;
 struct amf_cluster *amf_cluster;
 
-static struct openais_service_handler *amf_get_handler_ver0 (void);
+static struct corosync_service_engine *amf_get_service_engine_ver0 (void);
 
-static struct openais_service_handler_iface_ver0 amf_service_handler_iface = {
-	.openais_get_service_handler_ver0	= amf_get_handler_ver0
+static struct corosync_service_engine_iface_ver0 amf_service_engine_iface = {
+	.corosync_get_service_engine_ver0 = amf_get_service_engine_ver0
 };
 
 static struct lcr_iface openais_amf_ver0[1] = {
@@ -423,14 +419,14 @@ static struct lcr_comp amf_comp_ver0 = {
 	.ifaces				= openais_amf_ver0
 };
 
-static struct openais_service_handler *amf_get_handler_ver0 (void)
+static struct corosync_service_engine *amf_get_service_engine_ver0 (void)
 {
-	return (&amf_service_handler);
+	return (&amf_service_engine);
 }
 
 __attribute__ ((constructor)) static void register_this_component (void)
 {
-	lcr_interfaces_set (&openais_amf_ver0[0], &amf_service_handler_iface);
+	lcr_interfaces_set (&openais_amf_ver0[0], &amf_service_engine_iface);
 	lcr_component_register (&amf_comp_ver0);
 }
 
@@ -636,7 +632,7 @@ static struct amf_node *get_this_node_obj (void)
 
 	if (gethostname (hostname, sizeof(hostname)) == -1) {
 		log_printf (LOG_LEVEL_ERROR, "gethostname failed: %d", errno);
-		openais_exit_error (AIS_DONE_FATAL_ERR);
+		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 
 	return amf_node_find_by_hostname (hostname);
@@ -681,8 +677,7 @@ static int mcast_sync_data (
 	iov[1].iov_base = buf;
 	iov[1].iov_len  = len;
 
-	res = totempg_groups_mcast_joined (
-		openais_group_handle, iov, 2, TOTEMPG_AGREED);
+	res = api->totem_mcast (iov, 2, TOTEM_AGREED);
 
 	if (res != 0) {
 		dprintf("Unable to send %d bytes of sync data\n", req_exec.header.size);
@@ -725,7 +720,7 @@ static int create_cluster_model (void)
 	amf_cluster = amf_config_read (&error_string);
 	if (amf_cluster == NULL) {
 		log_printf (LOG_LEVEL_ERROR, error_string);
-		openais_exit_error (AIS_DONE_AMFCONFIGREAD);
+		corosync_fatal_error (COROSYNC_INVALID_CONFIG);
 	}
 	log_printf (LOG_LEVEL_NOTICE, error_string);
 
@@ -737,7 +732,7 @@ static int create_cluster_model (void)
 		return -1;
 	}
 
-	this_amf_node->nodeid = totempg_my_nodeid_get();
+	this_amf_node->nodeid = api->totem_nodeid_get();
 
 	return 0;
 }
@@ -758,7 +753,7 @@ static unsigned int calc_sync_master (
 	unsigned int *member_list, int member_list_entries)
 {
 	int i;
-	unsigned int master = totempg_my_nodeid_get(); /* assume this node is master */
+	unsigned int master = api->totem_nodeid_get(); /* assume this node is master */
 
 	for (i = 0; i < member_list_entries; i++) {
 		if (member_list[i] < master &&
@@ -1160,7 +1155,7 @@ static void amf_sync_init (void)
 			break;
 	}
 
-	if (scsm.state == SYNCHRONIZING && scsm.sync_master == totempg_my_nodeid_get()) {
+	if (scsm.state == SYNCHRONIZING && scsm.sync_master == api->totem_nodeid_get()) {
 		amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_SYNC_START, NULL, 0);
 		assert (amf_cluster != NULL);
 		scsm.cluster = amf_cluster;
@@ -1196,7 +1191,7 @@ static int amf_sync_process (void)
 {
 	SYNCTRACE ("state %s", scsm_state_names[scsm.state]);
 
-	if (scsm.state != SYNCHRONIZING || scsm.sync_master != totempg_my_nodeid_get()) {
+	if (scsm.state != SYNCHRONIZING || scsm.sync_master != api->totem_nodeid_get()) {
 		return 0;
 	}
 
@@ -1277,7 +1272,7 @@ static void amf_sync_activate (void)
 			this_amf_node = get_this_node_obj ();
 			sync_state_set (NORMAL_OPERATION);
 			if (this_amf_node != NULL) {
-				this_amf_node->nodeid = totempg_my_nodeid_get();
+				this_amf_node->nodeid = api->totem_nodeid_get();
 				cluster_joined_nodes_start ();
 			} else {
 				log_printf (LOG_LEVEL_INFO,
@@ -1307,17 +1302,14 @@ static void amf_sync_activate (void)
  * 
  * @return int
  */
-static int amf_exec_init_fn (struct objdb_iface_ver0 *objdb)
+static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
 	if (gethostname (hostname, sizeof (hostname)) == -1) {
 		log_printf (LOG_LEVEL_ERROR, "gethostname failed: %d", errno);
-		openais_exit_error (AIS_DONE_FATAL_ERR);
+		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 
-	if (objdb != NULL && !amf_enabled (objdb)) {
-		sync_state_set (UNCONFIGURED);
-		return 0;
-	}
+	api = corosync_api;
 
 	sync_state_set (IDLE);
 
@@ -1344,17 +1336,17 @@ static void amf_confchg_fn (
 {
 	ENTER ("mnum: %d, jnum: %d, lnum: %d, sync state: %s, ring ID %llu rep %s\n",
 		member_list_entries, joined_list_entries, left_list_entries,
-		scsm_state_names[scsm.state], ring_id->seq, totemip_print (&ring_id->rep));
+		scsm_state_names[scsm.state], ring_id->seq, api->totem_ip_print (&ring_id->rep));
 
 	switch (scsm.state) {
 		case UNCONFIGURED:
 			break;
 		case IDLE: {
 			sync_state_set (PROBING_1);
-			if (poll_timer_add (aisexec_poll_handle, AMF_SYNC_TIMEOUT, NULL,
+			if (api->timer_add_duration (AMF_SYNC_TIMEOUT, NULL,
 				timer_function_scsm_timer1_tmo,	&scsm.timer_handle) != 0) {
 
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			break;
 		}
@@ -1373,15 +1365,15 @@ static void amf_confchg_fn (
 			if (!is_list_member (scsm.sync_master, member_list, member_list_entries)) {
 				free_synced_data ();
 				sync_state_set (PROBING_1);
-				if (poll_timer_add (aisexec_poll_handle, AMF_SYNC_TIMEOUT, NULL,
+				if (api->timer_add_duration (AMF_SYNC_TIMEOUT, NULL,
 					timer_function_scsm_timer1_tmo, &scsm.timer_handle) != 0) {
 
-					openais_exit_error (AIS_DONE_FATAL_ERR);
+					corosync_fatal_error (COROSYNC_FATAL_ERR);
 				}
 			}
 			break;
 		case SYNCHRONIZING: {
-			if (joined_list_entries > 0 && scsm.sync_master == totempg_my_nodeid_get()) {
+			if (joined_list_entries > 0 && scsm.sync_master == api->totem_nodeid_get()) {
 				/* restart sync */
 				amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_SYNC_START, NULL, 0);
 			}
@@ -1393,7 +1385,7 @@ static void amf_confchg_fn (
 				scsm.sync_master =
 					calc_sync_master (member_list, member_list_entries);
 
-				if (scsm.sync_master == totempg_my_nodeid_get()) {
+				if (scsm.sync_master == api->totem_nodeid_get()) {
 					/* restart sync */
 					SYNCTRACE ("I am (new) sync master");
 					amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_SYNC_START, NULL, 0);
@@ -1409,7 +1401,7 @@ static void amf_confchg_fn (
 				scsm.sync_master =
 					calc_sync_master (member_list, member_list_entries);
 
-				if (scsm.sync_master == totempg_my_nodeid_get()) {
+				if (scsm.sync_master == api->totem_nodeid_get()) {
 					SYNCTRACE ("I am (new) sync master");
 				}
 			}
@@ -1438,7 +1430,7 @@ static void amf_confchg_fn (
 static int amf_lib_exit_fn (void *conn)
 {
 	struct amf_comp *comp;
-	struct amf_pd *amf_pd = (struct amf_pd *)openais_conn_private_data_get (conn);
+	struct amf_pd *amf_pd = (struct amf_pd *)api->ipc_private_data_get (conn);
 
 	assert (amf_pd != NULL);
 	comp = amf_pd->comp;
@@ -1454,7 +1446,7 @@ static int amf_lib_exit_fn (void *conn)
 
 static int amf_lib_init_fn (void *conn)
 {
-	struct amf_pd *amf_pd = (struct amf_pd *)openais_conn_private_data_get (conn);
+	struct amf_pd *amf_pd = (struct amf_pd *)api->ipc_private_data_get (conn);
 
 	list_init (&amf_pd->list);
 
@@ -1496,7 +1488,8 @@ static void message_handler_req_exec_amf_comp_register (
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = error;
-		openais_conn_send_response (
+
+		api->ipc_conn_send_response (
 			comp->conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 	}
 }
@@ -1636,36 +1629,36 @@ static void message_handler_req_exec_amf_response (
 		res_lib.header.id = MESSAGE_RES_AMF_RESPONSE;
 		res_lib.header.size = sizeof (struct res_lib_amf_response);
 		res_lib.header.error = retval;
-		openais_conn_send_response (comp->conn, &res_lib, sizeof (res_lib));
+		api->ipc_conn_send_response (comp->conn, &res_lib, sizeof (res_lib));
 	}
 }
 
 static void message_handler_req_exec_amf_sync_start (
 	void *message, unsigned int nodeid)
 {
-	SYNCTRACE ("from: %s", totempg_ifaces_print (nodeid));
+	SYNCTRACE ("from: %s", api->totem_ifaces_print (nodeid));
 
 	switch (scsm.state) {
 		case IDLE:
 			break;
 		case PROBING_1:
-			poll_timer_delete (aisexec_poll_handle, scsm.timer_handle);
+			api->timer_delete (scsm.timer_handle);
 			scsm.timer_handle = 0;
 			sync_state_set (UPDATING_CLUSTER_MODEL);
 			scsm.sync_master = nodeid;
 			break;
 		case PROBING_2:
-			if (totempg_my_nodeid_get() == nodeid) {
+			if (api->totem_nodeid_get() == nodeid) {
 				scsm.sync_master = nodeid;
 				sync_state_set (CREATING_CLUSTER_MODEL);
 				if (create_cluster_model() == 0) {
 					sync_state_set (SYNCHRONIZING);
-					sync_request (amf_service_handler.name);
+					api->sync_request (amf_service_engine.name);
 				} else {
                     /* TODO: I am sync master but not AMF node */
 					log_printf (LOG_LEVEL_ERROR,
 								"AMF sync error: I am sync master but not AMF node");
-					openais_exit_error (AIS_DONE_FATAL_ERR);
+					corosync_fatal_error (COROSYNC_FATAL_ERR);
 				}
 			} else {
 				sync_state_set (UPDATING_CLUSTER_MODEL);
@@ -1711,58 +1704,58 @@ static void message_handler_req_exec_amf_sync_data (
 	{
 		case AMF_CLUSTER:
 			if ((scsm.cluster = amf_cluster_deserialize (tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("Cluster '%s' deserialised", scsm.cluster->name.value);
 			break;
 		case AMF_NODE:
 			if ((scsm.node = amf_node_deserialize (scsm.cluster, tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("Node '%s' deserialised", scsm.node->name.value);
 			break;
 		case AMF_APPLICATION:
 			if ((scsm.app = amf_application_deserialize (scsm.cluster, tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("App '%s' deserialised", scsm.app->name.value);
 			break;
 		case AMF_SG:
 			if ((scsm.sg = amf_sg_deserialize (scsm.app, tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("SG '%s' deserialised", scsm.sg->name.value);
 			break;
 		case AMF_SU:
 			if ((scsm.su = amf_su_deserialize (scsm.sg, tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("SU '%s' deserialised", scsm.su->name.value);
 			break;
 		case AMF_COMP:
 			if ((scsm.comp = amf_comp_deserialize (scsm.su, tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("Component '%s' deserialised", scsm.comp->name.value);
 			break;
 		case AMF_HEALTHCHECK:
 			if ((scsm.healthcheck = amf_healthcheck_deserialize (scsm.comp,
 				tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("Healthcheck '%s' deserialised",
-					 scsm.healthcheck->safHealthcheckKey.key);
+					   scsm.healthcheck->safHealthcheckKey.key);
 			break;
 		case AMF_SI:
 			if ((scsm.si = amf_si_deserialize (scsm.app, tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("SI '%s' deserialised", scsm.si->name.value);
 			break;
 		case AMF_SI_ASSIGNMENT:
 			if ((scsm.si_assignment = amf_si_assignment_deserialize (scsm.si,
 				tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("SI Ass '%s' deserialised",
 					 scsm.si_assignment->name.value);
@@ -1770,14 +1763,14 @@ static void message_handler_req_exec_amf_sync_data (
 		case AMF_CSI:
 			if ((scsm.csi = amf_csi_deserialize (scsm.si,
 				tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("CSI '%s' deserialised", scsm.csi->name.value);
 			break;
 		case AMF_CSI_ASSIGNMENT:
 			if ((scsm.csi_assignment = amf_csi_assignment_deserialize (
 				scsm.csi, tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("CSI Ass '%s' deserialised",
 					 scsm.csi_assignment->name.value);
@@ -1785,7 +1778,7 @@ static void message_handler_req_exec_amf_sync_data (
 		case AMF_CSI_ATTRIBUTE:
 			if ((scsm.csi_attribute = amf_csi_attribute_deserialize (scsm.csi,
 				tmp)) == NULL) {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			SYNCTRACE ("CSI Attr '%s' deserialised",
 					 scsm.csi_attribute->name);
@@ -1816,7 +1809,7 @@ static void message_handler_req_exec_amf_sync_request (
 {
 	struct req_exec_amf_sync_request *req_exec = message;
 	
-	SYNCTRACE ("from: %s, name: %s, state %s", totempg_ifaces_print (nodeid),
+	SYNCTRACE ("from: %s, name: %s, state %s", api->totem_ifaces_print (nodeid),
 		req_exec->hostname, scsm_state_names[scsm.state]);
 
 	clm_node_list_update (nodeid, req_exec->hostname);
@@ -1854,7 +1847,7 @@ static void message_handler_req_lib_amf_componentregister (
 	if (comp) {
 		struct req_exec_amf_comp_register req_exec;
 		struct iovec iovec;
-		struct amf_pd *amf_pd = openais_conn_private_data_get (conn);
+		struct amf_pd *amf_pd = api->ipc_private_data_get (conn);
 
 		TRACE2("Comp register '%s'", req_lib->compName.value);
 		comp->conn = conn;
@@ -1867,15 +1860,14 @@ static void message_handler_req_lib_amf_componentregister (
 			&req_lib->proxyCompName, sizeof (SaNameT));
 		iovec.iov_base = (char *)&req_exec;
 		iovec.iov_len = sizeof (req_exec);
-		assert (totempg_groups_mcast_joined (openais_group_handle,
-			&iovec, 1, TOTEMPG_AGREED) == 0);
+		assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 	} else {
 		struct res_lib_amf_componentregister res_lib;
 		log_printf (LOG_ERR, "Error: Comp register: '%s' not found", req_lib->compName.value);
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = SA_AIS_ERR_INVALID_PARAM;
-		openais_conn_send_response (
+		api->ipc_conn_send_response (
 			conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 	}
 }
@@ -1909,8 +1901,7 @@ static void message_handler_req_lib_amf_componentunregister (
 	iovec.iov_base = (char *)&req_exec_amf_componentunregister;
 	iovec.iov_len = sizeof (req_exec_amf_componentunregister);
 
-	assert (totempg_groups_mcast_joined (openais_group_handle,
-		&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
 #endif
 }
 
@@ -1948,7 +1939,7 @@ static void message_handler_req_lib_amf_pmstart (
 	res_lib.header.id = MESSAGE_RES_AMF_PMSTART;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib,
+	api->ipc_conn_send_response (conn, &res_lib,
 								sizeof (struct res_lib_amf_pmstart));
 
 }
@@ -1986,7 +1977,7 @@ static void message_handler_req_lib_amf_pmstop (
 	res_lib.header.id = MESSAGE_RES_AMF_PMSTOP;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib,
+	api->ipc_conn_send_response (conn, &res_lib,
 								sizeof (struct res_lib_amf_pmstop));
 
 }
@@ -2015,7 +2006,7 @@ static void message_handler_req_lib_amf_healthcheckstart (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKSTART;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib,
+	api->ipc_conn_send_response (conn, &res_lib,
 		sizeof (struct res_lib_amf_healthcheckstart));
 }
 
@@ -2040,7 +2031,7 @@ static void message_handler_req_lib_amf_healthcheckconfirm (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKCONFIRM;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	api->ipc_conn_send_response (conn, &res_lib, sizeof (res_lib));
 }
 
 static void message_handler_req_lib_amf_healthcheckstop (
@@ -2063,7 +2054,7 @@ static void message_handler_req_lib_amf_healthcheckstop (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKSTOP;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	openais_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	api->ipc_conn_send_response (conn, &res_lib, sizeof (res_lib));
 }
 
 static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
@@ -2089,7 +2080,7 @@ static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
 	res_lib.header.size = sizeof (struct res_lib_amf_hastateget);
 	res_lib.header.error = error;
 
-	openais_conn_send_response (conn, &res_lib,
+	api->ipc_conn_send_response (conn, &res_lib,
 		sizeof (struct res_lib_amf_hastateget));
 }
 
@@ -2145,7 +2136,7 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 	if (amfProtectionGroup) {
 		res_lib_amf_protectiongrouptrack.header.error = SA_AIS_OK;
 	}
-	openais_conn_send_response (conn, &res_lib_amf_protectiongrouptrack,
+	api->ipc_conn_send_response (conn, &res_lib_amf_protectiongrouptrack,
 		sizeof (struct res_lib_amf_protectiongrouptrack));
 
 	if (amfProtectionGroup &&
@@ -2205,7 +2196,7 @@ static void message_handler_req_lib_amf_protectiongrouptrackstop (
 	if (track) {
 		res_lib_amf_protectiongrouptrackstop.header.error = SA_AIS_OK;
 	}
-	openais_conn_send_response (conn, &res_lib_amf_protectiongrouptrackstop,
+	api->ipc_conn_send_response (conn, &res_lib_amf_protectiongrouptrackstop,
 		sizeof (struct res_lib_amf_protectiongrouptrackstop));
 
 #endif
@@ -2237,8 +2228,7 @@ void mcast_error_report_from_pm (
 	iovec.iov_base = (char *)&req_exec;
 	iovec.iov_len = sizeof (req_exec);
 
-	totempg_groups_mcast_joined (openais_group_handle, 
-								 &iovec, 1, TOTEMPG_AGREED);
+	api->totem_mcast (&iovec, 1, TOTEM_AGREED);
 
 }
 
@@ -2281,8 +2271,7 @@ static void message_handler_req_lib_amf_componenterrorreport (
 		iovec.iov_base = (char *)&req_exec;
 		iovec.iov_len = sizeof (req_exec);
 
-		assert (totempg_groups_mcast_joined (
-			openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
+		assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 	} else {
 		struct res_lib_amf_componenterrorreport res_lib;
 
@@ -2291,7 +2280,7 @@ static void message_handler_req_lib_amf_componenterrorreport (
 		res_lib.header.size = sizeof (struct res_lib_amf_componenterrorreport);
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTERRORREPORT;
 		res_lib.header.error = SA_AIS_ERR_NOT_EXIST;
-		openais_conn_send_response (conn, &res_lib,
+		api->ipc_conn_send_response (conn, &res_lib,
 			sizeof (struct res_lib_amf_componenterrorreport));
 	}
 }
@@ -2321,8 +2310,7 @@ static void message_handler_req_lib_amf_componenterrorclear (
 	iovec.iov_base = (char *)&req_exec_amf_componenterrorclear;
 	iovec.iov_len = sizeof (req_exec_amf_componenterrorclear);
 
-	assert (totempg_groups_mcast_joined (openais_group_handle,
-		&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEMPG_AGREED) == 0);
 #endif
 
 }
@@ -2385,14 +2373,13 @@ static void message_handler_req_lib_amf_response (void *conn, void *msg)
 		req_exec.error = req_lib->error;
 		iovec.iov_base = (char *)&req_exec;
 		iovec.iov_len = sizeof (req_exec);
-		send_ok = totempg_groups_send_ok_joined (openais_group_handle, &iovec, 1);
+		send_ok = api->totem_send_ok (&iovec, 1);
 
 		if (send_ok) {
-			if (totempg_groups_mcast_joined (
-				openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0) {
+			if (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0) {
 				goto end;
 			} else {
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 		} else {
 			/* TOTEM queue is full, try again later */
@@ -2404,7 +2391,7 @@ send_response:
 	res_lib.header.id = MESSAGE_RES_AMF_RESPONSE;
 	res_lib.header.size = sizeof (struct res_lib_amf_response);
 	res_lib.header.error = retval;
-	openais_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	api->ipc_conn_send_response (conn, &res_lib, sizeof (res_lib));
 end:
 	return;
 }

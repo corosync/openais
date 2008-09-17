@@ -1,4 +1,4 @@
-# Version and symbol export for libSaClm.so
+# Version and symbol export for libSaAmf.so
 
 OPENAIS_AMF_B.01.01 {
 	global:

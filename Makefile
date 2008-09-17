@@ -29,31 +29,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-builddir:=$(CURDIR)/
+builddir:=$(shell pwd)/
 ifneq ($(O),)
 # cleanup the path (make it absolute)
-builddir:=$(abspath $(O))/
-ifeq ($(builddir),)
-builddir:=$(O)
-$(warning your abspath function is not working)
-$(warning > setting builddir to $(builddir))
+$(shell mkdir -p $(O))
+builddir:=$(shell cd $(O) && pwd)/
 endif
-endif
+srcdir:=$(shell cd $(dir $(MAKEFILE_LIST)) && pwd)/
 
-THIS_MAKEFILE:=$(realpath $(lastword $(MAKEFILE_LIST)))
-
-ifeq ($(THIS_MAKEFILE),)
-srcdir:=$(CURDIR)/
-$(warning your realpath function is not working)
-$(warning > setting srcdir to $(srcdir))
-else
-srcdir:=$(dir $(THIS_MAKEFILE))
-endif
-
-include $(srcdir)Makefile.inc
+include $(srcdir)/Makefile.inc
 
 INCLUDEDIR=$(PREFIX)/include/openais
 MANDIR=$(PREFIX)/share/man
+SBINDIR=$(PREFIX)/sbin
 ETCDIR=/etc
 ARCH=$(shell uname -p)
 
@@ -72,7 +60,7 @@ ifeq (ia64,$(ARCH))
 LIBDIR=$(PREFIX)/lib/openais
 endif
 
-SUBDIRS:=$(builddir)lcr $(builddir)lib $(builddir)test
+SUBDIRS:=$(builddir)lib $(builddir)test $(builddir)services
 sub_make = srcdir=$(srcdir) builddir=$(builddir) subdir=$(1)/ $(MAKE) -I$(srcdir)$(1) -f $(srcdir)$(1)/Makefile $(2)
 
 all: $(SUBDIRS)
@@ -118,8 +106,7 @@ clean:
 	(cd $(builddir)test; echo ==== `pwd` ===; $(call sub_make,test,clean));
 	rm -rf $(builddir)doc/api
 
-# AIS_LIBS	= SaAmf SaClm SaCkpt SaEvt SaLck SaMsg
-AIS_LIBS	= SaClm SaCkpt SaEvt SaLck SaMsg
+AIS_LIBS	= SaAmf SaClm SaCkpt SaEvt SaLck SaMsg
 
 AIS_HEADERS	= saAis.h saAmf.h saClm.h saCkpt.h saEvt.h saEvt.h saLck.h \
 		  saMsg.h
@@ -152,6 +139,7 @@ install: all
 	echo $(LIBDIR) > "$(DESTDIR)$(ETCDIR)/ld.so.conf.d/openais-$(ARCH).conf"
 
 	install -m 755 $(builddir)services/*lcrso $(DESTDIR)$(LCRSODIR)
+	install -m 755 $(builddir)services/openais-instantiate $(DESTDIR)$(SBINDIR)
 
 	if [ ! -f $(DESTDIR)$(ETCDIR)/ais/openais.conf ] ; then 	   \
 		install -m 644 $(srcdir)conf/openais.conf $(DESTDIR)$(ETCDIR)/ais ; \

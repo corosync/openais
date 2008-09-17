@@ -47,9 +47,9 @@
 
 #include <saAis.h>
 #include <saAmf.h>
-#include <ipc_gen.h>
+#include <corosync/ipc_gen.h>
 #include <ipc_amf.h>
-#include <ais_util.h>
+#include <corosync/ais_util.h>
 
 
 struct res_overlay {

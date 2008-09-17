@@ -127,8 +127,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "amf.h"
-#include "logsys.h"
-#include "util.h"
+#include <corosync/engine/logsys.h>
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 
@@ -430,7 +429,7 @@ void amf_application_sg_started (struct amf_application *app, struct amf_sg *sg,
 		default:
 			log_printf (LOG_LEVEL_ERROR, "amf_application_sg_started()"
 				" called in state = %d", app->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 	}
 }
@@ -449,7 +448,7 @@ void amf_application_sg_assigned (
 			log_printf (LOG_LEVEL_ERROR, 
 				"amf_application_sg_assigned()"
 				" called in state = %d", app->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 	}
 }

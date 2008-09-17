@@ -31,7 +31,10 @@
 
 # Include configuration
 #
-include ../Makefile.inc
+srcdir ?= $(CURDIR)/../
+subdir ?= test/
+
+include $(srcdir)Makefile.inc
 
 ifeq (${OPENAIS_COMPAT}, SOLARIS)
 	override LDFLAGS += -lnsl -lsocket -lrt

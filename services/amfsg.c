@@ -367,9 +367,9 @@
 #include <assert.h>
 
 #include "amf.h"
-#include "logsys.h"
-#include "main.h"
-#include "util.h"
+#include <netinet/in.h>
+#include <corosync/engine/coroapi.h>
+#include <corosync/engine/logsys.h>
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 
@@ -662,7 +662,7 @@ static struct amf_si *si_get_dependent (struct amf_si *si)
 		} else {
 			log_printf (LOG_LEVEL_ERROR, "distinguished name for "
 				"amf_si_depedency failed\n");
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 		}
 	}
 
@@ -745,9 +745,10 @@ static void acsm_enter_deactivating_dependent_workload (amf_sg_t *sg)
 	}
 
 	if (callback_pending == 0) {
-		static poll_timer_handle dependent_si_deactivated_handle;
+		static corosync_timer_handle_t dependent_si_deactivated_handle;
 		ENTER("");
-		poll_timer_add (aisexec_poll_handle, 0, sg,
+		api->timer_add_duration (
+			0, sg,
 			timer_function_dependent_si_deactivated2, 
 			&dependent_si_deactivated_handle);
 	}
@@ -813,7 +814,7 @@ static void acsm_enter_repairing_su (struct amf_sg *sg)
 			if (node == NULL) {
 				log_printf (LOG_LEVEL_ERROR, 
 					"Su to recover not hosted on any node\n");
-				openais_exit_error (AIS_DONE_FATAL_ERR);
+				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
 			if (node->saAmfNodeOperState == SA_AMF_OPERATIONAL_ENABLED) {
 				/* node is synchronized */
@@ -1746,7 +1747,7 @@ static int assign_si (struct amf_sg *sg, int dependency_level)
 			sg->saAmfSGMaxActiveSIsperSUs);
 	} else {
 		log_printf (LOG_LEVEL_ERROR, "ERROR: saAmfSGNumPrefActiveSUs == 0 !!");
-		openais_exit_error (AIS_DONE_FATAL_ERR);
+		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 
 	if (sg->saAmfSGNumPrefStandbySUs > 0) {
@@ -1755,7 +1756,7 @@ static int assign_si (struct amf_sg *sg, int dependency_level)
 			sg->saAmfSGMaxStandbySIsperSUs);
 	} else {
 		log_printf (LOG_LEVEL_ERROR, "ERROR: saAmfSGNumPrefStandbySUs == 0 !!");
-		openais_exit_error (AIS_DONE_FATAL_ERR);
+		corosync_fatal_error (COROSYNC_FATAL_ERR);
 
 	}
 

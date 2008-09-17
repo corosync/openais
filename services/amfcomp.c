@@ -133,22 +133,17 @@
 #include <errno.h>
 #include <assert.h>
 #include <dirent.h>
+#include <pthread.h>
+
+#include "amf.h"
+#include <netinet/in.h>
+#include <corosync/ipc_gen.h>
+#include "../include/ipc_amf.h"
+#include <corosync/engine/logsys.h>
+#include <corosync/engine/coroapi.h>
 
 #include "../include/saAis.h"
 #include "../include/saAmf.h"
-#include "../include/ipc_gen.h"
-#include "../include/ipc_amf.h"
-#include "totempg.h"
-#include "timer.h"
-#include "flow.h"
-#include "tlist.h"
-#include "ipc.h"
-#include "objdb.h"
-#include "service.h"
-#include "util.h"
-#include "amf.h"
-#include "logsys.h"
-#include "main.h"
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 
@@ -270,7 +265,7 @@ static int invocation_create (
 		invocation_temp = (struct invocation *)realloc (invocation_entries,
 			(invocation_entries_size + 1) * sizeof (struct invocation));
 		if (invocation_temp == NULL) {
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			api->error_memory_failure ();
 		}
 		invocation_entries = invocation_temp;
 		invocation_addr = &invocation_entries[invocation_entries_size];
@@ -445,7 +440,7 @@ static void *clc_command_run (void *context)
 			argv = realloc (argv, sizeof (char*) * argv_size);
 			if (argv == NULL) {
 				fprintf (stderr, "out-of-memory");  
-				exit (-1);
+				corosync_fatal_error(COROSYNC_OUT_OF_MEMORY);
 			}
 			argv[i] = arg;
 			arg = strtok_r(NULL, " ", &ptrptr);
@@ -472,7 +467,7 @@ static void *clc_command_run (void *context)
 		envp = realloc (envp, sizeof (char*) * envp_size);
 		if (envp == NULL) {
 			fprintf (stderr, "out-of-memory");
-			exit (-1);
+			corosync_fatal_error(COROSYNC_OUT_OF_MEMORY);
 		}
 		envp[i] = clc_command_run_data->comp->saAmfCompCmdEnv[i - 1];
 	}
@@ -519,8 +514,8 @@ static void start_component_instantiate_timer (struct amf_comp *component)
 {
 	ENTER("%s",component->name.value);
 	if (component->instantiate_timeout_handle == 0) {
-		poll_timer_add (aisexec_poll_handle, 
-			component->saAmfCompInstantiateTimeout,
+		api->timer_add_duration (
+			component->saAmfCompInstantiateTimeout * MILLI_2_NANO_SECONDS,
 			component,
 			amf_comp_instantiate_tmo,
 			&component->instantiate_timeout_handle);
@@ -531,8 +526,8 @@ static void start_component_cleanup_timer (struct amf_comp *component)
 {
 	ENTER("%s",component->name.value);
 	if (component->cleanup_timeout_handle == 0) {
-		poll_timer_add (aisexec_poll_handle, 
-			component->saAmfCompCleanupTimeout,
+		api->timer_add_duration (
+			component->saAmfCompCleanupTimeout * MILLI_2_NANO_SECONDS,
 			component,
 			amf_comp_cleanup_tmo,
 			&component->cleanup_timeout_handle);
@@ -544,7 +539,7 @@ void stop_component_cleanup_timer (struct amf_comp *component)
 	ENTER("%s",component->name.value);
 
 	if (component->cleanup_timeout_handle != 0) {
-		poll_timer_delete (aisexec_poll_handle, 
+		api->timer_delete (
 			component->cleanup_timeout_handle);
 		component->cleanup_timeout_handle  = 0;
 	}
@@ -627,8 +622,8 @@ static int lib_comp_terminate_request (struct amf_comp *comp)
 		AMF_RESPONSE_COMPONENTTERMINATECALLBACK,
 		component_terminate_callback_data);
 
-	openais_conn_send_response (
-		openais_conn_partner_get (comp->conn),
+	api->ipc_conn_send_response (
+		api->ipc_conn_partner_get (comp->conn),
 		&res_lib,
 		sizeof (struct res_lib_amf_componentterminatecallback));
 
@@ -663,8 +658,7 @@ static void mcast_cleanup_completion_event (void *context)
      */
 	req.cleanup_exit_code = clc_command_run_data->exit_code;
 
-	assert (totempg_groups_mcast_joined (openais_group_handle,
-		&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
 }
 
 /*
@@ -1057,10 +1051,8 @@ static void healthcheck_deactivate (
 	dprintf ("deactivating healthcheck for component %s\n",
 		getSaNameT (&healthcheck_active->comp->name));
 
-	poll_timer_delete (aisexec_poll_handle,
-		healthcheck_active->timer_handle_period);
-	poll_timer_delete (aisexec_poll_handle,
-		healthcheck_active->timer_handle_duration);
+	api->timer_delete (healthcheck_active->timer_handle_period);
+	api->timer_delete (healthcheck_active->timer_handle_duration);
 
 	invocation_destroy_by_data ((void *)healthcheck_active);
 	healthcheck_active->active = 0;
@@ -1079,8 +1071,8 @@ static void timer_function_healthcheck_next_fn (void *_healthcheck)
 	lib_healthcheck_request (healthcheck);
 
 	/* start duration timer for response */
-	poll_timer_add (aisexec_poll_handle,
-		healthcheck->saAmfHealthcheckMaxDuration,
+	api->timer_add_duration (
+		healthcheck->saAmfHealthcheckMaxDuration * MILLI_2_NANO_SECONDS,
 		(void *)healthcheck,
 		timer_function_healthcheck_tmo,
 		&healthcheck->timer_handle_duration);
@@ -1114,8 +1106,7 @@ static void mcast_healthcheck_tmo_event (
 	iovec.iov_base = (char *)&req_exec;
 	iovec.iov_len = sizeof (req_exec);
 
-	assert (totempg_groups_mcast_joined (openais_group_handle,
-		&iovec, 1, TOTEMPG_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) != 0);
 out:
 	return;
 }
@@ -1153,8 +1144,8 @@ static void lib_healthcheck_request (struct amf_healthcheck *healthcheck)
 
 	TRACE7 ("sending healthcheck request to component %s",
 		res_lib.compName.value);
-	openais_conn_send_response (
-		openais_conn_partner_get (healthcheck->comp->conn),
+	api->ipc_conn_send_response (
+		api->ipc_conn_partner_get (healthcheck->comp->conn),
 		&res_lib, sizeof (struct res_lib_amf_healthcheckcallback));
 }
 
@@ -1255,8 +1246,8 @@ static void lib_csi_set_request (
 	res_lib->haState = csi_assignment->requested_ha_state;
 	res_lib->invocation =
 		invocation_create (AMF_RESPONSE_CSISETCALLBACK, csi_assignment);
-	openais_conn_send_response (
-		openais_conn_partner_get (comp->conn), res_lib, res_lib->header.size);
+	api->ipc_conn_send_response (
+		api->ipc_conn_partner_get (comp->conn), res_lib, res_lib->header.size);
 	
 	free(p);
 }
@@ -1267,8 +1258,7 @@ static void stop_component_instantiate_timer (struct amf_comp *component)
 
 	if (component->instantiate_timeout_handle) {
 		dprintf ("Stop component instantiate timer");
-		poll_timer_delete (aisexec_poll_handle, 
-			component->instantiate_timeout_handle);
+		api->timer_delete (component->instantiate_timeout_handle);
 		component->instantiate_timeout_handle = 0;
 	}
 }
@@ -1313,7 +1303,7 @@ void amf_comp_error_report (struct amf_comp *comp, amf_comp_t* reporting_comp,
 			res_lib.header.size = sizeof (struct res_lib_amf_componenterrorreport);
 			res_lib.header.id = MESSAGE_RES_AMF_COMPONENTERRORREPORT;
 			res_lib.header.error = SA_AIS_OK;
-			openais_conn_send_response (reporting_comp->conn, &res_lib, sizeof (res_lib));
+			api->ipc_conn_send_response (reporting_comp->conn, &res_lib, sizeof (res_lib));
 		}
 	} else {
 		TRACE2("Exec comp error report on comp'%s' from AMF", comp->name.value);
@@ -1526,8 +1516,7 @@ static void timer_function_pm_fn (void *data)
 
 	if (!list_empty(&comp->pm_head)) {
 		pm = list_entry(comp->pm_head.next,struct amf_pm,entry);
-		poll_timer_add (aisexec_poll_handle,
-						500,
+		api->timer_add_duration (500,
 						(void *)comp,
 						timer_function_pm_fn,
 						&pm->timer_handle_period);
@@ -1658,11 +1647,11 @@ SaAisErrorT amf_comp_pm_start (
 			/* only add a timer per comp */
 			/* TODO: should this timer period be a define or a config option?
 			*/
-			poll_timer_add (aisexec_poll_handle,
-							500,
-							(void *)comp,
-							timer_function_pm_fn,
-							&pm->timer_handle_period);
+			api->timer_add_duration (
+				500 * MILLI_2_NANO_SECONDS,
+				(void *)comp,
+				timer_function_pm_fn,
+				&pm->timer_handle_period);
 
 		}
 		list_add(&pm->entry, &comp->pm_head);
@@ -1788,15 +1777,15 @@ SaAisErrorT amf_comp_healthcheck_start (
 
 	if (invocationType == SA_AMF_HEALTHCHECK_AMF_INVOKED) {
 		/* start timer to execute first healthcheck request */
-		poll_timer_add (aisexec_poll_handle,
-			healthcheck->saAmfHealthcheckPeriod,
+		api->timer_add_duration (
+			healthcheck->saAmfHealthcheckPeriod * MILLI_2_NANO_SECONDS,
 			(void *)healthcheck,
 			timer_function_healthcheck_next_fn,
 			&healthcheck->timer_handle_period);
 	} else if (invocationType == SA_AMF_HEALTHCHECK_COMPONENT_INVOKED) {
 		/* start supervision timer */
-		poll_timer_add (aisexec_poll_handle,
-			healthcheck->saAmfHealthcheckPeriod,
+		api->timer_add_duration (
+			healthcheck->saAmfHealthcheckPeriod * MILLI_2_NANO_SECONDS,
 			(void *)healthcheck,
 			timer_function_healthcheck_tmo,
 			&healthcheck->timer_handle_period);
@@ -2016,13 +2005,13 @@ int amf_comp_response_1 (
 
 				if (healthcheck->invocationType == SA_AMF_HEALTHCHECK_AMF_INVOKED) {
 				/* the response was on time, delete supervision timer */
-					poll_timer_delete (aisexec_poll_handle,
+					api->timer_delete (
 						healthcheck->timer_handle_duration);
 					healthcheck->timer_handle_duration = 0;
 
 				/* start timer to execute next healthcheck request */
-					poll_timer_add (aisexec_poll_handle,
-						healthcheck->saAmfHealthcheckPeriod,
+					api->timer_add_duration (
+						healthcheck->saAmfHealthcheckPeriod * MILLI_2_NANO_SECONDS,
 						(void *)healthcheck,
 						timer_function_healthcheck_next_fn,
 						&healthcheck->timer_handle_period);
@@ -2277,17 +2266,16 @@ SaAisErrorT amf_comp_healthcheck_confirm (
 	} else if (healthcheck->active) {
 		if (healthcheckResult == SA_AIS_OK) {
 			/* the response was on time, restart the supervision timer */
-			poll_timer_delete (aisexec_poll_handle,
-				healthcheck->timer_handle_period);
-			poll_timer_add (aisexec_poll_handle,
-				healthcheck->saAmfHealthcheckPeriod,
+			api->timer_delete (healthcheck->timer_handle_period);
+			api->timer_add_duration (
+				healthcheck->saAmfHealthcheckPeriod * MILLI_2_NANO_SECONDS,
 				(void *)healthcheck,
 				timer_function_healthcheck_tmo,
 				&healthcheck->timer_handle_period);
 		} else if (healthcheckResult == SA_AIS_ERR_FAILED_OPERATION) {
 			/* send to cluster */
 			if (!comp->error_suspected) {
-				poll_timer_delete (aisexec_poll_handle,
+				api->timer_delete (
 				healthcheck->timer_handle_period);
 				mcast_healthcheck_tmo_event (healthcheck);
 			}
@@ -2739,8 +2727,8 @@ void amf_comp_csi_remove (amf_comp_t *component,
 
 	TRACE7 ("sending CSI remove request to component %s",
 		res_lib.compName.value);
-	openais_conn_send_response (
-		openais_conn_partner_get (component->conn),
+	api->ipc_conn_send_response (
+		api->ipc_conn_partner_get (component->conn),
 		&res_lib, sizeof (struct res_lib_amf_csiremovecallback));
 }
 

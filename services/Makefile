@@ -33,14 +33,14 @@
 # Include configuration
 #
 srcdir ?= $(CURDIR)/../
+subdir ?= services/
 
 include $(srcdir)Makefile.inc
 
-override CFLAGS += -I$(srcdir)include
 LDFLAGS += -L./
 
 ifeq (${OPENAIS_COMPAT}, LINUX) 
-	override LDFLAGS += 
+	override LDFLAGS +=
 endif
 
 ifeq (${OPENAIS_COMPAT}, SOLARIS) 
@@ -57,8 +57,8 @@ LCR_OBJS = openaisparser.o openaisserviceenable.o clm.o ckpt.o evt.o lck.o msg.o
 
 override CFLAGS += -fPIC
 
-all: openaisparser.lcrso openaisserviceenable.lcrso service_clm.lcrso \
-	service_ckpt.lcrso service_evt.lcrso service_lck.lcrso \
+all: openaisparser.lcrso openaisserviceenable.lcrso service_amf.lcrso \
+	service_clm.lcrso service_ckpt.lcrso service_evt.lcrso service_lck.lcrso \
 	service_msg.lcrso openais-instantiate
 
 ifeq (${OPENAIS_COMPAT}, DARWIN)

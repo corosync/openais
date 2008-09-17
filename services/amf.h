@@ -41,16 +41,17 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <regex.h>
+#include <netinet/in.h>
 
+#include <corosync/ipc_gen.h>
+#include <corosync/engine/coroapi.h>
+#include <corosync/list.h>
 #include "../include/saAis.h"
 #include "../include/saAmf.h"
-#include "../include/list.h"
-#include "../include/ipc_gen.h"
-#include "objdb.h"
-#include "timer.h"
-#include "aispoll.h"
 
 typedef void (*async_func_t)(void *param);
+
+extern struct corosync_api_v1 *api;
 
 #define AMF_PROTOCOL_VERSION 1
 
@@ -71,7 +72,7 @@ enum scsm_states {
  */
 struct scsm_descriptor {
 	enum scsm_states           state;
-	poll_timer_handle          timer_handle;
+	corosync_timer_handle_t          timer_handle;
 
 	/* node ID of current sync master */
 	unsigned int               sync_master;
@@ -260,7 +261,7 @@ typedef struct amf_cluster {
 	struct amf_application *application_head;
 
 	/* Implementation */
-	poll_timer_handle timeout_handle;
+	corosync_timer_handle_t timeout_handle;
 	cluster_avail_control_state_t acsm_state;
 	amf_fifo_t *deferred_events;
 } amf_cluster_t;
@@ -455,12 +456,14 @@ typedef struct amf_comp {
 	enum clc_component_types comptype;
 	struct amf_healthcheck *healthcheck_head;
 	struct list_head pm_head;
-	poll_timer_handle instantiate_timeout_handle;
-	poll_timer_handle cleanup_timeout_handle;
+	corosync_timer_handle_t instantiate_timeout_handle;
+	corosync_timer_handle_t cleanup_timeout_handle;
 	/*
 	 * Flag that indicates of this component has a suspected error
 	 */
 	SaUint32T error_suspected;
+	/* Flag to indicate whether a cleanup is in progress for this component. */
+	SaUint32T waiting_for_cleanup;
 } amf_comp_t;
 
 
@@ -478,8 +481,8 @@ typedef struct amf_healthcheck {
 	SaUint32T active;
 	SaAmfHealthcheckInvocationT invocationType;
 	SaAmfRecommendedRecoveryT recommendedRecovery;
-	poll_timer_handle timer_handle_duration;
-	poll_timer_handle timer_handle_period;
+	corosync_timer_handle_t timer_handle_duration;
+	corosync_timer_handle_t timer_handle_period;
 
 } amf_healthcheck_t;
 
@@ -492,7 +495,7 @@ typedef struct amf_pm {
 
        /* Implementation */
 	   struct list_head entry;
-       poll_timer_handle timer_handle_period;
+       corosync_timer_handle_t timer_handle_period;
 } amf_pm_t;
 
 
@@ -663,7 +666,7 @@ struct req_exec_amf_cluster_start_tmo {
 
 extern struct amf_cluster *amf_config_read (char **error_string);
 extern void amf_runtime_attributes_print (struct amf_cluster *cluster);
-extern int amf_enabled (struct objdb_iface_ver0 *objdb);
+extern int amf_enabled (struct corosync_api_v1 *coroapi);
 extern void *_amf_malloc (size_t size, const char *file, unsigned int line);
 #define amf_malloc(size) _amf_malloc ((size), __FILE__, __LINE__)
 extern void *_amf_realloc (void* ptr, size_t size, const char *file, 
@@ -1201,5 +1204,28 @@ extern int sa_amf_grep(const char *string, char *pattern, size_t nmatch,
 /*===========================================================================*/
 extern struct amf_node *this_amf_node;
 extern struct amf_cluster *amf_cluster;
+
+static inline int name_match(SaNameT *name1, SaNameT *name2)
+{
+	if (name1->length == name2->length) {
+		return ((strncmp ((char *)name1->value, (char *)name2->value, name1->length)) == 0);
+	}
+	return 0;
+}
+
+static inline char *getSaNameT (SaNameT *name)
+{
+	return ((char *)name->value);
+}
+
+static inline void setSaNameT (SaNameT *name, char *str) {
+	strncpy ((char *)name->value, str, SA_MAX_NAME_LENGTH);
+	if (strlen ((char *)name->value) > SA_MAX_NAME_LENGTH) {
+		name->length = SA_MAX_NAME_LENGTH;
+	} else {
+		name->length = strlen (str);
+	}
+}
+
 
 #endif /* AMF_H_DEFINED */

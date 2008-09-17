@@ -32,14 +32,15 @@
 # Include configuration
 #
 srcdir ?= $(CURDIR)/../
+subdir ?= lib/
 
 include $(srcdir)Makefile.inc
 
-override CFLAGS += -I$(srcdir)include
 override LDFLAGS += -L./
 
 all: libSaClm.a libSaClm.so.2.0.0 \
 	libSaCkpt.a libSaCkpt.so.2.0.0 \
+	libSaAmf.so.2.0.0 \
 	libSaEvt.a libSaEvt.so.2.0.0 \
 	libSaMsg.a libSaMsg.so.2.0.0  \
 	libSaLck.a libSaLck.so.2.0.0 
@@ -68,20 +69,23 @@ libSaLck.so.2.0.0: util.o lck.o
 
 else
 
+libSaAmf.so.2.0.0: util.o amf.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaAmf.so.2,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o -o $@
+
 libSaClm.so.2.0.0: util.o clm.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libclm.so.2,-version-script=libSaClm.versions util.o clm.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions util.o clm.o -o $@
 
 libSaCkpt.so.2.0.0: util.o ckpt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=libSaCkpt.versions util.o ckpt.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o -o $@
 
 libSaEvt.so.2.0.0: util.o evt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=libSaEvt.versions util.o evt.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=$(srcdir)$(subdir)libSaEvt.versions util.o evt.o -o $@
 
 libSaMsg.so.2.0.0: util.o msg.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libmsg.so.2,-version-script=libSaMsg.versions util.o msg.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaMsg.so.2,-version-script=$(srcdir)$(subdir)libSaMsg.versions util.o msg.o -o $@
 
 libSaLck.so.2.0.0: util.o lck.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=libSaLck.versions util.o lck.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -o $@
 
 endif
 
@@ -101,7 +105,7 @@ libSaLck.a: util.o lck.o
 	$(AR) -rc libSaLck.a util.o lck.o
 
 clean:
-	rm -f *.o libSa*.so.* libSa*.a *.da *.bb *.bbg
+	rm -f *.o libSa*.so* libSa*.a *.da *.bb *.bbg
  
 # -fPIC rules required for all libraries
 %.o: %.c

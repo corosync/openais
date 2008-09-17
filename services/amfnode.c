@@ -193,9 +193,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include "amf.h"
-#include "util.h"
-#include "logsys.h"
-#include "main.h"
+#include <corosync/engine/logsys.h>
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO)
 
@@ -269,7 +267,7 @@ static void failover_all_sg_on_node (amf_node_t *node)
 
 static void node_acsm_enter_failing_gracefully_failing_over (amf_node_t *node)
 {
-	ENTER("");
+	ENTER("%s", node->name.value);
 	node->acsm_state = NODE_ACSM_FAILING_GRACEFULLY_FAILING_OVER;
 	failover_all_sg_on_node (node);
 }
@@ -377,7 +375,7 @@ void amf_node_leave (struct amf_node *node)
 		default:
 			log_printf (LOG_LEVEL_ERROR, "amf_node_leave called in state = %d"
 				" (should have been deferred)", node->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 
 	}
@@ -405,7 +403,7 @@ void amf_node_failover (struct amf_node *node)
 		default:
 			log_printf (LOG_LEVEL_ERROR, "amf_node_leave()called in state = %d"
 				" (should have been deferred)", node->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 	}
 }
@@ -556,7 +554,7 @@ void amf_node_sync_ready (struct amf_node *node)
 			log_printf (LOG_LEVEL_ERROR, "amf_node_sync_ready() was called in "
 										 "state = %d (should have been deferred)",
 				node->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 
 	}
@@ -594,7 +592,7 @@ void amf_node_application_started (struct amf_node *node,
 		default:
 			log_printf (LOG_LEVEL_ERROR, "amf_node_application_started()"
 				"called in state = %d (unexpected !!)", node->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 
 	}
@@ -625,7 +623,7 @@ void amf_node_application_workload_assigned (struct amf_node *node,
 		default:
 			log_printf (LOG_LEVEL_ERROR, "amf_node_application_workload_assigned()"
 				"called in state = %d (unexpected !!)", node->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 	}
 }
@@ -661,7 +659,7 @@ void amf_node_sg_failed_over (struct amf_node *node, struct amf_sg *sg_in)
 		default:
 			log_printf (LOG_LEVEL_ERROR, "amf_node_sg_failed_over()"
 				"called in state = %d (unexpected !!)", node->acsm_state);
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
 	}
 }

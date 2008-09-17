@@ -54,7 +54,7 @@ static int read_config_file_into_objdb(
 	char **error_string);
 static char error_string_response[512];
 
-static char *strstr_rs (const char *haystack, const char *needle)
+char *strstr_rs (const char *haystack, const char *needle)
 {
 	char *end_address;
 	char *new_needle;

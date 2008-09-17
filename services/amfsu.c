@@ -377,9 +377,7 @@
 #include <errno.h>
 
 #include "amf.h"
-#include "util.h"
-#include "logsys.h"
-#include "main.h"
+#include <corosync/engine/logsys.h>
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 

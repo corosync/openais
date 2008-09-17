@@ -114,10 +114,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "amf.h"
-#include "logsys.h"
-#include "util.h"
-#include "aispoll.h"
-#include "main.h"
+#include <netinet/in.h>
+#include <corosync/ipc_gen.h>
+#include <corosync/engine/coroapi.h>
+#include <corosync/engine/logsys.h>
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 
@@ -409,8 +409,9 @@ void amf_si_ha_state_assume (
 	 * simulated using a timeout instead.
 	 */
 	if (csi_assignment_cnt == hastate_set_done_cnt) {
-		poll_timer_handle handle;
-		poll_timer_add (aisexec_poll_handle, 0, si_assignment,
+		corosync_timer_handle_t handle;
+		api->timer_add_duration (
+			0, si_assignment,
 			timer_function_ha_state_assumed, &handle);
 	}
 }

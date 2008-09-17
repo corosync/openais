@@ -143,12 +143,13 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
+#include <netinet/in.h>
 
-#include "logsys.h"
+#include <corosync/ipc_gen.h>
+#include <corosync/mar_gen.h>
+#include <corosync/engine/coroapi.h>
+#include <corosync/engine/logsys.h>
 #include "amf.h"
-#include "util.h"
-#include "main.h"
-#include "service.h"
 
 LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
 
@@ -288,8 +289,7 @@ static inline void stop_cluster_startup_timer (struct amf_cluster *cluster)
 {
 	if (cluster->timeout_handle) {
 		dprintf ("Stop cluster startup timer");
-		poll_timer_delete (aisexec_poll_handle, 
-			cluster->timeout_handle);
+		api->timer_delete (cluster->timeout_handle);
 		cluster->timeout_handle = 0;
 	}
 }
@@ -297,8 +297,8 @@ static inline void stop_cluster_startup_timer (struct amf_cluster *cluster)
 static void start_cluster_startup_timer (struct amf_cluster *cluster)
 {
 	if (cluster->timeout_handle == 0) {
-		poll_timer_add (aisexec_poll_handle, 
-			cluster->saAmfClusterStartupTimeout,
+		api->timer_add_duration (
+			cluster->saAmfClusterStartupTimeout * MILLI_2_NANO_SECONDS,
 			cluster,
 			timer_function_cluster_assign_workload_tmo,
 			&cluster->timeout_handle);
@@ -466,7 +466,7 @@ void amf_cluster_application_started (
 		default: {
 			log_printf (LOG_ERR,"Error invalid cluster availability state %d",
 				cluster->acsm_state);
-			openais_exit_error(cluster->acsm_state);
+			corosync_fatal_error(cluster->acsm_state);
 			break;
 		}
 	}
