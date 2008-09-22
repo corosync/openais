@@ -267,6 +267,11 @@ int main (void)
 	printf ("[DEBUG]: (%d) saMsgQueueGroupInsert { group: %s + queue: %s }\n",
 		result, (char *)(queue_group_one.value), (char *)(queue_name_c.value));
 
+	/* This should fail with SA_AIS_ERR_EXIST */
+	result = saMsgQueueGroupInsert (handle, &queue_group_one, &queue_name_c);
+	printf ("[DEBUG]: (%d) saMsgQueueGroupInsert { group: %s + queue: %s }\n",
+		result, (char *)(queue_group_one.value), (char *)(queue_name_c.value));
+
 	/*
 	* Add queues to GROUP_TWO
 	*/
@@ -279,6 +284,11 @@ int main (void)
 	printf ("[DEBUG]: (%d) saMsgQueueGroupInsert { group: %s + queue: %s }\n",
 		result, (char *)(queue_group_two.value), (char *)(queue_name_y.value));
 
+	result = saMsgQueueGroupInsert (handle, &queue_group_two, &queue_name_z);
+	printf ("[DEBUG]: (%d) saMsgQueueGroupInsert { group: %s + queue: %s }\n",
+		result, (char *)(queue_group_two.value), (char *)(queue_name_z.value));
+
+	/* This should fail with SA_AIS_ERR_EXIST */
 	result = saMsgQueueGroupInsert (handle, &queue_group_two, &queue_name_z);
 	printf ("[DEBUG]: (%d) saMsgQueueGroupInsert { group: %s + queue: %s }\n",
 		result, (char *)(queue_group_two.value), (char *)(queue_name_z.value));
