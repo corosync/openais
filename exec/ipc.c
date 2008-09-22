@@ -1399,11 +1399,14 @@ retry_sendmsg_two:
 		queue_item_add (&conn_io->outq, &queue_item_out);
 
 		/*
-		 * Send a pthread_kill to interrupt the poll syscall
-		 * and start a new poll operation in the thread
+		 * Send a pthread_kill to interrupt the blocked poll syscall
+		 * and start a new poll operation in the thread if
+		 * POLLOUT is not already set
 		 */
-		conn_io->events = POLLIN|POLLOUT|POLLNVAL;
-		pthread_kill (conn_io->thread, SIGUSR1);
+		if (conn_io->events != (POLLIN|POLLOUT|POLLNVAL)) {
+			conn_io->events = POLLIN|POLLOUT|POLLNVAL;
+			pthread_kill (conn_io->thread, SIGUSR1);
+		}
 	}
 	pthread_mutex_unlock (&conn_io->mutex);
 	return (0);
