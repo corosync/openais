@@ -1310,6 +1310,10 @@ static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api)
 	}
 
 	api = corosync_api;
+	if (!amf_enabled (api)) {
+		sync_state_set (UNCONFIGURED);
+		return 0;
+	}
 
 	sync_state_set (IDLE);
 
