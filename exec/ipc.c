@@ -586,8 +586,8 @@ static void *prioritized_poll_thread (void *conn_io_in)
 	struct sched_param sched_param;
 	int res;
 
-	sched_param.sched_priority = 1;
-//	res = pthread_setschedparam (conn_io->thread, SCHED_RR, &sched_param);
+	sched_param.sched_priority = 99;
+	res = pthread_setschedparam (conn_io->thread, SCHED_RR, &sched_param);
 
 	ufd.fd = conn_io->fd;
 	for (;;) {
