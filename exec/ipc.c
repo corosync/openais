@@ -1369,7 +1369,6 @@ retry_sendmsg_two:
 		}
 		if (res == -1 && errno == EAGAIN) {
 			conn_io->byte_start = 0;
-			conn_io->events = POLLIN|POLLNVAL;
 		}
 		if (res != -1) {
 			if (res != mlen) {
@@ -1377,7 +1376,6 @@ retry_sendmsg_two:
 				res = -1;
 			} else {
 				conn_io->byte_start = 0;
-				conn_io->events = POLLIN|POLLNVAL;
 			}
 		}
 	}
