@@ -174,6 +174,13 @@ extern int totem_config_read (
 		 */
 		objdb_get_int (objdb, object_totem_handle, "nodeid", &totem_config->node_id);
 
+		totem_config->clear_node_high_bit = 0;
+		if (!objdb_get_string (objdb,object_totem_handle, "clear_node_high_bit", &str)) {
+		    if (strcmp (str, "yes") == 0) {
+			totem_config->clear_node_high_bit = 1;
+		    }
+		}
+		
 		objdb_get_int (objdb,object_totem_handle, "threads", &totem_config->threads);
 
 
