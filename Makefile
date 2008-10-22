@@ -112,6 +112,7 @@ AIS_HEADERS	= saAis.h saAmf.h saClm.h saCkpt.h saEvt.h saEvt.h saLck.h \
 		  saMsg.h
 
 install: all
+	mkdir -p $(DESTDIR)$(SBINDIR)
 	mkdir -p $(DESTDIR)$(INCLUDEDIR)
 	mkdir -p $(DESTDIR)$(LIBDIR)
 	mkdir -p $(DESTDIR)$(LCRSODIR)
@@ -140,6 +141,7 @@ install: all
 
 	install -m 755 $(builddir)services/*lcrso $(DESTDIR)$(LCRSODIR)
 	install -m 755 $(builddir)services/openais-instantiate $(DESTDIR)$(SBINDIR)
+	install -m 755 $(builddir)services/aisexec $(DESTDIR)$(SBINDIR)
 
 	if [ ! -f $(DESTDIR)$(ETCDIR)/ais/openais.conf ] ; then 	   \
 		install -m 644 $(srcdir)conf/openais.conf $(DESTDIR)$(ETCDIR)/ais ; \
