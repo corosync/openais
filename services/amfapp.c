@@ -151,7 +151,7 @@ static void application_defer_event (
 	amf_node_t *node) 
 {
 	application_event_t app_event = {event_type, app, node};
-	ENTER("");
+	ENTER();
 	amf_fifo_put (event_type, &app->deferred_events, 
 		sizeof (application_event_t), &app_event);
 }
@@ -189,7 +189,7 @@ static void timer_function_application_recall_deferred_events (void *data)
 {
 	amf_application_t *app = (amf_application_t*)data;
 
-	ENTER ("");
+	ENTER ();
 	application_recall_deferred_events (app);
 }
 
@@ -239,14 +239,14 @@ static void start_all_sg_for_cluster (amf_application_t *app)
 
 static void timer_function_cluster_application_started (void* app)
 {
-	ENTER("");
+	ENTER();
 	amf_application_t *application = (amf_application_t*)app;
 	amf_cluster_application_started (application->cluster, application);
 }
 
 static void timer_function_node_application_started (void* app)
 {
-	ENTER("");
+	ENTER();
 	amf_application_t *application = (amf_application_t*)app;
 	amf_node_application_started (application->node_to_start, application);
 }
@@ -258,7 +258,7 @@ static void application_enter_starting_sgs (struct amf_application *app,
 	int su_to_instantiate = 0;
 	app->node_to_start = node;
 	app->acsm_state = APP_AC_STARTING_SGS;
-	ENTER ("%s",app->name.value);
+	ENTER ();
 	for (sg = app->sg_head; sg != NULL; sg = sg->next) {
 		su_to_instantiate += amf_sg_start (sg, node);
 	}
@@ -279,7 +279,7 @@ static void application_enter_assigning_workload (amf_application_t *app)
 {
 	amf_sg_t *sg = 0;
 	int posible_to_assign_si = 0;
-	ENTER ("%s",app->name.value);
+	ENTER ();
 	app->acsm_state = APP_AC_ASSIGNING_WORKLOAD;
 	for (sg = app->sg_head; sg != NULL; sg = sg->next) {
 		if (amf_sg_assign_si_req (sg, 0)) {
@@ -294,7 +294,7 @@ static void application_enter_assigning_workload (amf_application_t *app)
 
 static void application_enter_workload_assigned (amf_application_t *app)
 {
-	ENTER ("%s", app->name.value);
+	ENTER ();
 	if (all_sg_assigned (app)){
 		app->acsm_state = APP_AC_WORKLOAD_ASSIGNED;
 		if (app->node_to_start == NULL){
@@ -319,7 +319,7 @@ static void application_enter_workload_assigned (amf_application_t *app)
 void amf_application_start (
 	struct amf_application *app, struct amf_node *node)
 {
-	ENTER ("'%s'", app->name.value);
+	ENTER ();
 	assert (app != NULL);
 	switch (app->acsm_state) {
 		case APP_AC_UNINSTANTIATED:
@@ -365,7 +365,7 @@ void amf_application_assign_workload (struct amf_application *app,
 
 	assert (app != NULL);
 	app->node_to_start = node;
-	ENTER("app->acsm_state = %d",app->acsm_state);
+	ENTER();
 
 	switch (app->acsm_state) {
 		case APP_AC_STARTING_SGS:
@@ -398,7 +398,7 @@ void amf_application_assign_workload (struct amf_application *app,
 			/*
 			 * Calling object has violated the contract !
 			 */
-			dprintf ("acsm_state = %d",app->acsm_state);
+			TRACE1 ("acsm_state = %d",app->acsm_state);
 			assert (0);
 			break;
 	}
@@ -411,7 +411,7 @@ void amf_application_assign_workload (struct amf_application *app,
 void amf_application_sg_started (struct amf_application *app, struct amf_sg *sg,
 		struct amf_node *node)
 {
-	ENTER ("'%s %s'", app->name.value, sg->name.value);
+	ENTER ();
 	
 	assert (app != NULL);
 
@@ -437,7 +437,7 @@ void amf_application_sg_started (struct amf_application *app, struct amf_sg *sg,
 void amf_application_sg_assigned (
 	struct amf_application *app, struct amf_sg *sg)
 {
-	ENTER ("'%s'", app->name.value);
+	ENTER ();
 	assert (app != NULL);
 
 	switch (app->acsm_state) {
@@ -543,7 +543,7 @@ struct amf_application *amf_application_find (
 	}
 
 	if (app == NULL) {
-		dprintf ("App %s not found!", name);
+		TRACE1 ("App %s not found!", name);
 	}
 	return app;
 }

@@ -594,7 +594,7 @@ static void nodeids_init (void)
 	int i;
 	amf_node_t *amf_node;
 
-	ENTER ("");
+	ENTER ();
 
 	if (amf_cluster == NULL) {
 		return;
@@ -611,7 +611,7 @@ static void nodeids_init (void)
 			if (strcmp ((char*)amf_node->saAmfNodeClmNode.value,
 				clm_node_list[i].hostname) == 0) {
 
-				dprintf ("%s id set to %u", amf_node->name.value,
+				TRACE1 ("%s id set to %u", amf_node->name.value,
 					clm_node_list[i].nodeid);
 				amf_node->nodeid = clm_node_list[i].nodeid;
 			}
@@ -680,7 +680,7 @@ static int mcast_sync_data (
 	res = api->totem_mcast (iov, 2, TOTEM_AGREED);
 
 	if (res != 0) {
-		dprintf("Unable to send %d bytes of sync data\n", req_exec.header.size);
+		TRACE1("Unable to send %d bytes of sync data\n", req_exec.header.size);
 	}
 
 	return res;
@@ -1111,7 +1111,7 @@ static void cluster_joined_nodes_start (void)
 	int i;
 	struct amf_node *node;
 
-	ENTER ("");
+	ENTER ();
 	log_printf(LOG_NOTICE, "AMF synchronisation ready, starting cluster");
 
 	for (i = 0; i < clm_node_list_entries; i++) {
@@ -1150,7 +1150,7 @@ static void amf_sync_init (void)
 			}
 			break;
 		default:
-			dprintf ("unknown state: %u", scsm.state);;
+			TRACE1 ("unknown state: %u", scsm.state);;
 			assert (0);
 			break;
 	}
@@ -1287,7 +1287,7 @@ static void amf_sync_activate (void)
 		case NORMAL_OPERATION:
 			break;
 		default:
-			dprintf ("unknown state: %u", scsm.state);;
+			TRACE1 ("unknown state: %u", scsm.state);;
 			assert (0);
 			break;
 	}
@@ -1338,9 +1338,7 @@ static void amf_confchg_fn (
 	unsigned int *joined_list, int joined_list_entries,
 	struct memb_ring_id *ring_id)
 {
-	ENTER ("mnum: %d, jnum: %d, lnum: %d, sync state: %s, ring ID %llu rep %s\n",
-		member_list_entries, joined_list_entries, left_list_entries,
-		scsm_state_names[scsm.state], ring_id->seq, api->totem_ip_print (&ring_id->rep));
+	ENTER ();
 
 	switch (scsm.state) {
 		case UNCONFIGURED:
@@ -1442,7 +1440,7 @@ static int amf_lib_exit_fn (void *conn)
 	/* Make sure this is not a new connection */
 	if (comp != NULL && comp->conn == conn ) {
 		comp->conn = NULL;
-		dprintf ("Lib exit from comp %s\n", getSaNameT (&comp->name));
+		TRACE1 ("Lib exit from comp %s\n", getSaNameT (&comp->name));
 	}
 
 	return (0);
@@ -1571,7 +1569,7 @@ static void message_handler_req_exec_amf_clc_cleanup_completed (
 	}
 
 	comp = amf_comp_find (amf_cluster, &req_exec->compName);
-	ENTER ("%s",comp->name.value);
+	ENTER ();
 
 	if (comp == NULL) {
 		log_printf (LOG_ERR, "Error: '%s' not found", req_exec->compName.value);
@@ -1603,7 +1601,7 @@ static void message_handler_req_exec_amf_healthcheck_tmo (
 		return;
 	}
 
-	ENTER ("%s", comp->name.value);
+	ENTER ();
 
 	healthcheck = amf_comp_find_healthcheck (comp, &req_exec->safHealthcheckKey);
 
@@ -1678,7 +1676,7 @@ static void message_handler_req_exec_amf_sync_start (
 		case UNCONFIGURED:
 			break;
 		default:
-			dprintf ("unknown state %d", scsm.state);
+			TRACE1 ("unknown state %d", scsm.state);
 			assert (0);
 			break;
 	}
@@ -1788,7 +1786,7 @@ static void message_handler_req_exec_amf_sync_data (
 					 scsm.csi_attribute->name);
 			break;
 		default:
-			dprintf ("unknown object: %u", req_exec->object_type);
+			TRACE1 ("unknown object: %u", req_exec->object_type);
 			assert (0);
 			break;
 	}

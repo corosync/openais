@@ -1303,7 +1303,7 @@ int sa_amf_grep_one_sub_match(const char *string, char *pattern,
 
 	int i;
 
-	ENTER("'%s %s'",string, pattern);
+	ENTER();
 
 	if (regcomp(&re, pattern, REG_EXTENDED) != 0) {
 		status = 0;
@@ -1345,7 +1345,7 @@ int sa_amf_grep(const char *string, char *pattern, size_t nmatch,
 
 	int i;
 
-	ENTER("'%s %s'",string, pattern);
+	ENTER();
 	if (regcomp(&re, pattern, REG_EXTENDED) != 0) {
 		status = 0;
 		goto out;
@@ -1390,7 +1390,7 @@ int amf_msg_mcast (int msg_id, void *buf, size_t len)
 	int iov_cnt;
 	int res;
 
-//	ENTER ("%u, %p, %u", msg_id, buf, len);
+	ENTER ();
 
 	msg.header.size = sizeof (msg);
 	msg.header.id = SERVICE_ID_MAKE (AMF_SERVICE, msg_id);
@@ -1410,7 +1410,7 @@ int amf_msg_mcast (int msg_id, void *buf, size_t len)
 	res = api->totem_mcast (iov, iov_cnt, TOTEM_AGREED);
 
 	if (res != 0) {
-		dprintf("Unable to send %d bytes\n", msg.header.size);
+		TRACE1("Unable to send %d bytes\n", msg.header.size);
 		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 

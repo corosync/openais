@@ -195,7 +195,7 @@ static void timer_function_cluster_recall_deferred_events (void *data)
 {
 	amf_cluster_t *cluster = (amf_cluster_t*)data;
 
-	ENTER ("");
+	ENTER ();
 	cluster_recall_deferred_events (cluster);
 }
 
@@ -260,7 +260,7 @@ static int cluster_applications_are_starting_sgs(struct amf_cluster *cluster)
 static void amf_cluster_assign_workload (struct amf_cluster *cluster)
 {
 	struct amf_application *app;
-	ENTER ("");
+	ENTER ();
 
 	for (app = cluster->application_head; app != NULL; app = app->next) {
 		amf_application_assign_workload (app, NULL);
@@ -279,7 +279,7 @@ static void timer_function_cluster_assign_workload_tmo (void *cluster)
 {
 	((struct amf_cluster*)cluster)->timeout_handle = 0;
 
-	ENTER ("");
+	ENTER ();
 
 	amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_CLUSTER_START_TMO, &this_amf_node->name, 
 		sizeof(SaNameT));
@@ -288,7 +288,7 @@ static void timer_function_cluster_assign_workload_tmo (void *cluster)
 static inline void stop_cluster_startup_timer (struct amf_cluster *cluster)
 {
 	if (cluster->timeout_handle) {
-		dprintf ("Stop cluster startup timer");
+		TRACE1 ("Stop cluster startup timer");
 		api->timer_delete (cluster->timeout_handle);
 		cluster->timeout_handle = 0;
 	}
@@ -308,7 +308,7 @@ static void start_cluster_startup_timer (struct amf_cluster *cluster)
 static inline void cluster_enter_starting_applications (
 	struct amf_cluster *cluster)
 {
-	ENTER ("");
+	ENTER ();
 	start_cluster_startup_timer (cluster);
 	amf_cluster->acsm_state = CLUSTER_AC_STARTING_APPLICATIONS;
 	amf_cluster_start_applications (cluster);
@@ -316,7 +316,7 @@ static inline void cluster_enter_starting_applications (
 
 static void acsm_cluster_enter_started (amf_cluster_t *cluster)
 {
-	ENTER ("");
+	ENTER ();
 	amf_cluster->acsm_state = CLUSTER_AC_STARTED;
 	amf_call_function_asynchronous (
 		timer_function_cluster_recall_deferred_events, cluster);
@@ -329,19 +329,19 @@ static void acsm_cluster_enter_started (amf_cluster_t *cluster)
 void amf_cluster_start_tmo_event (int is_sync_masterm, 
 	struct amf_cluster *cluster, SaNameT *sourceNodeName)
 {
-	ENTER ("acsm_state = %d", amf_cluster->acsm_state);
+	ENTER ();
 
 	stop_cluster_startup_timer (cluster);
 
 	switch (cluster->acsm_state) {
 		case CLUSTER_AC_WAITING_OVER_TIME_1:
 			if (cluster_applications_are_starting_sgs (cluster)) {
-				dprintf ("Cluster startup timeout," 
+				TRACE1 ("Cluster startup timeout," 
 					"start waiting over time");
 				amf_cluster->acsm_state = 
 					CLUSTER_AC_WAITING_OVER_TIME_2; 
 			} else {
-				dprintf ("Cluster startup timeout,"
+				TRACE1 ("Cluster startup timeout,"
 					" assigning workload");
 				acsm_cluster_enter_assigning_workload (cluster);
 			}
@@ -392,7 +392,7 @@ void amf_cluster_start_applications(struct amf_cluster *cluster)
  */
 void amf_cluster_sync_ready (struct amf_cluster *cluster, struct amf_node *node)
 {
-	ENTER ("");
+	ENTER ();
 	switch (amf_cluster->acsm_state) {
 		case CLUSTER_AC_UNINSTANTIATED:
 			if (amf_cluster->saAmfClusterAdminState == 
@@ -448,8 +448,7 @@ void amf_cluster_sync_ready (struct amf_cluster *cluster, struct amf_node *node)
 void amf_cluster_application_started (
 	struct amf_cluster *cluster, struct amf_application *application)
 {
-	ENTER ("application '%s' started %d", application->name.value, 
-		cluster->acsm_state);
+	ENTER ();
 	switch (cluster->acsm_state) {
 		case CLUSTER_AC_STARTING_APPLICATIONS:
 			if (cluster_applications_started_instantiated (cluster)) {
@@ -479,7 +478,7 @@ void amf_cluster_application_started (
 void amf_cluster_application_workload_assigned (
 	struct amf_cluster *cluster, struct amf_application *app)
 {
-	ENTER ("");
+	ENTER ();
 	switch (cluster->acsm_state) {
 		case CLUSTER_AC_ASSIGNING_WORKLOAD:
 			log_printf (LOG_NOTICE, "Cluster: application %s assigned.",

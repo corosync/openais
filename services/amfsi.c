@@ -297,7 +297,7 @@ char *amf_csi_dn_make (struct amf_csi *csi, SaNameT *name)
 void amf_si_comp_set_ha_state_done (
 	struct amf_si *si, struct amf_csi_assignment *csi_assignment)
 {
-	ENTER ("'%s', '%s'", si->name.value, csi_assignment->csi->name.value);
+	ENTER ();
 
 	set_si_ha_state (csi_assignment);
 
@@ -322,7 +322,7 @@ void amf_si_activate (
 {
 	struct amf_csi *csi;
 
-	ENTER ("'%s'", si->name.value);
+	ENTER ();
 
 	for (csi = si->csi_head; csi != NULL; csi = csi->next) {
 		struct amf_csi_assignment *csi_assignment;
@@ -346,7 +346,7 @@ void amf_si_activate (
 void amf_si_comp_set_ha_state_failed (
 	struct amf_si *si, struct amf_csi_assignment *csi_assignment)
 {
-	ENTER ("");
+	ENTER ();
 	assert (0);
 }
 
@@ -354,7 +354,7 @@ static void timer_function_ha_state_assumed (void *_si_assignment)
 {
 	struct amf_si_assignment *si_assignment = _si_assignment;
 
-	ENTER ("");
+	ENTER ();
 	si_assignment->saAmfSISUHAState = si_assignment->requested_ha_state;
 	si_assignment->assumed_callback_fn (si_assignment, 0);
 }
@@ -369,9 +369,7 @@ void amf_si_ha_state_assume (
 	int csi_assignment_cnt = 0;
 	int hastate_set_done_cnt = 0;
 
-	ENTER ("SI '%s' SU '%s' state %s", si_assignment->si->name.value,
-		si_assignment->su->name.value,
-		amf_ha_state (si_assignment->requested_ha_state));
+	ENTER ();
 
 	si_assignment->assumed_callback_fn = assumed_ha_state_callback_fn;
 	for (csi = si_assignment->si->csi_head; csi != NULL; csi = csi->next) {
@@ -509,7 +507,7 @@ SaAmfAssignmentStateT amf_si_get_saAmfSIAssignmentState (struct amf_si *si)
 void amf_csi_delete_assignments (struct amf_csi *csi, struct amf_su *su)
 {
 	struct amf_csi_assignment *csi_assignment;
-	ENTER ("'%s'", su->name.value);
+	ENTER ();
 	struct amf_csi_assignment **prev = &csi->assigned_csis;
 
 	for (csi_assignment = csi->assigned_csis; csi_assignment != NULL;
@@ -517,7 +515,7 @@ void amf_csi_delete_assignments (struct amf_csi *csi, struct amf_su *su)
 		if (csi_assignment->comp->su == su) {
 			struct amf_csi_assignment *tmp = csi_assignment;
 			*prev = csi_assignment->next;
-			dprintf ("CSI assignment %s unlinked", tmp->name.value);
+			TRACE1 ("CSI assignment %s unlinked", tmp->name.value);
 			free (tmp);
 		} else {
 			prev = &csi_assignment->next;
@@ -689,7 +687,7 @@ struct amf_si *amf_si_find (struct amf_application *app, char *name)
 	}
 
 	if (si == NULL) {
-		dprintf ("SI %s not found!", name);
+		TRACE1 ("SI %s not found!", name);
 	}
 
 	return si;
@@ -761,7 +759,7 @@ struct amf_csi *amf_csi_find (struct amf_si *si, char *name)
 	}
 
 	if (csi == NULL) {
-		dprintf ("CSI %s not found!", name);
+		TRACE1 ("CSI %s not found!", name);
 	}
 	return csi;
 }
@@ -1000,9 +998,7 @@ void amf_si_assignment_remove (amf_si_assignment_t *si_assignment,
 	struct amf_csi *csi;
 	int csi_assignment_cnt = 0;
 
-	ENTER ("SI '%s' SU '%s' state %s", si_assignment->si->name.value,
-		si_assignment->su->name.value,
-		amf_ha_state (si_assignment->requested_ha_state));
+	ENTER ();
 
 	si_assignment->requested_ha_state = USR_AMF_HA_STATE_REMOVED;
 	si_assignment->removed_callback_fn = async_func;
@@ -1042,7 +1038,7 @@ void amf_si_comp_csi_removed (
 	struct amf_si *si, struct amf_csi_assignment *csi_assignment,
 	SaAisErrorT error)
 {
-	ENTER ("'%s', '%s'", si->name.value, csi_assignment->csi->name.value);
+	ENTER ();
 
 	assert (csi_assignment->si_assignment->removed_callback_fn != NULL);
 

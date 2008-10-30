@@ -421,7 +421,7 @@ static void su_defer_event (amf_su_t *su, amf_comp_t *comp,
 	su_event_t event;
 	su_event_set(su, comp, recommended_recovery,&event, su_event_type);
 
-	ENTER("event_type = %d", event.event_type);
+	ENTER();
 	amf_fifo_put (event.event_type, &event.su->deferred_events,
 		sizeof (su_event_t), &event);
 }
@@ -430,7 +430,7 @@ static void su_recall_deferred_events (amf_su_t *su)
 {
 	su_event_t su_event;
 
-	ENTER ("%s", su->name.value);
+	ENTER ();
 	if (amf_fifo_get (&su->deferred_events, &su_event)) {
 		switch (su_event.event_type) {
 			case SU_COMP_ERROR_SUSPECTED_EV:
@@ -438,7 +438,7 @@ static void su_recall_deferred_events (amf_su_t *su)
 					su_event.recommended_recovery);
 				break;
 			default:
-				dprintf("event_type = %d", su_event.event_type);
+				TRACE1("event_type = %d", su_event.event_type);
 				break;
 		}
 	}
@@ -472,7 +472,7 @@ static void su_readiness_state_set (struct amf_su *su,
 static void clear_ha_state (
 	struct amf_su *su, struct amf_si_assignment *si_assignment)
 {
-	ENTER ("");
+	ENTER ();
 	si_assignment->saAmfSISUHAState = 0;
 }
 
@@ -564,7 +564,7 @@ static void comp_assign_csi (struct amf_comp *comp, struct amf_csi *csi,
 {
 	struct amf_csi_assignment *csi_assignment;
 
-	dprintf ("  Creating CSI '%s' to comp '%s' with hastate %s\n",
+	TRACE1 ("  Creating CSI '%s' to comp '%s' with hastate %s\n",
 		getSaNameT (&csi->name), getSaNameT (&comp->name),
 		amf_ha_state (ha_state));
 
@@ -584,7 +584,7 @@ static void comp_restart (struct amf_comp *comp)
 {
 	SaNameT dn;
 
-	ENTER ("'%s'", comp->name.value);
+	ENTER ();
 	amf_comp_dn_make (comp, &dn);
 	log_printf (LOG_NOTICE, "Error detected for '%s', recovery "
 		"action: Component restart", dn.value);
@@ -609,7 +609,7 @@ static void reassume_ha_state(struct amf_su *su)
 {
 	struct amf_si_assignment *si_assignment;
 
-	ENTER ("");
+	ENTER ();
 
 	si_assignment = amf_su_get_next_si_assignment(su, NULL);
 
@@ -729,8 +729,7 @@ void su_history_state_set(struct amf_su *su, SaAmfPresenceStateT state)
 static void su_comp_presence_state_changed (struct amf_su *su, 
 	struct amf_comp *comp, int state)
 {
-	ENTER ("'%s', '%s' %d %d", su->name.value, comp->name.value, state,
-		su->restart_control_state);
+	ENTER ();
 	amf_node_t *node = amf_node_find (&comp->su->saAmfSUHostedByNode);
 	switch (state) {
 		case SA_AMF_PRESENCE_INSTANTIATED:
@@ -782,7 +781,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 					}
 					break;
 				default:
-					dprintf ("state %d", su->restart_control_state);
+					TRACE1 ("state %d", su->restart_control_state);
 					assert (0);
 					break;
 			}
@@ -863,7 +862,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 					}
 					break;
 				default:
-					dprintf ("state %d", su->restart_control_state);
+					TRACE1 ("state %d", su->restart_control_state);
 					assert (0);
 					break;
 			}
@@ -905,7 +904,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 					}
 					break;
 				default:
-					dprintf ("state %d", su->restart_control_state);
+					TRACE1 ("state %d", su->restart_control_state);
 					assert (0);
 					break;
 			}
@@ -945,7 +944,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 				default:
 					log_printf (LOG_LEVEL_NOTICE,"%s %d",su->name.value, 
 						su->restart_control_state);
-					dprintf ("state %d", su->restart_control_state);
+					TRACE1 ("state %d", su->restart_control_state);
 					assert (0);
 					break;
 			}
@@ -965,7 +964,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 static void su_comp_op_state_changed (
 	struct amf_su *su, struct amf_comp *comp, int state)
 {
-	ENTER ("'%s', '%s' %d", su->name.value, comp->name.value, state);
+	ENTER ();
 
 	switch (state) {
 		case SA_AMF_OPERATIONAL_ENABLED:
@@ -1064,7 +1063,7 @@ static int are_all_comps_in_level_uninst_or_term_failed(
 static void su_rc_enter_idle_escalation_level_1 (amf_comp_t *component,
 	SaAmfRecommendedRecoveryT recommended_recovery)
 {
-	ENTER("");
+	ENTER();
 	component->su->restart_control_state = SU_RC_IDLE_ESCALATION_LEVEL_1;
 	if (has_component_restarted_max_times (component, component->su)) {
 		component->su->restart_control_state = SU_RC_IDLE_ESCALATION_LEVEL_2;
@@ -1076,7 +1075,7 @@ static void su_rc_enter_idle_escalation_level_1 (amf_comp_t *component,
 static void su_rc_enter_idle_escalation_level_2 (amf_comp_t *component,
 	SaAmfRecommendedRecoveryT recommended_recovery)
 {
-	ENTER("");
+	ENTER();
 	component->su->restart_control_state = SU_RC_IDLE_ESCALATION_LEVEL_2;
 	amf_node_t *node = amf_node_find (&component->su->saAmfSUHostedByNode);
 	amf_node_comp_restart_req (node, component); 
@@ -1157,7 +1156,7 @@ int amf_su_instantiate (struct amf_su *su)
 {
 	int is_instantiating = 1;
 
-	ENTER ("'%s %d'", su->name.value, su->saAmfSUPresenceState);
+	ENTER ();
 	switch (su->saAmfSUPresenceState) {
 		case SA_AMF_PRESENCE_UNINSTANTIATED:
 			instantiate_all_components_in_level(su, 
@@ -1186,7 +1185,7 @@ int amf_su_instantiate (struct amf_su *su)
  */
 void amf_su_terminate (struct amf_su *su)
 {
-	ENTER ("'%s'", su->name.value);
+	ENTER ();
 	su->current_comp_instantiation_level = get_instantiation_max_level (su);
 
 	terminate_all_components_in_level (su, su->current_comp_instantiation_level);
@@ -1203,8 +1202,7 @@ void amf_su_comp_error_suspected (
 	struct amf_comp *comp,
 	SaAmfRecommendedRecoveryT recommended_recovery)
 {
-	ENTER ("Comp '%s', SU '%s' %d", comp->name.value, su->name.value,
-		su->restart_control_state);
+	ENTER ();
 
 	switch (su->restart_control_state) {
 		case SU_RC_IDLE_ESCALATION_LEVEL_0:
@@ -1255,7 +1253,7 @@ void amf_su_comp_error_suspected (
 				SU_COMP_ERROR_SUSPECTED_EV); 
 			break;
 		default:
-			dprintf ("restart_control_state = %d",su->restart_control_state);
+			TRACE1 ("restart_control_state = %d",su->restart_control_state);
 			break;
 	}
 }
@@ -1268,7 +1266,7 @@ void amf_su_restart (struct amf_su *su)
 {
 	SaNameT dn;
 
-	ENTER ("'%s'", su->name.value);
+	ENTER ();
 
 	amf_su_dn_make (su, &dn);
 	log_printf (LOG_NOTICE, "Error detected for '%s', recovery "
@@ -1316,7 +1314,7 @@ static void si_ha_state_assumed_cbfn (
 	struct amf_comp *comp;
 	struct amf_csi_assignment *csi_assignment;
 	int all_confirmed = 1;
-	ENTER ("");
+	ENTER ();
 	tmp_si_assignment = amf_su_get_next_si_assignment(si_assignment->su, NULL);
 
 	while (tmp_si_assignment != NULL) {
@@ -1572,7 +1570,7 @@ amf_si_assignment_t *amf_su_assign_si (struct amf_su *su, struct amf_si *si,
 {
 	struct amf_si_assignment *si_assignment;
 
-	dprintf ("Creating SI '%s' to SU '%s' with hastate %s\n",
+	TRACE1 ("Creating SI '%s' to SU '%s' with hastate %s\n",
 		getSaNameT (&si->name), getSaNameT (&su->name),
 		amf_ha_state (ha_state));
 
