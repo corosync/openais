@@ -94,6 +94,8 @@ struct checkpoint_section {
 };
 
 enum sync_state {
+	SYNC_STATE_NOT_STARTED,
+	SYNC_STATE_STARTED,
 	SYNC_STATE_GLOBALID,
 	SYNC_STATE_CHECKPOINT,
 	SYNC_STATE_REFCOUNT
@@ -375,7 +377,7 @@ DECLARE_LIST_INIT(my_checkpoint_expiry_list_head);
 
 static mar_uint32_t global_ckpt_id = 0;
 
-static enum sync_state my_sync_state;
+static enum sync_state my_sync_state = SYNC_STATE_NOT_STARTED;
 
 static enum iteration_state my_iteration_state;
 
@@ -766,6 +768,8 @@ struct req_exec_ckpt_sync_checkpoint_refcount {
 	mar_refcount_set_t refcount_set[PROCESSOR_COUNT_MAX] __attribute__((aligned(8)));
 };
 
+static int first_configuration = 1;
+
 /*
  * Implementation
  */
@@ -778,7 +782,17 @@ static void ckpt_confchg_fn (
 {
 	unsigned int i, j;
 	unsigned int lowest_nodeid;
-	static int first_configuration = 1;
+
+	memcpy (&my_saved_ring_id, ring_id,
+		sizeof (struct memb_ring_id));
+       if (configuration_type != TOTEM_CONFIGURATION_REGULAR) {
+                return;
+        }
+        if (my_sync_state != SYNC_STATE_NOT_STARTED) {
+                return;
+        }
+
+	my_sync_state = SYNC_STATE_STARTED;
 
 	my_should_sync = 0;
 
@@ -787,29 +801,25 @@ static void ckpt_confchg_fn (
 	 */
 	lowest_nodeid = 0xffffffff;
 
-	if (configuration_type == TOTEM_CONFIGURATION_REGULAR) {
-		for (i = 0; i < my_old_member_list_entries; i++) {
-			for (j = 0; j < member_list_entries; j++) {
-				if (my_old_member_list[i] == member_list[j]) {
-					if (lowest_nodeid > member_list[j]) {
-						lowest_nodeid = member_list[j];
-					}
+	for (i = 0; i < my_old_member_list_entries; i++) {
+		for (j = 0; j < member_list_entries; j++) {
+			if (my_old_member_list[i] == member_list[j]) {
+				if (lowest_nodeid > member_list[j]) {
+					lowest_nodeid = member_list[j];
 				}
 			}
 		}
-		memcpy (&my_saved_ring_id, ring_id,
-			sizeof (struct memb_ring_id));
-		memcpy (my_old_member_list, member_list,
-			sizeof (unsigned int) * member_list_entries);
-		my_old_member_list_entries = member_list_entries;
-
-		if ((first_configuration) ||
-			(lowest_nodeid == totempg_my_nodeid_get())) {
-
-			my_should_sync = 1;
-		}
-		first_configuration = 0;
 	}
+	memcpy (my_old_member_list, member_list,
+		sizeof (unsigned int) * member_list_entries);
+	my_old_member_list_entries = member_list_entries;
+
+	if ((first_configuration) ||
+		(lowest_nodeid == totempg_my_nodeid_get())) {
+
+		my_should_sync = 1;
+	}
+	first_configuration = 0;
 }
 
 static struct checkpoint *checkpoint_find (
@@ -3691,6 +3701,9 @@ static int ckpt_sync_process (void)
 			}
 		}
 		break;
+
+	default:
+		assert (0);
 	}
 
 	LEAVE();
@@ -3711,7 +3724,7 @@ static void ckpt_sync_activate (void)
 
 	list_init (&sync_checkpoint_list_head);
 
-	my_sync_state = SYNC_STATE_CHECKPOINT;
+	my_sync_state = SYNC_STATE_NOT_STARTED;
 
 	LEAVE();
 }
