@@ -936,6 +936,8 @@ static void conn_io_deliver (struct conn_io *conn_io)
 			}
 			if (conn_io->state == CONN_IO_STATE_INITIALIZING) {
 				log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", egid, g_gid_valid);
+				conn_io->state = CONN_IO_STATE_INIT_FAILED;
+				return;
 			}
 		}
 #endif
@@ -1012,6 +1014,8 @@ retry_recv:
 		}
 		if (conn_io->state == CONN_IO_STATE_INITIALIZING) {
 			log_printf (LOG_LEVEL_SECURITY, "Connection not authenticated because gid is %d, expecting %d\n", cred->gid, g_gid_valid);
+			conn_io->state = CONN_IO_STATE_INIT_FAILED;
+			return;
 		}
 	}
 #endif
