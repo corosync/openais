@@ -39,6 +39,7 @@
 #include <corosync/swab.h>
 #include "saAis.h"
 #include "saClm.h"
+#include "mar_sa.h"
 #include <corosync/mar_gen.h>
 
 #define MAR_CLM_MAX_ADDRESS_LENGTH 64
@@ -110,7 +111,7 @@ static inline void marshall_to_mar_clm_cluster_node_t (
 	dest->node_id = src->nodeId;
 	marshall_to_mar_clm_node_address_t (&dest->node_address,
 		&src->nodeAddress);
-	marshall_to_mar_name_t (&dest->node_name, &src->nodeName);
+	marshall_SaNameT_to_mar_name_t (&dest->node_name, &src->nodeName);
 	dest->member = src->member;
 	dest->boot_timestamp = src->bootTimestamp;
 	dest->initial_view_number = src->initialViewNumber;
@@ -123,7 +124,7 @@ static inline void marshall_from_mar_clm_cluster_node_t (
 	dest->nodeId = src->node_id;
 	marshall_from_mar_clm_node_address_t (&dest->nodeAddress,
 		&src->node_address);
-	marshall_from_mar_name_t (&dest->nodeName, &src->node_name);
+	marshall_mar_name_t_to_SaNameT (&dest->nodeName, &src->node_name);
 	dest->member = src->member;
 	dest->bootTimestamp = src->boot_timestamp;
 	dest->initialViewNumber = src->initial_view_number;

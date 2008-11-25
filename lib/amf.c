@@ -49,7 +49,7 @@
 #include <saAmf.h>
 #include <corosync/ipc_gen.h>
 #include <ipc_amf.h>
-#include <corosync/ais_util.h>
+#include "util.h"
 
 
 struct res_overlay {

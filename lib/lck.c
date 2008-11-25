@@ -49,7 +49,8 @@
 #include <corosync/list.h>
 #include <saLck.h>
 #include <corosync/ipc_gen.h>
-#include "../include/ipc_lck.h"
+#include "ipc_lck.h"
+#include "mar_sa.h"
 
 #include "util.h"
 
@@ -671,7 +672,7 @@ saLckResourceOpen (
 	req_lib_lck_resourceopen.header.size = sizeof (struct req_lib_lck_resourceopen);
 	req_lib_lck_resourceopen.header.id = MESSAGE_REQ_LCK_RESOURCEOPEN;
 
-	marshall_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName, (SaNameT *)lockResourceName);
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName, (SaNameT *)lockResourceName);
 
 	memcpy (&lckResourceInstance->lockResourceName, lockResourceName, sizeof(SaNameT));
 	req_lib_lck_resourceopen.resourceOpenFlags = resourceOpenFlags;
@@ -759,7 +760,7 @@ saLckResourceOpenAsync (
 	lckResourceInstance->lckResourceHandle = lckResourceHandle;
 	lckResourceInstance->resourceOpenFlags = resourceOpenFlags;
 
-	marshall_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName, 
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName, 
 			(SaNameT *)lockResourceName);
 	memcpy (&lckResourceInstance->lockResourceName, lockResourceName, sizeof (SaNameT));
 	req_lib_lck_resourceopen.header.size = sizeof (struct req_lib_lck_resourceopen);
@@ -812,7 +813,7 @@ saLckResourceClose (
 
 	req_lib_lck_resourceclose.header.size = sizeof (struct req_lib_lck_resourceclose);
 	req_lib_lck_resourceclose.header.id = MESSAGE_REQ_LCK_RESOURCECLOSE;
-	marshall_to_mar_name_t (&req_lib_lck_resourceclose.lockResourceName,
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceclose.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 	req_lib_lck_resourceclose.resourceHandle = lckResourceHandle;
 
@@ -880,7 +881,7 @@ saLckResourceLock (
 
 	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
 	req_lib_lck_resourcelock.header.id = MESSAGE_REQ_LCK_RESOURCELOCK;
-	marshall_to_mar_name_t (&req_lib_lck_resourcelock.lockResourceName,
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourcelock.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 	req_lib_lck_resourcelock.lockMode = lockMode;
 	req_lib_lck_resourcelock.lockFlags = lockFlags;
@@ -973,7 +974,7 @@ saLckResourceLockAsync (
 
 	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
 	req_lib_lck_resourcelock.header.id = MESSAGE_REQ_LCK_RESOURCELOCKASYNC;
-	marshall_to_mar_name_t (&req_lib_lck_resourcelock.lockResourceName,
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourcelock.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 	req_lib_lck_resourcelock.lockMode = lockMode;
 	req_lib_lck_resourcelock.lockFlags = lockFlags;
@@ -1043,7 +1044,7 @@ saLckResourceUnlock (
 		return (error);
 	}
 
-	marshall_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 
 	saHandleInstancePut (&lckResourceHandleDatabase,
@@ -1101,7 +1102,7 @@ saLckResourceUnlockAsync (
 		return (error);
 	}
 
-	marshall_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 
 	saHandleInstancePut (&lckResourceHandleDatabase,
@@ -1149,7 +1150,7 @@ saLckLockPurge (
 
 	req_lib_lck_lockpurge.header.size = sizeof (struct req_lib_lck_lockpurge);
 	req_lib_lck_lockpurge.header.id = MESSAGE_REQ_LCK_LOCKPURGE;
-	marshall_to_mar_name_t (&req_lib_lck_lockpurge.lockResourceName,
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_lockpurge.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 
 	pthread_mutex_lock (lckResourceInstance->response_mutex);

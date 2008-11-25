@@ -39,9 +39,11 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/socket.h>
-#include <corosync/ais_util.h>
 #include <corosync/list.h>
-#include "../include/ipc_evt.h"
+#include "ipc_evt.h"
+#include "mar_sa.h"
+#include "../include/saAis.h"
+#include "util.h"
 
 #define MESSAGE_SIZE_MAX 1024*1024
 
@@ -507,7 +509,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 	edi->edi_pub_time = evt->led_publish_time;
 	edi->edi_event_data_size = evt->led_user_data_size;
 	edi->edi_event_id = evt->led_event_id;
-	marshall_from_mar_name_t (&edi->edi_pub_name, &evt->led_publisher_name);
+	marshall_mar_name_t_to_SaNameT (&edi->edi_pub_name, &evt->led_publisher_name);
 
 	if (edi->edi_event_data_size) {
 		edi->edi_event_data = malloc(edi->edi_event_data_size);
@@ -997,7 +999,7 @@ saEvtChannelOpen(
 	req.ico_c_handle = *channelHandle;
 	req.ico_timeout = timeout;
 	req.ico_open_flag = channelOpenFlags;
-	marshall_to_mar_name_t (&req.ico_channel_name, (SaNameT *)channelName);
+	marshall_SaNameT_to_mar_name_t (&req.ico_channel_name, (SaNameT *)channelName);
 
 	iov.iov_base = (char *)&req;
 	iov.iov_len = sizeof(req);
@@ -1223,7 +1225,7 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 	req.ico_timeout = 0;
 	req.ico_invocation = invocation;
 	req.ico_open_flag = channelOpenFlags;
-	marshall_to_mar_name_t (&req.ico_channel_name, (SaNameT *)channelName);
+	marshall_SaNameT_to_mar_name_t (&req.ico_channel_name, (SaNameT *)channelName);
 	iov.iov_base = (char *)&req;
 	iov.iov_len = sizeof(req);
 
@@ -1324,7 +1326,7 @@ saEvtChannelUnlink(
 	 */
 	req.iuc_head.size = sizeof(req);
 	req.iuc_head.id = MESSAGE_REQ_EVT_UNLINK_CHANNEL;
-	marshall_to_mar_name_t (&req.iuc_channel_name, (SaNameT *)channelName);
+	marshall_SaNameT_to_mar_name_t (&req.iuc_channel_name, (SaNameT *)channelName);
 	iov.iov_base = (char *)&req;
 	iov.iov_len = sizeof(req);
 
@@ -1999,7 +2001,7 @@ saEvtEventPublish(
 	req->led_retention_time = edi->edi_retention_time;
 	req->led_publish_time = clustTimeNow();
 	req->led_priority = edi->edi_priority;
-	marshall_to_mar_name_t (&req->led_publisher_name, &edi->edi_pub_name);
+	marshall_SaNameT_to_mar_name_t (&req->led_publisher_name, &edi->edi_pub_name);
 
 	iov.iov_base = (char *)req;
 	iov.iov_len = req->led_head.size;
