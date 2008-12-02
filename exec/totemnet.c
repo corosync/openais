@@ -702,7 +702,12 @@ static int netif_determine (
 	 * field is only 32 bits.
 	 */
 	if (bound_to->family == AF_INET && bound_to->nodeid == 0) {
-		memcpy (&bound_to->nodeid, bound_to->addr, sizeof (int));
+		int32_t nodeid = 0;
+		memcpy (&nodeid, bound_to->addr, sizeof (int));
+		if(nodeid < 0 && instance->totem_config->clear_node_high_bit) {
+			nodeid = 0 - nodeid;
+		}
+		bound_to->nodeid = nodeid;
 	}
 
 	return (res);
@@ -1226,15 +1231,6 @@ int totemnet_initialize (
 	}
 
 	instance->totemnet_poll_handle = poll_handle;
-
-	if(instance->totem_config->node_id == 0) {	
-		int32_t nodeid = 0;
-		memcpy (&nodeid, instance->totem_interface->bindnet.addr, sizeof (int32_t));
-		if(nodeid < 0 && instance->totem_config->clear_node_high_bit) {
-			nodeid = 0 - nodeid;
-		}
-		instance->totem_config->node_id = nodeid;
-	}
 
 	instance->totem_interface->bindnet.nodeid = instance->totem_config->node_id;
 
