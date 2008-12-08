@@ -63,6 +63,8 @@ all: openaisparser.lcrso openaisserviceenable.lcrso service_amf.lcrso \
 
 ifeq (${OPENAIS_COMPAT}, DARWIN)
 
+COROSYNC_BIN=$(PREFIX)/sbin/corosync
+
 service_evs.lcrso: evs.o
 	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load evs.o -o $@
 

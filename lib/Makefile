@@ -52,6 +52,9 @@ ifeq (${OPENAIS_COMPAT}, DARWIN)
 
 DARWIN_OPTS=-dynamiclib -bind_at_load -current_version 2.0.0 -compatibility_version 2.0.0
 
+libSaAmf.so.2.0.0: util.o amf.o
+	$(CC) $(DARWIN_OPTS) util.o amf.o -o $@
+
 libSaClm.so.2.0.0: util.o clm.o
 	$(CC) $(DARWIN_OPTS) util.o clm.o -o $@
 
@@ -59,7 +62,7 @@ libSaCkpt.so.2.0.0: util.o ckpt.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o ckpt.o -o $@
 
 libSaEvt.so.2.0.0: util.o evt.o 
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o -o $@
 
 libSaMsg.so.2.0.0: util.o msg.o
 	$(CC) $(DARWIN_OPTS) util.o msg.o -o $@
