@@ -801,7 +801,7 @@ saCkptCheckpointOpenAsync (
 
 	saHandleInstancePut (&ckptHandleDatabase, ckptHandle);
 
-	return (error == SA_AIS_OK ? res_lib_ckpt_checkpointopenasync.header.error : error);
+	return (SA_AIS_OK);
 
 error_put_destroy:
 	saHandleInstancePut (&checkpointHandleDatabase, checkpointHandle);
@@ -1332,7 +1332,7 @@ saCkptSectionIterationInitialize (
 	saHandleInstancePut (&ckptSectionIterationHandleDatabase, *sectionIterationHandle);
 	saHandleInstancePut (&checkpointHandleDatabase, checkpointHandle);
 
-	return (error == SA_AIS_OK ? res_lib_ckpt_sectioniterationinitialize.header.error : error);
+	return (res_lib_ckpt_sectioniterationinitialize.header.error);
 
 error_put_destroy:
 	saHandleInstancePut (&ckptSectionIterationHandleDatabase, *sectionIterationHandle);
@@ -1462,14 +1462,14 @@ saCkptSectionIterationFinalize (
 
 	saHandleInstancePut (&ckptSectionIterationHandleDatabase, sectionIterationHandle);
 
-	return (error);
+	return (res_lib_ckpt_sectioniterationfinalize.header.error);
 
 error_put:
 	pthread_mutex_unlock (&ckptSectionIterationInstance->response_mutex);
 
 	saHandleInstancePut (&ckptSectionIterationHandleDatabase, sectionIterationHandle);
 error_exit:
-	return (error == SA_AIS_OK ? res_lib_ckpt_sectioniterationfinalize.header.error : error);
+	return (error);
 }
 
 SaAisErrorT
