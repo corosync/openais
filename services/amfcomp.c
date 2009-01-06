@@ -1558,6 +1558,7 @@ void amf_comp_find_and_add_child_pids(
 
 			pm = amf_calloc(1, sizeof(struct amf_pm));
 			if ( pm == NULL ) {
+				fclose (p);
 				return;
 			}
 
