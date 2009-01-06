@@ -1282,13 +1282,13 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 	/*
 	 * If checkpoint doesn't exist, create one
 	 */
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		if ((req_exec_ckpt_checkpointopen->checkpoint_open_flags & SA_CKPT_CHECKPOINT_CREATE) == 0) {
 			error = SA_AIS_ERR_NOT_EXIST;
 			goto error_exit;
 		}
 		checkpoint = malloc (sizeof (struct checkpoint));
-		if (checkpoint == 0) {
+		if (checkpoint == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
 			goto error_exit;
 		}
@@ -1480,7 +1480,7 @@ void timer_function_section_expire (void *data)
 		&checkpoint_list_head,
 		&ckpt_id->ckpt_name,
 		ckpt_id->ckpt_id);
-        if (checkpoint == 0) {
+        if (checkpoint == NULL) {
 		log_printf (LOG_LEVEL_ERROR, "timer_function_section_expire could not find ckpt %s\n",
                         ckpt_id->ckpt_name.value);
 		goto free_mem;
@@ -1550,7 +1550,7 @@ static void message_handler_req_exec_ckpt_checkpointclose (
 		&checkpoint_list_head,
 		&req_exec_ckpt_checkpointclose->checkpoint_name,
 		req_exec_ckpt_checkpointclose->ckpt_id);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -1614,7 +1614,7 @@ static void message_handler_req_exec_ckpt_checkpointunlink (
 	checkpoint = checkpoint_find_linked (
 		&checkpoint_list_head,
 		&req_exec_ckpt_checkpointunlink->checkpoint_name);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -1754,7 +1754,7 @@ static void message_handler_req_exec_ckpt_sectioncreate (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectioncreate->checkpoint_name,
 		req_exec_ckpt_sectioncreate->ckpt_id);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -1917,7 +1917,7 @@ static void message_handler_req_exec_ckpt_sectiondelete (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectiondelete->checkpoint_name,
 		req_exec_ckpt_sectiondelete->ckpt_id);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -1985,7 +1985,7 @@ static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectionexpirationtimeset->checkpoint_name,
 		req_exec_ckpt_sectionexpirationtimeset->ckpt_id);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -2079,7 +2079,7 @@ static void message_handler_req_exec_ckpt_sectionwrite (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectionwrite->checkpoint_name,
 		req_exec_ckpt_sectionwrite->ckpt_id);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		log_printf (LOG_LEVEL_ERROR, "checkpoint_find returned 0 Calling error_exit.\n");
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
@@ -2188,7 +2188,7 @@ static void message_handler_req_exec_ckpt_sectionoverwrite (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectionoverwrite->checkpoint_name,
 		req_exec_ckpt_sectionoverwrite->ckpt_id);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -2288,7 +2288,7 @@ static void message_handler_req_exec_ckpt_sectionread (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectionread->checkpoint_name,
 		req_exec_ckpt_sectionread->ckpt_id);
-	if (checkpoint == 0) {
+	if (checkpoint == NULL) {
 		error = SA_AIS_ERR_LIBRARY;
 		goto error_exit;
 	}
@@ -2566,11 +2566,15 @@ static void message_handler_req_lib_ckpt_activereplicaset (
 	/*
 	 * Make sure checkpoint is collocated and async update option
 	 */
+	if (checkpoint == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+	} else
 	if (((checkpoint->checkpoint_creation_attributes.creation_flags & SA_CKPT_CHECKPOINT_COLLOCATED) == 0) ||
 		(checkpoint->checkpoint_creation_attributes.creation_flags & (SA_CKPT_WR_ACTIVE_REPLICA | SA_CKPT_WR_ACTIVE_REPLICA_WEAK)) == 0) {
 		error = SA_AIS_ERR_BAD_OPERATION;
+	} else {
+		checkpoint->active_replica_set = 1;
 	}
-	checkpoint->active_replica_set = 1;
 	res_lib_ckpt_activereplicaset.header.size = sizeof (struct res_lib_ckpt_activereplicaset);
 	res_lib_ckpt_activereplicaset.header.id = MESSAGE_RES_CKPT_ACTIVEREPLICASET;
 	res_lib_ckpt_activereplicaset.header.error = error;
@@ -2952,6 +2956,9 @@ static void message_handler_req_lib_ckpt_checkpointsynchronize (
 		&checkpoint_list_head,
 		&req_lib_ckpt_checkpointsynchronize->checkpoint_name,
 		req_lib_ckpt_checkpointsynchronize->ckpt_id);
+	if (checkpoint == NULL) {
+		res_lib_ckpt_checkpointsynchronize.header.error = SA_AIS_ERR_NOT_EXIST;	
+	} else
 	if ((checkpoint->checkpoint_creation_attributes.creation_flags & (SA_CKPT_WR_ACTIVE_REPLICA | SA_CKPT_WR_ACTIVE_REPLICA_WEAK)) == 0) {
 		res_lib_ckpt_checkpointsynchronize.header.error = SA_AIS_ERR_BAD_OPERATION;
 	} else
@@ -2982,6 +2989,9 @@ static void message_handler_req_lib_ckpt_checkpointsynchronizeasync (
 		&checkpoint_list_head,
 		&req_lib_ckpt_checkpointsynchronizeasync->checkpoint_name,
 		req_lib_ckpt_checkpointsynchronizeasync->ckpt_id);
+	if (checkpoint == NULL) {
+		res_lib_ckpt_checkpointsynchronizeasync.header.error = SA_AIS_ERR_NOT_EXIST;
+	} else
 	if ((checkpoint->checkpoint_creation_attributes.creation_flags & (SA_CKPT_WR_ACTIVE_REPLICA | SA_CKPT_WR_ACTIVE_REPLICA_WEAK)) == 0) {
 		res_lib_ckpt_checkpointsynchronizeasync.header.error = SA_AIS_ERR_BAD_OPERATION;
 	} else
