@@ -40,7 +40,7 @@ override LDFLAGS += -L./
 
 all: libSaClm.a libSaClm.so.2.0.0 \
 	libSaCkpt.a libSaCkpt.so.2.0.0 \
-	libSaAmf.so.2.0.0 \
+	libSaAmf.a libSaAmf.so.2.0.0 \
 	libSaEvt.a libSaEvt.so.2.0.0 \
 	libSaMsg.a libSaMsg.so.2.0.0  \
 	libSaLck.a libSaLck.so.2.0.0 
@@ -91,6 +91,9 @@ libSaLck.so.2.0.0: util.o lck.o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -o $@
 
 endif
+
+libSaAmf.a: util.o amf.o
+	$(AR) -rc libSaAmf.a util.o amf.o
 
 libSaCkpt.a: util.o ckpt.o
 	$(AR) -rc libSaCkpt.a util.o ckpt.o
