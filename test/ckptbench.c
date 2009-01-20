@@ -1,7 +1,7 @@
 #define _BSD_SOURCE
 /*
  * Copyright (c) 2002-2004 MontaVista Software, Inc.
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006-2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -55,6 +55,18 @@
 #include "saCkpt.h"
 #include "sa_error.h"
 
+#ifdef OPENAIS_SOLARIS
+#define timersub(a, b, result)						\
+    do {								\
+	(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;			\
+	(result)->tv_usec = (a)->tv_usec - (b)->tv_usec;		\
+	if ((result)->tv_usec < 0) {					\
+	    --(result)->tv_sec;						\
+	    (result)->tv_usec += 1000000;				\
+	}								\
+    } while (0)
+#endif
+
 int alarm_notice;
 
 void fail_on_error(SaAisErrorT error, char* opName) {
@@ -85,29 +97,29 @@ SaNameT checkpointName = { 5, "abra\0" };
 SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
         .creationFlags =        SA_CKPT_WR_ALL_REPLICAS,
         .checkpointSize =       250000,
-        .retentionDuration =    0,
+        .retentionDuration =    SA_TIME_END,
         .maxSections =          5,
         .maxSectionSize =       250000,
         .maxSectionIdSize =     15
 };
 
 SaCkptSectionIdT sectionId1 = {
-	14,
+	13,
 	(SaUint8T *) "section ID #1"
 };
 
 SaCkptSectionIdT sectionId2 = {
-	14,
+	13,
 	(SaUint8T *) "section ID #2"
 };
 SaCkptSectionCreationAttributesT sectionCreationAttributes1 = {
 	&sectionId1,
-	0xFFFFFFFF
+	SA_TIME_END
 };
 
 SaCkptSectionCreationAttributesT sectionCreationAttributes2 = {
 	&sectionId2,
-	0xFFFFFFFF
+	SA_TIME_END
 };
 
 char readBuffer1[1025];
@@ -117,7 +129,7 @@ char readBuffer2[1025];
 SaCkptIOVectorElementT ReadVectorElements[] = {
 	{
 		{
-			14,
+			13,
 			(SaUint8T *) "section ID #1"
 		},
 		readBuffer1,
@@ -127,7 +139,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 	},
 	{
 		{
-			14,
+			13,
 			(SaUint8T *) "section ID #2"
 		},
 		readBuffer2,
@@ -144,7 +156,7 @@ char data[500000];
 SaCkptIOVectorElementT WriteVectorElements[] = {
 	{
 		{
-			14,
+			13,
 			(SaUint8T *) "section ID #1"
 		},
 		data, /*"written data #1, this should extend past end of old section data", */
@@ -155,7 +167,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 #ifdef COMPILE_OUT
 	{
 		{
-			14,
+			13,
 			(SaUint8T *) "section ID #2"
 		},
 		data, /*"written data #2, this should extend past end of old section data" */
