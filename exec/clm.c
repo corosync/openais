@@ -715,7 +715,7 @@ static void message_handler_req_lib_clm_nodeget (void *conn, void *msg)
 	int valid = 0;
 	int i;
 
-	log_printf (LOG_LEVEL_NOTICE, "nodeget: trying to find node %x\n",
+	log_printf (LOG_LEVEL_DEBUG, "nodeget: trying to find node %x\n",
 		(int)req_lib_clm_nodeget->node_id);
 
 	if (req_lib_clm_nodeget->node_id == SA_CLM_LOCAL_NODE_ID) {
