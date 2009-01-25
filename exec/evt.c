@@ -2282,7 +2282,6 @@ static void lib_evt_open_channel_async(void *conn, void *message)
 
 	req = message;
 
-
 	log_printf(CHAN_OPEN_DEBUG,
 		"saEvtChannelOpenAsync (Async Open channel request)\n");
 	log_printf(CHAN_OPEN_DEBUG,
@@ -2324,7 +2323,7 @@ open_return:
 	res.ico_head.size = sizeof(res);
 	res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 	res.ico_head.error = error;
-	openais_dispatch_send(conn, &res, sizeof(res));
+	openais_response_send(conn, &res, sizeof(res));
 }
 
 
