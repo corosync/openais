@@ -692,23 +692,8 @@ static int netif_determine (
 	int res;
 
 	res = totemip_iface_check (bindnet, bound_to,
-		interface_up, interface_num);
-
-	/*
-	 * If the desired binding is to an IPV4 network and nodeid isn't
-	 * specified, retrieve the node id from this_ip network address
-	 *
-	 * IPV6 networks must have a node ID specified since the node id
-	 * field is only 32 bits.
-	 */
-	if (bound_to->family == AF_INET && bound_to->nodeid == 0) {
-		int32_t nodeid = 0;
-		memcpy (&nodeid, bound_to->addr, sizeof (int));
-		if(nodeid < 0 && instance->totem_config->clear_node_high_bit) {
-			nodeid = 0 - nodeid;
-		}
-		bound_to->nodeid = nodeid;
-	}
+		interface_up, interface_num,
+		instance->totem_config->clear_node_high_bit);
 
 	return (res);
 }
