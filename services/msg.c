@@ -317,8 +317,8 @@ static void message_handler_req_lib_msg_messagereplyasync (
 	void *msg);
 
 static void msg_sync_init (void);
-static void msg_sync_activate (void);
 static int  msg_sync_process (void);
+static void msg_sync_activate (void);
 static void msg_sync_abort(void);
 
 void queue_entry_release (struct message_entry *entry);
