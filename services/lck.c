@@ -1892,6 +1892,7 @@ static void message_handler_req_exec_lck_sync_resource_lock (
 	resource_lock->waiter_signal = req_exec_lck_sync_resource_lock->waiter_signal;
 	resource_lock->lock_status = req_exec_lck_sync_resource_lock->lock_status;
 	resource_lock->timeout = req_exec_lck_sync_resource_lock->timeout;
+	resource_lock->resource = resource;
 
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: lock_id=%u lock_mode=%u lock_status=%u\n",
