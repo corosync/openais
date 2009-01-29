@@ -5,7 +5,7 @@ OPENAIS_MSG_B.01.01 {
 		saMsgInitialize;
 		saMsgSelectionObjectGet;
 		saMsgDispatch;
-		saMsginalize;
+		saMsgFinalize;
 		saMsgQueueOpen;
 		saMsgQueueOpenAsync;
 		saMsgQueueClose;

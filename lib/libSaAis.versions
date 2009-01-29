@@ -156,7 +156,7 @@ OPENAIS_LCK_B.01.01 {
 		saLckInitialize;
 		saLckSelectionObjectGet;
 		saLckDispatch;
-		saLckinalize;
+		saLckFinalize;
 		saLckResourceOpen;
 		saLckResourceOpenAsync;
 		saLckResourcClose;
@@ -190,7 +190,7 @@ OPENAIS_MSG_B.01.01 {
 		saMsgInitialize;
 		saMsgSelectionObjectGet;
 		saMsgDispatch;
-		saMsginalize;
+		saMsgFinalize;
 		saMsgQueueOpen;
 		saMsgQueueOpenAsync;
 		saMsgQueueClose;

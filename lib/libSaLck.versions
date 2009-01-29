@@ -5,8 +5,7 @@ OPENAIS_LCK_B.01.01 {
 		saLckInitialize;
 		saLckSelectionObjectGet;
 		saLckDispatch;
-		saLckinalize;
-		saLckinalize;
+		saLckFinalize;
 		saLckResourceOpen;
 		saLckResourceOpenAsync;
 		saLckResourcClose;
