@@ -72,7 +72,18 @@ enum lck_message_req_types {
 	MESSAGE_REQ_EXEC_LCK_LOCKPURGE = 5,
 	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE = 6,
 	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_LOCK = 7,
+	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_REFCOUNT = 8,
 };
+
+struct refcount_set {
+	unsigned int refcount;
+	unsigned int nodeid;
+};
+
+typedef struct {
+	unsigned int refcount __attribute__((aligned(8)));
+	unsigned int nodeid __attribute__((aligned(8)));
+} mar_refcount_set_t;
 
 struct resource;
 
@@ -101,6 +112,7 @@ struct resource {
 	struct list_head pr_pending_list_head;
 	struct list_head ex_pending_list_head;
 	struct resource_lock *ex_granted;
+	struct refcount_set refcount_set[PROCESSOR_COUNT_MAX];
 };
 
 struct resource_cleanup {
@@ -162,6 +174,10 @@ static void message_handler_req_exec_lck_sync_resource_lock (
 	void *message,
 	unsigned int nodeid);
 
+static void message_handler_req_exec_lck_sync_resource_refcount (
+	void *message,
+	unsigned int nodeid);
+
 static void message_handler_req_lib_lck_resourceopen (
 	void *conn,
 	void *msg);
@@ -204,11 +220,19 @@ static void exec_lck_resource_endian_convert (void *msg);
 static void exec_lck_resource_lock_endian_convert (void *msg);
 static void exec_lck_sync_resource_endian_convert (void *msg);
 static void exec_lck_sync_resource_lock_endian_convert (void *msg);
+static void exec_lck_sync_resource_refcount_endian_convert (void *msg);
 
 static void lck_sync_init (void);
 static int  lck_sync_process (void);
 static void lck_sync_activate (void);
 static void lck_sync_abort (void);
+
+static void sync_refcount_increment (
+	struct resource *resource, unsigned int nodeid);
+static void sync_refcount_decrement (
+	struct resource *resource, unsigned int nodeid);
+static void sync_refcount_calculate (
+	struct resource *resource);
 
 void resource_release (struct resource *resource);
 void resource_lock_release (struct resource_lock *resource_lock);
@@ -323,6 +347,10 @@ static struct corosync_exec_handler lck_exec_engine[] = {
 	{
 		.exec_handler_fn	= message_handler_req_exec_lck_sync_resource_lock,
 		.exec_endian_convert_fn = exec_lck_sync_resource_lock_endian_convert
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_lck_sync_resource_refcount,
+		.exec_endian_convert_fn = exec_lck_sync_resource_refcount_endian_convert
 	},
 };
 
@@ -560,6 +588,18 @@ static void exec_lck_sync_resource_lock_endian_convert (void *msg)
 	to_swab->timeout = swab64 (to_swab->timeout);
 }
 
+struct req_exec_lck_sync_resource_refcount {
+	mar_req_header_t header __attribute__((aligned(8)));
+	struct memb_ring_id ring_id __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_refcount_set_t refcount_set[PROCESSOR_COUNT_MAX] __attribute__((aligned(8)));
+};
+
+static void exec_lck_sync_resource_refcount_endian_convert (void *msg)
+{
+	return;
+}
+
 static void print_resource_lock_list (struct resource *resource)
 {
 	struct list_head *list;
@@ -694,6 +734,57 @@ void resource_lock_release (struct resource_lock *resource_lock)
 	free (resource_lock);
 }
 
+static void sync_refcount_increment (
+	struct resource *resource,
+	unsigned int nodeid)
+{
+	unsigned int i;
+
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		if (resource->refcount_set[i].nodeid == 0) {
+			resource->refcount_set[i].nodeid = nodeid;
+			resource->refcount_set[i].refcount = 1;
+			break;
+		}
+		if (resource->refcount_set[i].nodeid == nodeid) {
+			resource->refcount_set[i].refcount += 1;
+			break;
+		}
+	}
+}
+
+static void sync_refcount_decrement (
+	struct resource *resource,
+	unsigned int nodeid)
+{
+	unsigned int i;
+
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		if (resource->refcount_set[i].nodeid == 0) {
+			break;
+		}
+		if (resource->refcount_set[i].nodeid == nodeid) {
+			resource->refcount_set[i].refcount -= 1;
+			break;
+		}
+	}
+}
+
+static void sync_refcount_calculate (
+	struct resource *resource)
+{
+	unsigned int i;
+
+	resource->refcount = 0;
+
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		if (resource->refcount_set[i].nodeid == 0) {
+			break;
+		}
+	}
+	resource->refcount += resource->refcount_set[i].refcount;
+}
+
 static inline void sync_resource_free (struct list_head *head)
 {
 	struct resource *resource;
@@ -777,6 +868,39 @@ static int sync_resource_lock_transmit (
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
 }
 
+static int sync_resource_refcount_transmit (
+	struct resource *resource)
+{
+	struct req_exec_lck_sync_resource_refcount req_exec_lck_sync_resource_refcount;
+	struct iovec iovec;
+	unsigned int i;
+
+	memset (&req_exec_lck_sync_resource_refcount, 0,
+		sizeof (struct req_exec_lck_sync_resource_refcount));
+
+	req_exec_lck_sync_resource_refcount.header.size =
+		sizeof (struct req_exec_lck_sync_resource_refcount);
+	req_exec_lck_sync_resource_refcount.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_REFCOUNT);
+
+	memcpy (&req_exec_lck_sync_resource_refcount.ring_id,
+		&my_saved_ring_id, sizeof (struct memb_ring_id));
+	memcpy (&req_exec_lck_sync_resource_refcount.resource_name,
+		&resource->name, sizeof (mar_name_t));
+
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		req_exec_lck_sync_resource_refcount.refcount_set[i].refcount =
+			resource->refcount_set[i].refcount;
+		req_exec_lck_sync_resource_refcount.refcount_set[i].nodeid =
+			resource->refcount_set[i].nodeid;
+	}
+
+	iovec.iov_base = (char *)&req_exec_lck_sync_resource_refcount;
+	iovec.iov_len = sizeof (struct req_exec_lck_sync_resource_refcount);
+
+	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
+}
+
 static int sync_resource_iterate (void)
 {
 	struct resource *resource;
@@ -814,6 +938,27 @@ static int sync_resource_iterate (void)
 	return (res);
 }
 
+static int sync_refcount_iterate (void)
+{
+	struct resource *resource;
+	struct list_head *list;
+	unsigned int res = 0;
+
+	for (list = resource_list_head.next;
+	     list != &resource_list_head;
+	     list = list->next) {
+
+		resource = list_entry (list, struct resource, list);
+
+		res = sync_resource_refcount_transmit (resource);
+		if (res != 0) {
+			break;
+		}
+	}
+
+	return (res);
+}
+
 static void lck_sync_init (void)
 {
 	return;
@@ -827,6 +972,12 @@ static int lck_sync_process (void)
 		TRACE1 ("transmit resources because lowest member in old configuration.\n");
 
 		res = sync_resource_iterate ();
+	}
+
+	if (my_lowest_nodeid == api->totem_nodeid_get ()) {
+		TRACE1 ("transmit refcounts because lowest member in old configuration.\n");
+
+		sync_refcount_iterate ();
 	}
 
 	return (0);
@@ -1201,7 +1352,15 @@ static void message_handler_req_exec_lck_resourceopen (
 
 		resource->refcount = 0;
 		resource->ex_granted = NULL;
+
+		memset (&resource->refcount_set, 0,
+			sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
 	}
+
+	log_printf (LOG_LEVEL_DEBUG, "RESOURCE opened is %p\n", resource);
+
+	sync_refcount_increment (resource, nodeid);
+	sync_refcount_calculate (resource);
 
 	if (api->ipc_source_is_local (&req_exec_lck_resourceopen->source)) {
 		resource_cleanup = malloc (sizeof (struct resource_cleanup));
@@ -1280,7 +1439,10 @@ static void message_handler_req_exec_lck_resourceclose (
 		goto error_exit;
 	}
 
-	resource->refcount -= 1;
+	/* resource->refcount -= 1; */
+
+	sync_refcount_decrement (resource, nodeid);
+	sync_refcount_calculate (resource);
 
 	if (resource->refcount == 0) {
 		/* TODO */
@@ -1918,6 +2080,56 @@ static void message_handler_req_exec_lck_sync_resource_lock (
 			list_add_tail (&resource_lock->list, &resource->ex_pending_list_head);
 		}
 	}
+}
+
+static void message_handler_req_exec_lck_sync_resource_refcount (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_lck_sync_resource_refcount *req_exec_lck_sync_resource_refcount
+		= (struct req_exec_lck_sync_resource_refcount *)message;
+	struct resource *resource;
+	unsigned int i, j;
+
+	/*
+	 * Ignore messages from previous ring
+	 */
+	if (memcmp (&req_exec_lck_sync_resource_refcount->ring_id,
+		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+	{
+		return;
+	}
+
+	resource = lck_resource_find (&sync_resource_list_head,
+		&req_exec_lck_sync_resource_refcount->resource_name);
+
+	assert (resource != NULL);
+
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		if (req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid == 0) {
+			break;
+		}
+		for (j = 0; j < PROCESSOR_COUNT_MAX; j++) {
+			if (resource->refcount_set[j].nodeid == 0) {
+				resource->refcount_set[j].nodeid =
+					req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid;
+				resource->refcount_set[j].refcount =
+					req_exec_lck_sync_resource_refcount->refcount_set[i].refcount;
+				break;
+			}
+			if (req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid == resource->refcount_set[j].nodeid) {
+				resource->refcount_set[j].refcount +=
+					req_exec_lck_sync_resource_refcount->refcount_set[i].refcount;
+				break;
+			}
+		}
+	}
+
+	sync_refcount_calculate (resource);
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_DEBUG, "[DEBUG]: sync refcount for resource %s is %u\n",
+		    get_mar_name_t (&resource->name), (unsigned int)(resource->refcount));
 }
 
 static void message_handler_req_lib_lck_resourceopen (

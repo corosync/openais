@@ -282,7 +282,6 @@ saLckInitialize (
 
 	pthread_mutex_init (&lckInstance->response_mutex, NULL);
 
-
 	saHandleInstancePut (&lckHandleDatabase, *lckHandle);
 
 	return (SA_AIS_OK);
