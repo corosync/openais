@@ -43,30 +43,15 @@ INCLUDEDIR=$(PREFIX)/include/openais
 MANDIR=$(PREFIX)/share/man
 SBINDIR=$(PREFIX)/sbin
 ETCDIR=/etc
-ARCH=$(shell uname -p)
 
-ifeq (,$(findstring 64,$(ARCH)))
-LIBDIR=$(PREFIX)/lib/openais
-else
-LIBDIR=$(PREFIX)/lib64/openais
-endif
-ifeq (s390,$(ARCH))
-LIBDIR=$(PREFIX)/lib/openais
-endif
-ifeq (s390x,$(ARCH))
-LIBDIR=$(PREFIX)/lib64/openais
-endif
-ifeq (ia64,$(ARCH))
-LIBDIR=$(PREFIX)/lib/openais
-endif
-
-SUBDIRS:=$(builddir)lib $(builddir)test $(builddir)services
+SUBDIRS:=$(builddir)lib $(builddir)test $(builddir)services $(builddir)pkgconfig
 sub_make = srcdir=$(srcdir) builddir=$(builddir) subdir=$(1)/ $(MAKE) -I$(srcdir)$(1) -f $(srcdir)$(1)/Makefile $(2)
 
 all: $(SUBDIRS)
 	@(cd $(builddir)lib; echo ==== `pwd` ===;  $(call sub_make,lib,all));
 	@(cd $(builddir)services; echo ==== `pwd` ===; $(call sub_make,services,all));
 	@(cd $(builddir)test; echo ==== `pwd` ===; $(call sub_make,test,all));
+	@(cd $(builddir)pkgconfig; echo ==== `pwd` ===; $(call sub_make,pkgconfig,all));
 
 # subdirs are not phony
 .PHONY: all clean install doxygen
@@ -104,6 +89,7 @@ clean:
 	(cd $(builddir)lib; echo ==== `pwd` ===; $(call sub_make,lib,clean));
 	(cd $(builddir)services; echo ==== `pwd` ===; $(call sub_make,services,clean));
 	(cd $(builddir)test; echo ==== `pwd` ===; $(call sub_make,test,clean));
+	(cd $(builddir)pkgconfig; echo ==== `pwd` ===; $(call sub_make,pkgconfig,clean));
 	rm -rf $(builddir)doc/api
 
 AIS_LIBS	= SaAmf SaClm SaCkpt SaEvt SaLck SaMsg
@@ -120,6 +106,7 @@ install: all
 	mkdir -p $(DESTDIR)$(MANDIR)/man5
 	mkdir -p $(DESTDIR)$(MANDIR)/man8
 	mkdir -p $(DESTDIR)$(ETCDIR)/ld.so.conf.d
+	mkdir -p $(DESTDIR)$(PKGCONFIGDIR)
 
 	for aLib in $(AIS_LIBS); do					\
 	    ( cd $(builddir) ;                                          \
@@ -155,6 +142,8 @@ install: all
 	done
 	install -m 644 $(srcdir)man/*.5 $(DESTDIR)$(MANDIR)/man5
 	install -m 644 $(srcdir)man/*.8 $(DESTDIR)$(MANDIR)/man8
+
+	install -m 644 $(builddir)/pkgconfig/*.pc $(DESTDIR)$(PKGCONFIGDIR)
 
 doxygen:
 	mkdir -p doc/api && doxygen
