@@ -3680,7 +3680,9 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 			&req_exec_ckpt_sync_checkpoint->checkpoint_creation_attributes,
 			sizeof (mar_ckpt_checkpoint_creation_attributes_t));
 
-		memset (&checkpoint->refcount_set, 0, sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
+		memset (&checkpoint->refcount_set, 0,
+			sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
+
 		checkpoint->ckpt_id = req_exec_ckpt_sync_checkpoint->ckpt_id;
 
 		checkpoint->active_replica_set = req_exec_ckpt_sync_checkpoint->active_replica_set;
@@ -3693,9 +3695,6 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 		list_init (&checkpoint->list);
 		list_init (&checkpoint->sections_list_head);
 		list_add (&checkpoint->list, &sync_checkpoint_list_head);
-
-		memset (checkpoint->refcount_set, 0,
-			sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
 	}
 
 	if (checkpoint->ckpt_id >= global_ckpt_id) {
