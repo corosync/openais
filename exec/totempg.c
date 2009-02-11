@@ -1108,6 +1108,12 @@ int totempg_groups_send_ok_joined (
 		size += iovec[i].iov_len;
 	}
 
+	/*
+	 * 2000 is a number chosen to represent the maximum size of
+	 * the totempg header used in the transmission of messages
+	 */
+	size += 2000;
+
 	res = send_ok (size);
 
 	hdb_handle_put (&totempg_groups_instance_database, handle);
