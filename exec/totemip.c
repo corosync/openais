@@ -310,7 +310,8 @@ int totemip_sockaddr_to_totemip_convert(struct sockaddr_storage *saddr, struct t
 int totemip_iface_check(struct totem_ip_address *bindnet,
 			struct totem_ip_address *boundto,
 			int *interface_up,
-			int *interface_num)
+			int *interface_num,
+			int mask_high_bit)
 {
 #define NEXT_IFR(a)	((struct ifreq *)((u_char *)&(a)->ifr_addr +\
 	((a)->ifr_addr.sa_len ? (a)->ifr_addr.sa_len : sizeof((a)->ifr_addr))))
@@ -375,6 +376,18 @@ int totemip_iface_check(struct totem_ip_address *bindnet,
 			if ( bindnet_sin->sin_family == AF_INET &&
 				 (intf_addr_sin->sin_addr.s_addr & intf_addr_mask->sin_addr.s_addr) ==
 			     (bindnet_sin->sin_addr.s_addr & intf_addr_mask->sin_addr.s_addr)) {
+				/*
+				 * Mask 32nd bit off to workaround bugs in other poeples code
+				 * if configuration requests it.
+				 */
+				if (bindnet->family == AF_INET && bindnet->nodeid == 0) {
+					unsigned int nodeid = 0;
+					memcpy (&nodeid, bindnet->addr, sizeof (int));
+					if (mask_high_bit) {
+						nodeid &= 0x7FFFFFFF;
+					}
+					bindnet->nodeid = nodeid;
+				}
 
 				totemip_copy(boundto, bindnet);
 				memcpy(boundto->addr, &intf_addr_sin->sin_addr, sizeof(intf_addr_sin->sin_addr));
