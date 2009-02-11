@@ -3806,6 +3806,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 
 		list_init (&checkpoint->list);
 		list_init (&checkpoint->sections_list_head);
+		list_init (&checkpoint->expiry_list);
 		list_add (&checkpoint->list, &sync_checkpoint_list_head);
 
 		memset (checkpoint->refcount_set, 0,
