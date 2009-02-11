@@ -994,6 +994,8 @@ void checkpoint_release (struct checkpoint *checkpoint)
 
 	openais_timer_delete (checkpoint->retention_timer);
 
+	list_del (&checkpoint->expiry_list);
+
 	/*
 	 * Release all checkpoint sections for this checkpoint
 	 */
