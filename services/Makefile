@@ -52,14 +52,14 @@ AMF_SRC = amf.c amfutil.c amfnode.c amfcluster.c amfapp.c amfsg.c amfsu.c amfcom
 AMF_OBJS = amf.o amfutil.o amfnode.o amfcluster.o amfapp.o amfsg.o amfsu.o amfcomp.o amfsi.o
 
 # LCR objects
-LCR_SRC = openaisparser.c openaisserviceenable.c clm.c ckpt.c evt.c lck.c msg.c cfg.c $(AMF_SRC)
-LCR_OBJS = openaisparser.o openaisserviceenable.o clm.o ckpt.o evt.o lck.o msg.o cfg.o o $(AMF_OBJS)
+LCR_SRC = openaisparser.c openaisserviceenable.c clm.c ckpt.c evt.c lck.c msg.c cfg.c tmr.c $(AMF_SRC)
+LCR_OBJS = openaisparser.o openaisserviceenable.o clm.o ckpt.o evt.o lck.o msg.o cfg.o tmr.o $(AMF_OBJS)
 
 override CFLAGS += -fPIC
 
 all: openaisparser.lcrso openaisserviceenable.lcrso service_amf.lcrso \
 	service_clm.lcrso service_ckpt.lcrso service_evt.lcrso service_lck.lcrso \
-	service_msg.lcrso openais-instantiate
+	service_msg.lcrso service_tmr.lcrso openais-instantiate
 
 ifeq (${OPENAIS_COMPAT}, DARWIN)
 
@@ -88,6 +88,9 @@ service_msg.lcrso: msg.o
 
 service_cfg.lcrso: cfg.o
 	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load cfg.o -o $@
+
+service_tmr.lcrso: tmr.o
+	$(CC) $(LDFLAGS) -bundle $(LDFALGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load tmr.o -o $@
 
 openaisparser.lcrso: openaisparser.o
 	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader $(COROSYNC_BIN) -bind_at_load openaisparser.o -o $@
@@ -121,6 +124,9 @@ service_msg.lcrso: msg.o
 
 service_cfg.lcrso: cfg.o
 	$(CC) -shared -Wl,-soname,service_cfg.lcrso cfg.o -o $@
+
+service_tmr.lcrso: tmr.o
+	$(CC) -shared -Wl,-soname,service_tmr.lcrso tmr.o -o $@
 
 openaisparser.lcrso: openaisparser.o
 	$(CC) -shared -Wl,-soname,openaisparser.lcrso openaisparser.o -o $@
@@ -166,6 +172,9 @@ lck.o: lck.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 msg.o: msg.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+tmr.o: tmr.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 openaisparser.o: openaisparser.c

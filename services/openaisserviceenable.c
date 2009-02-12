@@ -62,7 +62,8 @@ static struct service_engine service_engines[] = {
 	{ "openais_ckpt", "0" },
 	{ "openais_amf", "0" },
 	{ "openais_msg", "0" },
-	{ "openais_lck", "0" }
+	{ "openais_lck", "0" },
+	{ "openais_tmr", "0" },
 };
 
 static int openais_service_enable (

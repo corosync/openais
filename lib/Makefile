@@ -43,7 +43,8 @@ all: libSaClm.a libSaClm.so.2.0.0 \
 	libSaAmf.a libSaAmf.so.2.0.0 \
 	libSaEvt.a libSaEvt.so.2.0.0 \
 	libSaMsg.a libSaMsg.so.2.0.0  \
-	libSaLck.a libSaLck.so.2.0.0 
+	libSaLck.a libSaLck.so.2.0.0 \
+	libSaTmr.a libSaTmr.so.2.0.0
 
 libcoroutil.a: util.o
 	$(AR) -rc libcoroutil.a util.o
@@ -70,6 +71,9 @@ libSaMsg.so.2.0.0: util.o msg.o
 libSaLck.so.2.0.0: util.o lck.o
 	$(CC) $(DARWIN_OPTS) util.o lck.o -o $@
 
+libSaTmr.so.2.0.0: util.o tmr.o
+	$(CC) $(DARWIN_OPTS) util.o tmr.o -o $@
+
 else
 
 libSaAmf.so.2.0.0: util.o amf.o
@@ -89,6 +93,9 @@ libSaMsg.so.2.0.0: util.o msg.o
 
 libSaLck.so.2.0.0: util.o lck.o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -o $@
+
+libSaTmr.so.2.0.0: util.o tmr.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaTmr.so.2,-version-script=$(srcdir)$(subdir)libSaTmr.versions util.o tmr.o -o $@
 
 endif
 
@@ -110,9 +117,12 @@ libSaMsg.a: util.o msg.o
 libSaLck.a: util.o lck.o
 	$(AR) -rc libSaLck.a util.o lck.o
 
+libSaTmr.a: util.o tmr.o
+	$(AR) -rc libSaTmr.a util.o tmr.o
+
 clean:
 	rm -f *.o libSa*.so* libSa*.a *.da *.bb *.bbg
- 
+
 # -fPIC rules required for all libraries
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -fPIC -c -o $@ $<

@@ -92,10 +92,10 @@ clean:
 	(cd $(builddir)pkgconfig; echo ==== `pwd` ===; $(call sub_make,pkgconfig,clean));
 	rm -rf $(builddir)doc/api
 
-AIS_LIBS	= SaAmf SaClm SaCkpt SaEvt SaLck SaMsg
+AIS_LIBS	= SaAmf SaClm SaCkpt SaEvt SaLck SaMsg SaTmr
 
 AIS_HEADERS	= saAis.h saAmf.h saClm.h saCkpt.h saEvt.h saEvt.h saLck.h \
-		  saMsg.h
+		  saMsg.h saTmr.h
 
 install: all
 	mkdir -p $(DESTDIR)$(SBINDIR)

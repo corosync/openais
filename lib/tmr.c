@@ -1,0 +1,851 @@
+/*
+ * Copyright (c) 2008 Red Hat, Inc.
+ *
+ * All rights reserved.
+ *
+ * Author: Ryan O'Hara (rohara@redhat.com)
+ *
+ * This software licensed under BSD license, the text of which follows:
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * - Redistributions of source code must retain the above copyright notice,
+ *   this list of conditions and the following disclaimer.
+ * - Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ * - Neither the name of the MontaVista Software, Inc. nor the names of its
+ *   contributors may be used to endorse or promote products derived from this
+ *   software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <unistd.h>
+#include <inttypes.h>
+#include <errno.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/un.h>
+
+#include <saAis.h>
+#include <saTmr.h>
+
+#include <corosync/list.h>
+#include <corosync/ipc_gen.h>
+
+#include "../include/ipc_tmr.h"
+#include "util.h"
+
+struct message_overlay {
+	mar_res_header_t header __attribute__((aligned(8)));
+	char data[4096];
+};
+
+struct tmrInstance {
+	int response_fd;
+	int dispatch_fd;
+	SaTmrCallbacksT callbacks;
+	int finalize;
+	SaTmrHandleT tmrHandle;
+	pthread_mutex_t response_mutex;
+	pthread_mutex_t dispatch_mutex;
+};
+
+struct tmrTimerIdInstance {
+	int response_fd;
+	int dispatch_fd;
+	SaTmrHandleT tmrHandle;
+	struct list_head list;
+	void *timer_lock;
+	pthread_mutex_t *response_mutex;
+	pthread_mutex_t *dispatch_mutex;
+};
+
+void tmrHandleInstanceDestructor (void *instance);
+void tmrTimerIdHandleInstanceDestructor (void *instance);
+
+static SaTimeT tmrGetTimeNow (void);
+
+static struct saHandleDatabase tmrHandleDatabase = {
+	.handleCount			= 0,
+	.handles			= 0,
+	.mutex				= PTHREAD_MUTEX_INITIALIZER,
+	.handleInstanceDestructor	= tmrHandleInstanceDestructor
+};
+
+static struct saHandleDatabase tmrTimerIdHandleDatabase = {
+	.handleCount			= 0,
+	.handles			= 0,
+	.mutex				= PTHREAD_MUTEX_INITIALIZER,
+	.handleInstanceDestructor	= tmrTimerIdHandleInstanceDestructor
+};
+
+static SaVersionT tmrVersionsSupported[] = {
+	{ 'A', 1, 1 }
+};
+
+static struct saVersionDatabase tmrVersionDatabase = {
+	sizeof (tmrVersionsSupported) / sizeof (SaVersionT),
+	tmrVersionsSupported
+};
+
+void tmrHandleInstanceDestructor (void *instance)
+{
+	struct tmrInstance *tmrInstance = instance;
+
+	pthread_mutex_destroy (&tmrInstance->response_mutex);
+	pthread_mutex_destroy (&tmrInstance->dispatch_mutex);
+}
+
+void tmrTimerIdHandleInstanceDestructor (void *instance)
+{
+	return;
+}
+
+#ifdef COMPILE_OUT
+static void tmrInstanceFinalize (struct tmrInstance *tmrInstance)
+{
+	return;
+}
+#endif /* COMPILE_OUT */
+
+SaAisErrorT
+saTmrInitialize (
+	SaTmrHandleT *tmrHandle,
+	const SaTmrCallbacksT *timerCallbacks,
+	SaVersionT *version)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrInitialize\n");
+
+	if (tmrHandle == NULL) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	error = saVersionVerify (&tmrVersionDatabase, version);
+	if (error != SA_AIS_OK) {
+		goto error_no_destroy;
+	}
+
+	error = saHandleCreate (&tmrHandleDatabase, sizeof (struct tmrInstance), tmrHandle);
+	if (error != SA_AIS_OK) {
+		goto error_no_destroy;
+	}
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, *tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		goto error_destroy;
+	}
+
+	tmrInstance->response_fd = -1;
+
+	error = saServiceConnect (
+		&tmrInstance->response_fd,
+		&tmrInstance->dispatch_fd,
+		TMR_SERVICE);
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
+	}
+
+	if (timerCallbacks != NULL) {
+		memcpy (&tmrInstance->callbacks, timerCallbacks, sizeof (SaTmrCallbacksT));
+	} else {
+		memset (&tmrInstance->callbacks, 0, sizeof (SaTmrCallbacksT));
+	}
+
+	tmrInstance->tmrHandle = *tmrHandle;
+
+	pthread_mutex_init (&tmrInstance->response_mutex, NULL);
+
+	saHandleInstancePut (&tmrHandleDatabase, *tmrHandle);
+
+	return (SA_AIS_OK);
+
+error_put_destroy:
+	saHandleInstancePut (&tmrHandleDatabase, *tmrHandle);
+error_destroy:
+	saHandleDestroy (&tmrHandleDatabase, *tmrHandle);
+error_no_destroy:
+	return (error);
+}
+
+SaAisErrorT
+saTmrSelectionObjectGet (
+	SaTmrHandleT tmrHandle,
+	SaSelectionObjectT *selectionObject)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrSelectionObjectGet\n");
+
+	if (selectionObject == NULL) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		return (error);
+	}
+
+	*selectionObject = tmrInstance->dispatch_fd;
+
+	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+
+	return (SA_AIS_OK);
+}
+
+SaAisErrorT
+saTmrDispatch (
+	SaTmrHandleT tmrHandle,
+	SaDispatchFlagsT dispatchFlags)
+{
+	SaTmrCallbacksT callbacks;
+	SaAisErrorT error = SA_AIS_OK;
+	struct tmrInstance *tmrInstance;
+	struct message_overlay dispatch_data;
+	struct pollfd ufds;
+	int dispatch_avail;
+	int poll_fd;
+	int timeout = 1;
+	int cont = 1;
+
+	struct res_lib_tmr_timerexpiredcallback *res_lib_tmr_timerexpiredcallback;
+
+	if (dispatchFlags != SA_DISPATCH_ONE &&
+	    dispatchFlags != SA_DISPATCH_ALL &&
+	    dispatchFlags != SA_DISPATCH_BLOCKING)
+	{
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle,
+		(void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	if (dispatchFlags == SA_DISPATCH_ALL) {
+		timeout = 0;
+	}
+
+	do {
+		poll_fd = tmrInstance->dispatch_fd;
+		ufds.fd = poll_fd;
+		ufds.events = POLLIN;
+		ufds.revents = 0;
+
+		error = saPollRetry (&ufds, 1, timeout);
+		if (error != SA_AIS_OK) {
+			goto error_put;
+		}
+		pthread_mutex_lock (&tmrInstance->dispatch_mutex);
+
+		if (tmrInstance->finalize == 1) {
+			error = SA_AIS_OK;
+			goto error_unlock;
+		}
+
+		if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
+			error = SA_AIS_ERR_BAD_HANDLE;
+			goto error_unlock;
+		}
+
+		dispatch_avail = (ufds.revents & POLLIN);
+
+		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
+			pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
+			break;
+		}
+		else if (dispatch_avail == 0) {
+			pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
+			continue;
+		}
+
+		memset (&dispatch_data, 0, sizeof (struct message_overlay));
+
+		error = saRecvRetry (tmrInstance->dispatch_fd,
+			&dispatch_data.header, sizeof (mar_res_header_t));
+		if (error != SA_AIS_OK) {
+			goto error_unlock;
+		}
+
+		if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
+			error = saRecvRetry (tmrInstance->dispatch_fd,
+				&dispatch_data.data,
+				(dispatch_data.header.size - sizeof (mar_res_header_t)));
+			if (error != SA_AIS_OK) {
+				goto error_unlock;
+			}
+		}
+
+		memcpy (&callbacks, &tmrInstance->callbacks,
+			sizeof (tmrInstance->callbacks));
+
+		pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
+
+		/* DEBUG */
+		printf ("[DEBUG]: saTmrDispatch { id = %d }\n",
+			dispatch_data.header.id);
+
+		switch (dispatch_data.header.id)
+		{
+		case MESSAGE_RES_TMR_TIMEREXPIREDCALLBACK:
+			if (callbacks.saTmrTimerExpiredCallback == NULL) {
+				continue;
+			}
+
+			res_lib_tmr_timerexpiredcallback =
+				(struct res_lib_tmr_timerexpiredcallback *) &dispatch_data;
+
+			callbacks.saTmrTimerExpiredCallback (
+				res_lib_tmr_timerexpiredcallback->timer_id,
+				res_lib_tmr_timerexpiredcallback->timer_data,
+				res_lib_tmr_timerexpiredcallback->expiration_count);
+
+			break;
+		default:
+			break;
+		}
+
+		switch (dispatchFlags)
+		{
+		case SA_DISPATCH_ONE:
+			cont = 0;
+			break;
+		case SA_DISPATCH_ALL:
+			break;
+		case SA_DISPATCH_BLOCKING:
+			break;
+		}
+	} while (cont);
+
+error_unlock:
+	pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
+error_put:
+	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+error_exit:
+	return (error);
+}
+
+SaAisErrorT
+saTmrFinalize (
+	SaTmrHandleT tmrHandle)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrFinalize\n");
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		return (error);
+	}
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	if (tmrInstance->finalize) {
+		pthread_mutex_unlock (&tmrInstance->response_mutex);
+		saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+		return (SA_AIS_ERR_BAD_HANDLE);
+	}
+
+	tmrInstance->finalize = 1;
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	/* tmrInstanceFinalize (tmrInstance); */
+
+	if (tmrInstance->response_fd != -1) {
+		shutdown (tmrInstance->response_fd, 0);
+		close (tmrInstance->response_fd);
+	}
+
+	if (tmrInstance->dispatch_fd != -1) {
+		shutdown (tmrInstance->dispatch_fd, 0);
+		close (tmrInstance->dispatch_fd);
+	}
+
+	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+
+	return (SA_AIS_OK);
+}
+
+SaAisErrorT
+saTmrTimerStart (
+	SaTmrHandleT tmrHandle,
+	const SaTmrTimerAttributesT *timerAttributes,
+	const void *timerData,
+	SaTmrTimerIdT *timerId,
+	SaTimeT *callTime)
+{
+	struct tmrInstance *tmrInstance;
+	struct tmrTimerIdInstance *tmrTimerIdInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_timerstart req_lib_tmr_timerstart;
+	struct res_lib_tmr_timerstart res_lib_tmr_timerstart;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrTimerStart\n");
+
+	if (timerAttributes == NULL) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	if ((timerAttributes->type != SA_TIME_ABSOLUTE) &&
+	    (timerAttributes->type != SA_TIME_DURATION)) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	/* DEBUG */
+	printf ("[DEBUG]:\t type=%d expire=%"PRId64" duration=%"PRId64"\n",
+		timerAttributes->type,
+		timerAttributes->initialExpirationTime,
+		timerAttributes->timerPeriodDuration);
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		return (error);
+	}
+
+	error = saHandleCreate (&tmrTimerIdHandleDatabase,
+		sizeof (struct tmrTimerIdInstance), timerId);
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	error = saHandleInstanceGet (&tmrTimerIdHandleDatabase, *timerId,
+		(void *)&tmrTimerIdInstance);
+	if (error != SA_AIS_OK) {
+		goto error_destroy;
+	}
+
+	*callTime = tmrGetTimeNow ();
+
+	tmrTimerIdInstance->response_fd = tmrInstance->response_fd;
+	tmrTimerIdInstance->response_mutex = &tmrInstance->response_mutex;
+	tmrTimerIdInstance->tmrHandle = tmrHandle;
+
+	req_lib_tmr_timerstart.header.size =
+		sizeof (struct req_lib_tmr_timerstart);
+	req_lib_tmr_timerstart.header.id =
+		MESSAGE_REQ_TMR_TIMERSTART;
+
+	req_lib_tmr_timerstart.timer_id = *timerId;
+	req_lib_tmr_timerstart.call_time = *callTime;
+
+	memcpy (&req_lib_tmr_timerstart.timer_attributes,
+		timerAttributes, sizeof (SaTmrTimerAttributesT));
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_timerstart,
+		sizeof (struct req_lib_tmr_timerstart),
+		&res_lib_tmr_timerstart,
+		sizeof (struct res_lib_tmr_timerstart));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_timerstart.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_timerstart.header.error;
+	}
+
+error_destroy:
+	saHandleDestroy (&tmrTimerIdHandleDatabase, *timerId);
+
+error_exit:
+	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+	return (error);;
+}
+
+SaAisErrorT
+saTmrTimerReschedule (
+	SaTmrHandleT tmrHandle,
+	SaTmrTimerIdT timerId,
+	const SaTmrTimerAttributesT *timerAttributes,
+	SaTimeT *callTime)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_timerreschedule req_lib_tmr_timerreschedule;
+	struct res_lib_tmr_timerreschedule res_lib_tmr_timerreschedule;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrTimerReschedule\n");
+
+	if (timerAttributes == NULL) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	/* DEBUG */
+	printf ("[DEBUG]:\t type=%d expire=%"PRId64" duration=%"PRId64"\n",
+		timerAttributes->type,
+		timerAttributes->initialExpirationTime,
+		timerAttributes->timerPeriodDuration);
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		return (error);
+	}
+
+	req_lib_tmr_timerreschedule.header.size =
+		sizeof (struct req_lib_tmr_timerreschedule);
+	req_lib_tmr_timerreschedule.header.id =
+		MESSAGE_REQ_TMR_TIMERRESCHEDULE;
+
+	req_lib_tmr_timerreschedule.timer_id = timerId;
+
+	memcpy (&req_lib_tmr_timerreschedule.timer_attributes,
+		timerAttributes, sizeof (SaTmrTimerAttributesT));
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_timerreschedule,
+		sizeof (struct req_lib_tmr_timerreschedule),
+		&res_lib_tmr_timerreschedule,
+		sizeof (struct res_lib_tmr_timerreschedule));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_timerreschedule.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_timerreschedule.header.error;
+	}
+
+	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+
+	return (error);
+}
+
+SaAisErrorT
+saTmrTimerCancel (
+	SaTmrHandleT tmrHandle,
+	SaTmrTimerIdT timerId,
+	void **timerDataP)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_timercancel req_lib_tmr_timercancel;
+	struct res_lib_tmr_timercancel res_lib_tmr_timercancel;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrTimerCancel\n");
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	req_lib_tmr_timercancel.header.size =
+		sizeof (struct req_lib_tmr_timercancel);
+	req_lib_tmr_timercancel.header.id =
+		MESSAGE_REQ_TMR_TIMERCANCEL;
+
+	req_lib_tmr_timercancel.timer_id = timerId;
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_timercancel,
+		sizeof (struct req_lib_tmr_timercancel),
+		&res_lib_tmr_timercancel,
+		sizeof (struct res_lib_tmr_timercancel));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_timercancel.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_timercancel.header.error;
+	}
+
+error_exit:
+	return (error);
+}
+
+SaAisErrorT
+saTmrPeriodicTimerSkip (
+	SaTmrHandleT tmrHandle,
+	SaTmrTimerIdT timerId)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_periodictimerskip req_lib_tmr_periodictimerskip;
+	struct res_lib_tmr_periodictimerskip res_lib_tmr_periodictimerskip;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrPeriodicTimerSkip\n");
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		return (error);
+	}
+
+	req_lib_tmr_periodictimerskip.header.size =
+		sizeof (struct req_lib_tmr_periodictimerskip);
+	req_lib_tmr_periodictimerskip.header.id =
+		MESSAGE_REQ_TMR_PERIODICTIMERSKIP;
+
+	req_lib_tmr_periodictimerskip.timer_id = timerId;
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_periodictimerskip,
+		sizeof (struct req_lib_tmr_periodictimerskip),
+		&res_lib_tmr_periodictimerskip,
+		sizeof (struct res_lib_tmr_periodictimerskip));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_periodictimerskip.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_periodictimerskip.header.error;
+	}
+
+	return (error);
+}
+
+SaAisErrorT
+saTmrTimerRemainingTimeGet (
+	SaTmrHandleT tmrHandle,
+	SaTmrTimerIdT timerId,
+	SaTimeT *remainingTime)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_timerremainingtimeget req_lib_tmr_timerremainingtimeget;
+	struct res_lib_tmr_timerremainingtimeget res_lib_tmr_timerremainingtimeget;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTimerRemainingTimeGet\n");
+
+	if (remainingTime == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		return (error);
+	}
+
+	req_lib_tmr_timerremainingtimeget.header.size =
+		sizeof (struct req_lib_tmr_timerremainingtimeget);
+	req_lib_tmr_timerremainingtimeget.header.id =
+		MESSAGE_REQ_TMR_TIMERREMAININGTIMEGET;
+
+	req_lib_tmr_timerremainingtimeget.timer_id = timerId;
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_timerremainingtimeget,
+		sizeof (struct req_lib_tmr_timerremainingtimeget),
+		&res_lib_tmr_timerremainingtimeget,
+		sizeof (struct res_lib_tmr_timerremainingtimeget));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_timerremainingtimeget.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_timerremainingtimeget.header.error;
+	}
+
+	return (error);
+}
+
+SaAisErrorT
+saTmrTimerAttributesGet (
+	SaTmrHandleT tmrHandle,
+	SaTmrTimerIdT timerId,
+	SaTmrTimerAttributesT *timerAttributes)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_timerattributesget req_lib_tmr_timerattributesget;
+	struct res_lib_tmr_timerattributesget res_lib_tmr_timerattributesget;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrTimerAttributesGet\n");
+
+	if (timerAttributes == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	req_lib_tmr_timerattributesget.header.size =
+		sizeof (struct req_lib_tmr_timerattributesget);
+	req_lib_tmr_timerattributesget.header.id =
+		MESSAGE_REQ_TMR_TIMERATTRIBUTESGET;
+
+	req_lib_tmr_timerattributesget.timer_id = timerId;
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_timerattributesget,
+		sizeof (struct req_lib_tmr_timerattributesget),
+		&res_lib_tmr_timerattributesget,
+		sizeof (struct res_lib_tmr_timerattributesget));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_timerattributesget.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_timerattributesget.header.error;
+	}
+
+	memcpy (timerAttributes, &res_lib_tmr_timerattributesget.timer_attributes,
+		sizeof (SaTmrTimerAttributesT));
+
+error_exit:
+	return (error);
+}
+
+SaAisErrorT
+saTmrTimeGet (
+	SaTmrHandleT tmrHandle,
+	SaTimeT *currentTime)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_timeget req_lib_tmr_timeget;
+	struct res_lib_tmr_timeget res_lib_tmr_timeget;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrTimeGet\n");
+
+	if (currentTime == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	req_lib_tmr_timeget.header.size =
+		sizeof (struct req_lib_tmr_timeget);
+	req_lib_tmr_timeget.header.id =
+		MESSAGE_REQ_TMR_TIMEGET;
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_timeget,
+		sizeof (struct req_lib_tmr_timeget),
+		&res_lib_tmr_timeget,
+		sizeof (struct res_lib_tmr_timeget));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_timeget.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_timeget.header.error;
+	}
+
+	memcpy (currentTime, &res_lib_tmr_timeget.current_time,
+		sizeof (SaTimeT));
+
+error_exit:
+	return (error);
+}
+
+SaAisErrorT
+saTmrClockTickGet (
+	SaTmrHandleT tmrHandle,
+	SaTimeT *clockTick)
+{
+	struct tmrInstance *tmrInstance;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct req_lib_tmr_clocktickget req_lib_tmr_clocktickget;
+	struct res_lib_tmr_clocktickget res_lib_tmr_clocktickget;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saTmrClockTickGet\n");
+
+	if (clockTick == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	req_lib_tmr_clocktickget.header.size =
+		sizeof (struct req_lib_tmr_clocktickget);
+	req_lib_tmr_clocktickget.header.id =
+		MESSAGE_REQ_TMR_CLOCKTICKGET;
+
+	pthread_mutex_lock (&tmrInstance->response_mutex);
+
+	error = saSendReceiveReply (tmrInstance->response_fd,
+		&req_lib_tmr_clocktickget,
+		sizeof (struct req_lib_tmr_clocktickget),
+		&res_lib_tmr_clocktickget,
+		sizeof (struct res_lib_tmr_clocktickget));
+
+	pthread_mutex_unlock (&tmrInstance->response_mutex);
+
+	if (res_lib_tmr_clocktickget.header.error != SA_AIS_OK) {
+		error = res_lib_tmr_clocktickget.header.error;
+	}
+
+	memcpy (clockTick, &res_lib_tmr_clocktickget.clock_tick,
+		sizeof (SaTimeT));
+
+error_exit:
+	return (error);
+}
+
+static SaTimeT tmrGetTimeNow (void)
+{
+	struct timeval tv;
+	SaTimeT time;
+
+	if (gettimeofday (&tv, 0)) {
+		return (0ULL);
+	}
+
+	time = (SaTimeT)(tv.tv_sec) *  1000000000ULL;
+	time += (SaTimeT)(tv.tv_usec) * 1000ULL;
+
+	return (time);
+}

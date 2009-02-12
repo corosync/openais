@@ -1,0 +1,32 @@
+# Version and symbol export for libSaTmr.so
+
+OPENAIS_TMR_A.01.01 {
+	global:
+		saTmrInitialize;
+		saTmrSelectionObjectGet;
+		saTmrDispatch;
+		saLckFinalize;
+		saTmrTimerStart;
+		saTmrTimerReschedule;
+		saTmrTimerCancel;
+		saTmrPeriodicTimerSkip;
+		saTmrTimerRemainingTimeGet;
+		saTmrTimerAttributesGet;
+		saTmrTimeGet;
+		saTmrClockTickGet;
+
+	local:
+		saHandleCreate;
+		saHandleDestroy;
+		saHandleInstanceGet;
+		saHandleInstancePut;
+		saPollRetry;
+		saRecvRetry;
+		saSendMsgReceiveReply;
+		saSendMsgRetry;
+		saSendReceiveReply;
+		saSendRetry;
+		saServiceConnect;
+		saVersionVerify;
+		clustTimeNow;
+};
