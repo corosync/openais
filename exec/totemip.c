@@ -382,7 +382,7 @@ int totemip_iface_check(struct totem_ip_address *bindnet,
 				 */
 				if (bindnet->family == AF_INET && bindnet->nodeid == 0) {
 					unsigned int nodeid = 0;
-					memcpy (&nodeid, bindnet->addr, sizeof (int));
+					memcpy (&nodeid, &intf_addr_sin->sin_addr, sizeof (int));
 					if (mask_high_bit) {
 						nodeid &= 0x7FFFFFFF;
 					}
