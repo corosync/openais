@@ -44,14 +44,14 @@ TEST_SRC =  testclm.c testamf1.c \
 		testamf4.c testamf5.c testamf6.c testamfth.c  \
 		testckpt.c ckptstress.c ckptbench.c  \
 		ckptbenchth.c testevt.c testevs.c evsbench.c \
-		subscription.c publish.c evtbench.c \
-		sa_error.c unlink.c testclm2.c testlck.c testmsg.c
+		evsverify.c subscription.c publish.c evtbench.c \
+		sa_error.c unlink.c testclm2.c testlck.c
 
 all: testclm testamf1 \
 	testckpt ckptstress ckptbench \
 	ckptbenchth ckpt-rd ckpt-wr ckpt-overload-exit testevt testevs \
-	evsbench subscription publish evtbench unlink testclm2 testlck \
-	testmsg testcpg testcpg2 cpgbench openais-cfgtool
+	evsbench evsverify subscription publish evtbench unlink testclm2 \
+	testlck testcpg testcpg2 cpgbench openais-cfgtool testmsg
 
 testtimer: testtimer.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testtimer testtimer.o ../exec/timer.o
@@ -91,6 +91,9 @@ testevsth: testevsth.o $(LIBS)
 
 evsbench: evsbench.o $(LIBS)
 	$(CC) $(LDFLAGS) -o evsbench evsbench.o $(LIBS)
+
+evsverify: evsverify.o $(LIBS)
+	$(CC) $(LDFLAGS) -o evsverify evsverify.o $(LIBS) ../exec/crypto.o
 
 testclm: testclm.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testclm testclm.o $(LIBS)
@@ -156,8 +159,8 @@ clean:
 	rm -f *.o testclm testamf testamf1 testamf2 testamf3 testamf4 \
 	testamf5 testamf6 testamfth testckpt ckptstress testtimer \
 	ckptbench ckptbenchth testevt testevs ckpt-wr ckpt-rd \
-	evsbench subscription publish evtbench unlink testmsg testcpg \
-	testclm2 testlck cpgbench openais-cfgtool
+	evsbench subscription publish evtbench unlink testcpg \
+	testclm2 testlck cpgbench openais-cfgtool testmsg
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<

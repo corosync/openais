@@ -677,7 +677,6 @@ test_channel()
 	}
 
 
-
 	do {
 		result = saEvtFinalize(handle);
 	} while ((result == SA_AIS_ERR_TRY_AGAIN) && !sleep(TRY_WAIT));

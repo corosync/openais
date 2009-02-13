@@ -75,7 +75,6 @@
 #include "timer.h"
 #include "print.h"
 #include "util.h"
-#include "flow.h"
 #include "version.h"
 
 #define SERVER_BACKLOG 5
@@ -146,7 +145,9 @@ void sigintr_handler (int signum)
 	}
 #endif
 
+	poll_stop (0);
 	totempg_finalize ();
+	openais_ipc_exit ();
 	openais_exit_error (AIS_DONE_EXIT);
 }
 
@@ -578,8 +579,6 @@ int main (int argc, char **argv)
 		totem_config.vsf_type);
 
 
-	res = openais_flow_control_initialize ();
-
 	/*
 	 * Drop root privleges to user 'ais'
 	 * TODO: Don't really need full root capabilities;
@@ -592,10 +591,7 @@ int main (int argc, char **argv)
 
 	aisexec_mempool_init ();
 
-	openais_ipc_init (
-		serialize_mutex_lock,
-		serialize_mutex_unlock,
-		gid_valid);
+	openais_ipc_init (gid_valid);
 
 	/*
 	 * Start main processing loop

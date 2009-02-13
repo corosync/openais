@@ -53,8 +53,7 @@
 #include "util.h"
 
 struct evs_inst {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	int finalize;
 	evs_callbacks_t callbacks;
 	pthread_mutex_t response_mutex;
@@ -116,10 +115,8 @@ evs_error_t evs_initialize (
 		goto error_destroy;
 	}
 
-	error = saServiceConnect (&evs_inst->response_fd,
-		&evs_inst->dispatch_fd,
-		EVS_SERVICE);
-	if (error != SA_AIS_OK) {
+	error = openais_service_connect (EVS_SERVICE, &evs_inst->ipc_ctx);
+	if (error != EVS_OK) {
 		goto error_put_destroy;
 	}
 
@@ -151,7 +148,6 @@ evs_error_t evs_finalize (
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
-//	  TODO is the locking right here
 	pthread_mutex_lock (&evs_inst->response_mutex);
 
 	/*
@@ -165,22 +161,13 @@ evs_error_t evs_finalize (
 
 	evs_inst->finalize = 1;
 
+	openais_service_disconnect (evs_inst->ipc_ctx);
+
 	pthread_mutex_unlock (&evs_inst->response_mutex);
 
 	saHandleDestroy (&evs_handle_t_db, handle);
-    /*
-     * Disconnect from the server
-     */
-    if (evs_inst->response_fd != -1) {
-        shutdown(evs_inst->response_fd, 0);
-        close(evs_inst->response_fd);
-    }
-    if (evs_inst->dispatch_fd != -1) {
-        shutdown(evs_inst->dispatch_fd, 0);
-        close(evs_inst->dispatch_fd);
-    }
-	saHandleInstancePut (&evs_handle_t_db, handle);
 
+	saHandleInstancePut (&evs_handle_t_db, handle);
 
 	return (EVS_OK);
 }
@@ -197,7 +184,7 @@ evs_error_t evs_fd_get (
 		return (error);
 	}
 
-	*fd = evs_inst->dispatch_fd; 
+	*fd = openais_fd_get (evs_inst->ipc_ctx);
 
 	saHandleInstancePut (&evs_handle_t_db, handle);
 
@@ -208,7 +195,6 @@ evs_error_t evs_dispatch (
 	evs_handle_t handle,
 	evs_dispatch_t dispatch_types)
 {
-	struct pollfd ufds;
 	int timeout = -1;
 	SaAisErrorT error;
 	int cont = 1; /* always continue do loop except when set to 0 */
@@ -234,24 +220,14 @@ evs_error_t evs_dispatch (
 	}
 
 	do {
-		ufds.fd = evs_inst->dispatch_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
-
-		error = saPollRetry (&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
+		dispatch_avail = openais_dispatch_recv (evs_inst->ipc_ctx, (void *)&dispatch_data, timeout);
+		if (dispatch_avail == -1) {
+			error = SA_AIS_ERR_LIBRARY;
 			goto error_nounlock;
 		}
+			
 
 		pthread_mutex_lock (&evs_inst->dispatch_mutex);
-
-		/*
-		 * Regather poll data in case ufds has changed since taking lock
-		 */
-		error = saPollRetry (&ufds, 1, 0);
-		if (error != SA_AIS_OK) {
-			goto error_nounlock;
-		}
 
 		/*
 		 * Handle has been finalized in another thread
@@ -262,36 +238,13 @@ evs_error_t evs_dispatch (
 			goto error_unlock;
 		}
 
-		dispatch_avail = ufds.revents & POLLIN;
 		if (dispatch_avail == 0 && dispatch_types == EVS_DISPATCH_ALL) {
 			pthread_mutex_unlock (&evs_inst->dispatch_mutex);
 			break; /* exit do while cont is 1 loop */
 		} else 
 		if (dispatch_avail == 0) {
 			pthread_mutex_unlock (&evs_inst->dispatch_mutex);
-			continue; /* next poll */
-		}
-
-		if (ufds.revents & POLLIN) {
-			/*
-			 * Queue empty, read response from socket
-			 */
-			error = saRecvRetry (evs_inst->dispatch_fd, &dispatch_data.header,
-				sizeof (mar_res_header_t));
-			if (error != SA_AIS_OK) {
-				goto error_unlock;
-			}
-			if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-				error = saRecvRetry (evs_inst->dispatch_fd, &dispatch_data.data,
-					dispatch_data.header.size - sizeof (mar_res_header_t));
-
-				if (error != SA_AIS_OK) {
-					goto error_unlock;
-				}
-			}
-		} else {
-			pthread_mutex_unlock (&evs_inst->dispatch_mutex);
-			continue;
+			continue; /* next dispatch event */
 		}
 
 		/*
@@ -370,7 +323,7 @@ evs_error_t evs_join (
 	struct res_lib_evs_join res_lib_evs_join;
 
 	error = saHandleInstanceGet (&evs_handle_t_db, handle, (void *)&evs_inst);
-	if (error != SA_AIS_OK) {
+	if (error != EVS_OK) {
 		return (error);
 	}
 
@@ -386,7 +339,7 @@ evs_error_t evs_join (
 	
 	pthread_mutex_lock (&evs_inst->response_mutex);
 
-	error = saSendMsgReceiveReply (evs_inst->response_fd, iov, 2,
+	error = openais_msg_send_reply_receive (evs_inst->ipc_ctx, iov, 2,
 		&res_lib_evs_join, sizeof (struct res_lib_evs_join));
 
 	pthread_mutex_unlock (&evs_inst->response_mutex);
@@ -431,7 +384,7 @@ evs_error_t evs_leave (
 	
 	pthread_mutex_lock (&evs_inst->response_mutex);
 
-	error = saSendMsgReceiveReply (evs_inst->response_fd, iov, 2,
+	error = openais_msg_send_reply_receive (evs_inst->ipc_ctx, iov, 2,
 		&res_lib_evs_leave, sizeof (struct res_lib_evs_leave));
 
 	pthread_mutex_unlock (&evs_inst->response_mutex);
@@ -484,8 +437,10 @@ evs_error_t evs_mcast_joined (
 	
 	pthread_mutex_lock (&evs_inst->response_mutex);
 
-	error = saSendMsgReceiveReply (evs_inst->response_fd, iov, iov_len + 1,
-		&res_lib_evs_mcast_joined, sizeof (struct res_lib_evs_mcast_joined));
+	error = openais_msg_send_reply_receive (evs_inst->ipc_ctx, iov,
+		iov_len + 1,
+		&res_lib_evs_mcast_joined,
+		sizeof (struct res_lib_evs_mcast_joined));
 
 	pthread_mutex_unlock (&evs_inst->response_mutex);
 
@@ -539,8 +494,10 @@ evs_error_t evs_mcast_groups (
 	
 	pthread_mutex_lock (&evs_inst->response_mutex);
 
-	error = saSendMsgReceiveReply (evs_inst->response_fd, iov, iov_len + 2,
-		&res_lib_evs_mcast_groups, sizeof (struct res_lib_evs_mcast_groups));
+	error = openais_msg_send_reply_receive (evs_inst->ipc_ctx, iov,
+		iov_len + 2,
+		&res_lib_evs_mcast_groups,
+		sizeof (struct res_lib_evs_mcast_groups));
 
 	pthread_mutex_unlock (&evs_inst->response_mutex);
 	if (error != SA_AIS_OK) {
@@ -580,8 +537,11 @@ evs_error_t evs_membership_get (
 
 	pthread_mutex_lock (&evs_inst->response_mutex);
 
-	error = saSendMsgReceiveReply (evs_inst->response_fd, &iov, 1,
-		&res_lib_evs_membership_get, sizeof (struct res_lib_evs_membership_get));
+	error = openais_msg_send_reply_receive (evs_inst->ipc_ctx,
+		&iov,
+		1,
+		&res_lib_evs_membership_get,
+		sizeof (struct res_lib_evs_membership_get));
 
 	pthread_mutex_unlock (&evs_inst->response_mutex);
 

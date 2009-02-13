@@ -63,8 +63,7 @@ struct message_overlay {
  * Data structure for instance data
  */
 struct lckInstance {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	SaLckCallbacksT callbacks;
 	int finalize;
 	SaLckHandleT lckHandle;
@@ -74,7 +73,7 @@ struct lckInstance {
 };
 
 struct lckResourceInstance {
-	int response_fd;
+	void *ipc_ctx;
 	SaLckHandleT lckHandle;
 	SaLckResourceHandleT lckResourceHandle;
 	SaLckResourceOpenFlagsT resourceOpenFlags;
@@ -85,7 +84,7 @@ struct lckResourceInstance {
 };
 
 struct lckLockIdInstance {
-	int response_fd;
+	void *ipc_ctx;
 	SaLckResourceHandleT lckResourceHandle;
 	struct list_head list;
 	void *resource_lock;
@@ -262,10 +261,7 @@ saLckInitialize (
 		goto error_destroy;
 	}
 
-	lckInstance->response_fd = -1;
-
-	error = saServiceConnect (&lckInstance->response_fd,
-		&lckInstance->dispatch_fd, LCK_SERVICE);
+	error = openais_service_connect (LCK_SERVICE, &lckInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -311,7 +307,7 @@ saLckSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = lckInstance->dispatch_fd;
+	*selectionObject = openais_fd_get (lckInstance->ipc_ctx);
 
 	saHandleInstancePut (&lckHandleDatabase, lckHandle);
 
@@ -331,8 +327,6 @@ saLckDispatch (
 	const SaLckHandleT lckHandle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	struct pollfd ufds;
-	int poll_fd;
 	int timeout = 1;
 	SaLckCallbacksT callbacks;
 	SaAisErrorT error;
@@ -369,31 +363,15 @@ saLckDispatch (
 	}
 
 	do {
-		/*
-		 * Read data directly from socket
-		 */
-		poll_fd = lckInstance->dispatch_fd;
-		ufds.fd = poll_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
+		dispatch_avail = openais_dispatch_recv (lckInstance->ipc_ctx,
+			(void *)&dispatch_data, timeout);
 
-		error = saPollRetry(&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto error_put;
-		}
 		pthread_mutex_lock(&lckInstance->dispatch_mutex);
 
 		if (lckInstance->finalize == 1) {
 			error = SA_AIS_OK;
 			goto error_unlock;
 		}
-
-		if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
-				error = SA_AIS_ERR_BAD_HANDLE;
-				goto error_unlock;
-		}
-		
-		dispatch_avail = (ufds.revents & POLLIN);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
 			pthread_mutex_unlock(&lckInstance->dispatch_mutex);
@@ -404,19 +382,6 @@ saLckDispatch (
 			continue;
 		}
 		
-		memset(&dispatch_data,0, sizeof(struct message_overlay));
-		error = saRecvRetry (lckInstance->dispatch_fd, &dispatch_data.header, sizeof (mar_res_header_t));
-		if (error != SA_AIS_OK) {
-			goto error_unlock;
-		}
-		if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-			error = saRecvRetry (lckInstance->dispatch_fd, &dispatch_data.data,
-				dispatch_data.header.size - sizeof (mar_res_header_t));
-			if (error != SA_AIS_OK) {
-				goto error_unlock;
-			}
-		}
-
 		/*
 		* Make copy of callbacks, message data, unlock instance,
 		* and call callback. A risk of this dispatch method is that
@@ -558,7 +523,6 @@ saLckDispatch (
 	} while (cont);
 error_unlock:
 	pthread_mutex_unlock(&lckInstance->dispatch_mutex);
-error_put:
 	saHandleInstancePut(&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
@@ -590,20 +554,12 @@ saLckFinalize (
 
 	lckInstance->finalize = 1;
 
+	openais_service_disconnect (lckInstance->ipc_ctx);
+
 	pthread_mutex_unlock (&lckInstance->response_mutex);
 	pthread_mutex_destroy (&lckInstance->response_mutex);
 
 // TODO	lckInstanceFinalize (lckInstance);
-
-	if (lckInstance->response_fd != -1) {
-		shutdown (lckInstance->response_fd, 0);
-		close (lckInstance->response_fd);
-	}
-
-	if (lckInstance->dispatch_fd != -1) {
-		shutdown (lckInstance->dispatch_fd, 0);
-		close (lckInstance->dispatch_fd);
-	}
 
 	saHandleInstancePut (&lckHandleDatabase, lckHandle);
 
@@ -621,6 +577,7 @@ saLckResourceOpen (
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckInstance *lckInstance;
+	struct iovec iov;
 	struct req_lib_lck_resourceopen req_lib_lck_resourceopen;
 	struct res_lib_lck_resourceopen res_lib_lck_resourceopen;
 
@@ -650,7 +607,7 @@ saLckResourceOpen (
 		goto error_destroy;
 	}
 
-	lckResourceInstance->response_fd = lckInstance->response_fd;
+	lckResourceInstance->ipc_ctx = lckInstance->ipc_ctx;
 
 	lckResourceInstance->lckHandle = lckHandle;
 	lckResourceInstance->lckResourceHandle = *lckResourceHandle;
@@ -666,11 +623,15 @@ saLckResourceOpen (
 	req_lib_lck_resourceopen.resourceHandle = *lckResourceHandle;
 	req_lib_lck_resourceopen.async_call = 0;
 
+	iov.iov_base = &req_lib_lck_resourceopen;
+	iov.iov_len = sizeof (struct req_lib_lck_resourceopen);
+
 	pthread_mutex_lock (&lckInstance->response_mutex);
 
-	error = saSendReceiveReply (lckResourceInstance->response_fd, 
-		&req_lib_lck_resourceopen,
-		sizeof (struct req_lib_lck_resourceopen),
+	error = openais_msg_send_reply_receive (
+		lckResourceInstance->ipc_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_resourceopen,
 		sizeof (struct res_lib_lck_resourceopen));
 	
@@ -714,6 +675,7 @@ saLckResourceOpenAsync (
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckInstance *lckInstance;
 	SaLckResourceHandleT lckResourceHandle;
+	struct iovec iov;
 	SaAisErrorT error;
 	struct req_lib_lck_resourceopen req_lib_lck_resourceopen;
 	struct res_lib_lck_resourceopenasync res_lib_lck_resourceopenasync;
@@ -741,7 +703,7 @@ saLckResourceOpenAsync (
 		goto error_destroy;
 	}
 
-	lckResourceInstance->response_fd = lckInstance->response_fd;
+	lckResourceInstance->ipc_ctx = lckInstance->ipc_ctx;
 	lckResourceInstance->response_mutex = &lckInstance->response_mutex;
 	lckResourceInstance->lckHandle = lckHandle;
 	lckResourceInstance->lckResourceHandle = lckResourceHandle;
@@ -755,11 +717,15 @@ saLckResourceOpenAsync (
 	req_lib_lck_resourceopen.resourceHandle = lckResourceHandle;
 	req_lib_lck_resourceopen.async_call = 1;
 
+	iov.iov_base = &req_lib_lck_resourceopen;
+	iov.iov_len = sizeof (struct req_lib_lck_resourceopen);
+
 	pthread_mutex_lock (&lckInstance->response_mutex);
 
-	error = saSendReceiveReply (lckResourceInstance->response_fd, 
-		&req_lib_lck_resourceopen,
-		sizeof (struct req_lib_lck_resourceopen),
+	error = openais_msg_send_reply_receive (
+		lckResourceInstance->ipc_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_resourceopenasync,
 		sizeof (struct res_lib_lck_resourceopenasync));
 
@@ -787,6 +753,7 @@ saLckResourceClose (
 {
 	struct req_lib_lck_resourceclose req_lib_lck_resourceclose;
 	struct res_lib_lck_resourceclose res_lib_lck_resourceclose;
+	struct iovec iov;
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 
@@ -802,11 +769,15 @@ saLckResourceClose (
 		&lckResourceInstance->lockResourceName, sizeof (SaNameT));
 	req_lib_lck_resourceclose.resourceHandle = lckResourceHandle;
 
+	iov.iov_base = &req_lib_lck_resourceclose;
+	iov.iov_len = sizeof (struct req_lib_lck_resourceclose);
+
 	pthread_mutex_lock (lckResourceInstance->response_mutex);
 
-	error = saSendReceiveReply (lckResourceInstance->response_fd, 
-		&req_lib_lck_resourceclose,
-		sizeof (struct req_lib_lck_resourceclose),
+	error = openais_msg_send_reply_receive (
+		lckResourceInstance->ipc_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_resourceclose,
 		sizeof (struct res_lib_lck_resourceclose));
 
@@ -831,11 +802,11 @@ saLckResourceLock (
 {
 	struct req_lib_lck_resourcelock req_lib_lck_resourcelock;
 	struct res_lib_lck_resourcelock res_lib_lck_resourcelock;
+	struct iovec iov;
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
-	int lock_fd;
-	int dummy_fd;
+	void *lock_ctx;
 
 	error = saHandleInstanceGet (&lckResourceHandleDatabase, lckResourceHandle,
 		(void *)&lckResourceInstance);
@@ -855,13 +826,13 @@ saLckResourceLock (
 		goto error_destroy;
 	}
 
-	error = saServiceConnect (&lock_fd, &dummy_fd, LCK_SERVICE);
+	error = openais_service_connect (LCK_SERVICE, &lock_ctx);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}
 
 	lckLockIdInstance->response_mutex = lckResourceInstance->response_mutex;
-	lckLockIdInstance->response_fd = lckResourceInstance->response_fd;
+	lckLockIdInstance->ipc_ctx = lckResourceInstance->ipc_ctx;
 	lckLockIdInstance->lckResourceHandle = lckResourceHandle;
 
 	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
@@ -880,17 +851,17 @@ saLckResourceLock (
 		&lckResourceInstance->source,
 		sizeof (mar_message_source_t));
 
+	iov.iov_base = &req_lib_lck_resourcelock;	
+	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
+
 	/*
 	 * no mutex needed here since its a new connection
 	 */
-	error = saSendReceiveReply (lock_fd, 
-		&req_lib_lck_resourcelock,
-		sizeof (struct req_lib_lck_resourcelock),
+	error = openais_msg_send_reply_receive (lock_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_resourcelock,
 		sizeof (struct res_lib_lck_resourcelock));
-
-	close (lock_fd);
-	close (dummy_fd);
 
 	if (error == SA_AIS_OK) {
 		lckLockIdInstance->resource_lock = res_lib_lck_resourcelock.resource_lock;
@@ -924,11 +895,11 @@ saLckResourceLockAsync (
 {
 	struct req_lib_lck_resourcelock req_lib_lck_resourcelock;
 	struct res_lib_lck_resourcelockasync res_lib_lck_resourcelockasync;
+	struct iovec iov;
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
-	int lock_fd;
-	int dummy_fd;
+	void *lock_ctx;
 
 	error = saHandleInstanceGet (&lckResourceHandleDatabase, lckResourceHandle,
 		(void *)&lckResourceInstance);
@@ -948,13 +919,13 @@ saLckResourceLockAsync (
 		goto error_destroy;
 	}
 
-	error = saServiceConnect (&lock_fd, &dummy_fd, LCK_SERVICE);
+	error = openais_service_connect (LCK_SERVICE, &lock_ctx);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}
 
 	lckLockIdInstance->response_mutex = lckResourceInstance->response_mutex;
-	lckLockIdInstance->response_fd = lckResourceInstance->response_fd;
+	lckLockIdInstance->ipc_ctx = lckResourceInstance->ipc_ctx;
 	lckLockIdInstance->lckResourceHandle = lckResourceHandle;
 
 	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
@@ -973,17 +944,18 @@ saLckResourceLockAsync (
 		&lckResourceInstance->source,
 		sizeof (mar_message_source_t));
 
+	iov.iov_base = &req_lib_lck_resourcelock;
+	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
+
 	/*
 	 * no mutex needed here since its a new connection
 	 */
-	error = saSendReceiveReply (lock_fd, 
-		&req_lib_lck_resourcelock,
-		sizeof (struct req_lib_lck_resourcelock),
+	error = openais_msg_send_reply_receive (
+		lock_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_resourcelockasync,
 		sizeof (struct res_lib_lck_resourcelock));
-
-	close (lock_fd);
-	close (dummy_fd);
 
 	if (error == SA_AIS_OK) {
 		return (res_lib_lck_resourcelockasync.header.error);
@@ -1009,6 +981,7 @@ saLckResourceUnlock (
 {
 	struct req_lib_lck_resourceunlock req_lib_lck_resourceunlock;
 	struct res_lib_lck_resourceunlock res_lib_lck_resourceunlock;
+	struct iovec iov;
 	SaAisErrorT error;
 	struct lckLockIdInstance *lckLockIdInstance;
 	struct lckResourceInstance *lckResourceInstance;
@@ -1043,11 +1016,15 @@ saLckResourceUnlock (
 	req_lib_lck_resourceunlock.async_call = 0;
 	req_lib_lck_resourceunlock.resource_lock = lckLockIdInstance->resource_lock;
 
+	iov.iov_base = &req_lib_lck_resourceunlock;
+	iov.iov_len = sizeof (struct req_lib_lck_resourceunlock);
+
 	pthread_mutex_lock (lckLockIdInstance->response_mutex);
 
-	error = saSendReceiveReply (lckLockIdInstance->response_fd, 
-		&req_lib_lck_resourceunlock,
-		sizeof (struct req_lib_lck_resourceunlock),
+	error = openais_msg_send_reply_receive (
+		lckLockIdInstance->ipc_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_resourceunlock,
 		sizeof (struct res_lib_lck_resourceunlock));
 
@@ -1067,6 +1044,7 @@ saLckResourceUnlockAsync (
 {
 	struct req_lib_lck_resourceunlock req_lib_lck_resourceunlock;
 	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
+	struct iovec iov;
 	SaAisErrorT error;
 	struct lckLockIdInstance *lckLockIdInstance;
 	struct lckResourceInstance *lckResourceInstance;
@@ -1103,11 +1081,14 @@ saLckResourceUnlockAsync (
 	req_lib_lck_resourceunlock.lockId = lockId;
 	req_lib_lck_resourceunlock.async_call = 1;
 
+	iov.iov_base = &req_lib_lck_resourceunlock;
+	iov.iov_len = sizeof (struct req_lib_lck_resourceunlock);
+
 	pthread_mutex_lock (lckLockIdInstance->response_mutex);
 
-	error = saSendReceiveReply (lckLockIdInstance->response_fd, 
-		&req_lib_lck_resourceunlock,
-		sizeof (struct req_lib_lck_resourceunlock),
+	error = openais_msg_send_reply_receive (lckLockIdInstance->ipc_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_resourceunlockasync,
 		sizeof (struct res_lib_lck_resourceunlockasync));
 
@@ -1124,6 +1105,7 @@ saLckLockPurge (
 {
 	struct req_lib_lck_lockpurge req_lib_lck_lockpurge;
 	struct res_lib_lck_lockpurge res_lib_lck_lockpurge;
+	struct iovec iov;
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 
@@ -1138,11 +1120,14 @@ saLckLockPurge (
 	memcpy (&req_lib_lck_lockpurge.lockResourceName,
 		&lckResourceInstance->lockResourceName, sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_lck_lockpurge;
+	iov.iov_len = sizeof (struct req_lib_lck_lockpurge);
+
 	pthread_mutex_lock (lckResourceInstance->response_mutex);
 
-	error = saSendReceiveReply (lckResourceInstance->response_fd, 
-		&req_lib_lck_lockpurge,
-		sizeof (struct req_lib_lck_lockpurge),
+	error = openais_msg_send_reply_receive (lckResourceInstance->ipc_ctx, 
+		&iov,
+		1,
 		&res_lib_lck_lockpurge,
 		sizeof (struct res_lib_lck_lockpurge));
 

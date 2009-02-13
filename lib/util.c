@@ -2,7 +2,7 @@
  * vi: set autoindent tabstop=4 shiftwidth=4 :
  *
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006-2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -52,6 +52,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <assert.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
 
 #include "../include/saAis.h"
 #include "../include/ipc_gen.h"
@@ -69,6 +71,16 @@ struct saHandle {
 	int refCount;
 	uint32_t check;
 };
+
+struct ipc_segment {
+	int fd;
+	int shmid;
+	int semid;
+	int flow_control_state;
+	struct shared_memory *shared_memory;
+	uid_t euid;
+};
+
 
 #if defined(OPENAIS_LINUX)
 /* SUN_LEN is broken for abstract namespace 
@@ -90,189 +102,12 @@ void socket_nosigpipe(int s)
 }
 #endif 
 
-SaAisErrorT
-saServiceConnect (
-	int *responseOut,
-	int *callbackOut,
-	enum service_types service)
-{
-	int responseFD;
-	int callbackFD;
-	int result;
-	struct sockaddr_un address;
-	mar_req_lib_response_init_t req_lib_response_init;
-	mar_res_lib_response_init_t res_lib_response_init;
-	mar_req_lib_dispatch_init_t req_lib_dispatch_init;
-	mar_res_lib_dispatch_init_t res_lib_dispatch_init;
-	SaAisErrorT error;
-	gid_t egid;
-
-	/*
-	 * Allow set group id binaries to be authenticated
-	 */
-	egid = getegid();
-	setregid (egid, -1);
-
-	memset (&address, 0, sizeof (struct sockaddr_un));
-#if defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
-	address.sun_len = sizeof(struct sockaddr_un);
-#endif
-	address.sun_family = PF_UNIX;
-#if defined(OPENAIS_LINUX)
-	strcpy (address.sun_path + 1, socketname);
-#else
-	strcpy (address.sun_path, socketname);
-#endif
-	responseFD = socket (PF_UNIX, SOCK_STREAM, 0);
-	if (responseFD == -1) {
-		return (SA_AIS_ERR_NO_RESOURCES);
-	}
-
-	socket_nosigpipe (responseFD);
-
-	result = connect (responseFD, (struct sockaddr *)&address, AIS_SUN_LEN(&address));
-	if (result == -1) {
-		close (responseFD);
-		return (SA_AIS_ERR_TRY_AGAIN);
-	}
-
-	req_lib_response_init.resdis_header.size = sizeof (req_lib_response_init);
-	req_lib_response_init.resdis_header.id = MESSAGE_REQ_RESPONSE_INIT;
-	req_lib_response_init.resdis_header.service = service;
-
-	error = saSendRetry (responseFD, &req_lib_response_init,
-		sizeof (mar_req_lib_response_init_t));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-	error = saRecvRetry (responseFD, &res_lib_response_init,
-		sizeof (mar_res_lib_response_init_t));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	/*
-	 * Check for security errors
-	 */
-	if (res_lib_response_init.header.error != SA_AIS_OK) {
-		error = res_lib_response_init.header.error;
-		goto error_exit;
-	}
-
-	*responseOut = responseFD;
-
-/* if I comment out the 4 lines below the executive crashes */
-	callbackFD = socket (PF_UNIX, SOCK_STREAM, 0);
-	if (callbackFD == -1) {
-		close (responseFD);
-		return (SA_AIS_ERR_NO_RESOURCES);
-	}
-
-	socket_nosigpipe (callbackFD);
-
-	result = connect (callbackFD, (struct sockaddr *)&address, AIS_SUN_LEN(&address));
-	if (result == -1) {
-		close (callbackFD);
-		close (responseFD);
-		return (SA_AIS_ERR_TRY_AGAIN);
-	}
-
-	req_lib_dispatch_init.resdis_header.size = sizeof (req_lib_dispatch_init);
-	req_lib_dispatch_init.resdis_header.id = MESSAGE_REQ_DISPATCH_INIT;
-	req_lib_dispatch_init.resdis_header.service = service;
-
-	req_lib_dispatch_init.conn_info = res_lib_response_init.conn_info;
-
-	error = saSendRetry (callbackFD, &req_lib_dispatch_init,
-		sizeof (mar_req_lib_dispatch_init_t));
-	if (error != SA_AIS_OK) {
-		goto error_exit_two;
-	}
-	error = saRecvRetry (callbackFD, &res_lib_dispatch_init,
-		sizeof (mar_res_lib_dispatch_init_t));
-	if (error != SA_AIS_OK) {
-		goto error_exit_two;
-	}
-
-	/*
-	 * Check for security errors
-	 */
-	if (res_lib_dispatch_init.header.error != SA_AIS_OK) {
-		error = res_lib_dispatch_init.header.error;
-		goto error_exit;
-	}
-
-	*callbackOut = callbackFD;
-	return (SA_AIS_OK);
-
-error_exit_two:
-	close (callbackFD);
-error_exit:
-	close (responseFD);
-	return (error);
-}
-
-SaAisErrorT
-saRecvRetry (
-	int s,
-	void *msg,
-	size_t len)
-{
-	SaAisErrorT error = SA_AIS_OK;
-	int result;
-	struct msghdr msg_recv;
-	struct iovec iov_recv;
-	char *rbuf = (char *)msg;
-	int processed = 0;
-
-	msg_recv.msg_iov = &iov_recv;
-	msg_recv.msg_iovlen = 1;
-	msg_recv.msg_name = 0;
-	msg_recv.msg_namelen = 0;
-	msg_recv.msg_control = 0;
-	msg_recv.msg_controllen = 0;
-	msg_recv.msg_flags = 0;
-
-retry_recv:
-	iov_recv.iov_base = (void *)&rbuf[processed];
-	iov_recv.iov_len = len - processed;
-
-	result = recvmsg (s, &msg_recv, MSG_NOSIGNAL);
-	if (result == -1 && errno == EINTR) {
-		goto retry_recv;
-	}
-	if (result == -1 && errno == EAGAIN) {
-		goto retry_recv;
-	}
-#if defined(OPENAIS_SOLARIS) || defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
-	/* On many OS poll never return POLLHUP or POLLERR.
-	 * EOF is detected when recvmsg return 0.
-	 */
-	if (result == 0) {
-		error = SA_AIS_ERR_LIBRARY;
-		goto error_exit;
-	}
-#endif
-	if (result == -1 || result == 0) {
-		error = SA_AIS_ERR_LIBRARY;
-		goto error_exit;
-	}
-	processed += result;
-	if (processed != len) {
-		goto retry_recv;
-	}
-	assert (processed == len);
-error_exit:
-	return (error);
-}
-
-SaAisErrorT
-saSendRetry (
+static int
+openais_send (
 	int s,
 	const void *msg,
 	size_t len)
 {
-	SaAisErrorT error = SA_AIS_OK;
 	int result;
 	struct msghdr msg_send;
 	struct iovec iov_send;
@@ -299,15 +134,12 @@ retry_send:
 	 */
 	if (result == -1 && processed == 0) {
 		if (errno == EINTR) {
-			error = SA_AIS_ERR_TRY_AGAIN;
 			goto error_exit;
 		}
 		if (errno == EAGAIN) {
-			error = SA_AIS_ERR_TRY_AGAIN;
 			goto error_exit;
 		}
 		if (errno == EFAULT) {
-			error = SA_AIS_ERR_INVALID_PARAM;
 			goto error_exit;
 		}
 	}
@@ -324,7 +156,6 @@ retry_send:
 			goto retry_send;
 		}
 		if (errno == EFAULT) {
-			error = SA_AIS_ERR_LIBRARY;
 			goto error_exit;
 		}
 	}
@@ -333,7 +164,6 @@ retry_send:
 	 * return ERR_LIBRARY on any other syscall error
 	 */
 	if (result == -1) {
-		error = SA_AIS_ERR_LIBRARY;
 		goto error_exit;
 	}
 
@@ -342,180 +172,531 @@ retry_send:
 		goto retry_send;
 	}
 
+	return (0);
+
 error_exit:
-	return (error);
+	return (-1);
 }
 
-SaAisErrorT saSendMsgRetry (
-        int s,
-        struct iovec *iov,
-        int iov_len)
+static int
+openais_recv (
+	int s,
+	void *msg,
+	size_t len)
 {
-	SaAisErrorT error = SA_AIS_OK;
+	int error = 0;
 	int result;
-	int total_size = 0;
-	int i;
-	int csize;
-	int csize_cntr;
-	int total_sent = 0;
-	int iov_len_sendmsg = iov_len;
-	struct iovec *iov_sendmsg = iov;
-	struct iovec iovec_save;
-	int iovec_saved_position = -1;
+	struct msghdr msg_recv;
+	struct iovec iov_recv;
+	char *rbuf = (char *)msg;
+	int processed = 0;
 
-	struct msghdr msg_send;
+	msg_recv.msg_iov = &iov_recv;
+	msg_recv.msg_iovlen = 1;
+	msg_recv.msg_name = 0;
+	msg_recv.msg_namelen = 0;
+	msg_recv.msg_control = 0;
+	msg_recv.msg_controllen = 0;
+	msg_recv.msg_flags = 0;
 
-	for (i = 0; i < iov_len; i++) {
-		total_size += iov[i].iov_len;
+retry_recv:
+	iov_recv.iov_base = (void *)&rbuf[processed];
+	iov_recv.iov_len = len - processed;
+
+	result = recvmsg (s, &msg_recv, MSG_NOSIGNAL|MSG_WAITALL);
+	if (result == -1 && errno == EINTR) {
+		goto retry_recv;
 	}
-	msg_send.msg_iov = iov_sendmsg;
-	msg_send.msg_iovlen = iov_len_sendmsg;
-	msg_send.msg_name = 0;
-	msg_send.msg_namelen = 0;
-	msg_send.msg_control = 0;
-	msg_send.msg_controllen = 0;
-	msg_send.msg_flags = 0;
-
-retry_sendmsg:
-	result = sendmsg (s, &msg_send, MSG_NOSIGNAL);
-	/*
-	 * Can't send now, and message not committed, so don't retry send
-	 */
-	if (result == -1 && iovec_saved_position == -1) {
-		if (errno == EINTR) {
-			error = SA_AIS_ERR_TRY_AGAIN;
-			goto error_exit;
-		}
-		if (errno == EAGAIN) {
-			error = SA_AIS_ERR_TRY_AGAIN;
-			goto error_exit;
-		}
-		if (errno == EFAULT) {
-			error = SA_AIS_ERR_INVALID_PARAM;
-			goto error_exit;
-		}
+	if (result == -1 && errno == EAGAIN) {
+		goto retry_recv;
 	}
-
-	/*
-	 * Retry (and block) if portion of message has already been written
+#if defined(OPENAIS_SOLARIS) || defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
+	/* On many OS poll never return POLLHUP or POLLERR.
+	 * EOF is detected when recvmsg return 0.
 	 */
-	if (result == -1 && iovec_saved_position != -1) {
-		if (errno == EINTR) {
-			goto retry_sendmsg;
-		}
-		if (errno == EAGAIN) {
-			goto retry_sendmsg;
-		}
-		if (errno == EFAULT) {
-			error = SA_AIS_ERR_LIBRARY;
-			goto error_exit;
-		}
-	}
-	
-	/*
-	 * ERR_LIBRARY for any other syscall error
-	 */
-	if (result == -1) {
-		error = SA_AIS_ERR_LIBRARY;
+	if (result == 0) {
+		error = -1;
 		goto error_exit;
 	}
-
-	if (iovec_saved_position != -1) {
-			memcpy (&iov[iovec_saved_position], &iovec_save, sizeof (struct iovec));
+#endif
+	if (result == -1 || result == 0) {
+		error = -1;
+		goto error_exit;
 	}
-
-	total_sent += result;
-	if (total_sent != total_size) {
-		for (i = 0, csize = 0, csize_cntr = 0; i < iov_len; i++) {
-			csize += iov[i].iov_len;
-			if (csize > total_sent) {
-				break;
-			}
-
-			csize_cntr += iov[i].iov_len;
-		}
-		memcpy (&iovec_save, &iov[i], sizeof (struct iovec));
-		iovec_saved_position = i;
-		iov[i].iov_base = ((unsigned char *)(iov[i].iov_base)) +
-			(total_sent - csize_cntr);
-		iov[i].iov_len = total_size - total_sent;
-		msg_send.msg_iov = &iov[i];
-		msg_send.msg_iovlen = iov_len - i;
-
-		goto retry_sendmsg;
+	processed += result;
+	if (processed != len) {
+		goto retry_recv;
 	}
-
+	assert (processed == len);
 error_exit:
-	return (error);
+	return (0);
 }
 
-SaAisErrorT saSendMsgReceiveReply (
-        int s,
-        struct iovec *iov,
-        int iov_len,
-        void *responseMessage,
-        int responseLen)
+static int 
+priv_change_send (struct ipc_segment *ipc_segment)
 {
-	SaAisErrorT error = SA_AIS_OK;
-
-	error = saSendMsgRetry (s, iov, iov_len);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
+	char buf_req;
+	mar_req_priv_change req_priv_change;
+	unsigned int res;
 	
-	error = saRecvRetry (s, responseMessage, responseLen);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
+	req_priv_change.euid = geteuid();
+	/*
+	 * Don't resend request unless euid has changed
+	*/
+	if (ipc_segment->euid == req_priv_change.euid) {
+		return (0);
+	}
+	req_priv_change.egid = getegid();
+
+	buf_req = MESSAGE_REQ_CHANGE_EUID;
+	res = openais_send (ipc_segment->fd, &buf_req, 1);
+	if (res == -1) {
+		return (-1);
 	}
 
-error_exit:
-	return (error);
+	res = openais_send (ipc_segment->fd, &req_priv_change,
+		sizeof (req_priv_change));
+	if (res == -1) {
+		return (-1);
+	}
+
+	ipc_segment->euid = req_priv_change.euid;
+	return (0);
 }
-
-SaAisErrorT saSendReceiveReply (
-        int s,
-        void *requestMessage,
-        int requestLen,
-        void *responseMessage,
-        int responseLen)
+	
+SaAisErrorT
+openais_service_connect (
+	enum service_types service,
+	void **shmseg)
 {
-	SaAisErrorT error = SA_AIS_OK;
+	int request_fd;
+	struct sockaddr_un address;
+	SaAisErrorT error;
+	struct ipc_segment *ipc_segment;
+	key_t shmkey = 0;
+	key_t semkey = 0;
+	int res;
+	mar_req_setup_t req_setup;
+	mar_res_setup_t res_setup;
 
-	error = saSendRetry (s, requestMessage, requestLen);
-	if (error != SA_AIS_OK) {
+	res_setup.error = SA_AIS_ERR_LIBRARY;
+
+	request_fd = socket (PF_UNIX, SOCK_STREAM, 0);
+	if (request_fd == -1) {
+		return (-1);
+	}
+
+	memset (&address, 0, sizeof (struct sockaddr_un));
+#if defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
+	address.sun_len = sizeof(struct sockaddr_un);
+#endif
+	address.sun_family = PF_UNIX;
+#if defined(OPENAIS_LINUX)
+	strcpy (address.sun_path + 1, socketname);
+#else
+	strcpy (address.sun_path, socketname);
+#endif
+	res = connect (request_fd, (struct sockaddr *)&address,
+		AIS_SUN_LEN(&address));
+	if (res == -1) {
+		close (request_fd);
+		return (SA_AIS_ERR_TRY_AGAIN);
+	}
+
+	ipc_segment = malloc (sizeof (struct ipc_segment));
+	if (ipc_segment == NULL) {
+		close (request_fd);
+		return (-1);
+	}
+	bzero (ipc_segment, sizeof (struct ipc_segment));
+
+	/*
+	 * Allocate a shared memory segment
+	 */
+	do {
+		shmkey = random();
+		ipc_segment->shmid = shmget (shmkey, sizeof (struct shared_memory),
+			IPC_CREAT|IPC_EXCL|0600);
+	} while (ipc_segment->shmid == -1);
+
+	/*
+	 * Allocate a semaphore segment
+	 */
+	do {
+		semkey = random();
+		ipc_segment->semid = semget (semkey, 3, IPC_CREAT|IPC_EXCL|0600);
+		ipc_segment->euid = geteuid ();
+	} while (ipc_segment->semid == -1);
+
+	/*
+	 * Attach to shared memory segment
+	 */
+	ipc_segment->shared_memory = shmat (ipc_segment->shmid, NULL, 0);
+	if (ipc_segment->shared_memory == (void *)-1) {
 		goto error_exit;
 	}
 	
-	error = saRecvRetry (s, responseMessage, responseLen);
-	if (error != SA_AIS_OK) {
+	res = semctl (ipc_segment->semid, 0, SETVAL, 0);
+	if (res != 0) {
 		goto error_exit;
 	}
 
+	res = semctl (ipc_segment->semid, 1, SETVAL, 0);
+	if (res != 0) {
+		goto error_exit;
+	}
+
+	req_setup.shmkey = shmkey;
+	req_setup.semkey = semkey;
+	req_setup.service = service;
+
+	error = openais_send (request_fd, &req_setup, sizeof (mar_req_setup_t));
+	if (error != 0) {
+		goto error_exit;
+	}
+	error = openais_recv (request_fd, &res_setup, sizeof (mar_res_setup_t));
+	if (error != 0) {
+		goto error_exit;
+	}
+
+	ipc_segment->fd = request_fd;
+	ipc_segment->flow_control_state = 0;
+	*shmseg = ipc_segment;
+
+	/*
+	 * Something go wrong with server
+	 * Cleanup all
+	 */
+	if (res_setup.error == SA_AIS_ERR_TRY_AGAIN) {
+		goto error_exit;
+	}
+
+	return (res_setup.error);
+
 error_exit:
-	return (error);
+	close (request_fd);
+	if (ipc_segment->shmid > 0)
+		shmctl (ipc_segment->shmid, IPC_RMID, NULL);
+	if (ipc_segment->semid > 0)
+		semctl (ipc_segment->semid, 0, IPC_RMID);
+	return (res_setup.error);
 }
 
 SaAisErrorT
-saPollRetry (
-        struct pollfd *ufds,
-        unsigned int nfds,
-        int timeout) 
+openais_service_disconnect (
+	void *ipc_context)
 {
-	SaAisErrorT error = SA_AIS_OK;
-	int result;
+	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_context;
 
-retry_poll:
-	result = poll (ufds, nfds, timeout);
-	if (result == -1 && errno == EINTR) {
-		goto retry_poll;
-	}
-	if (result == -1) {
-		error = SA_AIS_ERR_LIBRARY;
-	}
-
-	return (error);
+	shutdown (ipc_segment->fd, SHUT_RDWR);
+	close (ipc_segment->fd);
+	shmdt (ipc_segment->shared_memory);
+	free (ipc_segment);
+	return (SA_AIS_OK);
 }
 
+int
+openais_dispatch_flow_control_get (
+        void *ipc_context)
+{
+	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_context;
+
+	return (ipc_segment->flow_control_state);
+}
+
+
+int
+openais_fd_get (void *ipc_ctx)
+{
+	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_ctx;
+
+	return (ipc_segment->fd);
+}
+
+static void memcpy_swrap (
+	void *dest, void *src, int len, unsigned int *read)
+{
+	char *dest_chr = (char *)dest;
+	char *src_chr = (char *)src;
+
+	unsigned int first_read;
+	unsigned int second_read;
+
+	first_read = len;
+	second_read = 0;
+
+	if (len + *read >= DISPATCH_SIZE) {
+		first_read = DISPATCH_SIZE - *read;
+		second_read = (len + *read) % DISPATCH_SIZE;
+	}
+	memcpy (dest_chr, &src_chr[*read], first_read);
+	if (second_read) {
+		memcpy (&dest_chr[first_read], src_chr,
+			second_read);
+	}
+	*read = (*read + len) % (DISPATCH_SIZE);
+}
+int original_flow = -1;
+
+int
+openais_dispatch_recv (void *ipc_ctx, void *data, int timeout)
+{
+	struct pollfd ufds;
+	struct sembuf sop;
+	int poll_events;
+	mar_res_header_t *header;
+	char buf;
+	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_ctx;
+	int res;
+	unsigned int my_read;
+	char buf_two = 1;
+
+	ufds.fd = ipc_segment->fd;
+	ufds.events = POLLIN;
+	ufds.revents = 0;
+
+retry_poll:
+	poll_events = poll (&ufds, 1, timeout);
+	if (poll_events == -1 && errno == EINTR) {
+		goto retry_poll;
+	} else 
+	if (poll_events == -1) {
+		return (-1);
+	} else
+	if (poll_events == 0) {
+		return (0);
+	}
+	if (poll_events == 1 && (ufds.revents & (POLLERR|POLLHUP))) {
+		return (-1);
+	}
+retry_recv:
+	res = recv (ipc_segment->fd, &buf, 1, 0);
+	if (res == -1 && errno == EINTR) {
+		goto retry_recv;
+	} else
+	if (res == -1) {
+		return (-1);
+	}
+	if (res == 0) {
+		return (-1);
+	}
+	ipc_segment->flow_control_state = 0;
+	if (buf == 1 || buf == 2) {
+		ipc_segment->flow_control_state = 1;
+	}
+	/*
+	 * Notify executive to flush any pending dispatch messages
+	 */
+	if (ipc_segment->flow_control_state) {
+		buf_two = MESSAGE_REQ_OUTQ_FLUSH;
+		res = openais_send (ipc_segment->fd, &buf_two, 1);
+		assert (res == 0); //TODO
+	}
+	/*
+	 * This is just a notification of flow control starting at the addition
+	 * of a new pending message, not a message to dispatch
+	 */
+	if (buf == 2) {
+		return (0);
+	}
+	if (buf == 3) {
+		return (0);
+	}
+
+	sop.sem_num = 2;
+	sop.sem_op = -1;
+	sop.sem_flg = 0;
+
+retry_semop:
+	res = semop (ipc_segment->semid, &sop, 1);
+	if (res == -1 && errno == EINTR) {
+		goto retry_semop;
+	} else
+	if (res == -1 && errno == EACCES) {
+		priv_change_send (ipc_segment);
+		goto retry_semop;
+	} else
+	if (res == -1) {
+		return (-1);
+	}
+	
+	if (ipc_segment->shared_memory->read + sizeof (mar_res_header_t) >= DISPATCH_SIZE) {
+		my_read = ipc_segment->shared_memory->read;
+		memcpy_swrap (data,
+			ipc_segment->shared_memory->dispatch_buffer,
+			sizeof (mar_res_header_t),
+			&ipc_segment->shared_memory->read);
+		header = (mar_res_header_t *)data;
+		memcpy_swrap (
+			data + sizeof (mar_res_header_t),
+			ipc_segment->shared_memory->dispatch_buffer,
+			header->size - sizeof (mar_res_header_t),
+			&ipc_segment->shared_memory->read);
+	} else {
+		header = (mar_res_header_t *)&ipc_segment->shared_memory->dispatch_buffer[ipc_segment->shared_memory->read];
+		memcpy_swrap (
+			data,
+			ipc_segment->shared_memory->dispatch_buffer,
+			header->size,
+			&ipc_segment->shared_memory->read);
+	}
+
+	return (1);
+}
+
+static SaAisErrorT
+openais_msg_send (
+	void *ipc_context,
+	struct iovec *iov,
+	int iov_len)
+{
+	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_context;
+	struct sembuf sop;
+	int i;
+	int res;
+	int req_buffer_idx = 0;
+
+	for (i = 0; i < iov_len; i++) {
+		memcpy (&ipc_segment->shared_memory->req_buffer[req_buffer_idx],
+			iov[i].iov_base,
+			iov[i].iov_len);
+		req_buffer_idx += iov[i].iov_len;
+	}
+	/*
+	 * Signal semaphore #0 indicting a new message from client
+	 * to server request queue
+	 */
+	sop.sem_num = 0;
+	sop.sem_op = 1;
+	sop.sem_flg = 0;
+
+retry_semop:
+	res = semop (ipc_segment->semid, &sop, 1);
+	if (res == -1 && errno == EINTR) {
+		goto retry_semop;
+	} else
+	if (res == -1 && errno == EACCES) {
+		priv_change_send (ipc_segment);
+		goto retry_semop;
+	} else
+	if (res == -1) {
+		return (SA_AIS_ERR_LIBRARY);
+	}
+	return (SA_AIS_OK);
+}
+
+static SaAisErrorT
+openais_reply_receive (
+	void *ipc_context,
+	void *res_msg, int res_len)
+{
+	struct sembuf sop;
+	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_context;
+	unsigned int res;
+
+	/*
+	 * Wait for semaphore #1 indicating a new message from server
+	 * to client in the response queue
+	 */
+	sop.sem_num = 1;
+	sop.sem_op = -1;
+	sop.sem_flg = 0;
+
+retry_semop:
+	res = semop (ipc_segment->semid, &sop, 1);
+	if (res == -1 && errno == EINTR) {
+		goto retry_semop;
+	} else
+	if (res == -1 && errno == EACCES) {
+		priv_change_send (ipc_segment);
+		goto retry_semop;
+	} else
+	if (res == -1) {
+		return (SA_AIS_ERR_LIBRARY);
+	}
+
+	memcpy (res_msg, ipc_segment->shared_memory->res_buffer, res_len);
+	return (SA_AIS_OK);
+}
+
+static SaAisErrorT
+openais_reply_receive_in_buf (
+	void *ipc_context,
+	void **res_msg)
+{
+	struct sembuf sop;
+	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_context;
+	int res;
+
+	/*
+	 * Wait for semaphore #1 indicating a new message from server
+	 * to client in the response queue
+	 */
+	sop.sem_num = 1;
+	sop.sem_op = -1;
+	sop.sem_flg = 0;
+
+retry_semop:
+	res = semop (ipc_segment->semid, &sop, 1);
+	if (res == -1 && errno == EINTR) {
+		goto retry_semop;
+	} else
+	if (res == -1 && errno == EACCES) {
+		priv_change_send (ipc_segment);
+		goto retry_semop;
+	} else
+	if (res == -1) {
+		return (SA_AIS_ERR_LIBRARY);
+	}
+
+	*res_msg = (char *)ipc_segment->shared_memory->res_buffer;
+	return (SA_AIS_OK);
+}
+
+SaAisErrorT
+openais_msg_send_reply_receive (
+	void *ipc_context,
+	struct iovec *iov,
+	int iov_len,
+	void *res_msg,
+	int res_len)
+{
+	SaAisErrorT res;
+
+	res = openais_msg_send (ipc_context, iov, iov_len);
+	if (res != SA_AIS_OK) {
+		return (res);
+	}
+
+	res = openais_reply_receive (ipc_context, res_msg, res_len);
+	if (res != SA_AIS_OK) {
+		return (res);
+	}
+
+	return (SA_AIS_OK);
+}
+
+SaAisErrorT
+openais_msg_send_reply_receive_in_buf (
+	void *ipc_context,
+	struct iovec *iov,
+	int iov_len,
+	void **res_msg)
+{
+	unsigned int res;
+
+	res = openais_msg_send (ipc_context, iov, iov_len);
+	if (res != SA_AIS_OK) {
+		return (res);
+	}
+
+	res = openais_reply_receive_in_buf (ipc_context, res_msg);
+	if (res != SA_AIS_OK) {
+		return (res);
+	}
+
+	return (SA_AIS_OK);
+}
 
 SaAisErrorT
 saHandleCreate (
@@ -525,7 +706,7 @@ saHandleCreate (
 {
 	uint32_t handle;
 	uint32_t check;
-	void *newHandles;
+	void *newHandles = NULL;
 	int found = 0;
 	void *instance;
 	int i;

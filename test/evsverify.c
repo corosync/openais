@@ -1,8 +1,5 @@
-#include <unistd.h>
-#include <assert.h>
 /*
- * Copyright (c) 2004 MontaVista Software, Inc.
- * Copyright (c) 2006-2009 Red Hat, Inc.
+ * Copyright (c) 2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -40,19 +37,38 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
-#include "../include/evs.h"
+#include <string.h>
+
+#include "saAis.h"
+#include "evs.h"
+#include "../exec/crypto.h"
 
 char *delivery_string;
+struct msg {
+	unsigned int msg_size;
+	unsigned char sha1[20];
+	unsigned char buffer[0];
+};
 
 int deliveries = 0;
 void evs_deliver_fn (
 	unsigned int nodeid,
-	void *msg,
+	void *m,
 	int msg_len)
 {
-	char *buf = msg;
+	struct msg *msg2 = (struct msg *)m;
+	unsigned char sha1_compare[20];
+	hash_state sha1_hash;
+	unsigned int i;
 
-	printf ("API '%s' msg '%s'\n", delivery_string, buf);
+	sha1_init (&sha1_hash);
+	sha1_process (&sha1_hash, msg2->buffer, msg2->msg_size);
+	sha1_done (&sha1_hash, sha1_compare);
+	if (memcmp (sha1_compare, msg2->sha1, 20) != 0) {
+		printf ("Received incorrectly signed message of size %d - fatal error in system\n", msg2->msg_size);
+		exit (1);
+	}
+	printf ("Received correctly signed message of size %d\n", msg2->msg_size);
 	deliveries++;
 }
 
@@ -90,21 +106,21 @@ struct evs_group groups[3] = {
 	{ "key3" }
 };
 
-char buffer[2000];
-struct iovec iov = {
-	.iov_base = buffer,
-	.iov_len = sizeof (buffer)
-};
+struct msg msg;
 
+unsigned char buffer[200000];
 int main (void)
 {
 	evs_handle_t handle;
-	evs_error_t result;
-	int i = 0;
+	SaAisErrorT result;
+	unsigned int i = 0, j;
 	int fd;
 	unsigned int member_list[32];
 	unsigned int local_nodeid;
 	unsigned int member_list_entries = 32;
+	struct msg msg;
+	hash_state sha1_hash;
+	struct iovec iov[2];
 
 	result = evs_initialize (&handle, &callbacks);
 	if (result != EVS_OK) {
@@ -128,53 +144,34 @@ int main (void)
 	printf ("Leave result %d\n", result);
 	delivery_string = "evs_mcast_joined";
 
+	iov[0].iov_base = &msg;
+	iov[0].iov_len = sizeof (struct msg);
+	iov[1].iov_base = buffer;
+
 	/*
 	 * Demonstrate evs_mcast_joined
 	 */
-	for (i = 0; i < 500; i++) {
-		sprintf (buffer, "evs_mcast_joined: This is message %d", i);
+	for (i = 0; i < 1000000000; i++) {
+		msg.msg_size = 99 + rand() % 100000;
+		iov[1].iov_len = msg.msg_size;
+		for (j = 0; j < msg.msg_size; j++) {
+			buffer[j] = j + msg.msg_size;
+		}
+
+		sprintf ((char *)buffer,
+			"evs_mcast_joined: This is message %12d", i);
+		sha1_init (&sha1_hash);
+		sha1_process (&sha1_hash, buffer,
+			msg.msg_size);
+		sha1_done (&sha1_hash, msg.sha1);
 try_again_one:
 		result = evs_mcast_joined (handle, EVS_TYPE_AGREED,
-			&iov, 1);
+			iov, 2);
 		if (result == EVS_ERR_TRY_AGAIN) {
 			goto try_again_one;
 		}
-		if (result != EVS_OK){
-			printf ("result is %d\n", result);
-		}
-		assert (result == EVS_OK);
-		/*
-		 * Verify that messages are sent/delivered when a proccess
-		 * ID change occurs from root to 20333.
-		 */
-		if (i == 45) {
-			seteuid (20333);
-		}
-	}
-
-	result = evs_dispatch (handle, EVS_DISPATCH_ALL);
-
-	/*
-	 * Demonstrate evs_mcast_joined
-	 */
-	delivery_string = "evs_mcast_groups";
-	for (i = 0; i < 500; i++) {
-		sprintf (buffer, "evs_mcast_groups: This is message %d", i);
-try_again_two:
-		result = evs_mcast_groups (handle, EVS_TYPE_AGREED,
-			 &groups[1], 1, &iov, 1);
-		if (result == EVS_ERR_TRY_AGAIN) {
-			goto try_again_two;
-		}
-	
 		result = evs_dispatch (handle, EVS_DISPATCH_ALL);
 	}
-	/*
-	 * Flush any pending callbacks
-	 */
-	do {
-		result = evs_dispatch (handle, EVS_DISPATCH_ALL);
-	} while (deliveries < 1000);
 
 	evs_fd_get (handle, &fd);
 	

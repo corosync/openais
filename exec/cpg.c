@@ -63,7 +63,6 @@
 #include "totempg.h"
 #include "totemip.h"
 #include "main.h"
-#include "flow.h"
 #include "tlist.h"
 #include "ipc.h"
 #include "mempool.h"
@@ -72,7 +71,6 @@
 #include "jhash.h"
 #include "swab.h"
 #include "ipc.h"
-#include "flow.h"
 #include "print.h"
 
 #define GROUP_HASH_SIZE 32
@@ -110,7 +108,6 @@ struct process_info {
 	void *conn;
 	void *trackerconn;
 	struct group_info *group;
-	enum openais_flow_control_state flow_control_state;
 	struct list_head list; /* on the group_info members list */
 };
 
@@ -489,11 +486,6 @@ static int cpg_lib_exit_fn (void *conn)
 		notify_info.reason = CONFCHG_CPG_REASON_PROCDOWN;
 		cpg_node_joinleave_send(gi, pi, MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_PROCDOWN);
 		list_del(&pi->list);
-		openais_ipc_flow_control_destroy (
-			conn,
-			CPG_SERVICE,
-			(unsigned char *)gi->group_name.value,
-			(unsigned int)gi->group_name.length);
 	}
 	return (0);
 }
@@ -661,15 +653,6 @@ static void cpg_confchg_fn (
 		req_exec_cpg_downlist.left_nodes = 0;
 		log_printf(LOG_LEVEL_DEBUG, "confchg, sent downlist\n");
 	}
-}
-
-static void cpg_flow_control_state_set_fn (
-	void *context,
-	enum openais_flow_control_state flow_control_state)
-{
-	struct process_info *process_info = (struct process_info *)context;
-
-	process_info->flow_control_state = flow_control_state;
 }
 
 /* Can byteswap join & leave messages */
@@ -860,9 +843,7 @@ static void message_handler_req_exec_cpg_procleave (
 			}
 			
 			list_del(&pi->list);
-			if (pi->conn) {
-				openais_conn_info_refcnt_dec(pi->conn);
-			} else {
+			if (pi->conn == NULL) {
 				free(pi);
 			}
 
@@ -919,12 +900,9 @@ static void message_handler_req_exec_cpg_mcast (
 	res_lib_cpg_mcast->msglen = msglen;
 	res_lib_cpg_mcast->pid = req_exec_cpg_mcast->pid;
 	res_lib_cpg_mcast->nodeid = nodeid;
-	res_lib_cpg_mcast->flow_control_state = CPG_FLOW_CONTROL_DISABLED;
 	if (message_source_is_local (&req_exec_cpg_mcast->source)) {
-		openais_ipc_flow_control_local_decrement (req_exec_cpg_mcast->source.conn);
+		openais_conn_refcount_dec (req_exec_cpg_mcast->source.conn);
 		process_info = (struct process_info *)openais_conn_private_data_get (req_exec_cpg_mcast->source.conn);
-		res_lib_cpg_mcast->flow_control_state = process_info->flow_control_state;
-		openais_conn_info_refcnt_dec (req_exec_cpg_mcast->source.conn);
 	}
 	memcpy(&res_lib_cpg_mcast->group_name, &gi->group_name,
 		sizeof(mar_cpg_name_t));
@@ -1014,7 +992,7 @@ static int cpg_lib_init_fn (void *conn)
 	struct process_info *pi = (struct process_info *)openais_conn_private_data_get (conn);
 	pi->conn = conn;
 
-	openais_conn_info_refcnt_inc (conn);
+//	openais_conn_info_refcnt_inc (conn);
 	log_printf(LOG_LEVEL_DEBUG, "lib_init_fn: conn=%p, pi=%p\n", conn, pi);
 	return (0);
 }
@@ -1041,14 +1019,6 @@ static void message_handler_req_lib_cpg_join (void *conn, void *message)
 		error = SA_AIS_ERR_NO_SPACE;
 		goto join_err;
 	}
-
-	openais_ipc_flow_control_create (
-		conn,
-		CPG_SERVICE,
-		req_lib_cpg_join->group_name.value,
-		req_lib_cpg_join->group_name.length,
-		cpg_flow_control_state_set_fn,
-		pi);
 
 	/* Add a node entry for us */
 	pi->nodeid = totempg_my_nodeid_get();
@@ -1085,12 +1055,6 @@ static void message_handler_req_lib_cpg_leave (void *conn, void *message)
 	cpg_node_joinleave_send(gi, pi, MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_LEAVE);
 	pi->group = NULL;
 
-	openais_ipc_flow_control_destroy (
-		conn,
-		CPG_SERVICE,
-		(unsigned char *)gi->group_name.value,
-		(unsigned int)gi->group_name.length);
-
 leave_ret:
 	/* send return */
 	res_lib_cpg_leave.header.size = sizeof(res_lib_cpg_leave);
@@ -1118,7 +1082,6 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 		res_lib_cpg_mcast.header.size = sizeof(res_lib_cpg_mcast);
 		res_lib_cpg_mcast.header.id = MESSAGE_RES_CPG_MCAST;
 		res_lib_cpg_mcast.header.error = SA_AIS_ERR_ACCESS; /* TODO Better error code ?? */
-		res_lib_cpg_mcast.flow_control_state = CPG_FLOW_CONTROL_DISABLED;
 		openais_response_send(conn, &res_lib_cpg_mcast,
 			sizeof(res_lib_cpg_mcast));
 		return;
@@ -1127,7 +1090,6 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	req_exec_cpg_mcast.header.size = sizeof(req_exec_cpg_mcast) + msglen;
 	req_exec_cpg_mcast.header.id = SERVICE_ID_MAKE(CPG_SERVICE,
 		MESSAGE_REQ_EXEC_CPG_MCAST);
-	openais_conn_info_refcnt_inc (conn);
 	req_exec_cpg_mcast.pid = pi->pid;
 	req_exec_cpg_mcast.msglen = msglen;
 	message_source_set (&req_exec_cpg_mcast.source, conn);
@@ -1140,13 +1102,13 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	req_exec_cpg_iovec[1].iov_len = msglen;
 
 	// TODO: guarantee type...
+	openais_conn_refcount_inc (conn);
 	result = totempg_groups_mcast_joined (openais_group_handle, req_exec_cpg_iovec, 2, TOTEMPG_AGREED);
-	openais_ipc_flow_control_local_increment (conn);
+	assert(result == 0);
 
 	res_lib_cpg_mcast.header.size = sizeof(res_lib_cpg_mcast);
 	res_lib_cpg_mcast.header.id = MESSAGE_RES_CPG_MCAST;
 	res_lib_cpg_mcast.header.error = SA_AIS_OK;
-	res_lib_cpg_mcast.flow_control_state = pi->flow_control_state;
 	openais_response_send(conn, &res_lib_cpg_mcast,
 		sizeof(res_lib_cpg_mcast));
 }

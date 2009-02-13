@@ -65,8 +65,7 @@ struct message_overlay {
  * Data structure for instance data
  */
 struct ckptInstance {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	SaCkptCallbacksT callbacks;
 	int finalize;
 	SaCkptHandleT ckptHandle;
@@ -76,7 +75,7 @@ struct ckptInstance {
 };
 
 struct ckptCheckpointInstance {
-	int response_fd;
+	void *ipc_ctx;
 	SaCkptHandleT ckptHandle;
 	SaCkptCheckpointHandleT checkpointHandle;
 	SaCkptCheckpointOpenFlagsT checkpointOpenFlags;
@@ -88,7 +87,7 @@ struct ckptCheckpointInstance {
 };
 
 struct ckptSectionIterationInstance {
-	int response_fd;
+	void *ipc_ctx;
 	SaCkptSectionIterationHandleT sectionIterationHandle;
 	SaNameT checkpointName;
         SaSizeT maxSectionIdSize;
@@ -286,10 +285,7 @@ saCkptInitialize (
 		goto error_destroy;
 	}
 
-	ckptInstance->response_fd = -1;
-
-	error = saServiceConnect (&ckptInstance->response_fd,
-		&ckptInstance->dispatch_fd, CKPT_SERVICE);
+	error = openais_service_connect (CKPT_SERVICE, &ckptInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -334,7 +330,7 @@ saCkptSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = ckptInstance->dispatch_fd;
+	*selectionObject = openais_fd_get (ckptInstance->ipc_ctx);
 
 	saHandleInstancePut (&ckptHandleDatabase, ckptHandle);
 
@@ -346,9 +342,7 @@ saCkptDispatch (
 	const SaCkptHandleT ckptHandle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	struct pollfd ufds;
-	int poll_fd;
-	int timeout = 1;
+	int timeout = -1;
 	SaCkptCallbacksT callbacks;
 	SaAisErrorT error;
 	int dispatch_avail;
@@ -373,69 +367,45 @@ saCkptDispatch (
 	}
 
 	/*
-	 * Timeout instantly for SA_DISPATCH_ALL
+	 * Timeout instantly for SA_DISPATCH_ALL, otherwise don't timeout
+	 * for SA_DISPATCH_BLOCKING or SA_DISPATCH_ONE
 	 */
 	if (dispatchFlags == SA_DISPATCH_ALL) {
 		timeout = 0;
 	}
 
 	do {
-		/*
-		 * Read data directly from socket
-		 */
-		poll_fd = ckptInstance->dispatch_fd;
-		ufds.fd = poll_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
+		pthread_mutex_lock (&ckptInstance->dispatch_mutex);
 
-		error = saPollRetry(&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto error_put;
-		}
-		pthread_mutex_lock(&ckptInstance->dispatch_mutex);
+		dispatch_avail = openais_dispatch_recv (ckptInstance->ipc_ctx,
+			&dispatch_data, timeout);
 
-		if (ckptInstance->finalize == 1) {
-			error = SA_AIS_OK;
-			goto error_unlock;
-		}
-
-		if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
-				error = SA_AIS_ERR_BAD_HANDLE;
-				goto error_unlock;
-		}
-		
-		dispatch_avail = (ufds.revents & POLLIN);
+		pthread_mutex_unlock (&ckptInstance->dispatch_mutex);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			pthread_mutex_unlock(&ckptInstance->dispatch_mutex);
 			break; /* exit do while cont is 1 loop */
 		} else
 		if (dispatch_avail == 0) {
-			pthread_mutex_unlock(&ckptInstance->dispatch_mutex);
 			continue;
 		}
-		
-		memset(&dispatch_data,0, sizeof(struct message_overlay));
-		error = saRecvRetry (ckptInstance->dispatch_fd, &dispatch_data.header, sizeof (mar_res_header_t));
-		if (error != SA_AIS_OK) {
-			goto error_unlock;
-		}
-		if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-			error = saRecvRetry (ckptInstance->dispatch_fd, &dispatch_data.data,
-				dispatch_data.header.size - sizeof (mar_res_header_t));
-			if (error != SA_AIS_OK) {
-				goto error_unlock;
+		if (dispatch_avail == -1) {
+			if (ckptInstance->finalize == 1) {
+				error = SA_AIS_OK;
+			} else {
+				error = SA_AIS_ERR_LIBRARY;
 			}
+			goto error_exit;
 		}
-
+		
 		/*
 		* Make copy of callbacks, message data, unlock instance,
 		* and call callback. A risk of this dispatch method is that
 		* the callback routines may operate at the same time that
 		* CkptFinalize has been called in another thread.
 		*/
-		memcpy(&callbacks,&ckptInstance->callbacks, sizeof(ckptInstance->callbacks));
-		pthread_mutex_unlock(&ckptInstance->dispatch_mutex);
+		memcpy (&callbacks, &ckptInstance->callbacks,
+			sizeof(ckptInstance->callbacks));
+
 		/*
 		 * Dispatch incoming response
 		 */
@@ -503,7 +473,7 @@ saCkptDispatch (
 		 */
 		switch (dispatchFlags) {
 		case SA_DISPATCH_ONE:
-				cont = 0;
+			cont = 0;
 			break;
 		case SA_DISPATCH_ALL:
 			break;
@@ -511,9 +481,7 @@ saCkptDispatch (
 			break;
 		}
 	} while (cont);
-error_unlock:
-	pthread_mutex_unlock(&ckptInstance->dispatch_mutex);
-error_put:
+
 	saHandleInstancePut(&ckptHandleDatabase, ckptHandle);
 error_exit:
 	return (error);
@@ -545,19 +513,11 @@ saCkptFinalize (
 
 	ckptInstance->finalize = 1;
 
+	openais_service_disconnect (ckptInstance->ipc_ctx);
+
 	pthread_mutex_unlock (&ckptInstance->response_mutex);
 	
 	ckptInstanceFinalize (ckptInstance);
-
-	if (ckptInstance->response_fd != -1) {
-		shutdown (ckptInstance->response_fd, 0);
-		close (ckptInstance->response_fd);
-	}
-
-	if (ckptInstance->dispatch_fd != -1) {
-		shutdown (ckptInstance->dispatch_fd, 0);
-		close (ckptInstance->dispatch_fd);
-	}
 
 	saHandleInstancePut (&ckptHandleDatabase, ckptHandle);
 
@@ -578,6 +538,7 @@ saCkptCheckpointOpen (
 	struct ckptInstance *ckptInstance;
 	struct req_lib_ckpt_checkpointopen req_lib_ckpt_checkpointopen;
 	struct res_lib_ckpt_checkpointopen res_lib_ckpt_checkpointopen;
+	struct iovec iov;
 
 	if (checkpointHandle == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -628,7 +589,7 @@ saCkptCheckpointOpen (
 		goto error_destroy;
 	}
 
-	ckptCheckpointInstance->response_fd = ckptInstance->response_fd;
+	ckptCheckpointInstance->ipc_ctx = ckptInstance->ipc_ctx;
 
 	ckptCheckpointInstance->ckptHandle = ckptHandle;
 	ckptCheckpointInstance->checkpointHandle = *checkpointHandle;
@@ -652,18 +613,16 @@ saCkptCheckpointOpen (
 	}
 	req_lib_ckpt_checkpointopen.checkpoint_open_flags = checkpointOpenFlags;
 
-	error = saSendRetry (ckptCheckpointInstance->response_fd, &req_lib_ckpt_checkpointopen,
-		sizeof (struct req_lib_ckpt_checkpointopen));
-	if (error != SA_AIS_OK) {
-		goto error_put_destroy;
-	}
+	iov.iov_base = &req_lib_ckpt_checkpointopen;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
 
-	error = saRecvRetry (ckptCheckpointInstance->response_fd, &res_lib_ckpt_checkpointopen,
+	error = openais_msg_send_reply_receive (
+		ckptInstance->ipc_ctx,
+		&iov,
+		1,
+		&res_lib_ckpt_checkpointopen,
 		sizeof (struct res_lib_ckpt_checkpointopen));
-	if (error != SA_AIS_OK) {
-		goto error_put_destroy;
-	}
-	
+
 	if (res_lib_ckpt_checkpointopen.header.error != SA_AIS_OK) {
 		error = res_lib_ckpt_checkpointopen.header.error;
 		goto error_put_destroy;
@@ -706,6 +665,7 @@ saCkptCheckpointOpenAsync (
 	SaAisErrorT error;
 	struct req_lib_ckpt_checkpointopen req_lib_ckpt_checkpointopen;
 	struct res_lib_ckpt_checkpointopenasync res_lib_ckpt_checkpointopenasync;
+	struct iovec iov;
 	SaAisErrorT failWithError = SA_AIS_OK;
 
 	if (checkpointName == NULL) {
@@ -755,7 +715,7 @@ saCkptCheckpointOpenAsync (
 		goto error_destroy;
 	}
 
-	ckptCheckpointInstance->response_fd = ckptInstance->response_fd;
+	ckptCheckpointInstance->ipc_ctx = ckptInstance->ipc_ctx;
 	ckptCheckpointInstance->ckptHandle = ckptHandle;
 	ckptCheckpointInstance->checkpointHandle = checkpointHandle;
 	ckptCheckpointInstance->checkpointOpenFlags = checkpointOpenFlags;
@@ -782,9 +742,13 @@ saCkptCheckpointOpenAsync (
 	req_lib_ckpt_checkpointopen.checkpoint_open_flags = checkpointOpenFlags;
 	req_lib_ckpt_checkpointopen.checkpoint_handle = checkpointHandle;
 
-	error = saSendReceiveReply (ckptInstance->response_fd,
-		&req_lib_ckpt_checkpointopen,
-		sizeof (struct req_lib_ckpt_checkpointopen),
+	iov.iov_base = &req_lib_ckpt_checkpointopen;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
+
+	error = openais_msg_send_reply_receive (
+		ckptInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_checkpointopenasync,
 		sizeof (struct res_lib_ckpt_checkpointopenasync));
 
@@ -822,6 +786,7 @@ saCkptCheckpointClose (
 	struct req_lib_ckpt_checkpointclose req_lib_ckpt_checkpointclose;
 	struct res_lib_ckpt_checkpointclose res_lib_ckpt_checkpointclose;
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 
 	error = saHandleInstanceGet (&checkpointHandleDatabase, checkpointHandle,
@@ -837,11 +802,15 @@ saCkptCheckpointClose (
 	req_lib_ckpt_checkpointclose.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+	iov.iov_base = &req_lib_ckpt_checkpointclose;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointclose);
+
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptCheckpointInstance->response_fd,
-		&req_lib_ckpt_checkpointclose,
-		sizeof (struct req_lib_ckpt_checkpointclose),
+	error = openais_msg_send_reply_receive (
+		ckptCheckpointInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_checkpointclose,
 		sizeof (struct res_lib_ckpt_checkpointclose));
 
@@ -866,6 +835,7 @@ saCkptCheckpointUnlink (
 	const SaNameT *checkpointName)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptInstance *ckptInstance;
 	struct req_lib_ckpt_checkpointunlink req_lib_ckpt_checkpointunlink;
 	struct res_lib_ckpt_checkpointunlink res_lib_ckpt_checkpointunlink;
@@ -883,11 +853,15 @@ saCkptCheckpointUnlink (
 	marshall_to_mar_name_t (&req_lib_ckpt_checkpointunlink.checkpoint_name,
 		(SaNameT *)checkpointName);
 
+	iov.iov_base = &req_lib_ckpt_checkpointunlink;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointunlink);
+
 	pthread_mutex_lock (&ckptInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptInstance->response_fd,
-		&req_lib_ckpt_checkpointunlink,
-		sizeof (struct req_lib_ckpt_checkpointunlink),
+	error = openais_msg_send_reply_receive (
+		ckptInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_checkpointunlink,
 		sizeof (struct res_lib_ckpt_checkpointunlink));
 
@@ -905,6 +879,7 @@ saCkptCheckpointRetentionDurationSet (
 	SaTimeT retentionDuration)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_checkpointretentiondurationset req_lib_ckpt_checkpointretentiondurationset;
 	struct res_lib_ckpt_checkpointretentiondurationset res_lib_ckpt_checkpointretentiondurationset;
@@ -924,11 +899,15 @@ saCkptCheckpointRetentionDurationSet (
 	req_lib_ckpt_checkpointretentiondurationset.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+	iov.iov_base = &req_lib_ckpt_checkpointretentiondurationset;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointretentiondurationset);
+	
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptCheckpointInstance->response_fd,
-		&req_lib_ckpt_checkpointretentiondurationset,
-		sizeof (struct req_lib_ckpt_checkpointretentiondurationset),
+	error = openais_msg_send_reply_receive (
+		ckptCheckpointInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_checkpointretentiondurationset,
 		sizeof (struct res_lib_ckpt_checkpointretentiondurationset));
 
@@ -943,6 +922,7 @@ saCkptActiveReplicaSet (
 	SaCkptCheckpointHandleT checkpointHandle)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_activereplicaset req_lib_ckpt_activereplicaset;
 	struct res_lib_ckpt_activereplicaset res_lib_ckpt_activereplicaset;
@@ -965,11 +945,15 @@ saCkptActiveReplicaSet (
 	req_lib_ckpt_activereplicaset.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+	iov.iov_base = &req_lib_ckpt_activereplicaset;
+	iov.iov_len = sizeof (struct req_lib_ckpt_activereplicaset);
+
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptCheckpointInstance->response_fd,
-		&req_lib_ckpt_activereplicaset,
-		sizeof (struct req_lib_ckpt_activereplicaset),
+	error = openais_msg_send_reply_receive (
+		ckptCheckpointInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_activereplicaset,
 		sizeof (struct res_lib_ckpt_activereplicaset));
 
@@ -987,6 +971,7 @@ saCkptCheckpointStatusGet (
 	SaCkptCheckpointDescriptorT *checkpointStatus)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_checkpointstatusget req_lib_ckpt_checkpointstatusget;
 	struct res_lib_ckpt_checkpointstatusget res_lib_ckpt_checkpointstatusget;
@@ -1008,11 +993,14 @@ saCkptCheckpointStatusGet (
 	req_lib_ckpt_checkpointstatusget.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+	iov.iov_base = &req_lib_ckpt_checkpointstatusget;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointstatusget);
+
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptCheckpointInstance->response_fd,
-		&req_lib_ckpt_checkpointstatusget,
-		sizeof (struct req_lib_ckpt_checkpointstatusget),
+	error = openais_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_checkpointstatusget,
 		sizeof (struct res_lib_ckpt_checkpointstatusget));
 
@@ -1035,6 +1023,8 @@ saCkptSectionCreate (
 	SaSizeT initialDataSize)
 {
 	SaAisErrorT error;
+	struct iovec iov[3];
+	int iov_len;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_sectioncreate req_lib_ckpt_sectioncreate;
 	struct res_lib_ckpt_sectioncreate res_lib_ckpt_sectioncreate;
@@ -1073,30 +1063,27 @@ saCkptSectionCreate (
 	req_lib_ckpt_sectioncreate.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+
+	iov[0].iov_base = &req_lib_ckpt_sectioncreate;
+	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectioncreate);
+	iov_len = 1;
+	if (sectionCreationAttributes->sectionId->id) {
+		iov[1].iov_base = sectionCreationAttributes->sectionId->id;
+		iov[1].iov_len = sectionCreationAttributes->sectionId->idLen;
+		iov_len = 2;
+	}
+	if (initialDataSize) {
+		iov[iov_len].iov_base = (void *)initialData;
+		iov[iov_len].iov_len = initialDataSize;
+		iov_len++;
+	}
+
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendRetry (ckptCheckpointInstance->response_fd, &req_lib_ckpt_sectioncreate,
-		sizeof (struct req_lib_ckpt_sectioncreate));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	/*
-	 * Write section identifier to server
-	 */
-	error = saSendRetry (ckptCheckpointInstance->response_fd, sectionCreationAttributes->sectionId->id,
-		sectionCreationAttributes->sectionId->idLen);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saSendRetry (ckptCheckpointInstance->response_fd, initialData,
-		initialDataSize);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saRecvRetry (ckptCheckpointInstance->response_fd,
+	error = openais_msg_send_reply_receive (
+		ckptCheckpointInstance->ipc_ctx,
+		iov,
+		iov_len,
 		&res_lib_ckpt_sectioncreate,
 		sizeof (struct res_lib_ckpt_sectioncreate));
 
@@ -1115,6 +1102,8 @@ saCkptSectionDelete (
 	const SaCkptSectionIdT *sectionId)
 {
 	SaAisErrorT error;
+	struct iovec iov[2];
+	int iov_len;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_sectiondelete req_lib_ckpt_sectiondelete;
 	struct res_lib_ckpt_sectiondelete res_lib_ckpt_sectiondelete;
@@ -1134,8 +1123,6 @@ saCkptSectionDelete (
 		goto error_put;
 	}
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	req_lib_ckpt_sectiondelete.header.size = sizeof (struct req_lib_ckpt_sectiondelete) + sectionId->idLen; 
 	req_lib_ckpt_sectiondelete.header.id = MESSAGE_REQ_CKPT_CHECKPOINT_SECTIONDELETE;
 	req_lib_ckpt_sectiondelete.id_len = sectionId->idLen;
@@ -1146,25 +1133,23 @@ saCkptSectionDelete (
 	req_lib_ckpt_sectiondelete.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	error = saSendRetry (ckptCheckpointInstance->response_fd, &req_lib_ckpt_sectiondelete,
-		sizeof (struct req_lib_ckpt_sectiondelete));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
+	iov[0].iov_base = &req_lib_ckpt_sectiondelete;
+	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectiondelete);
+	iov_len = 1;
+	if (sectionId->idLen) {
+		iov[1].iov_base = sectionId->id;
+		iov[1].iov_len = sectionId->idLen;
+		iov_len = 2;
 	}
 
-	/*
-	 * Write section identifier to server
-	 */
-	error = saSendRetry (ckptCheckpointInstance->response_fd, sectionId->id,
-		sectionId->idLen);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-	error = saRecvRetry (ckptCheckpointInstance->response_fd,
+	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
+
+	error = openais_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+		iov,
+		iov_len,
 		&res_lib_ckpt_sectiondelete,
 		sizeof (struct res_lib_ckpt_sectiondelete));
 
-error_exit:
 	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_put:
@@ -1179,6 +1164,8 @@ saCkptSectionExpirationTimeSet (
 	SaTimeT expirationTime)
 {
 	SaAisErrorT error;
+	struct iovec iov[2];
+	unsigned int iov_len;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_sectionexpirationtimeset req_lib_ckpt_sectionexpirationtimeset;
 	struct res_lib_ckpt_sectionexpirationtimeset res_lib_ckpt_sectionexpirationtimeset;
@@ -1209,30 +1196,24 @@ saCkptSectionExpirationTimeSet (
 	req_lib_ckpt_sectionexpirationtimeset.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+	iov[0].iov_base = &req_lib_ckpt_sectionexpirationtimeset;
+	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectionexpirationtimeset);
+	iov_len = 1;
+	if (sectionId->idLen) {
+		iov[1].iov_base = sectionId->id;
+		iov[1].iov_len = sectionId->idLen;
+		iov_len = 2;
+	}
+	
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendRetry (ckptCheckpointInstance->response_fd, &req_lib_ckpt_sectionexpirationtimeset,
-		sizeof (struct req_lib_ckpt_sectionexpirationtimeset));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	/*
-	 * Write section identifier to server
-	 */
-	if (sectionId->idLen) {
-		error = saSendRetry (ckptCheckpointInstance->response_fd, sectionId->id,
-			sectionId->idLen);
-		if (error != SA_AIS_OK) {
-			goto error_exit;
-		}
-	}
-
-	error = saRecvRetry (ckptCheckpointInstance->response_fd,
+	error = openais_msg_send_reply_receive (
+		ckptCheckpointInstance->ipc_ctx,
+		iov,
+		iov_len,
 		&res_lib_ckpt_sectionexpirationtimeset,
 		sizeof (struct res_lib_ckpt_sectionexpirationtimeset));
 
-error_exit:
 	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_put:
@@ -1249,6 +1230,7 @@ saCkptSectionIterationInitialize (
 	SaCkptSectionIterationHandleT *sectionIterationHandle)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct ckptSectionIterationInstance *ckptSectionIterationInstance;
 	struct req_lib_ckpt_sectioniterationinitialize req_lib_ckpt_sectioniterationinitialize;
@@ -1284,7 +1266,7 @@ saCkptSectionIterationInitialize (
 		goto error_destroy;
 	}
 
-	ckptSectionIterationInstance->response_fd = ckptCheckpointInstance->response_fd;
+	ckptSectionIterationInstance->ipc_ctx = ckptCheckpointInstance->ipc_ctx;
 	ckptSectionIterationInstance->sectionIterationHandle = *sectionIterationHandle;
 
 	memcpy (&ckptSectionIterationInstance->checkpointName,
@@ -1312,11 +1294,14 @@ saCkptSectionIterationInitialize (
 	req_lib_ckpt_sectioniterationinitialize.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+	iov.iov_base = &req_lib_ckpt_sectioniterationinitialize;
+	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationinitialize);
+
 	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptSectionIterationInstance->response_fd,
-		&req_lib_ckpt_sectioniterationinitialize,
-		sizeof (struct req_lib_ckpt_sectioniterationinitialize),
+	error = openais_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_sectioniterationinitialize,
 		sizeof (struct res_lib_ckpt_sectioniterationinitialize));
 
@@ -1351,10 +1336,12 @@ saCkptSectionIterationNext (
 	SaCkptSectionDescriptorT *sectionDescriptor)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptSectionIterationInstance *ckptSectionIterationInstance;
 	struct req_lib_ckpt_sectioniterationnext req_lib_ckpt_sectioniterationnext;
-	struct res_lib_ckpt_sectioniterationnext res_lib_ckpt_sectioniterationnext;
+	struct res_lib_ckpt_sectioniterationnext *res_lib_ckpt_sectioniterationnext;
 	struct iteratorSectionIdListEntry *iteratorSectionIdListEntry;
+	void *return_address;
 
 	if (sectionDescriptor == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1379,13 +1366,17 @@ saCkptSectionIterationNext (
 	req_lib_ckpt_sectioniterationnext.header.id = MESSAGE_REQ_CKPT_SECTIONITERATIONNEXT;
 	req_lib_ckpt_sectioniterationnext.iteration_handle = ckptSectionIterationInstance->executive_iteration_handle;
 
+	iov.iov_base = &req_lib_ckpt_sectioniterationnext;
+	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationnext);
+
 	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptSectionIterationInstance->response_fd,
-		&req_lib_ckpt_sectioniterationnext,
-		sizeof (struct req_lib_ckpt_sectioniterationnext),
-		&res_lib_ckpt_sectioniterationnext,
-		sizeof (struct res_lib_ckpt_sectioniterationnext));
+	error = openais_msg_send_reply_receive_in_buf (
+		ckptSectionIterationInstance->ipc_ctx,
+		&iov,
+		1,
+		&return_address);
+	res_lib_ckpt_sectioniterationnext = return_address;
 
 	if (error != SA_AIS_OK) {
 		goto error_put_unlock;
@@ -1393,18 +1384,18 @@ saCkptSectionIterationNext (
 
 	marshall_from_mar_ckpt_section_descriptor_t (
 		sectionDescriptor,
-		&res_lib_ckpt_sectioniterationnext.section_descriptor);
+		&res_lib_ckpt_sectioniterationnext->section_descriptor);
 
 	sectionDescriptor->sectionId.id = &iteratorSectionIdListEntry->data[0];
-	
-	if ((res_lib_ckpt_sectioniterationnext.header.size - sizeof (struct res_lib_ckpt_sectioniterationnext)) > 0) {
-		error = saRecvRetry (ckptSectionIterationInstance->response_fd,
-			sectionDescriptor->sectionId.id,
-			res_lib_ckpt_sectioniterationnext.header.size -
-				sizeof (struct res_lib_ckpt_sectioniterationnext));
-	}
 
-	error = (error == SA_AIS_OK ? res_lib_ckpt_sectioniterationnext.header.error : error);
+	memcpy (sectionDescriptor->sectionId.id,
+		((char *)res_lib_ckpt_sectioniterationnext) +
+		sizeof (struct res_lib_ckpt_sectioniterationnext),
+		res_lib_ckpt_sectioniterationnext->header.size -
+		sizeof (struct res_lib_ckpt_sectioniterationnext));
+		
+		
+	error = (error == SA_AIS_OK ? res_lib_ckpt_sectioniterationnext->header.error : error);
 	
 	/*
 	 * Add to persistent memory list for this sectioniterator
@@ -1432,6 +1423,7 @@ saCkptSectionIterationFinalize (
 	SaCkptSectionIterationHandleT sectionIterationHandle)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptSectionIterationInstance *ckptSectionIterationInstance;
 	struct req_lib_ckpt_sectioniterationfinalize req_lib_ckpt_sectioniterationfinalize;
 	struct res_lib_ckpt_sectioniterationfinalize res_lib_ckpt_sectioniterationfinalize;
@@ -1446,11 +1438,14 @@ saCkptSectionIterationFinalize (
 	req_lib_ckpt_sectioniterationfinalize.header.id = MESSAGE_REQ_CKPT_SECTIONITERATIONFINALIZE;
 	req_lib_ckpt_sectioniterationfinalize.iteration_handle = ckptSectionIterationInstance->executive_iteration_handle;
 
+	iov.iov_base = &req_lib_ckpt_sectioniterationfinalize;
+	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationfinalize);
+
 	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptSectionIterationInstance->response_fd,
-		&req_lib_ckpt_sectioniterationfinalize,
-		sizeof (struct req_lib_ckpt_sectioniterationfinalize),
+	error = openais_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_sectioniterationfinalize,
 		sizeof (struct res_lib_ckpt_sectioniterationfinalize));
 
@@ -1538,10 +1533,9 @@ saCkptCheckpointWrite (
 			ckptCheckpointInstance->checkpointId;
 
 		iov_len = 0;
-		iov_idx = 0;
-		iov[iov_idx].iov_base = (char *)&req_lib_ckpt_sectionwrite;
-		iov[iov_idx].iov_len = sizeof (struct req_lib_ckpt_sectionwrite);
-		iov_idx++;
+		iov[0].iov_base = (char *)&req_lib_ckpt_sectionwrite;
+		iov[0].iov_len = sizeof (struct req_lib_ckpt_sectionwrite);
+		iov_idx = 1;
 
 		if (ioVector[i].sectionId.idLen) {
 			iov[iov_idx].iov_base = ioVector[i].sectionId.id;
@@ -1552,21 +1546,12 @@ saCkptCheckpointWrite (
 		iov[iov_idx].iov_len = ioVector[i].dataSize;
 		iov_idx++;
 
-		error = saSendMsgRetry (ckptCheckpointInstance->response_fd,
+		error = openais_msg_send_reply_receive (
+			ckptCheckpointInstance->ipc_ctx,
 			iov,
-			iov_idx);
-		if (error != SA_AIS_OK) {
-			goto error_exit;
-		}
-
-		/*
-		 * Receive response
-		 */
-		error = saRecvRetry (ckptCheckpointInstance->response_fd, &res_lib_ckpt_sectionwrite,
+			iov_idx,
+			&res_lib_ckpt_sectionwrite,
 			sizeof (struct res_lib_ckpt_sectionwrite));
-		if (error != SA_AIS_OK) {
-			goto error_exit;
-		}
 
 		if (res_lib_ckpt_sectionwrite.header.error == SA_AIS_ERR_TRY_AGAIN) {
 			error = SA_AIS_ERR_TRY_AGAIN;
@@ -1600,6 +1585,8 @@ saCkptSectionOverwrite (
 	SaSizeT dataSize)
 {
 	SaAisErrorT error;
+	struct iovec iov[3];
+	int iov_idx;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_sectionoverwrite req_lib_ckpt_sectionoverwrite;
 	struct res_lib_ckpt_sectionoverwrite res_lib_ckpt_sectionoverwrite;
@@ -1631,31 +1618,31 @@ saCkptSectionOverwrite (
 	req_lib_ckpt_sectionoverwrite.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 	
+	/*
+	 * Build request IO Vector
+	 */
+	iov[0].iov_base = &req_lib_ckpt_sectionoverwrite;
+	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectionoverwrite);
+	iov_idx = 1;
+	if (sectionId->idLen) {
+		iov[iov_idx].iov_base = sectionId->id;
+		iov[iov_idx].iov_len = sectionId->idLen;
+		iov_idx += 1;
+	}
+	iov[iov_idx].iov_base = (void *)dataBuffer;
+	iov[iov_idx].iov_len = dataSize;
+	if (dataSize) {
+		iov_idx += 1;
+	}
+
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendRetry (ckptCheckpointInstance->response_fd, &req_lib_ckpt_sectionoverwrite,
-		sizeof (struct req_lib_ckpt_sectionoverwrite));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	if (sectionId->idLen) {
-		error = saSendRetry (ckptCheckpointInstance->response_fd, sectionId->id,
-			sectionId->idLen);
-		if (error != SA_AIS_OK) {
-			goto error_exit;
-		}
-	}
-	error = saSendRetry (ckptCheckpointInstance->response_fd, dataBuffer, dataSize);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saRecvRetry (ckptCheckpointInstance->response_fd,
+	error = openais_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+		iov,
+		iov_idx,
 		&res_lib_ckpt_sectionoverwrite,
 		sizeof (struct res_lib_ckpt_sectionoverwrite));
-
-error_exit:
+		
 	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 	saHandleInstancePut (&checkpointHandleDatabase, checkpointHandle);
@@ -1673,10 +1660,13 @@ saCkptCheckpointRead (
 	SaAisErrorT error = SA_AIS_OK;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_sectionread req_lib_ckpt_sectionread;
-	struct res_lib_ckpt_sectionread res_lib_ckpt_sectionread;
-	int dataLength;
+	struct res_lib_ckpt_sectionread *res_lib_ckpt_sectionread = NULL;
+	char *source_char;
+	unsigned int copy_bytes;
 	int i;
 	struct iovec iov[3];
+	int source_length;
+	void *return_address;
 
 	if (ioVector == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1697,7 +1687,8 @@ saCkptCheckpointRead (
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
 	for (i = 0; i < numberOfElements; i++) {
-		req_lib_ckpt_sectionread.header.size = sizeof (struct req_lib_ckpt_sectionread) +
+		req_lib_ckpt_sectionread.header.size =
+			sizeof (struct req_lib_ckpt_sectionread) +
 			ioVector[i].sectionId.idLen;
 
 		req_lib_ckpt_sectionread.id_len = ioVector[i].sectionId.idLen;
@@ -1714,48 +1705,49 @@ saCkptCheckpointRead (
 		iov[1].iov_base = ioVector[i].sectionId.id;
 		iov[1].iov_len = ioVector[i].sectionId.idLen;
 
-		error = saSendMsgRetry (ckptCheckpointInstance->response_fd,
+		openais_msg_send_reply_receive_in_buf (
+			ckptCheckpointInstance->ipc_ctx,
 			iov,
-			2);
+			2,
+			&return_address);
+		res_lib_ckpt_sectionread = return_address;
 
-		/*
-		 * Receive response header
-		 */
-		error = saRecvRetry (ckptCheckpointInstance->response_fd, &res_lib_ckpt_sectionread,
-			sizeof (struct res_lib_ckpt_sectionread));
-		if (error != SA_AIS_OK) {
-			goto error_exit;
-		}
-		
-		dataLength = res_lib_ckpt_sectionread.header.size - sizeof (struct res_lib_ckpt_sectionread);
+		source_char = ((char *)(res_lib_ckpt_sectionread)) +
+			sizeof (struct res_lib_ckpt_sectionread);
+
+		source_length = res_lib_ckpt_sectionread->header.size -
+			sizeof (struct res_lib_ckpt_sectionread);
 
 		/*
 		 * Receive checkpoint section data
 		 */
 		if (ioVector[i].dataBuffer == 0) {
 			ioVector[i].dataBuffer =
-				malloc (dataLength);
+				malloc (source_length);
 			if (ioVector[i].dataBuffer == NULL) {
 				error = SA_AIS_ERR_NO_MEMORY;
 				goto error_exit;
 			}
+			ioVector[i].dataSize = source_length;
 		}
 		
-		if (dataLength > 0) {
-			error = saRecvRetry (ckptCheckpointInstance->response_fd, ioVector[i].dataBuffer,
-				dataLength);
-			if (error != SA_AIS_OK) {
-					goto error_exit;
+		copy_bytes = source_length;
+		if (source_length > 0) {
+			if (copy_bytes > ioVector[i].dataSize) {
+				copy_bytes = ioVector[i].dataSize;
 			}
+			memcpy (((char *)ioVector[i].dataBuffer) +
+				ioVector[i].dataOffset,
+				source_char, copy_bytes);
 		}
-		if (res_lib_ckpt_sectionread.header.error != SA_AIS_OK) {
+		if (res_lib_ckpt_sectionread->header.error != SA_AIS_OK) {
 			goto error_exit;
 		}
 
 		/*
 		 * Report back bytes of data read
 		 */
-		ioVector[i].readSize = res_lib_ckpt_sectionread.data_read;
+		ioVector[i].readSize = copy_bytes;
 	}
 
 error_exit:
@@ -1766,7 +1758,11 @@ error_exit:
 	if (error != SA_AIS_OK && erroneousVectorIndex) {
 		*erroneousVectorIndex = i;
 	}
-	return (error == SA_AIS_OK ? res_lib_ckpt_sectionread.header.error : error);
+	if (res_lib_ckpt_sectionread) {
+		return (error == SA_AIS_OK ? res_lib_ckpt_sectionread->header.error : error);
+	} else  {
+		return (error);
+	}
 }
 
 SaAisErrorT
@@ -1775,6 +1771,7 @@ saCkptCheckpointSynchronize (
 	SaTimeT timeout)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_checkpointsynchronize req_lib_ckpt_checkpointsynchronize;
 	struct res_lib_ckpt_checkpointsynchronize res_lib_ckpt_checkpointsynchronize;
@@ -1801,11 +1798,15 @@ saCkptCheckpointSynchronize (
 	req_lib_ckpt_checkpointsynchronize.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
+	iov.iov_base = &req_lib_ckpt_checkpointsynchronize;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointsynchronize);
+
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptCheckpointInstance->response_fd,
-		&req_lib_ckpt_checkpointsynchronize,
-		sizeof (struct req_lib_ckpt_checkpointsynchronize),
+	error = openais_msg_send_reply_receive (
+		ckptCheckpointInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_checkpointsynchronize,
 		sizeof (struct res_lib_ckpt_checkpointsynchronize));
 
@@ -1823,6 +1824,7 @@ saCkptCheckpointSynchronizeAsync (
 	SaInvocationT invocation)
 {
 	SaAisErrorT error;
+	struct iovec iov;
 	struct ckptInstance *ckptInstance;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
 	struct req_lib_ckpt_checkpointsynchronizeasync req_lib_ckpt_checkpointsynchronizeasync;
@@ -1862,11 +1864,15 @@ saCkptCheckpointSynchronizeAsync (
 		ckptCheckpointInstance->checkpointId;
 	req_lib_ckpt_checkpointsynchronizeasync.invocation = invocation;
 
+	iov.iov_base = &req_lib_ckpt_checkpointsynchronizeasync;
+	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointsynchronizeasync);
+
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = saSendReceiveReply (ckptCheckpointInstance->response_fd,
-		&req_lib_ckpt_checkpointsynchronizeasync,
-		sizeof (struct req_lib_ckpt_checkpointsynchronizeasync),
+	error = openais_msg_send_reply_receive (
+		ckptCheckpointInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_ckpt_checkpointsynchronizeasync,
 		sizeof (struct res_lib_ckpt_checkpointsynchronizeasync));
 

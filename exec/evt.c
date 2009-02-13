@@ -2837,14 +2837,13 @@ evt_ret_clr_err:
  */
 static void lib_evt_event_data_get(void *conn, void *message)
 {
-	struct lib_event_data res;
 	struct chan_event_list *cel;
 	struct event_data *edp;
 	int i;
 	struct libevt_pd *esip;
+	struct iovec iov;
 
 	esip = (struct libevt_pd *)openais_conn_private_data_get(conn);
-
 
 	/*
 	 * Deliver events in publish order within priority
@@ -2867,23 +2866,20 @@ static void lib_evt_event_data_get(void *conn, void *message)
 			edp->ed_event.led_head.id = MESSAGE_RES_EVT_EVENT_DATA;
 			edp->ed_event.led_head.error = SA_AIS_OK;
 			free(cel);
-			openais_response_send(conn, &edp->ed_event,
-											edp->ed_event.led_head.size);
+			iov.iov_base = &edp->ed_event;
+			iov.iov_len = edp->ed_event.led_head.size;
+
+			openais_response_iov_send (conn, &iov, 1);
+
 			free_event_data(edp);
-			goto data_get_done;
+			break;
 		}
 	}
-
-	res.led_head.size = sizeof(res.led_head);
-	res.led_head.id = MESSAGE_RES_EVT_EVENT_DATA;
-	res.led_head.error = SA_AIS_ERR_NOT_EXIST;
-	openais_response_send(conn, &res, res.led_head.size);
 
 	/*
 	 * See if there are any events that the app doesn't know about
 	 * because the notify pipe was full.
 	 */
-data_get_done:
 	if (esip->esi_nevents) {
 		__notify_event(conn);
 	}

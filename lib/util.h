@@ -73,47 +73,42 @@ struct saVersionDatabase {
 };
 
 SaAisErrorT
-saServiceConnect (
-        int *responseOut,
-        int *callbackOut,
-        enum service_types service);
+openais_service_connect (
+	enum service_types service,
+	void **ipc_context);
 
 SaAisErrorT
-saRecvRetry (
-	int s,
-	void *msg,
-	size_t len);
+openais_service_disconnect (
+	void *ipc_context);
+
+int
+openais_fd_get (
+	void *ipc_context);
+
+int
+openais_dispatch_recv (
+	void *ipc_context,
+	void *buf,
+	int timeout);
+
+int
+openais_dispatch_flow_control_get (
+	void *ipc_context);
 
 SaAisErrorT
-saSendRetry (
-	int s,
-	const void *msg,
-	size_t len);
-
-SaAisErrorT saSendMsgRetry (
-	int s,
-	struct iovec *iov,
-	int iov_len);
-
-SaAisErrorT saSendMsgReceiveReply (
-	int s,
+openais_msg_send_reply_receive (
+	void *ipc_context,
 	struct iovec *iov,
 	int iov_len,
-	void *responseMessage,
-	int responseLen);
-
-SaAisErrorT saSendReceiveReply (
-	int s,
-	void *requestMessage,
-	int requestLen,
-	void *responseMessage,
-	int responseLen);
+	void *res_msg,
+	int res_len);
 
 SaAisErrorT
-saPollRetry (
-	struct pollfd *ufds,
-	unsigned int nfds,
-	int timeout);
+openais_msg_send_reply_receive_in_buf (
+	void *ipc_context,
+	struct iovec *iov,
+	int iov_len,
+	void **res_msg);
 
 SaAisErrorT
 saHandleCreate (

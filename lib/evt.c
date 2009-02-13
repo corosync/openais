@@ -105,7 +105,7 @@ struct handle_list {
  * data required to support events for a given initialization
  *
  * ei_dispatch_fd:	fd used for getting callback data e.g. async event data
- * ei_response_fd:	fd used for everything else (i.e. evt sync api commands).
+ * ipc_ctx:	fd used for everything else (i.e. evt sync api commands).
  * ei_callback:		callback function.
  * ei_version:		version sent to the evtInitialize call.
  * ei_node_id:		our node id.
@@ -123,8 +123,7 @@ struct handle_list {
  *
  */
 struct event_instance {
-	int 					ei_dispatch_fd;
-	int 					ei_response_fd;
+	void				*ipc_ctx;
 	SaEvtCallbacksT			ei_callback;
 	SaVersionT				ei_version;
 	SaClmNodeIdT			ei_node_id;
@@ -307,31 +306,23 @@ static void eventHandleInstanceDestructor(void *instance)
 	pthread_mutex_destroy(&edi->edi_mutex);
 }
 
-static SaAisErrorT evt_recv_event(int fd, struct lib_event_data **msg)
+static void evt_recv_event(void *ipc_ctx, struct lib_event_data **msg)
 {
-	SaAisErrorT error;
-	mar_res_header_t hdr;
-	void *data;
+	struct res_evt_event_data req;
+	struct lib_event_data res;
+	struct iovec iov;
 
-	error = saRecvRetry(fd, &hdr, sizeof(hdr));
-	if (error != SA_AIS_OK) {
-		goto msg_out;
-	}
-	*msg = malloc(hdr.size);
-	if (!*msg) {
-		error = SA_AIS_ERR_LIBRARY;
-		goto msg_out;
-	}
-	data = (void *)((unsigned long)*msg) + sizeof(hdr);
-	memcpy(*msg, &hdr, sizeof(hdr));
-	if (hdr.size > sizeof(hdr)) {
-		error = saRecvRetry(fd, data, hdr.size - sizeof(hdr));
-		if (error != SA_AIS_OK) {
-			goto msg_out;
-		}
-	}
-msg_out:
-	return error;
+	req.evd_head.id = MESSAGE_REQ_EVT_EVENT_DATA;
+	req.evd_head.size = sizeof(res);
+
+	iov.iov_base = &req;
+	iov.iov_len = sizeof (struct res_evt_event_data);
+
+	openais_msg_send_reply_receive_in_buf (
+		ipc_ctx,
+		&iov,
+		1,
+		(void **)msg);
 }
 
 /* 
@@ -393,8 +384,7 @@ saEvtInitialize(
 	/*
 	 * Set up communication with the event server
 	 */
-	error = saServiceConnect(&evti->ei_response_fd,
-		&evti->ei_dispatch_fd, EVT_SERVICE);
+	error = openais_service_connect (EVT_SERVICE, &evti->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_handle_put;
 	}
@@ -450,7 +440,7 @@ saEvtSelectionObjectGet(
 		return error;
 	}
 
-	*selectionObject = evti->ei_dispatch_fd;
+	*selectionObject = openais_fd_get (evti->ipc_ctx);
 
 	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
 
@@ -598,7 +588,6 @@ saEvtDispatch(
 	SaEvtHandleT evtHandle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	struct pollfd ufds;
 	int timeout = -1;
 	SaAisErrorT error;
 	int dispatch_avail;
@@ -607,9 +596,7 @@ saEvtDispatch(
 	SaEvtCallbacksT callbacks;
 	int ignore_dispatch = 0;
 	int cont = 1; /* always continue do loop except when set to 0 */
-	int poll_fd;
 	struct lib_event_data *evt = 0;
-	struct res_evt_event_data res;
 
 	if (dispatchFlags < SA_DISPATCH_ONE || 
 			dispatchFlags > SA_DISPATCH_BLOCKING) {
@@ -630,18 +617,8 @@ saEvtDispatch(
 	}
 
 	do {
-		poll_fd = evti->ei_dispatch_fd;
-
-		ufds.fd = poll_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
-
-		error = saPollRetry(&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto dispatch_put;
-		}
-
-		pthread_mutex_lock(&evti->ei_dispatch_mutex);
+		dispatch_avail = openais_dispatch_recv (evti->ipc_ctx,
+			&evti->ei_dispatch_data, timeout);
 
 		/*
 		 * Handle has been finalized in another thread
@@ -651,61 +628,13 @@ saEvtDispatch(
 			goto dispatch_unlock;
 		}
 
-		/*
-		 * If we know that we have an event waiting, we can skip the
-		 * polling and just ask for it.
-		 */
-		if (!evti->ei_data_available) {
-			/*
-			 * Check the poll data in case the fd status has changed
-			 * since taking the lock
-			 */
-			error = saPollRetry(&ufds, 1, 0);
-			if (error != SA_AIS_OK) {
-				goto dispatch_unlock;
-			}
-
-			if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
-				error = SA_AIS_ERR_BAD_HANDLE;
-				goto dispatch_unlock;
-			}
-
-			dispatch_avail = ufds.revents & POLLIN;
-			if (dispatch_avail == 0 &&
-					(dispatchFlags == SA_DISPATCH_ALL ||
-					 dispatchFlags == SA_DISPATCH_ONE)) {
-				pthread_mutex_unlock(&evti->ei_dispatch_mutex);
-				break; /* exit do while cont is 1 loop */
-			} else if (dispatch_avail == 0) {
-				pthread_mutex_unlock(&evti->ei_dispatch_mutex);
-				continue; /* next poll */
-			}
-
-			if (ufds.revents & POLLIN) {
-				error = saRecvRetry (evti->ei_dispatch_fd, &evti->ei_dispatch_data.header,
-					sizeof (mar_res_header_t));
-
-				if (error != SA_AIS_OK) {
-					goto dispatch_unlock;
-				}
-				if (evti->ei_dispatch_data.header.size > sizeof (mar_res_header_t)) {
-					error = saRecvRetry (evti->ei_dispatch_fd, &evti->ei_dispatch_data.data,
-						evti->ei_dispatch_data.header.size - sizeof (mar_res_header_t));
-					if (error != SA_AIS_OK) {
-						goto dispatch_unlock;
-					}
-				}
-			} else {
-				pthread_mutex_unlock(&evti->ei_dispatch_mutex);
-				continue;
-			}
-		} else {
-			/*
-			 * We know that we have an event available from before.
-			 * Fake up a header message and the switch statement will
-			 * take care of the rest.
-			 */
-			evti->ei_dispatch_data.header.id = MESSAGE_RES_EVT_AVAILABLE;
+		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
+			pthread_mutex_unlock (&evti->ei_dispatch_mutex);
+			break; /* exit do while cont is 1 loop */
+		} else
+		if (dispatch_avail == 0) {
+			pthread_mutex_unlock (&evti->ei_dispatch_mutex);
+			continue; /* next poll */
 		}
 
 		/*
@@ -723,32 +652,11 @@ saEvtDispatch(
 
 		case MESSAGE_RES_EVT_AVAILABLE:
 			evti->ei_data_available = 0;
-			/*
-			 * There are events available.  Send a request for one and then
-			 * dispatch it.
-			 */
-			res.evd_head.id = MESSAGE_REQ_EVT_EVENT_DATA;
-			res.evd_head.size = sizeof(res);
  
  			pthread_mutex_lock(&evti->ei_response_mutex);
- 			error = saSendRetry(evti->ei_response_fd, &res, sizeof(res));
- 
-			if (error != SA_AIS_OK) {
-				DPRINT (("MESSAGE_RES_EVT_AVAILABLE: send failed: %d\n", error));
- 				pthread_mutex_unlock(&evti->ei_response_mutex);
-					break;
-			}
- 			error = evt_recv_event(evti->ei_response_fd, &evt);
+			evt_recv_event(evti->ipc_ctx, &evt);
  			pthread_mutex_unlock(&evti->ei_response_mutex);
 
-			if (error != SA_AIS_OK) {
-				DPRINT (("MESSAGE_RES_EVT_AVAILABLE: receive failed: %d\n", error));
-				break;
-			}
-			/*
- 			 * No data available.  This is OK, another thread may have
- 			 * grabbed it.
-			 */
 			if (evt->led_head.error == SA_AIS_ERR_NOT_EXIST) {
 				error = SA_AIS_OK;
 				break;
@@ -765,8 +673,6 @@ saEvtDispatch(
 				 */
 				if (error == SA_AIS_ERR_TRY_AGAIN) {
 					evti->ei_data_available = 1;
-				} else {
-					DPRINT (("MESSAGE_RES_EVT_AVAILABLE: Error returned: %d\n", error));
 				}
 				break;
 			}
@@ -821,22 +727,12 @@ saEvtDispatch(
 			break;
 
 		default:
-			DPRINT (("Dispatch: Bad message type 0x%x\n", evti->ei_dispatch_data.header.id));
+			printf ("Dispatch: Bad message type 0x%x\n", evti->ei_dispatch_data.header.id);
 			error = SA_AIS_ERR_LIBRARY;	
 			goto dispatch_unlock;
 		}
 
 		pthread_mutex_unlock(&evti->ei_dispatch_mutex);
-
-		/*
-		 * If empty is zero it means the we got the 
-		 * message from the queue and we are responsible
-		 * for freeing it.
-		 */
-		if (evt) {
-			free(evt);
-			evt = 0;
-		}
 
 		/*
 		 * Determine if more messages should be processed
@@ -903,21 +799,12 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 
 	evti->ei_finalize = 1;
 
+	openais_service_disconnect (evti->ipc_ctx);
+
 	pthread_mutex_unlock (&evti->ei_response_mutex);
 
 	saHandleDestroy(&evt_instance_handle_db, evtHandle);
-	/*
-	 * Disconnect from the server
-	 */
-    if (evti->ei_response_fd != -1) {
-		shutdown(evti->ei_response_fd, 0);
-		close(evti->ei_response_fd);
-	}
 
-	if (evti->ei_dispatch_fd != -1) {
-		shutdown(evti->ei_dispatch_fd, 0);
-		close(evti->ei_dispatch_fd);
-	}
 	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
 
 	return error;
@@ -1004,7 +891,7 @@ saEvtChannelOpen(
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = saSendMsgReceiveReply(evti->ei_response_fd, &iov, 1,
+	error = openais_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
 		&res, sizeof(res));
 
 	pthread_mutex_unlock (&evti->ei_response_mutex);
@@ -1107,7 +994,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = saSendMsgReceiveReply (evti->ei_response_fd, &iov, 1,
+	error = openais_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
 		&res, sizeof (res));
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
@@ -1231,7 +1118,7 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = saSendMsgReceiveReply (evti->ei_response_fd, &iov, 1,
+	error = openais_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
 		&res, sizeof (res));
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
@@ -1332,7 +1219,7 @@ saEvtChannelUnlink(
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = saSendMsgReceiveReply (evti->ei_response_fd, &iov, 1,
+	error = openais_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
 		&res, sizeof (res));
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
@@ -2008,7 +1895,7 @@ saEvtEventPublish(
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = saSendMsgReceiveReply(evti->ei_response_fd, &iov, 1, &res,
+	error = openais_msg_send_reply_receive(evti->ipc_ctx, &iov, 1, &res,
 		sizeof(res));
 
 	pthread_mutex_unlock (&evti->ei_response_mutex);
@@ -2125,7 +2012,7 @@ saEvtEventSubscribe(
 	iov.iov_len = req->ics_head.size;
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
-	error = saSendMsgReceiveReply(evti->ei_response_fd, &iov, 1,
+	error = openais_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
 		&res, sizeof(res));
 	pthread_mutex_unlock (&evti->ei_response_mutex);
 	free(req);
@@ -2188,7 +2075,7 @@ saEvtEventUnsubscribe(
 	iov.iov_len = sizeof(req);
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
- 	error = saSendMsgReceiveReply(evti->ei_response_fd, &iov, 1,
+ 	error = openais_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
  		&res, sizeof(res));
  	pthread_mutex_unlock (&evti->ei_response_mutex);
 
@@ -2259,7 +2146,7 @@ saEvtEventRetentionTimeClear(
 	iov.iov_len = sizeof(req);
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
-	error = saSendMsgReceiveReply(evti->ei_response_fd, &iov, 1,
+	error = openais_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
 		&res, sizeof(res));
 	pthread_mutex_unlock (&evti->ei_response_mutex);
 

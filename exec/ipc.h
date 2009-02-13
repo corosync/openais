@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006-2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -35,61 +35,25 @@
 #ifndef IPC_H_DEFINED
 #define IPC_H_DEFINED
 
-#include "tlist.h"
-#include "flow.h"
-
 extern void message_source_set (mar_message_source_t *source, void *conn);
 
 extern int message_source_is_local (mar_message_source_t *source);
+
+extern void openais_ipc_init (unsigned int gid_valid);
 
 extern void *openais_conn_private_data_get (void *conn);
 
 extern int openais_response_send (void *conn, void *msg, int mlen);
 
+extern int openais_response_iov_send (void *conn, struct iovec *iov, int iov_len);
+
 extern int openais_dispatch_send (void *conn, void *msg, int mlen);
 
-extern void openais_conn_info_refcnt_dec (void *conn);
+extern int openais_dispatch_iov_send (void *conn, struct iovec *iov, int iov_len);
+extern void openais_conn_refcount_inc (void *conn);
 
-extern void openais_conn_info_refcnt_inc (void *conn);
+extern void openais_conn_refcount_dec (void *conn);
 
-extern void openais_ipc_init (
-        void (*serialize_lock_fn) (void),
-        void (*serialize_unlock_fn) (void),
-	unsigned int gid_valid);
-
-extern int openais_ipc_timer_add (
-	void *conn,
-	void (*timer_fn) (void *data),
-	void *data,
-	unsigned int msec_in_future,
-	timer_handle *handle);
-
-extern void openais_ipc_timer_del (
-	void *conn,
-	timer_handle timer_handle);
-
-extern void openais_ipc_timer_del_data (
-	void *conn,
-	timer_handle timer_handle);
-
-extern void openais_ipc_flow_control_create (
-	void *conn,
-	unsigned int service,
-	char *id,
-	int id_len,
-	void (*flow_control_state_set_fn) (void *context, enum openais_flow_control_state flow_control_state_set),
-	void *context);
-	
-extern void openais_ipc_flow_control_destroy (
-	void *conn,
-	unsigned int service,
-	unsigned char *id,
-	int id_len);
-
-extern void openais_ipc_flow_control_local_increment (
-	void *conn);
-
-extern void openais_ipc_flow_control_local_decrement (
-	void *conn);
+extern void openais_ipc_exit (void);
 
 #endif /* IPC_H_DEFINED */

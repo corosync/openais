@@ -1,4 +1,4 @@
-#define _BSD_SOURCE
+#include <assert.h>
 /*
  * Copyright (c) 2006-2007 Red Hat, Inc.
  *
@@ -110,14 +110,17 @@ void cpg_benchmark (
 retry:
 			res = cpg_mcast_joined (handle, CPG_TYPE_AGREED, &iov, 1);
 			if (res == CPG_ERR_TRY_AGAIN) {
-				goto retry;
+				break;
 			}
+		} else {
+			break;
 		}
 		res = cpg_dispatch (handle, CPG_DISPATCH_ALL);
 		if (res != CPG_OK) {
 			printf ("cpg dispatch returned error %d\n", res);
 			exit (1);
 		}
+		assert (res == CPG_OK);
 	} while (alarm_notice == 0);
 	gettimeofday (&tv2, NULL);
 	timersub (&tv2, &tv1, &tv_elapsed);
@@ -144,10 +147,11 @@ static struct cpg_name group_name = {
 
 int main (void) {
 	cpg_handle_t handle;
-	unsigned int size = 1;
+	unsigned int size;
 	int i;
 	unsigned int res;
 	
+	size = 1000;
 	signal (SIGALRM, sigalrm_handler);
 	res = cpg_initialize (&handle, &callbacks);
 	if (res != CPG_OK) {

@@ -1504,6 +1504,9 @@ int callback_expiry (enum totem_callback_token_type type, void *data)
 		checkpoint = list_entry (list,
 			struct checkpoint, expiry_list);
 
+		log_printf (LOG_LEVEL_DEBUG,
+			"refcnt checkpoint %s %d\n",
+			get_mar_name_t (&checkpoint->name), checkpoint->reference_count);
 		if (checkpoint->reference_count == 0) {
 			req_exec_ckpt_checkpointunlink.header.size =
 				sizeof (struct req_exec_ckpt_checkpointunlink);
@@ -1540,6 +1543,7 @@ int callback_expiry (enum totem_callback_token_type type, void *data)
 void timer_function_retention (void *data)
 {
 	struct checkpoint *checkpoint = (struct checkpoint *)data;
+
 	checkpoint->retention_timer = 0;
 	list_add (&checkpoint->expiry_list, &my_checkpoint_expiry_list_head);
 
@@ -2301,6 +2305,8 @@ static void message_handler_req_exec_ckpt_sectionread (
 	struct checkpoint_section *checkpoint_section = 0;
 	int section_size = 0;
 	SaAisErrorT error = SA_AIS_OK;
+	int iov_len;
+	struct iovec iov[2];
 
 	res_lib_ckpt_sectionread.data_read = 0;
 
@@ -2369,6 +2375,7 @@ static void message_handler_req_exec_ckpt_sectionread (
 	 */
 error_exit:
 	if (message_source_is_local(&req_exec_ckpt_sectionread->source)) {
+
 		res_lib_ckpt_sectionread.header.size = sizeof (struct res_lib_ckpt_sectionread) + section_size;
 		res_lib_ckpt_sectionread.header.id = MESSAGE_RES_CKPT_CHECKPOINT_SECTIONREAD;
 		res_lib_ckpt_sectionread.header.error = error;
@@ -2377,22 +2384,23 @@ error_exit:
 			res_lib_ckpt_sectionread.data_read = section_size;
 		}
 
-		openais_response_send (
-			req_exec_ckpt_sectionread->source.conn,
-			&res_lib_ckpt_sectionread,
-			sizeof (struct res_lib_ckpt_sectionread));
+		iov[0].iov_base = &res_lib_ckpt_sectionread;
+		iov[0].iov_len = sizeof (struct res_lib_ckpt_sectionread);
+		iov_len = 1;
 
-		/*
-		 * Write checkpoint to CKPT library section if section has data
-		 */
 		if (error == SA_AIS_OK) {
 			char *sd;
+
 			sd = (char *)checkpoint_section->section_data;
-			openais_response_send (
-				req_exec_ckpt_sectionread->source.conn,
-				&sd[req_exec_ckpt_sectionread->data_offset],
-				section_size);
+			iov[1].iov_base = &sd[req_exec_ckpt_sectionread->data_offset],
+			iov[1].iov_len = section_size;
+			iov_len = 2;
 		}
+
+		openais_response_iov_send (
+			req_exec_ckpt_sectionread->source.conn,
+			iov,
+			iov_len);
 	}
 }
 
@@ -3212,6 +3220,8 @@ static void message_handler_req_lib_ckpt_sectioniterationnext (
 	struct res_lib_ckpt_sectioniterationnext res_lib_ckpt_sectioniterationnext;
 	SaAisErrorT error = SA_AIS_OK;
 	int section_id_size = 0;
+	int iov_len;
+	struct iovec iov[2];
 	unsigned int res;
 	struct iteration_instance *iteration_instance = NULL;
 	void *iteration_instance_p;
@@ -3286,17 +3296,18 @@ error_exit:
 	res_lib_ckpt_sectioniterationnext.header.id = MESSAGE_RES_CKPT_SECTIONITERATIONNEXT;
 	res_lib_ckpt_sectioniterationnext.header.error = error;
 
-	openais_response_send (
-		conn,
-		&res_lib_ckpt_sectioniterationnext,
-		sizeof (struct res_lib_ckpt_sectioniterationnext));
-
-	if (error == SA_AIS_OK) {
-		openais_response_send (
-			conn,
-			checkpoint_section->section_descriptor.section_id.id,
-			checkpoint_section->section_descriptor.section_id.id_len);
+	iov[0].iov_base = &res_lib_ckpt_sectioniterationnext;
+	iov[0].iov_len = sizeof (struct res_lib_ckpt_sectioniterationnext);
+	iov_len = 1;
+	if (error == SA_AIS_OK ) {
+		iov[1].iov_base = checkpoint_section->section_descriptor.section_id.id,
+		iov[1].iov_len = checkpoint_section->section_descriptor.section_id.id_len;
+		iov_len = 2;
 	}
+	openais_response_iov_send (
+		conn,
+		iov,
+		iov_len);
 }
 
 /*

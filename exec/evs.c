@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2004-2006 MontaVista Software, Inc.
- * Copyright (c) 2006-2007 Red Hat, Inc.
  * Copyright (c) 2006 Sun Microsystems, Inc.
+ * Copyright (c) 2006-2009 Red Hat, Inc.
  *
  * Author: Steven Dake (sdake@redhat.com)
  *
@@ -271,11 +271,13 @@ static int evs_lib_init_fn (void *conn)
 	return (0);
 }
 
+unsigned int count = 0;
 static int evs_lib_exit_fn (void *conn)
 {
     struct evs_pd *evs_pd = (struct evs_pd *)openais_conn_private_data_get (conn);
 
 	list_del (&evs_pd->list);
+
 	return (0);
 }
 
@@ -499,6 +501,7 @@ static void message_handler_req_exec_mcast (
 	int found = 0;
 	int i, j;
 	struct evs_pd *evs_pd;
+	struct iovec iov[2];
 
 	res_evs_deliver_callback.header.size =
 		sizeof (struct res_evs_deliver_callback) +
@@ -532,14 +535,15 @@ static void message_handler_req_exec_mcast (
 
 		if (found) {
 			res_evs_deliver_callback.local_nodeid = nodeid;
-			openais_dispatch_send (
+			iov[0].iov_base = &res_evs_deliver_callback;
+			iov[0].iov_len = sizeof (struct res_evs_deliver_callback);
+			iov[1].iov_base = msg_addr;
+			iov[1].iov_len = req_exec_evs_mcast->msg_len;
+
+			openais_dispatch_iov_send (
 				evs_pd->conn,
-				&res_evs_deliver_callback,
-				sizeof (struct res_evs_deliver_callback));
-			openais_dispatch_send (
-				evs_pd->conn,
-				msg_addr,
-				req_exec_evs_mcast->msg_len);
+				iov,
+				2);
 		}
 	}
 }

@@ -61,8 +61,7 @@ struct res_overlay {
  * Data structure for instance data
  */
 struct cfg_instance {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	OpenaisCfgCallbacksT callbacks;
 	SaNameT compName;
 	int compRegistered;
@@ -112,13 +111,8 @@ openais_cfg_initialize (
 		goto error_destroy;
 	}
 
-	cfg_instance->response_fd = -1;
-
-	cfg_instance->dispatch_fd = -1;
-	
-	error = saServiceConnect (&cfg_instance->response_fd,
-		&cfg_instance->dispatch_fd, CFG_SERVICE);
-	if (error != SA_AIS_OK) {
+	error = openais_service_connect (CFG_SERVICE, &cfg_instance->ipc_ctx);
+	if (error != 0) {
 		goto error_put_destroy;
 	}
 
@@ -155,7 +149,7 @@ openais_cfg_fd_get (
 		return (error);
 	}
 
-	*selectionObject = cfg_instance->dispatch_fd;
+	*selectionObject = openais_fd_get (cfg_instance->ipc_ctx);
 
 	saHandleInstancePut (&cfg_hdb, cfg_handle);
 	return (SA_AIS_OK);
@@ -166,7 +160,6 @@ openais_cfg_dispatch (
 	openais_cfg_handle_t cfg_handle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	struct pollfd ufds;
 	int timeout = -1;
 	SaAisErrorT error;
 	int cont = 1; /* always continue do loop except when set to 0 */
@@ -196,35 +189,15 @@ openais_cfg_dispatch (
 	}
 
 	do {
-		/*
-		 * Read data directly from socket
-		 */
-		ufds.fd = cfg_instance->dispatch_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
+		dispatch_avail = openais_dispatch_recv (cfg_instance->ipc_ctx,
+			(void *)&dispatch_data, timeout);
 
-		error = saPollRetry (&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto error_nounlock;
-		}
-
-		pthread_mutex_lock (&cfg_instance->dispatch_mutex);
-
-		error = saPollRetry (&ufds, 1, 0);
-		if (error != SA_AIS_OK) {
-			goto error_nounlock;
-		}
-
-		/*
-		 * Handle has been finalized in another thread
-		 */
 		if (cfg_instance->finalize == 1) {
 			error = SA_AIS_OK;
 			pthread_mutex_unlock (&cfg_instance->dispatch_mutex);
 			goto error_unlock;
 		}
 
-		dispatch_avail = ufds.revents & POLLIN;
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
 			pthread_mutex_unlock (&cfg_instance->dispatch_mutex);
 			break; /* exit do while cont is 1 loop */
@@ -232,27 +205,6 @@ openais_cfg_dispatch (
 		if (dispatch_avail == 0) {
 			pthread_mutex_unlock (&cfg_instance->dispatch_mutex);
 			continue; /* next poll */
-		}
-
-		if (ufds.revents & POLLIN) {
-			/*
-			 * Queue empty, read response from socket
-			 */
-			error = saRecvRetry (cfg_instance->dispatch_fd, &dispatch_data.header,
-				sizeof (mar_res_header_t));
-			if (error != SA_AIS_OK) {
-				goto error_unlock;
-			}
-			if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-				error = saRecvRetry (cfg_instance->dispatch_fd, &dispatch_data.data,
-					dispatch_data.header.size - sizeof (mar_res_header_t));
-				if (error != SA_AIS_OK) {
-					goto error_unlock;
-				}
-			}
-		} else {
-			pthread_mutex_unlock (&cfg_instance->dispatch_mutex);
-			continue;
 		}
 
 		/*
@@ -322,6 +274,8 @@ openais_cfg_finalize (
 
 	cfg_instance->finalize = 1;
 
+	openais_service_disconnect (cfg_instance->ipc_ctx);
+
 	pthread_mutex_unlock (&cfg_instance->response_mutex);
 
 	pthread_mutex_unlock (&cfg_instance->dispatch_mutex);
@@ -331,15 +285,6 @@ openais_cfg_finalize (
 	pthread_mutex_destroy (&cfg_instance->dispatch_mutex);
 
 	saHandleDestroy (&cfg_hdb, cfg_handle);
-
-	if (cfg_instance->response_fd != -1) {
-		shutdown (cfg_instance->response_fd, 0);
-		close (cfg_instance->response_fd);
-	}
-	if (cfg_instance->dispatch_fd != -1) {
-		shutdown (cfg_instance->dispatch_fd, 0);
-		close (cfg_instance->dispatch_fd);
-	}
 
 	saHandleInstancePut (&cfg_hdb, cfg_handle);
 
@@ -358,6 +303,7 @@ openais_cfg_ring_status_get (
 	struct res_lib_cfg_ringstatusget res_lib_cfg_ringstatusget;
 	unsigned int i;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&cfg_hdb, cfg_handle, (void *)&cfg_instance);
 	if (error != SA_AIS_OK) {
@@ -367,11 +313,14 @@ openais_cfg_ring_status_get (
 	req_lib_cfg_ringstatusget.header.size = sizeof (struct req_lib_cfg_ringstatusget);
 	req_lib_cfg_ringstatusget.header.id = MESSAGE_REQ_CFG_RINGSTATUSGET;
 
+	iov.iov_base = 	&req_lib_cfg_ringstatusget,
+	iov.iov_len = sizeof (struct req_lib_cfg_ringstatusget),
+
 	pthread_mutex_lock (&cfg_instance->response_mutex);
 
-	error = saSendReceiveReply (cfg_instance->response_fd,
-		&req_lib_cfg_ringstatusget,
-		sizeof (struct req_lib_cfg_ringstatusget),
+	error = openais_msg_send_reply_receive(cfg_instance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_cfg_ringstatusget,
 		sizeof (struct res_lib_cfg_ringstatusget));
 
@@ -434,6 +383,7 @@ openais_cfg_ring_reenable (
 	struct req_lib_cfg_ringreenable req_lib_cfg_ringreenable;
 	struct res_lib_cfg_ringreenable res_lib_cfg_ringreenable;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&cfg_hdb, cfg_handle, (void *)&cfg_instance);
 	if (error != SA_AIS_OK) {
@@ -443,11 +393,14 @@ openais_cfg_ring_reenable (
 	req_lib_cfg_ringreenable.header.size = sizeof (struct req_lib_cfg_ringreenable);
 	req_lib_cfg_ringreenable.header.id = MESSAGE_REQ_CFG_RINGREENABLE;
 
+	iov.iov_base = &req_lib_cfg_ringreenable,
+	iov.iov_len = sizeof (struct req_lib_cfg_ringreenable);
+
 	pthread_mutex_lock (&cfg_instance->response_mutex);
 
-	error = saSendReceiveReply (cfg_instance->response_fd,
-		&req_lib_cfg_ringreenable,
-		sizeof (struct req_lib_cfg_ringreenable),
+	error = openais_msg_send_reply_receive (cfg_instance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_cfg_ringreenable,
 		sizeof (struct res_lib_cfg_ringreenable));
 
@@ -467,6 +420,7 @@ openais_cfg_state_track (
 	struct req_lib_cfg_statetrack req_lib_cfg_statetrack;
 	struct res_lib_cfg_statetrack res_lib_cfg_statetrack;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	req_lib_cfg_statetrack.header.size = sizeof (struct req_lib_cfg_statetrack);
 	req_lib_cfg_statetrack.header.id = MESSAGE_REQ_CFG_STATETRACKSTART;
@@ -479,11 +433,14 @@ openais_cfg_state_track (
 		return (error);
 	}
 
+	iov.iov_base = &req_lib_cfg_statetrack,
+	iov.iov_len = sizeof (struct req_lib_cfg_statetrack),
+
 	pthread_mutex_lock (&cfg_instance->response_mutex);
 
-	error = saSendReceiveReply (cfg_instance->response_fd,
-		&req_lib_cfg_statetrack,
-		sizeof (struct req_lib_cfg_statetrack),
+	error = openais_msg_send_reply_receive (cfg_instance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_cfg_statetrack,
 		sizeof (struct res_lib_cfg_statetrack));
 
@@ -502,6 +459,7 @@ openais_cfg_state_track_stop (
 	struct req_lib_cfg_statetrackstop req_lib_cfg_statetrackstop;
 	struct res_lib_cfg_statetrackstop res_lib_cfg_statetrackstop;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&cfg_hdb, cfg_handle,
 		(void *)&cfg_instance);
@@ -512,11 +470,13 @@ openais_cfg_state_track_stop (
 	req_lib_cfg_statetrackstop.header.size = sizeof (struct req_lib_cfg_statetrackstop);
 	req_lib_cfg_statetrackstop.header.id = MESSAGE_REQ_CFG_STATETRACKSTOP;
 
+	iov.iov_base = &req_lib_cfg_statetrackstop,
+	iov.iov_len = sizeof (struct req_lib_cfg_statetrackstop),
 	pthread_mutex_lock (&cfg_instance->response_mutex);
 
-	error = saSendReceiveReply (cfg_instance->response_fd,
-		&req_lib_cfg_statetrackstop,
-		sizeof (struct req_lib_cfg_statetrackstop),
+	error = openais_msg_send_reply_receive (cfg_instance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_cfg_statetrackstop,
 		sizeof (struct res_lib_cfg_statetrackstop));
 
@@ -537,6 +497,7 @@ openais_cfg_admin_state_get (
 	struct req_lib_cfg_administrativestateget req_lib_cfg_administrativestateget;
 	struct res_lib_cfg_administrativestateget res_lib_cfg_administrativestateget;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&cfg_hdb, cfg_handle,
 		(void *)&cfg_instance);
@@ -548,9 +509,14 @@ openais_cfg_admin_state_get (
 	req_lib_cfg_administrativestateget.header.size = sizeof (struct req_lib_cfg_administrativestateget);
 	req_lib_cfg_administrativestateget.administrativeTarget = administrativeTarget;
 
-	error = saSendReceiveReply (cfg_instance->response_fd,
-		&req_lib_cfg_administrativestateget,
-		sizeof (struct req_lib_cfg_administrativestateget),
+	iov.iov_base = &req_lib_cfg_administrativestateget,
+	iov.iov_len = sizeof (struct req_lib_cfg_administrativestateget),
+
+	pthread_mutex_lock (&cfg_instance->response_mutex);
+
+	error = openais_msg_send_reply_receive (cfg_instance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_cfg_administrativestateget,
 		sizeof (struct res_lib_cfg_administrativestateget));
 
@@ -573,6 +539,7 @@ openais_cfg_admin_state_set (
 	struct req_lib_cfg_administrativestateset req_lib_cfg_administrativestateset;
 	struct res_lib_cfg_administrativestateset res_lib_cfg_administrativestateset;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&cfg_hdb, cfg_handle,
 		(void *)&cfg_instance);
@@ -585,9 +552,14 @@ openais_cfg_admin_state_set (
 	req_lib_cfg_administrativestateset.administrativeTarget = administrativeTarget;
 	req_lib_cfg_administrativestateset.administrativeState = administrativeState;
 
-	error = saSendReceiveReply (cfg_instance->response_fd,
-		&req_lib_cfg_administrativestateset,
-		sizeof (struct req_lib_cfg_administrativestateset),
+	iov.iov_base = &req_lib_cfg_administrativestateset,
+	iov.iov_len = sizeof (struct req_lib_cfg_administrativestateset),
+
+	pthread_mutex_lock (&cfg_instance->response_mutex);
+
+	error = openais_msg_send_reply_receive (cfg_instance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_cfg_administrativestateset,
 		sizeof (struct res_lib_cfg_administrativestateset));
 

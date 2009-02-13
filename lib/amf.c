@@ -61,8 +61,7 @@ struct res_overlay {
  * Data structure for instance data
  */
 struct amfInstance {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	SaAmfCallbacksT callbacks;
 	SaNameT compName;
 	int compRegistered;
@@ -131,12 +130,7 @@ saAmfInitialize (
 		goto error_destroy;
 	}
 
-	amfInstance->response_fd = -1;
-
-	amfInstance->dispatch_fd = -1;
-	
-	error = saServiceConnect (&amfInstance->response_fd,
-		&amfInstance->dispatch_fd, AMF_SERVICE);
+	error = openais_service_connect (CPG_SERVICE, &amfInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -172,7 +166,7 @@ saAmfSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = amfInstance->dispatch_fd;
+	*selectionObject = openais_fd_get (amfInstance->ipc_ctx);
 
 	saHandleInstancePut (&amfHandleDatabase, amfHandle);
 	return (SA_AIS_OK);
@@ -184,7 +178,6 @@ saAmfDispatch (
 	SaAmfHandleT amfHandle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	struct pollfd ufds;
 	int timeout = -1;
 	SaAisErrorT error;
 	int cont = 1; /* always continue do loop except when set to 0 */
@@ -216,28 +209,9 @@ saAmfDispatch (
 	}
 
 	do {
-		/*
-		 * Read data directly from socket
-		 */
-		ufds.fd = amfInstance->dispatch_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
+		dispatch_avail = openais_dispatch_recv (amfInstance->ipc_ctx,
+			(void *)&dispatch_data, timeout);
 
-		error = saPollRetry (&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto error_nounlock;
-		}
-
-		pthread_mutex_lock (&amfInstance->dispatch_mutex);
-
-		error = saPollRetry (&ufds, 1, 0);
-		if (error != SA_AIS_OK) {
-			goto error_nounlock;
-		}
-
-		/*
-		 * Handle has been finalized in another thread
-		 */
 		if (amfInstance->finalize == 1) {
 			error = SA_AIS_OK;
 			pthread_mutex_unlock (&amfInstance->dispatch_mutex);
@@ -245,7 +219,6 @@ saAmfDispatch (
 			goto error_unlock;
 		}
 
-		dispatch_avail = ufds.revents & POLLIN;
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
 			pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 			break; /* exit do while cont is 1 loop */
@@ -253,33 +226,6 @@ saAmfDispatch (
 		if (dispatch_avail == 0) {
 			pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 			continue; /* next poll */
-		}
-
-		if (ufds.revents & POLLIN) {
-			/*
-			 * Queue empty, read response from socket
-			 */ 
-			error = saRecvRetry (amfInstance->dispatch_fd, &dispatch_data.header,
-				sizeof (mar_res_header_t));
-
-			if (error != SA_AIS_OK) {
-
-				goto error_unlock;
-			}
-			if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-
-				error = saRecvRetry (amfInstance->dispatch_fd, &dispatch_data.data,
-					dispatch_data.header.size - sizeof (mar_res_header_t));
-
-				if (error != SA_AIS_OK) {
-
-					goto error_unlock;
-				}
-			}
-		} else {
-			pthread_mutex_unlock (&amfInstance->dispatch_mutex);
-
-			continue;
 		}
 
 		/*
@@ -434,6 +380,8 @@ saAmfFinalize (
 
 	amfInstance->finalize = 1;
 
+	openais_service_disconnect (amfInstance->ipc_ctx);
+
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 	pthread_mutex_destroy (&amfInstance->response_mutex);
 
@@ -441,15 +389,6 @@ saAmfFinalize (
 	pthread_mutex_destroy (&amfInstance->dispatch_mutex);
 	
 	saHandleDestroy (&amfHandleDatabase, amfHandle);
-
-	if (amfInstance->response_fd != -1) {
-		shutdown (amfInstance->response_fd, 0);
-		close (amfInstance->response_fd);
-	}
-	if (amfInstance->dispatch_fd != -1) {
-		shutdown (amfInstance->dispatch_fd, 0);
-		close (amfInstance->dispatch_fd);
-	}
 
 	saHandleInstancePut (&amfHandleDatabase, amfHandle);
 
@@ -466,6 +405,7 @@ saAmfComponentRegister (
 	SaAisErrorT error;
 	struct req_lib_amf_componentregister req_lib_amf_componentregister;
 	struct res_lib_amf_componentregister res_lib_amf_componentregister;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
 		(void *)&amfInstance);
@@ -485,11 +425,13 @@ saAmfComponentRegister (
 			sizeof (SaNameT));
 	}
 
+	iov.iov_base = &req_lib_amf_componentregister;
+	iov.iov_len = sizeof (struct req_lib_amf_componentregister);
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_componentregister,
-		sizeof (struct req_lib_amf_componentregister),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_componentregister,
 		sizeof (struct res_lib_amf_componentregister));
 
@@ -514,6 +456,7 @@ saAmfComponentUnregister (
 	struct res_lib_amf_componentunregister res_lib_amf_componentunregister;
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
 		(void *)&amfInstance);
@@ -533,11 +476,14 @@ saAmfComponentUnregister (
 			sizeof (SaNameT));
 	}	
 
+	iov.iov_base = &req_lib_amf_componentunregister;
+	iov.iov_len = sizeof (struct req_lib_amf_componentunregister);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_componentunregister,
-		sizeof (struct req_lib_amf_componentunregister),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_componentunregister,
 		sizeof (struct res_lib_amf_componentunregister));
 
@@ -598,6 +544,7 @@ saAmfPmStart (
 	struct res_lib_amf_pmstart res_lib_amf_pmstart;
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
 		(void *)&amfInstance);
@@ -613,11 +560,14 @@ saAmfPmStart (
 	req_lib_amf_pmstart.descendentsTreeDepth = descendentsTreeDepth;
 	req_lib_amf_pmstart.pmErrors = pmErrors;
 
+	iov.iov_base = &req_lib_amf_pmstart;
+	iov.iov_len = sizeof (struct req_lib_amf_pmstart);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_pmstart,
-		sizeof (struct req_lib_amf_pmstart),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_pmstart,
 		sizeof (struct res_lib_amf_pmstart));
 
@@ -640,6 +590,7 @@ saAmfPmStop (
 	struct res_lib_amf_pmstop res_lib_amf_pmstop;
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
 		(void *)&amfInstance);
@@ -654,11 +605,14 @@ saAmfPmStop (
 	req_lib_amf_pmstop.processId = processId;
 	req_lib_amf_pmstop.pmErrors = pmErrors;
 
+	iov.iov_base = &req_lib_amf_pmstop;
+	iov.iov_len = sizeof (struct req_lib_amf_pmstop);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_pmstop,
-		sizeof (struct req_lib_amf_pmstop),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_pmstop,
 		sizeof (struct res_lib_amf_pmstop));
 
@@ -682,6 +636,7 @@ saAmfHealthcheckStart (
 	struct res_lib_amf_healthcheckstart res_lib_amf_healthcheckstart;
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
 		(void *)&amfInstance);
@@ -698,11 +653,14 @@ saAmfHealthcheckStart (
 	req_lib_amf_healthcheckstart.invocationType = invocationType;
 	req_lib_amf_healthcheckstart.recommendedRecovery = recommendedRecovery;
 
+	iov.iov_base = &req_lib_amf_healthcheckstart;
+	iov.iov_len = sizeof (struct req_lib_amf_healthcheckstart);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_healthcheckstart,
-		sizeof (struct req_lib_amf_healthcheckstart),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_healthcheckstart,
 		sizeof (struct res_lib_amf_healthcheckstart));
 
@@ -724,6 +682,7 @@ saAmfHealthcheckConfirm (
 	struct res_lib_amf_healthcheckconfirm res_lib_amf_healthcheckconfirm;
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
 		(void *)&amfInstance);
@@ -739,11 +698,14 @@ saAmfHealthcheckConfirm (
 		healthcheckKey, sizeof (SaAmfHealthcheckKeyT));
 	req_lib_amf_healthcheckconfirm.healthcheckResult = healthcheckResult;
 
+	iov.iov_base = &req_lib_amf_healthcheckconfirm;
+	iov.iov_len = sizeof (struct req_lib_amf_healthcheckconfirm);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_healthcheckconfirm,
-		sizeof (struct req_lib_amf_healthcheckconfirm),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_healthcheckconfirm,
 		sizeof (struct res_lib_amf_healthcheckconfirm));
 
@@ -763,6 +725,7 @@ saAmfHealthcheckStop (
 	struct req_lib_amf_healthcheckstop req_lib_amf_healthcheckstop;
 	struct res_lib_amf_healthcheckstop res_lib_amf_healthcheckstop;
 	struct amfInstance *amfInstance;
+	struct iovec iov;
 	SaAisErrorT error;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
@@ -778,11 +741,14 @@ saAmfHealthcheckStop (
 	memcpy (&req_lib_amf_healthcheckstop.healthcheckKey,
 		healthcheckKey, sizeof (SaAmfHealthcheckKeyT));
 
+	iov.iov_base = &req_lib_amf_healthcheckstop;
+	iov.iov_len = sizeof (struct req_lib_amf_healthcheckstop);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_healthcheckstop,
-		sizeof (struct req_lib_amf_healthcheckstop),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_healthcheckstop,
 		sizeof (struct res_lib_amf_healthcheckstop));
 
@@ -804,6 +770,7 @@ saAmfHAStateGet (
 	struct amfInstance *amfInstance;
 	struct req_lib_amf_hastateget req_lib_amf_hastateget;
 	struct res_lib_amf_hastateget res_lib_amf_hastateget;
+	struct iovec iov;
 	SaAisErrorT error;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
@@ -812,6 +779,9 @@ saAmfHAStateGet (
 		return (error);
 	}
 
+	iov.iov_base = &req_lib_amf_hastateget,
+	iov.iov_len = sizeof (struct req_lib_amf_hastateget),
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
 	req_lib_amf_hastateget.header.id = MESSAGE_REQ_AMF_HASTATEGET;
@@ -819,9 +789,11 @@ saAmfHAStateGet (
 	memcpy (&req_lib_amf_hastateget.compName, compName, sizeof (SaNameT));
 	memcpy (&req_lib_amf_hastateget.csiName, csiName, sizeof (SaNameT));
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_hastateget, sizeof (struct req_lib_amf_hastateget),
-		&res_lib_amf_hastateget, sizeof (struct res_lib_amf_hastateget));
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
+		&res_lib_amf_hastateget,
+		sizeof (struct res_lib_amf_hastateget));
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
@@ -843,6 +815,7 @@ saAmfCSIQuiescingComplete (
 	struct req_lib_amf_csiquiescingcomplete req_lib_amf_csiquiescingcomplete;
 	struct res_lib_amf_csiquiescingcomplete res_lib_amf_csiquiescingcomplete;
 	struct amfInstance *amfInstance;
+	struct iovec iov;
 	SaAisErrorT errorResult;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
@@ -856,11 +829,14 @@ saAmfCSIQuiescingComplete (
 	req_lib_amf_csiquiescingcomplete.invocation = invocation;
 	req_lib_amf_csiquiescingcomplete.error = error;
 
+	iov.iov_base = &req_lib_amf_csiquiescingcomplete;
+	iov.iov_len = sizeof (struct req_lib_amf_csiquiescingcomplete);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	errorResult = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_csiquiescingcomplete,
-		sizeof (struct req_lib_amf_csiquiescingcomplete),
+	errorResult = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_csiquiescingcomplete,
 		sizeof (struct res_lib_amf_csiquiescingcomplete));
 
@@ -881,6 +857,7 @@ saAmfProtectionGroupTrack (
 	struct amfInstance *amfInstance;
 	struct req_lib_amf_protectiongrouptrack req_lib_amf_protectiongrouptrack;
 	struct res_lib_amf_protectiongrouptrack res_lib_amf_protectiongrouptrack;
+	struct iovec iov;
 	SaAisErrorT error;
 
 	req_lib_amf_protectiongrouptrack.header.size = sizeof (struct req_lib_amf_protectiongrouptrack);
@@ -896,11 +873,14 @@ saAmfProtectionGroupTrack (
 		return (error);
 	}
 
+	iov.iov_base = &req_lib_amf_protectiongrouptrack;
+	iov.iov_len = sizeof (struct req_lib_amf_protectiongrouptrack);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_protectiongrouptrack,
-		sizeof (struct req_lib_amf_protectiongrouptrack),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_protectiongrouptrack,
 		sizeof (struct res_lib_amf_protectiongrouptrack));
 
@@ -919,6 +899,7 @@ saAmfProtectionGroupTrackStop (
 	struct amfInstance *amfInstance;
 	struct req_lib_amf_protectiongrouptrackstop req_lib_amf_protectiongrouptrackstop;
 	struct res_lib_amf_protectiongrouptrackstop res_lib_amf_protectiongrouptrackstop;
+	struct iovec iov;
 	SaAisErrorT error;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
@@ -931,11 +912,13 @@ saAmfProtectionGroupTrackStop (
 	req_lib_amf_protectiongrouptrackstop.header.id = MESSAGE_REQ_AMF_PROTECTIONGROUPTRACKSTOP;
 	memcpy (&req_lib_amf_protectiongrouptrackstop.csiName, csiName, sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_amf_protectiongrouptrackstop,
+	iov.iov_len = sizeof (struct req_lib_amf_protectiongrouptrackstop),
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_protectiongrouptrackstop,
-		sizeof (struct req_lib_amf_protectiongrouptrackstop),
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_protectiongrouptrackstop,
 		sizeof (struct res_lib_amf_protectiongrouptrackstop));
 
@@ -957,6 +940,7 @@ saAmfComponentErrorReport (
 	struct amfInstance *amfInstance;
 	struct req_lib_amf_componenterrorreport req_lib_amf_componenterrorreport;
 	struct res_lib_amf_componenterrorreport res_lib_amf_componenterrorreport;
+	struct iovec iov;
 	SaAisErrorT error;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
@@ -971,13 +955,14 @@ saAmfComponentErrorReport (
 		sizeof (SaNameT));
 	req_lib_amf_componenterrorreport.errorDetectionTime = errorDetectionTime;
 
-    DPRINT (("start error report\n"));
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_componenterrorreport,
-		sizeof (struct req_lib_amf_componenterrorreport),
+	iov.iov_base = &req_lib_amf_componenterrorreport;
+	iov.iov_len = sizeof (struct req_lib_amf_componenterrorreport);
+
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_componenterrorreport,
 		sizeof (struct res_lib_amf_componenterrorreport));
-    DPRINT (("end error report\n"));
 
 	error = res_lib_amf_componenterrorreport.header.error;
 
@@ -997,6 +982,7 @@ saAmfComponentErrorClear (
 	struct amfInstance *amfInstance;
 	struct req_lib_amf_componenterrorclear req_lib_amf_componenterrorclear;
 	struct res_lib_amf_componenterrorclear res_lib_amf_componenterrorclear;
+	struct iovec iov;
 	SaAisErrorT error;
 
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
@@ -1009,9 +995,12 @@ saAmfComponentErrorClear (
 	req_lib_amf_componenterrorclear.header.size = sizeof (struct req_lib_amf_componenterrorclear);
 	memcpy (&req_lib_amf_componenterrorclear.compName, compName, sizeof (SaNameT));
 
-	error = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_componenterrorclear,
-		sizeof (struct req_lib_amf_componenterrorclear),
+	iov.iov_base = &req_lib_amf_componenterrorclear;
+	iov.iov_len = sizeof (struct req_lib_amf_componenterrorclear);
+
+	error = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_amf_componenterrorclear,
 		sizeof (struct res_lib_amf_componenterrorclear));
 
@@ -1031,6 +1020,7 @@ saAmfResponse (
 	struct amfInstance *amfInstance;
 	struct req_lib_amf_response req_lib_amf_response;
 	struct res_lib_amf_response res_lib_amf_response;
+	struct iovec iov;
 	SaAisErrorT errorResult;
 
 	errorResult = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
@@ -1044,11 +1034,16 @@ saAmfResponse (
 	req_lib_amf_response.invocation = invocation;
 	req_lib_amf_response.error = error;
 
+	iov.iov_base = &req_lib_amf_response;
+	iov.iov_len = sizeof (struct req_lib_amf_response);
+
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	errorResult = saSendReceiveReply (amfInstance->response_fd,
-		&req_lib_amf_response, sizeof (struct req_lib_amf_response),
-		&res_lib_amf_response, sizeof (struct res_lib_amf_response));
+	errorResult = openais_msg_send_reply_receive (amfInstance->ipc_ctx,
+		&iov,
+		1,
+		&res_lib_amf_response,
+		sizeof (struct res_lib_amf_response));
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 

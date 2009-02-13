@@ -61,8 +61,7 @@ struct res_overlay {
 };
 
 struct clmInstance {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	SaClmCallbacksT callbacks;
 	int finalize;
 	pthread_mutex_t response_mutex;
@@ -170,12 +169,7 @@ saClmInitialize (
 		goto error_destroy;
 	}
 
-	clmInstance->response_fd = -1;
-
-	clmInstance->dispatch_fd = -1;
-
-	error = saServiceConnect (&clmInstance->response_fd,
-		&clmInstance->dispatch_fd, CLM_SERVICE);
+	error = openais_service_connect (CLM_SERVICE, &clmInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -241,7 +235,7 @@ saClmSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = clmInstance->dispatch_fd;
+	*selectionObject = openais_fd_get (clmInstance->ipc_ctx);
 
 	saHandleInstancePut (&clmHandleDatabase, clmHandle);
 	return (SA_AIS_OK);
@@ -268,7 +262,6 @@ saClmDispatch (
 	SaClmHandleT clmHandle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	struct pollfd ufds;
 	int timeout = -1;
 	SaAisErrorT error;
 	int cont = 1; /* always continue do loop except when set to 0 */
@@ -306,65 +299,35 @@ saClmDispatch (
 	}
 
 	do {
-		ufds.fd = clmInstance->dispatch_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
-
 		pthread_mutex_lock (&clmInstance->dispatch_mutex);
 
-		error = saPollRetry (&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto error_unlock;
-		}
+		dispatch_avail = openais_dispatch_recv (clmInstance->ipc_ctx,
+			(void *)&dispatch_data, timeout);
 
-		/*
-		 * Handle has been finalized in another thread
-		 */
-		if (clmInstance->finalize == 1) {
-			error = SA_AIS_OK;
-			goto error_unlock;
-		}
+		pthread_mutex_unlock (&clmInstance->dispatch_mutex);
 
-		if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
-			error = SA_AIS_ERR_BAD_HANDLE;
-			goto error_unlock;
-		}
-
-		dispatch_avail = ufds.revents & POLLIN;
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			pthread_mutex_unlock (&clmInstance->dispatch_mutex);
 			break; /* exit do while cont is 1 loop */
 		} else
 		if (dispatch_avail == 0) {
-			pthread_mutex_unlock (&clmInstance->dispatch_mutex);
 			continue; /* next poll */
 		}
 
-		if (ufds.revents & POLLIN) {
-			error = saRecvRetry (clmInstance->dispatch_fd, &dispatch_data.header,
-				sizeof (mar_res_header_t));
-			if (error != SA_AIS_OK) {
-				goto error_unlock;
+		if (dispatch_avail == -1) {
+			if (clmInstance->finalize == 1) {
+				error = SA_AIS_OK;
+			} else {
+				error = SA_AIS_ERR_LIBRARY;
 			}
-			if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-				error = saRecvRetry (clmInstance->dispatch_fd, &dispatch_data.data,
-					dispatch_data.header.size - sizeof (mar_res_header_t));
-				if (error != SA_AIS_OK) {
-					goto error_unlock;
-				}
-			}
-		} else {
-			pthread_mutex_unlock (&clmInstance->dispatch_mutex);
-			continue;
+			goto error_put;
 		}
-			
+
 		/*
 		 * Make copy of callbacks, message data, unlock instance, and call callback
 		 * A risk of this dispatch method is that the callback routines may
 		 * operate at the same time that clmFinalize has been called in another thread.
 		 */
 		memcpy (&callbacks, &clmInstance->callbacks, sizeof (SaClmCallbacksT));
-		pthread_mutex_unlock (&clmInstance->dispatch_mutex);
 
 		/*
 		 * Dispatch incoming message
@@ -439,9 +402,6 @@ saClmDispatch (
 
 	goto error_put;
 
-error_unlock:
-	pthread_mutex_unlock (&clmInstance->dispatch_mutex);
-
 error_put:
 	saHandleInstancePut (&clmHandleDatabase, clmHandle);
 	return (error);
@@ -497,18 +457,11 @@ saClmFinalize (
 
 	clmInstance->finalize = 1;
 
+	openais_service_disconnect (clmInstance->ipc_ctx);
+
 	pthread_mutex_unlock (&clmInstance->response_mutex);
 
 	saHandleDestroy (&clmHandleDatabase, clmHandle);
-
-	if (clmInstance->response_fd != -1) {
-		shutdown (clmInstance->response_fd, 0);
-		close (clmInstance->response_fd);
-	}
-	if (clmInstance->dispatch_fd != -1) {
-		shutdown (clmInstance->dispatch_fd, 0);
-		close (clmInstance->dispatch_fd);
-	}
 
 	saHandleInstancePut (&clmHandleDatabase, clmHandle);
 
@@ -527,6 +480,7 @@ saClmClusterTrack (
 	SaAisErrorT error = SA_AIS_OK;
 	int items_to_copy;
 	unsigned int i;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
 		(void *)&clmInstance);
@@ -560,6 +514,9 @@ saClmClusterTrack (
 		req_lib_clm_clustertrack.return_in_callback = 1;
 	}
 
+	iov.iov_base = &req_lib_clm_clustertrack;
+	iov.iov_len = sizeof (req_lib_clm_clustertrack);;
+
 	pthread_mutex_lock (&clmInstance->response_mutex);
 
 	if ((clmInstance->callbacks.saClmClusterTrackCallback == 0) &&
@@ -570,9 +527,9 @@ saClmClusterTrack (
 		goto error_exit;
 	}
 
-	error = saSendReceiveReply (clmInstance->response_fd,
-		&req_lib_clm_clustertrack,
-		sizeof (struct req_lib_clm_clustertrack),
+	error = openais_msg_send_reply_receive (clmInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_clm_clustertrack,
 		sizeof (struct res_lib_clm_clustertrack));
 
@@ -620,6 +577,7 @@ saClmClusterTrackStop (
 	struct req_lib_clm_trackstop req_lib_clm_trackstop;
 	struct res_lib_clm_trackstop res_lib_clm_trackstop;
 	SaAisErrorT error = SA_AIS_OK;
+	struct iovec iov;
 
 	req_lib_clm_trackstop.header.size = sizeof (struct req_lib_clm_trackstop);
 	req_lib_clm_trackstop.header.id = MESSAGE_REQ_CLM_TRACKSTOP;
@@ -629,11 +587,14 @@ saClmClusterTrackStop (
 		return (error);
 	}
 
+	iov.iov_base = &req_lib_clm_trackstop;
+	iov.iov_len = sizeof (struct req_lib_clm_trackstop);
+
 	pthread_mutex_lock (&clmInstance->response_mutex);
 
-	error = saSendReceiveReply (clmInstance->response_fd,
-		&req_lib_clm_trackstop,
-		sizeof (struct req_lib_clm_trackstop),
+	error = openais_msg_send_reply_receive (clmInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_clm_trackstop,
 		sizeof (struct res_lib_clm_trackstop));
 
@@ -655,6 +616,7 @@ saClmClusterNodeGet (
 	struct req_lib_clm_nodeget req_lib_clm_nodeget;
 	struct res_clm_nodeget res_clm_nodeget;
 	SaAisErrorT error = SA_AIS_OK;
+	struct iovec iov;
 
 	if (clusterNode == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -670,6 +632,9 @@ saClmClusterNodeGet (
 		return (error);
 	}
 
+	iov.iov_base = &req_lib_clm_nodeget,
+	iov.iov_len = sizeof (struct req_lib_clm_nodeget),
+
 	pthread_mutex_lock (&clmInstance->response_mutex);
 
 	/*
@@ -679,8 +644,11 @@ saClmClusterNodeGet (
 	req_lib_clm_nodeget.header.id = MESSAGE_REQ_CLM_NODEGET;
 	req_lib_clm_nodeget.node_id = nodeId;
 
-	error = saSendReceiveReply (clmInstance->response_fd, &req_lib_clm_nodeget,
-		sizeof (struct req_lib_clm_nodeget), &res_clm_nodeget, sizeof (res_clm_nodeget));
+	error = openais_msg_send_reply_receive (clmInstance->ipc_ctx,
+		&iov,
+		1,
+		&res_clm_nodeget,
+		sizeof (res_clm_nodeget));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -707,6 +675,7 @@ saClmClusterNodeGetAsync (
 	struct clmInstance *clmInstance;
 	struct req_lib_clm_nodegetasync req_lib_clm_nodegetasync;
 	struct res_clm_nodegetasync res_clm_nodegetasync;
+	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
 
 	req_lib_clm_nodegetasync.header.size = sizeof (struct req_lib_clm_nodegetasync);
@@ -727,9 +696,15 @@ saClmClusterNodeGetAsync (
 		goto error_exit;
 	}
 
-	error = saSendReceiveReply (clmInstance->response_fd, &req_lib_clm_nodegetasync,
-		sizeof (struct req_lib_clm_nodegetasync),
-		&res_clm_nodegetasync, sizeof (struct res_clm_nodegetasync));
+	iov.iov_base = &req_lib_clm_nodegetasync;
+	iov.iov_len = sizeof (req_lib_clm_nodegetasync);
+
+	error = openais_msg_send_reply_receive (
+		clmInstance->ipc_ctx,
+		&iov,
+		1,
+		&res_clm_nodegetasync,
+		sizeof (struct res_clm_nodegetasync));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
