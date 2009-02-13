@@ -71,33 +71,13 @@ struct tmrInstance {
 	pthread_mutex_t dispatch_mutex;
 };
 
-struct tmrTimerIdInstance {
-	int response_fd;
-	int dispatch_fd;
-	SaTmrHandleT tmrHandle;
-	struct list_head list;
-	void *timer_lock;
-	pthread_mutex_t *response_mutex;
-	pthread_mutex_t *dispatch_mutex;
-};
-
 void tmrHandleInstanceDestructor (void *instance);
-void tmrTimerIdHandleInstanceDestructor (void *instance);
-
-static SaTimeT tmrGetTimeNow (void);
 
 static struct saHandleDatabase tmrHandleDatabase = {
 	.handleCount			= 0,
 	.handles			= 0,
 	.mutex				= PTHREAD_MUTEX_INITIALIZER,
 	.handleInstanceDestructor	= tmrHandleInstanceDestructor
-};
-
-static struct saHandleDatabase tmrTimerIdHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= tmrTimerIdHandleInstanceDestructor
 };
 
 static SaVersionT tmrVersionsSupported[] = {
@@ -115,11 +95,6 @@ void tmrHandleInstanceDestructor (void *instance)
 
 	pthread_mutex_destroy (&tmrInstance->response_mutex);
 	pthread_mutex_destroy (&tmrInstance->dispatch_mutex);
-}
-
-void tmrTimerIdHandleInstanceDestructor (void *instance)
-{
-	return;
 }
 
 #ifdef COMPILE_OUT
@@ -405,7 +380,6 @@ saTmrTimerStart (
 	SaTimeT *callTime)
 {
 	struct tmrInstance *tmrInstance;
-	struct tmrTimerIdInstance *tmrTimerIdInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
 	struct req_lib_tmr_timerstart req_lib_tmr_timerstart;
@@ -434,31 +408,10 @@ saTmrTimerStart (
 		return (error);
 	}
 
-	error = saHandleCreate (&tmrTimerIdHandleDatabase,
-		sizeof (struct tmrTimerIdInstance), timerId);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saHandleInstanceGet (&tmrTimerIdHandleDatabase, *timerId,
-		(void *)&tmrTimerIdInstance);
-	if (error != SA_AIS_OK) {
-		goto error_destroy;
-	}
-
-	*callTime = tmrGetTimeNow ();
-
-	tmrTimerIdInstance->response_fd = tmrInstance->response_fd;
-	tmrTimerIdInstance->response_mutex = &tmrInstance->response_mutex;
-	tmrTimerIdInstance->tmrHandle = tmrHandle;
-
 	req_lib_tmr_timerstart.header.size =
 		sizeof (struct req_lib_tmr_timerstart);
 	req_lib_tmr_timerstart.header.id =
 		MESSAGE_REQ_TMR_TIMERSTART;
-
-	req_lib_tmr_timerstart.timer_id = *timerId;
-	req_lib_tmr_timerstart.call_time = *callTime;
 
 	memcpy (&req_lib_tmr_timerstart.timer_attributes,
 		timerAttributes, sizeof (SaTmrTimerAttributesT));
@@ -473,12 +426,12 @@ saTmrTimerStart (
 
 	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
+	*timerId = (SaTmrTimerIdT)(res_lib_tmr_timerstart.timer_id);
+	*callTime = (SaTimeT)(res_lib_tmr_timerstart.call_time);
+
 	if (res_lib_tmr_timerstart.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_timerstart.header.error;
 	}
-
-error_destroy:
-	saHandleDestroy (&tmrTimerIdHandleDatabase, *timerId);
 
 error_exit:
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
@@ -499,17 +452,12 @@ saTmrTimerReschedule (
 	struct res_lib_tmr_timerreschedule res_lib_tmr_timerreschedule;
 
 	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerReschedule\n");
+	printf ("[DEBUG]: saTmrTimerReschedule { id=%u }\n",
+		(unsigned int)(timerId));
 
 	if (timerAttributes == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t type=%d expire=%"PRId64" duration=%"PRId64"\n",
-		timerAttributes->type,
-		timerAttributes->initialExpirationTime,
-		timerAttributes->timerPeriodDuration);
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
@@ -558,7 +506,8 @@ saTmrTimerCancel (
 	struct res_lib_tmr_timercancel res_lib_tmr_timercancel;
 
 	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerCancel\n");
+	printf ("[DEBUG]: saTmrTimerCancel { id=%u }\n",
+		(unsigned int)(timerId));
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
@@ -602,7 +551,8 @@ saTmrPeriodicTimerSkip (
 	struct res_lib_tmr_periodictimerskip res_lib_tmr_periodictimerskip;
 
 	/* DEBUG */
-	printf ("[DEBUG]: saTmrPeriodicTimerSkip\n");
+	printf ("[DEBUG]: saTmrPeriodicTimerSkip { id=%u }\n",
+		(unsigned int)(timerId));
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
@@ -646,7 +596,8 @@ saTmrTimerRemainingTimeGet (
 	struct res_lib_tmr_timerremainingtimeget res_lib_tmr_timerremainingtimeget;
 
 	/* DEBUG */
-	printf ("[DEBUG]: saTimerRemainingTimeGet\n");
+	printf ("[DEBUG]: saTimerRemainingTimeGet { id=%u }\n",
+		(unsigned int)(timerId));
 
 	if (remainingTime == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -696,7 +647,8 @@ saTmrTimerAttributesGet (
 	struct res_lib_tmr_timerattributesget res_lib_tmr_timerattributesget;
 
 	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerAttributesGet\n");
+	printf ("[DEBUG]: saTmrTimerAttributesGet { id=%u }\n",
+		(unsigned int)(timerId));
 
 	if (timerAttributes == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -834,19 +786,4 @@ saTmrClockTickGet (
 
 error_exit:
 	return (error);
-}
-
-static SaTimeT tmrGetTimeNow (void)
-{
-	struct timeval tv;
-	SaTimeT time;
-
-	if (gettimeofday (&tv, 0)) {
-		return (0ULL);
-	}
-
-	time = (SaTimeT)(tv.tv_sec) *  1000000000ULL;
-	time += (SaTimeT)(tv.tv_usec) * 1000ULL;
-
-	return (time);
 }

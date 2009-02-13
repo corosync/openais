@@ -66,14 +66,13 @@ enum res_lib_tmr_timer_types {
 
 struct req_lib_tmr_timerstart {
 	mar_req_header_t header;
-	SaTmrTimerIdT timer_id;
 	SaTmrTimerAttributesT timer_attributes;
-	SaTimeT call_time;
 };
 
 struct res_lib_tmr_timerstart {
 	mar_res_header_t header;
 	SaTmrTimerIdT timer_id;
+	SaTimeT call_time;
 };
 
 struct req_lib_tmr_timerreschedule {
@@ -150,8 +149,8 @@ struct req_lib_tmr_timerexpiredcallback {
 struct res_lib_tmr_timerexpiredcallback {
 	mar_res_header_t header;
 	SaTmrTimerIdT timer_id;
-	void *timer_data;
 	SaUint64T expiration_count;
+	void *timer_data;
 };
 
 #endif /* IPC_TMR_H_DEFINED  */

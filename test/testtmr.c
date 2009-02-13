@@ -59,9 +59,9 @@ void TimerExpiredCallback (
 {
 	/* DEBUG */
 	printf ("[DEBUG]: TimerExpiredCallback\n");
-	printf ("[DEBUG]:\t timerId = %u\n", timerId);
+	printf ("[DEBUG]:\t timerId = %"PRIu64"\n", timerId);
 	printf ("[DEBUG]:\t timerData = %p\n", timerData);
-	printf ("[DEBUG]:\t expirationCount = %u\n", expirationCount);
+	printf ("[DEBUG]:\t expirationCount = %"PRIu64"\n", expirationCount);
 
 	return;
 }
@@ -85,22 +85,20 @@ int main (void)
 {
 	SaTmrHandleT handle;
 	SaSelectionObjectT select_obj;
-	SaTmrTimerAttributesT my_attrs;
-	SaTmrTimerAttributesT attrs_a = { SA_TIME_DURATION, TMR_10_SECONDS, TMR_10_SECONDS };
-	SaTmrTimerAttributesT attrs_b = { SA_TIME_DURATION, TMR_20_SECONDS, TMR_20_SECONDS };
+	SaTmrTimerAttributesT attrs;
+	SaTmrTimerAttributesT attrs_a = { SA_TIME_DURATION, TMR_30_SECONDS, 0 };
+	SaTmrTimerAttributesT attrs_b = { SA_TIME_DURATION, TMR_30_SECONDS, 0 };
+	SaTmrTimerAttributesT new_attrs_a = { SA_TIME_DURATION, TMR_10_SECONDS, TMR_10_SECONDS };
+	SaTmrTimerAttributesT new_attrs_b = { SA_TIME_DURATION, TMR_20_SECONDS, TMR_20_SECONDS };
 	SaTmrTimerIdT id_a;
 	SaTmrTimerIdT id_b;
-	SaTimeT time;
-	SaTimeT current_time_a;
-	SaTimeT current_time_b;
-	SaTimeT delta_time;
+	SaTimeT current_time;
 	SaTimeT clock_tick;
+	SaTimeT call_time;
 
 	pthread_t dispatch_thread;
-	int result;
-	int i;
 
-	printf ("[DEBUG]: TMR_10_SECONDS = %"PRId64"\n", TMR_10_SECONDS);
+	int result;
 
 	result = saTmrInitialize (&handle, &callbacks, &version);
 	if (result != SA_AIS_OK) {
@@ -116,12 +114,12 @@ int main (void)
 		exit (result);
 	}
 
-	result = saTmrTimeGet (handle, &current_time_a);
+	result = saTmrTimeGet (handle, &current_time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimeGet\n", result);
 	}
 	else {
-		printf ("[DEBUG]: current_time = %"PRIu64"\n", current_time_a);
+		printf ("[DEBUG]: current_time = %"PRIu64"\n", current_time);
 	}
 
 	result = saTmrClockTickGet (handle, &clock_tick);
@@ -132,129 +130,95 @@ int main (void)
 		printf ("[DEBUG]: clock_tick = %"PRIu64"\n", clock_tick);
 	}
 
-	sleep (10);
-
-	result = saTmrTimeGet (handle, &current_time_b);
-	if (result != SA_AIS_OK) {
-		printf ("[ERROR]: (%d) saTmrTimeGet\n", result);
-	}
-	else {
-		printf ("[DEBUG]: current_time = %"PRIu64"\n", current_time_b);
-	}
-
-	delta_time = current_time_b - current_time_a;
-
-	printf ("[DEBUG]: delta_time = %"PRIu64"\n", delta_time);
-
-	result = saTmrTimerStart (handle, &attrs_a, NULL, &id_a, &time);
+	result = saTmrTimerStart (handle, &attrs_a, NULL, &id_a, &call_time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerStart\n", result);
 	}
 	else {
 		printf ("[DEBUG]: saTmrTimerStart { id=%u }\n", id_a);
-		printf ("[DEBUG]:\t callTime = %"PRIu64"\n", time);
+		printf ("[DEBUG]:\t callTime = %"PRIu64"\n", call_time);
 	}
 
-	result = saTmrTimerAttributesGet (handle, id_a, &my_attrs);
-	if (result != SA_AIS_OK) {
-		printf ("[ERROR]: (%d) saTmrTimerAttributesGet\n", result);
-	}
-	else {
-		printf ("[DEBUG]: id=%u attributes:\n", id_a);
-		printf ("[DEBUG]:\t type=%"PRId64"\n", my_attrs.type);
-		printf ("[DEBUG]:\t expire=%"PRIi64"\n", my_attrs.initialExpirationTime);
-		printf ("[DEBUG]:\t duration=%"PRIi64"\n", my_attrs.timerPeriodDuration);
-	}
-
-	result = saTmrTimerStart (handle, &attrs_b, NULL, &id_b, &time);
+	result = saTmrTimerStart (handle, &attrs_b, NULL, &id_b, &call_time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerStart\n", result);
 	}
 	else {
 		printf ("[DEBUG]: saTmrTimerStart { id=%u }\n", id_b);
-		printf ("[DEBUG]:\t callTime = %"PRIu64"\n", time);
+		printf ("[DEBUG]:\t callTime = %"PRIu64"\n", call_time);
 	}
 
-	result = saTmrTimerAttributesGet (handle, id_a, &my_attrs);
+	/* SLEEP */
+	sleep (10);
+
+	result = saTmrTimerAttributesGet (handle, id_a, &attrs);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerAttributesGet\n", result);
 	}
 	else {
 		printf ("[DEBUG]: id=%u attributes:\n", id_a);
-		printf ("[DEBUG]:\t type=%"PRId64"\n", my_attrs.type);
-		printf ("[DEBUG]:\t expire=%"PRId64"\n", my_attrs.initialExpirationTime);
-		printf ("[DEBUG]:\t duration=%"PRId64"\n", my_attrs.timerPeriodDuration);
+		printf ("[DEBUG]:\t type=%"PRId64"\n", attrs.type);
+		printf ("[DEBUG]:\t expire=%"PRIi64"\n", attrs.initialExpirationTime);
+		printf ("[DEBUG]:\t duration=%"PRIi64"\n", attrs.timerPeriodDuration);
 	}
 
-	result = saTmrTimerReschedule (handle, id_a, &attrs_a, &time);
+	result = saTmrTimerAttributesGet (handle, id_b, &attrs);
+	if (result != SA_AIS_OK) {
+		printf ("[ERROR]: (%d) saTmrTimerAttributesGet\n", result);
+	}
+	else {
+		printf ("[DEBUG]: id=%u attributes:\n", id_b);
+		printf ("[DEBUG]:\t type=%"PRId64"\n", attrs.type);
+		printf ("[DEBUG]:\t expire=%"PRIi64"\n", attrs.initialExpirationTime);
+		printf ("[DEBUG]:\t duration=%"PRIi64"\n", attrs.timerPeriodDuration);
+	}
+
+	/* SLEEP */
+	sleep (10);
+
+	result = saTmrTimerReschedule (handle, id_a, &new_attrs_a, &time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerReschedule\n", result);
 	}
 
-	result = saTmrTimerAttributesGet (handle, id_a, &my_attrs);
-	if (result != SA_AIS_OK) {
-		printf ("[ERROR]: (%d) saTmrTimerAttributesGet\n", result);
-	}
-	else {
-		printf ("[DEBUG]: id=%u attributes:\n", id_a);
-		printf ("[DEBUG]:\t type=%"PRId64"\n", my_attrs.type);
-		printf ("[DEBUG]:\t expire=%"PRId64"\n", my_attrs.initialExpirationTime);
-		printf ("[DEBUG]:\t duration=%"PRId64"\n", my_attrs.timerPeriodDuration);
-	}
-
-	result = saTmrTimerReschedule (handle, id_b, &attrs_b, &time);
+	result = saTmrTimerReschedule (handle, id_b, &new_attrs_b, &time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerReschedule\n", result);
 	}
 
-	result = saTmrTimerAttributesGet (handle, id_a, &my_attrs);
+	result = saTmrTimerAttributesGet (handle, id_a, &attrs);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerAttributesGet\n", result);
 	}
 	else {
 		printf ("[DEBUG]: id=%u attributes:\n", id_a);
-		printf ("[DEBUG]:\t type=%"PRId64"\n", my_attrs.type);
-		printf ("[DEBUG]:\t expire=%"PRId64"\n", my_attrs.initialExpirationTime);
-		printf ("[DEBUG]:\t duration=%"PRId64"\n", my_attrs.timerPeriodDuration);
+		printf ("[DEBUG]:\t type=%"PRId64"\n", attrs.type);
+		printf ("[DEBUG]:\t expire=%"PRIi64"\n", attrs.initialExpirationTime);
+		printf ("[DEBUG]:\t duration=%"PRIi64"\n", attrs.timerPeriodDuration);
 	}
 
+	result = saTmrTimerAttributesGet (handle, id_b, &attrs);
+	if (result != SA_AIS_OK) {
+		printf ("[ERROR]: (%d) saTmrTimerAttributesGet\n", result);
+	}
+	else {
+		printf ("[DEBUG]: id=%u attributes:\n", id_b);
+		printf ("[DEBUG]:\t type=%"PRId64"\n", attrs.type);
+		printf ("[DEBUG]:\t expire=%"PRIi64"\n", attrs.initialExpirationTime);
+		printf ("[DEBUG]:\t duration=%"PRIi64"\n", attrs.timerPeriodDuration);
+	}
+
+	/* SLEEP */
 	sleep (30);
-
-	result = saTmrPeriodicTimerSkip (handle, id_a);
-	if (result != SA_AIS_OK) {
-		printf ("[ERROR]: (%d) saTmrPeriodicTimerSkip\n", result);
-	}
-
-	sleep (60);
-
-	for (i = 0; i < 4; i++) {
-		result = saTmrPeriodicTimerSkip (handle, id_a);
-		if (result != SA_AIS_OK) {
-			printf ("[ERROR]: (%d) saTmrPeriodicTimerSkip\n", result);
-		}
-	}
-
-	sleep (120);
-
-	result = saTmrTimerCancel (handle, id_a, NULL);
-	if (result != SA_AIS_OK) {
-		printf ("[ERROR]: (%d) saTmrTimerCancel\n", result);
-	}
-
-	result = saTmrTimerReschedule (handle, id_a, &attrs_a, &time);
-	if (result != SA_AIS_OK) {
-		printf ("[ERROR]: (%d) saTmrTimerReschedule\n", result);
-	}
 
 	result = saTmrTimerCancel (handle, id_b, NULL);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerCancel\n", result);
+		exit (1);
 	}
 
-	result = saTmrTimerReschedule (handle, id_b, &attrs_b, &time);
-	if (result != SA_AIS_OK) {
-		printf ("[ERROR]: (%d) saTmrTimerReschedule\n", result);
-	}
+	/* SLEEP */
+	sleep (30);
 
 	result = saTmrFinalize (handle);
 	if (result != SA_AIS_OK) {

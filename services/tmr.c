@@ -47,12 +47,11 @@
 #include <time.h>
 #include <arpa/inet.h>
 
-#include <inttypes.h> /* for development only */
-
 #include <corosync/ipc_gen.h>
 #include <corosync/mar_gen.h>
 #include <corosync/swab.h>
 #include <corosync/list.h>
+#include <corosync/hdb.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
 #include <corosync/lcr/lcr_comp.h>
@@ -63,19 +62,24 @@
 
 LOGSYS_DECLARE_SUBSYS ("TMR", LOG_INFO);
 
-struct timer {
+struct timer_instance {
 	SaTmrTimerIdT timer_id;
 	SaTmrTimerAttributesT timer_attributes;
-	corosync_timer_handle_t timer_handle;
-	mar_message_source_t source;
 	SaUint64T expiration_count;
 	SaUint64T timer_skip;
 	SaTimeT call_time;
+	corosync_timer_handle_t timer_handle;
+	mar_message_source_t source;
 	void *timer_data;
-	struct list_head list;
+	struct list_head cleanup_list;
 };
 
-DECLARE_LIST_INIT(timer_list_head);
+static struct hdb_handle_database timer_hdb = {
+	.handle_count	= 0,
+	.handles	= 0,
+	.iterator	= 0,
+	.mutex		= PTHREAD_MUTEX_INITIALIZER
+};
 
 static struct corosync_api_v1 *api;
 
@@ -238,15 +242,39 @@ static int tmr_exec_init_fn (struct corosync_api_v1 *corosync_api)
 
 static int tmr_lib_init_fn (void *conn)
 {
+	struct tmr_pd *tmr_pd = (struct tmr_pd *) api->ipc_private_data_get (conn);
+
+	list_init (&tmr_pd->timer_list);
+	list_init (&tmr_pd->timer_cleanup_list);
+
 	return (0);
 }
 
 static int tmr_lib_exit_fn (void *conn)
 {
+	struct timer_instance *timer_instance;
+	struct list_head *cleanup_list;
 	struct tmr_pd *tmr_pd = (struct tmr_pd *) api->ipc_private_data_get (conn);
 
-	list_init (&tmr_pd->timer_list);
-	list_init (&tmr_pd->timer_cleanup_list);
+	cleanup_list = tmr_pd->timer_cleanup_list.next;
+
+	while (!list_empty (&tmr_pd->timer_cleanup_list))
+	{
+		timer_instance = list_entry (cleanup_list, struct timer_instance, cleanup_list);
+
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: cleanup timer { id=%u }\n",
+			    (unsigned int)(timer_instance->timer_id));
+
+		api->timer_delete (timer_instance->timer_handle);
+
+		list_del (&timer_instance->cleanup_list);
+
+		hdb_handle_destroy (&timer_hdb, timer_instance->timer_id);
+		hdb_handle_put (&timer_hdb, timer_instance->timer_id);
+
+		cleanup_list = tmr_pd->timer_cleanup_list.next;
+	}
 
 	return (0);
 }
@@ -263,22 +291,19 @@ SaTimeT tmr_time_now (void)
 	time = (SaTimeT)(tv.tv_sec) * 1000000000ULL;
 	time += (SaTimeT)(tv.tv_usec) * 1000ULL;
 
-	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: tmr_time_now %"PRIu64"\n", time);
-
 	return (time);
 }
 
 static void tmr_timer_expired (void *data)
 {
-	struct timer *timer = (struct timer *)data;
+	struct timer_instance *timer_instance = (struct timer_instance *)data;
 	struct res_lib_tmr_timerexpiredcallback res_lib_tmr_timerexpiredcallback;
 
-	timer->expiration_count += 1;
+	timer_instance->expiration_count += 1;
 
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: tmr_timer_expired { id=%u }\n",
-		    (unsigned int)(timer->timer_id));
+		    (unsigned int)(timer_instance->timer_id));
 
 	res_lib_tmr_timerexpiredcallback.header.size =
 		sizeof (struct res_lib_tmr_timerexpiredcallback);
@@ -286,37 +311,42 @@ static void tmr_timer_expired (void *data)
 		MESSAGE_RES_TMR_TIMEREXPIREDCALLBACK;
 	res_lib_tmr_timerexpiredcallback.header.error = SA_AIS_OK; /* FIXME */
 
-	res_lib_tmr_timerexpiredcallback.timer_id = timer->timer_id;
-	res_lib_tmr_timerexpiredcallback.timer_data = timer->timer_data;
-	res_lib_tmr_timerexpiredcallback.expiration_count = timer->expiration_count;
+	res_lib_tmr_timerexpiredcallback.timer_id = timer_instance->timer_id;
+	res_lib_tmr_timerexpiredcallback.timer_data = timer_instance->timer_data;
+	res_lib_tmr_timerexpiredcallback.expiration_count = timer_instance->expiration_count;
 
-	if (timer->timer_skip == 0) {
+	if (timer_instance->timer_skip == 0) {
 		api->ipc_conn_send_response (
-			api->ipc_conn_partner_get (timer->source.conn),
+			api->ipc_conn_partner_get (timer_instance->source.conn),
 			&res_lib_tmr_timerexpiredcallback,
 			sizeof (struct res_lib_tmr_timerexpiredcallback));
 	}
 	else {
 		/* DEBUG */
 		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: skipping timer { id=%u }\n",
-			    (unsigned int)(timer->timer_id));
+			    (unsigned int)(timer_instance->timer_id));
 
-		timer->timer_skip -= 1;
+		timer_instance->timer_skip -= 1;
 	}
 
-	if (timer->timer_attributes.timerPeriodDuration > 0) {
-		switch (timer->timer_attributes.type) {
+	if (timer_instance->timer_attributes.timerPeriodDuration > 0) {
+		switch (timer_instance->timer_attributes.type) {
+		/*
+		 * We don't really need a switch statement here,
+		 * since periodic timers will always get recreated
+		 * as duration timers.
+		 */
 		case SA_TIME_ABSOLUTE:
 			api->timer_add_absolute (
-				timer->timer_attributes.timerPeriodDuration,
-				(void *)(timer), tmr_timer_expired,
-				&timer->timer_handle);
+				timer_instance->timer_attributes.timerPeriodDuration,
+				(void *)(timer_instance), tmr_timer_expired,
+				&timer_instance->timer_handle);
 			break;
 		case SA_TIME_DURATION:
 			api->timer_add_duration (
-				timer->timer_attributes.timerPeriodDuration,
-				(void *)(timer), tmr_timer_expired,
-				&timer->timer_handle);
+				timer_instance->timer_attributes.timerPeriodDuration,
+				(void *)(timer_instance), tmr_timer_expired,
+				&timer_instance->timer_handle);
 			break;
 		default:
 			break;
@@ -326,24 +356,6 @@ static void tmr_timer_expired (void *data)
 	return;
 }
 
-static struct timer *tmr_find_timer (
-	struct list_head *head,
-	SaTmrTimerIdT timer_id)
-{
-	struct list_head *list;
-	struct timer *timer;
-
-	for (list = head->next; list != head; list = list->next)
-	{
-		timer = list_entry (list, struct timer, list);
-
-		if (timer->timer_id == timer_id) {
-			return (timer);
-		}
-	}
-	return (0);
-}
-
 static void message_handler_req_lib_tmr_timerstart (
 	void *conn,
 	void *msg)
@@ -351,56 +363,59 @@ static void message_handler_req_lib_tmr_timerstart (
 	struct req_lib_tmr_timerstart *req_lib_tmr_timerstart =
 		(struct req_lib_tmr_timerstart *)msg;
 	struct res_lib_tmr_timerstart res_lib_tmr_timerstart;
+	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
-	struct timer *timer = NULL;
+
+	unsigned int timer_id;
+	struct tmr_pd *tmr_pd = (struct tmr_pd *) api->ipc_private_data_get (conn);
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerStart { id=%u }\n",
-		    (unsigned int)(req_lib_tmr_timerstart->timer_id));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerStart\n");
 
-	timer = tmr_find_timer (&timer_list_head,
-		req_lib_tmr_timerstart->timer_id);
-	if (timer == NULL) {
-		timer = malloc (sizeof (struct timer));
-		if (timer == NULL) {
-			error = SA_AIS_ERR_NO_MEMORY;
-			goto error_exit;
-		}
-		memset (timer, 0, sizeof (struct timer));
+	hdb_handle_create (&timer_hdb,
+		   sizeof (struct timer_instance),
+		   &timer_id);
 
-		timer->timer_id = req_lib_tmr_timerstart->timer_id;
-		timer->call_time = req_lib_tmr_timerstart->call_time;
+	hdb_handle_get (&timer_hdb, timer_id,
+		(void *)&timer_instance);
 
-		memcpy (&timer->timer_attributes,
-			&req_lib_tmr_timerstart->timer_attributes,
-			sizeof (SaTmrTimerAttributesT));
-
-		api->ipc_source_set (&timer->source, conn);
-
-		list_init (&timer->list);
-		list_add (&timer->list, &timer_list_head);
-
-		switch (timer->timer_attributes.type)
-		{
-		case SA_TIME_ABSOLUTE:
-			api->timer_add_absolute (
-				timer->timer_attributes.initialExpirationTime,
-				(void *)(timer), tmr_timer_expired,
-				&timer->timer_handle);
-			break;
-		case SA_TIME_DURATION:
-			api->timer_add_duration (
-				timer->timer_attributes.initialExpirationTime,
-				(void *)(timer), tmr_timer_expired,
-				&timer->timer_handle);
-			break;
-		default:
-			/*
-			 * This case is handled in the library.
-			 */
-			break;
-		}
+	if (timer_instance == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
 	}
+
+	timer_instance->timer_id = timer_id;
+
+	memcpy (&timer_instance->timer_attributes,
+		&req_lib_tmr_timerstart->timer_attributes,
+		sizeof (SaTmrTimerAttributesT));
+
+	api->ipc_source_set (&timer_instance->source, conn);
+
+	list_init (&timer_instance->cleanup_list);
+
+	switch (timer_instance->timer_attributes.type)
+	{
+	case SA_TIME_ABSOLUTE:
+		api->timer_add_absolute (
+			timer_instance->timer_attributes.initialExpirationTime,
+			(void *)(timer_instance), tmr_timer_expired,
+			&timer_instance->timer_handle);
+		break;
+	case SA_TIME_DURATION:
+		api->timer_add_duration (
+			timer_instance->timer_attributes.initialExpirationTime,
+			(void *)(timer_instance), tmr_timer_expired,
+			&timer_instance->timer_handle);
+		break;
+	default:
+		/*
+		 * This case is handled in the library.
+		 */
+		break;
+	}
+
+	list_add (&timer_instance->cleanup_list, &tmr_pd->timer_cleanup_list);
 
 error_exit:
 
@@ -409,6 +424,9 @@ error_exit:
 	res_lib_tmr_timerstart.header.id =
 		MESSAGE_RES_TMR_TIMERSTART;
 	res_lib_tmr_timerstart.header.error = error;
+
+	res_lib_tmr_timerstart.timer_id = timer_id;
+	res_lib_tmr_timerstart.call_time = tmr_time_now (); /* FIXME */
 
 	api->ipc_conn_send_response (conn,
 		&res_lib_tmr_timerstart,
@@ -422,23 +440,26 @@ static void message_handler_req_lib_tmr_timerreschedule (
 	struct req_lib_tmr_timerreschedule *req_lib_tmr_timerreschedule =
 		(struct req_lib_tmr_timerreschedule *)msg;
 	struct res_lib_tmr_timerreschedule res_lib_tmr_timerreschedule;
+	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
-	struct timer *timer = NULL;
 
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerReschedule { id=%u }\n",
 		    (unsigned int)(req_lib_tmr_timerreschedule->timer_id));
 
-	timer = tmr_find_timer (&timer_list_head,
-		req_lib_tmr_timerreschedule->timer_id);
-	if (timer == NULL) {
+	hdb_handle_get (&timer_hdb,
+		(unsigned int)(req_lib_tmr_timerreschedule->timer_id),
+		(void *)&timer_instance);
+	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	memcpy (&timer->timer_attributes,
+	memcpy (&timer_instance->timer_attributes,
 		&req_lib_tmr_timerreschedule->timer_attributes,
 		sizeof (SaTmrTimerAttributesT));
+
+	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
 
 error_exit:
 
@@ -460,22 +481,27 @@ static void message_handler_req_lib_tmr_timercancel (
 	struct req_lib_tmr_timercancel *req_lib_tmr_timercancel =
 		(struct req_lib_tmr_timercancel *)msg;
 	struct res_lib_tmr_timercancel res_lib_tmr_timercancel;
+	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
-	struct timer *timer = NULL;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerCancel\n");
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerCancel { id=%u }\n",
+		    (unsigned int)(req_lib_tmr_timercancel->timer_id));
 
-	timer = tmr_find_timer (&timer_list_head,
-		req_lib_tmr_timercancel->timer_id);
-	if (timer == NULL) {
+	hdb_handle_get (&timer_hdb,
+		(unsigned int)(req_lib_tmr_timercancel->timer_id),
+		(void *)&timer_instance);
+	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	api->timer_delete (timer->timer_handle);
-	list_del (&timer->list);
-	free (timer);
+	api->timer_delete (timer_instance->timer_handle);
+
+	list_del (&timer_instance->cleanup_list);
+
+	hdb_handle_destroy (&timer_hdb, (unsigned int)(timer_instance->timer_id));
+	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
 
 error_exit:
 
@@ -497,26 +523,29 @@ static void message_handler_req_lib_tmr_periodictimerskip (
 	struct req_lib_tmr_periodictimerskip *req_lib_tmr_periodictimerskip =
 		(struct req_lib_tmr_periodictimerskip *)msg;
 	struct res_lib_tmr_periodictimerskip res_lib_tmr_periodictimerskip;
+	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
-	struct timer *timer = NULL;
 
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrPeriodicTimerSkip { id=%u }\n",
 		    (unsigned int)(req_lib_tmr_periodictimerskip->timer_id));
 
-	timer = tmr_find_timer (&timer_list_head,
-		req_lib_tmr_periodictimerskip->timer_id);
-	if (timer == NULL) {
+	hdb_handle_get (&timer_hdb,
+		(unsigned int)(req_lib_tmr_periodictimerskip->timer_id),
+		(void *)&timer_instance);
+	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	if (timer->timer_attributes.timerPeriodDuration == 0) {
+	if (timer_instance->timer_attributes.timerPeriodDuration == 0) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	timer->timer_skip += 1;
+	timer_instance->timer_skip += 1;
+
+	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
 
 error_exit:
 
@@ -538,19 +567,22 @@ static void message_handler_req_lib_tmr_timerremainingtimeget (
 	struct req_lib_tmr_timerremainingtimeget *req_lib_tmr_timerremainingtimeget =
 		(struct req_lib_tmr_timerremainingtimeget *)msg;
 	struct res_lib_tmr_timerremainingtimeget res_lib_tmr_timerremainingtimeget;
+	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
-	struct timer *timer = NULL;
 
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerRemainingTimeGet { id=%u }\n",
 		    (unsigned int)(req_lib_tmr_timerremainingtimeget->timer_id));
 
-	timer = tmr_find_timer (&timer_list_head,
-		req_lib_tmr_timerremainingtimeget->timer_id);
-	if (timer == NULL) {
+	hdb_handle_get (&timer_hdb,
+		(unsigned int)(req_lib_tmr_timerremainingtimeget->timer_id),
+		(void *)&timer_instance);
+	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
+
+	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
 
 error_exit:
 
@@ -572,22 +604,26 @@ static void message_handler_req_lib_tmr_timerattributesget (
 	struct req_lib_tmr_timerattributesget *req_lib_tmr_timerattributesget =
 		(struct req_lib_tmr_timerattributesget *)msg;
 	struct res_lib_tmr_timerattributesget res_lib_tmr_timerattributesget;
+	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
-	struct timer *timer = NULL;
 
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerAttributesGet { id=%u }\n",
 		    (unsigned int)(req_lib_tmr_timerattributesget->timer_id));
 
-	timer = tmr_find_timer (&timer_list_head,
-		req_lib_tmr_timerattributesget->timer_id);
-	if (timer == NULL) {
+	hdb_handle_get (&timer_hdb,
+		(unsigned int)(req_lib_tmr_timerattributesget->timer_id),
+		(void *)&timer_instance);
+	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
 	memcpy (&res_lib_tmr_timerattributesget.timer_attributes,
-		&timer->timer_attributes, sizeof (SaTmrTimerAttributesT));
+		&timer_instance->timer_attributes,
+		sizeof (SaTmrTimerAttributesT));
+
+	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
 
 error_exit:
 
@@ -615,6 +651,9 @@ static void message_handler_req_lib_tmr_timeget (
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimeGet\n");
 
+	/*
+	 * Use api->timer_time_get();
+	 */
 	current_time = tmr_time_now();
 
 	memcpy (&res_lib_tmr_timeget.current_time,
