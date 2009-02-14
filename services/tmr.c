@@ -47,6 +47,8 @@
 #include <time.h>
 #include <arpa/inet.h>
 
+#include <inttypes.h>
+
 #include <corosync/ipc_gen.h>
 #include <corosync/mar_gen.h>
 #include <corosync/swab.h>
@@ -279,21 +281,6 @@ static int tmr_lib_exit_fn (void *conn)
 	return (0);
 }
 
-SaTimeT tmr_time_now (void)
-{
-	struct timeval tv;
-	SaTimeT time;
-
-	if (gettimeofday (&tv, 0)) {
-		return (0ULL);
-	}
-
-	time = (SaTimeT)(tv.tv_sec) * 1000000000ULL;
-	time += (SaTimeT)(tv.tv_usec) * 1000ULL;
-
-	return (time);
-}
-
 static void tmr_timer_expired (void *data)
 {
 	struct timer_instance *timer_instance = (struct timer_instance *)data;
@@ -426,7 +413,7 @@ error_exit:
 	res_lib_tmr_timerstart.header.error = error;
 
 	res_lib_tmr_timerstart.timer_id = timer_id;
-	res_lib_tmr_timerstart.call_time = tmr_time_now (); /* FIXME */
+	res_lib_tmr_timerstart.call_time = (SaTimeT)(api->timer_time_get());
 
 	api->ipc_conn_send_response (conn,
 		&res_lib_tmr_timerstart,
@@ -651,10 +638,7 @@ static void message_handler_req_lib_tmr_timeget (
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimeGet\n");
 
-	/*
-	 * Use api->timer_time_get();
-	 */
-	current_time = tmr_time_now();
+	current_time = (SaTimeT)(api->timer_time_get());
 
 	memcpy (&res_lib_tmr_timeget.current_time,
 		&current_time, sizeof (SaTimeT));
