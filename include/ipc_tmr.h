@@ -67,6 +67,7 @@ enum res_lib_tmr_timer_types {
 struct req_lib_tmr_timerstart {
 	mar_req_header_t header;
 	SaTmrTimerAttributesT timer_attributes;
+	void *timer_data;
 };
 
 struct res_lib_tmr_timerstart {
@@ -93,6 +94,7 @@ struct req_lib_tmr_timercancel {
 
 struct res_lib_tmr_timercancel {
 	mar_res_header_t header;
+	void *timer_data;
 };
 
 struct req_lib_tmr_periodictimerskip {

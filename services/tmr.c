@@ -372,6 +372,11 @@ static void message_handler_req_lib_tmr_timerstart (
 	}
 
 	timer_instance->timer_id = timer_id;
+	timer_instance->timer_data = req_lib_tmr_timerstart->timer_data;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t timer_data=%p\n",
+		    (void *)(timer_instance->timer_data));
 
 	memcpy (&timer_instance->timer_attributes,
 		&req_lib_tmr_timerstart->timer_attributes,
@@ -482,6 +487,8 @@ static void message_handler_req_lib_tmr_timercancel (
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
+
+	res_lib_tmr_timercancel.timer_data = timer_instance->timer_data;
 
 	api->timer_delete (timer_instance->timer_handle);
 

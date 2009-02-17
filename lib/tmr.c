@@ -386,7 +386,8 @@ saTmrTimerStart (
 	struct res_lib_tmr_timerstart res_lib_tmr_timerstart;
 
 	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerStart\n");
+	printf ("[DEBUG]: saTmrTimerStart { data=%p }\n",
+		(void *)(timerData));
 
 	if (timerAttributes == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -396,12 +397,6 @@ saTmrTimerStart (
 	    (timerAttributes->type != SA_TIME_DURATION)) {
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t type=%d expire=%"PRId64" duration=%"PRId64"\n",
-		timerAttributes->type,
-		timerAttributes->initialExpirationTime,
-		timerAttributes->timerPeriodDuration);
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
@@ -415,6 +410,8 @@ saTmrTimerStart (
 
 	memcpy (&req_lib_tmr_timerstart.timer_attributes,
 		timerAttributes, sizeof (SaTmrTimerAttributesT));
+
+	req_lib_tmr_timerstart.timer_data = timerData;
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
@@ -533,6 +530,10 @@ saTmrTimerCancel (
 
 	if (res_lib_tmr_timercancel.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_timercancel.header.error;
+	}
+
+	if (error == SA_AIS_OK) {
+		*timerDataP = res_lib_tmr_timercancel.timer_data;
 	}
 
 error_exit:

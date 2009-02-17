@@ -96,6 +96,10 @@ int main (void)
 	SaTimeT clock_tick;
 	SaTimeT call_time;
 
+	void *data_a = 0xdeadbeef;
+	void *data_b = 0xdecafbad;
+	void *cancel_data = NULL;
+
 	pthread_t dispatch_thread;
 
 	int result;
@@ -130,7 +134,7 @@ int main (void)
 		printf ("[DEBUG]: clock_tick = %"PRIu64"\n", clock_tick);
 	}
 
-	result = saTmrTimerStart (handle, &attrs_a, NULL, &id_a, &call_time);
+	result = saTmrTimerStart (handle, &attrs_a, data_a, &id_a, &call_time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerStart\n", result);
 	}
@@ -139,7 +143,7 @@ int main (void)
 		printf ("[DEBUG]:\t callTime = %"PRIu64"\n", call_time);
 	}
 
-	result = saTmrTimerStart (handle, &attrs_b, NULL, &id_b, &call_time);
+	result = saTmrTimerStart (handle, &attrs_b, data_b, &id_b, &call_time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerStart\n", result);
 	}
@@ -211,10 +215,13 @@ int main (void)
 	/* SLEEP */
 	sleep (30);
 
-	result = saTmrTimerCancel (handle, id_b, NULL);
+	result = saTmrTimerCancel (handle, id_b, &cancel_data);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerCancel\n", result);
 		exit (1);
+	}
+	else {
+		printf ("[DEBUG]:\t id=%u data=%p\n", id_b, cancel_data);
 	}
 
 	/* SLEEP */
