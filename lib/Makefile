@@ -44,7 +44,8 @@ all:libSaClm.a libSaClm.so.2.0.0 \
 	libcpg.a libcpg.so.2.0.0 \
 	libais.a libais.so.2.0.0 \
 	libevs.a libevs.so.2.0.0 \
-	libcfg.a libcfg.so.2.0.0
+	libcfg.a libcfg.so.2.0.0 \
+	libconfdb.a libconfdb.so.2.0.0
 
 LIBAIS_SRC = util.c amf.c clm.c ckpt.c evt.c
 
@@ -87,6 +88,9 @@ libcpg.so.2.0.0: util.o cpg.o
 libcfg.so.2.0.0: util.o cfg.o
 	$(CC) $(DARWIN_OPTS) util.o cfg.o -o $@
 
+libconfdb.so.2.0.0: util.o cfg.o
+	$(CC) -bundle -bind_at_load util.o confdb.o -o $@
+
 else
 
 libSaClm.so.2.0.0: util.o clm.o
@@ -119,6 +123,9 @@ libcpg.so.2.0.0: util.o cpg.o
 libcfg.so.2.0.0: util.o cfg.o
 	$(CC) -shared -Wl,-soname,libcfg.so.2,-version-script=libcfg.versions util.o cfg.o -o $@
 
+libconfdb.so.2.0.0: util.o confdb.o
+	$(CC) -shared -Wl,-soname,libcfg.so.2,-version-script=libconfdb.versions util.o confdb.o -o $@
+
 endif
 
 libSaAmf.a: util.o amf.o
@@ -148,11 +155,14 @@ libcpg.a: util.o cpg.o
 libcfg.a: util.o cfg.o
 	$(AR) -rc libcfg.a util.o cfg.o
 
+libconfdb.a: util.o confdb.o
+	$(AR) -rc libconfdb.a util.o confdb.o
+
 clean:
 	rm -f *.o libais.so* libais.a libSaClm.so* libSaClm.a* libSaAmf.so* libSaAmf.a \
 		libSaCkpt.so* libSaCkpt.a* libSaEvt.so* libSaEvt.a libSaLck.so* libSaLck.a \
 		libSaMsg.so* libSaMsg.a libcfg.a libcfg.so* libOpenaisCfg.a \
-		libevs.so* libevs.a libcpg.so* libcpg.a *.da *.bb *.bbg
+		libevs.so* libevs.a libcpg.so* libcpg.a libconfdb.a libconfdb.so.* *.da *.bb *.bbg
  
 # -fPIC rules required for all libraries
 %.o: %.c

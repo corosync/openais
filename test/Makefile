@@ -33,7 +33,7 @@
 #
 include ../Makefile.inc
 
-LIBRARIES= ../lib/libSaClm.a ../lib/libSaAmf.a ../lib/libSaCkpt.a ../lib/libSaEvt.a ../lib/libSaLck.a ../lib/libSaMsg.a ../lib/libevs.a ../lib/libcpg.a ../lib/libcfg.a
+LIBRARIES= ../lib/libSaClm.a ../lib/libSaAmf.a ../lib/libSaCkpt.a ../lib/libSaEvt.a ../lib/libSaLck.a ../lib/libSaMsg.a ../lib/libevs.a ../lib/libcpg.a ../lib/libcfg.a ../lib/libconfdb.a
 LIBS = $(LIBRARIES) 
 
 CFLAGS += -I../include
@@ -45,13 +45,13 @@ TEST_SRC =  testclm.c testamf1.c \
 		testckpt.c ckptstress.c ckptbench.c  \
 		ckptbenchth.c testevt.c testevs.c evsbench.c \
 		evsverify.c subscription.c publish.c evtbench.c \
-		sa_error.c unlink.c testclm2.c testlck.c
+		sa_error.c unlink.c testclm2.c testlck.c testconfdb.c
 
 all: testclm testamf1 \
 	testckpt ckptstress ckptbench \
 	ckptbenchth ckpt-rd ckpt-wr ckpt-overload-exit testevt testevs \
 	evsbench evsverify subscription publish evtbench unlink testclm2 \
-	testlck testcpg testcpg2 cpgbench openais-cfgtool testmsg
+	testlck testcpg testcpg2 testconfdb cpgbench openais-cfgtool testmsg
 
 testtimer: testtimer.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testtimer testtimer.o ../exec/timer.o
@@ -149,6 +149,9 @@ testcpg: testcpg.o $(LIBRARIES)
 testcpg2: testcpg2.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testcpg2 testcpg2.o $(LIBS)
 
+testconfdb: testconfdb.o $(LIBRARIES)
+	$(CC) $(LDFLAGS) -o testconfdb testconfdb.o $(LIBS)
+
 cpgbench: cpgbench.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o cpgbench cpgbench.o $(LIBS)
 
@@ -160,7 +163,7 @@ clean:
 	testamf5 testamf6 testamfth testckpt ckptstress testtimer \
 	ckptbench ckptbenchth testevt testevs ckpt-wr ckpt-rd \
 	evsbench subscription publish evtbench unlink testcpg \
-	testclm2 testlck cpgbench openais-cfgtool testmsg
+	testclm2 testlck testconfdb cpgbench openais-cfgtool testmsg
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<

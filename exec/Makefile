@@ -54,8 +54,8 @@ AMF_SRC = amf.c amfutil.c amfnode.c amfcluster.c amfapp.c amfsg.c amfsu.c amfcom
 AMF_OBJS = amf.o amfutil.o amfnode.o amfcluster.o amfapp.o amfsg.o amfsu.o amfcomp.o amfsi.o
 
 # LCR objects
-LCR_SRC = evs.c clm.c ckpt.c evt.c lck.c msg.c cfg.c cpg.c aisparser.c vsf_ykd.c $(AMF_SRC)
-LCR_OBJS = evs.o clm.o ckpt.o evt.o lck.o msg.o cfg.o cpg.o aisparser.o vsf_ykd.o $(AMF_OBJS)
+LCR_SRC = evs.c clm.c ckpt.c evt.c lck.c msg.c cfg.c cpg.c aisparser.c vsf_ykd.c confdb.c $(AMF_SRC)
+LCR_OBJS = evs.o clm.o ckpt.o evt.o lck.o msg.o cfg.o cpg.o aisparser.o vsf_ykd.o confdb.o $(AMF_OBJS)
 
 # main executive objects
 MAIN_SRC = main.c print.c mempool.c util.c sync.c service.c ipc.c timer.c \
@@ -72,7 +72,7 @@ all:libtotem_pg.a libtotem_pg.so.2.0.0 ../lcr/lcr_ifact.o \
 	aisexec \
 	service_evs.lcrso service_clm.lcrso service_amf.lcrso \
 	service_ckpt.lcrso service_evt.lcrso service_lck.lcrso \
-	service_msg.lcrso service_cfg.lcrso service_cpg.lcrso \
+	service_msg.lcrso service_cfg.lcrso service_cpg.lcrso service_confdb.lcrso \
 	objdb.lcrso aisparser.lcrso vsf_ykd.lcrso keygen openais-instantiate
 else
 EXEC_OBJS = $(TOTEM_OBJS) $(MAIN_OBJS) $(OTHER_OBJS) $(LCR_OBJS)
@@ -108,6 +108,9 @@ service_cfg.lcrso: cfg.o
 
 service_cpg.lcrso: cpg.o
 	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load cpg.o -o $@
+
+service_confdb.lcrso: confdb.o
+	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load confdb.o -o $@
 
 aisparser.lcrso: aisparser.o
 	$(CC) $(LDFLAGS) -bundle $(LDFLAGS) -bundle_loader ./aisexec -bind_at_load aisparser.o -o $@
@@ -147,6 +150,9 @@ service_cfg.lcrso: cfg.o
 
 service_cpg.lcrso: cpg.o
 	$(CC) -shared -Wl,-soname,service_cpg.lcrso cpg.o -o $@
+
+service_confdb.lcrso: confdb.o
+	$(CC) -shared -Wl,-soname,service_confdb.lcrso confdb.o -o $@
 
 aisparser.lcrso: aisparser.o
 	$(CC) -shared -Wl,-soname,aisparser.lcrso aisparser.o -o $@
@@ -227,6 +233,9 @@ cpg.o: cpg.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $(*F).c
 
 objdb.o: objdb.c
+	$(CC) $(CFLAGS) -c -o $@ $(*F).c
+
+confdb.o: confdb.c
 	$(CC) $(CFLAGS) -c -o $@ $(*F).c
 
 # -fPIC rules required for lib totem
