@@ -631,6 +631,8 @@ saTmrTimerRemainingTimeGet (
 		error = res_lib_tmr_timerremainingtimeget.header.error;
 	}
 
+	*remainingTime = res_lib_tmr_timerremainingtimeget.remaining_time;
+
 error_exit:
 	return (error);
 }

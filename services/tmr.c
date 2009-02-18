@@ -576,6 +576,10 @@ static void message_handler_req_lib_tmr_timerremainingtimeget (
 		goto error_exit;
 	}
 
+	res_lib_tmr_timerremainingtimeget.remaining_time =
+		(SaTimeT)((api->timer_expire_time_get(timer_instance->timer_handle)) -
+			  (api->timer_time_get()));
+
 	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
 
 error_exit:
