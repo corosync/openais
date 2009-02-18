@@ -41,8 +41,9 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
-#include <corosync/corotypes.h>
-#include <corosync/confdb.h>
+#include "saAis.h"
+#include "../exec/objdb.h"
+#include "confdb.h"
 
 
 int main (int argc, char *argv[]) {
@@ -54,7 +55,7 @@ int main (int argc, char *argv[]) {
 	int value_len;
 
 	result = confdb_initialize (&handle, NULL);
-	if (result != CS_OK) {
+	if (result != SA_AIS_OK) {
 		printf ("Could not initialize Cluster Configuration Database API instance error %d\n", result);
 		exit (1);
 	}
@@ -64,19 +65,19 @@ int main (int argc, char *argv[]) {
 
 		/* Find "totem" and dump bits of it again, to test the direct APIs */
 		result = confdb_object_find_start(handle, OBJECT_PARENT_HANDLE);
-		if (result != CS_OK) {
+		if (result != SA_AIS_OK) {
 			printf ("Could not start object_find %d\n", result);
 			exit (1);
 		}
 
 		result = confdb_object_find(handle, OBJECT_PARENT_HANDLE, "totem", strlen("totem"), &totem_handle);
-		if (result != CS_OK) {
+		if (result != SA_AIS_OK) {
 			printf ("Could not object_find \"totem\": %d\n", result);
 			exit (1);
 		}
 
 		result = confdb_key_get(handle, totem_handle, "version", strlen("version"), key_value, &value_len);
-		if (result != CS_OK) {
+		if (result != SA_AIS_OK) {
 			printf ("Could not get \"version\" key: %d\n", result);
 			exit (1);
 		}
@@ -84,7 +85,7 @@ int main (int argc, char *argv[]) {
 		printf("totem.version = '%s'\n", key_value);
 
 		result = confdb_key_get(handle, totem_handle, "secauth", strlen("secauth"), key_value, &value_len);
-		if (result != CS_OK) {
+		if (result != SA_AIS_OK) {
 			printf ("Could not get \"secauth\" key: %d\n", result);
 			exit (1);
 		}
@@ -98,13 +99,13 @@ int main (int argc, char *argv[]) {
 		int i;
 
 		result = confdb_object_find_start(handle, OBJECT_PARENT_HANDLE);
-		if (result != CS_OK) {
+		if (result != SA_AIS_OK) {
 			printf ("Could not start object_find %d\n", result);
 			exit (1);
 		}
 
 		result = confdb_object_find(handle, OBJECT_PARENT_HANDLE, argv[1], strlen(argv[1]), &object_handle);
-		if (result != CS_OK) {
+		if (result != SA_AIS_OK) {
 			printf ("Could not find object \"%s\": %d\n", argv[1], result);
 			goto finish;
 		}
@@ -112,7 +113,7 @@ int main (int argc, char *argv[]) {
 		i=1;
 		while (argv[++i]) {
 			result = confdb_key_get(handle, object_handle, argv[i], strlen(argv[i]), key_value, &value_len);
-			if (result != CS_OK) {
+			if (result != SA_AIS_OK) {
 				printf ("Could not get \"%s\" : %d\n", argv[i], result);
 			}
 			else {
