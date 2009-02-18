@@ -38,6 +38,8 @@
 
 #define OBJECT_PARENT_HANDLE 0
 
+#include <stdio.h>
+
 struct object_valid {
 	char *object_name;
 	int object_len;
@@ -101,6 +103,16 @@ struct objdb_iface_ver0 {
 	int (*object_priv_get) (
 		unsigned int jobject_handle,
 		void **priv);
+
+	int (*object_key_delete) (
+		unsigned int object_handle,
+		void *key_name,
+		int key_len,
+		void *value,
+		int value_len);
+
+	int (*save_iter) (unsigned int object_handle);
+	int (*restore_iter) (unsigned int object_handle);
 };
 
 #endif /* OBJDB_H_DEFINED */

@@ -313,10 +313,65 @@ error_exit:
 	return (-1);
 }
 
+static int _clear_object(struct object_instance *instance)
+{
+	struct list_head *list;
+	int res;
+	struct object_instance *find_instance = NULL;
+	struct object_key *object_key = NULL;
+
+	for (list = instance->key_head.next;
+	     list != &instance->key_head; ) {
+
+                object_key = list_entry (list, struct object_key,
+					 list);
+
+		list = list->next;
+
+		list_del(&object_key->list);
+		free(object_key->key_name);
+		free(object_key->value);
+	}
+
+	for (list = instance->child_head.next;
+	     list != &instance->child_head; ) {
+
+                find_instance = list_entry (list, struct object_instance,
+					    child_list);
+		res = _clear_object(find_instance);
+		if (res)
+			return res;
+
+		list = list->next;
+
+		list_del(&find_instance->child_list);
+		free(find_instance->object_name);
+		free(find_instance);
+	}
+
+	return 0;
+}
+
 static int object_destroy (
 	unsigned int object_handle)
 {
-	return (0);
+	struct object_instance *instance;
+	unsigned int res;
+
+	res = hdb_handle_get (&object_instance_database,
+		object_handle, (void *)&instance);
+	if (res != 0) {
+		return (res);
+	}
+
+	/* Recursively clear sub-objects & keys */
+	res = _clear_object(instance);
+
+	list_del(&instance->child_list);
+	free(instance->object_name);
+	free(instance);
+
+	return (res);
 }
 
 static int object_valid_set (
@@ -478,6 +533,57 @@ error_exit:
 	return (-1);
 }
 
+static int object_key_delete (
+	unsigned int object_handle,
+	void *key_name,
+	int key_len,
+	void *value,
+	int value_len)
+{
+	unsigned int res;
+	int ret = 0;
+	struct object_instance *instance;
+	struct object_key *object_key = NULL;
+	struct list_head *list;
+	int found = 0;
+
+	res = hdb_handle_get (&object_instance_database,
+		object_handle, (void *)&instance);
+	if (res != 0) {
+		goto error_exit;
+	}
+	for (list = instance->key_head.next;
+		list != &instance->key_head; list = list->next) {
+
+		object_key = list_entry (list, struct object_key, list);
+
+		if ((object_key->key_len == key_len) &&
+		    (memcmp (object_key->key_name, key_name, key_len) == 0) &&
+		    (value == NULL ||
+		     (object_key->value_len == value_len &&
+		      (memcmp (object_key->value, value, value_len) == 0)))) {
+			found = 1;
+			break;
+		}
+	}
+	if (found) {
+		list_del(&object_key->list);
+		free(object_key->key_name);
+		free(object_key->value);
+		free(object_key);
+	}
+	else {
+		ret = -1;
+		errno = ENOENT;
+	}
+
+	hdb_handle_put (&object_instance_database, object_handle);
+	return (ret);
+
+error_exit:
+	return (-1);
+}
+
 static int object_priv_get (
 	unsigned int object_handle,
 	void **priv)
@@ -500,16 +606,45 @@ error_exit:
 	return (-1);
 }
 
+static struct list_head *last_result = NULL;
+static int save_search_iter (unsigned int parent_object_handle)
+{
+	struct object_instance *instance;
+	if(0 != hdb_handle_get (&object_instance_database,
+				parent_object_handle, (void *)&instance)) {
+		return -1;
+	}
+	last_result = instance->find_child_list;
+	hdb_handle_put (&object_instance_database, parent_object_handle);
+	return 0;
+}
+
+static int restore_search_iter (unsigned int parent_object_handle)
+{
+	struct object_instance *instance;
+	if(0 != hdb_handle_get (&object_instance_database,
+				parent_object_handle, (void *)&instance)) {
+		return -1;
+	}
+	instance->find_child_list = last_result;
+	hdb_handle_put (&object_instance_database, parent_object_handle);
+	return 0;
+}
+
+
 struct objdb_iface_ver0 objdb_iface = {
 	.objdb_init		= objdb_init,
 	.object_create		= object_create,
 	.object_priv_set	= object_priv_set,
 	.object_key_create	= object_key_create,
+	.object_key_delete	= object_key_delete,
 	.object_destroy		= object_destroy,
 	.object_valid_set	= object_valid_set,
 	.object_key_valid_set	= object_key_valid_set,
 	.object_find_reset	= object_find_reset,
 	.object_find		= object_find,
+	.save_iter	        = save_search_iter,
+	.restore_iter	        = restore_search_iter,
 	.object_key_get		= object_key_get,
 	.object_priv_get	= object_priv_get
 };
