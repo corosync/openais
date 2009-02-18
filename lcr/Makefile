@@ -26,8 +26,8 @@
 #
 include ../Makefile.inc
 
-CFLAGS += -I../include
 override LDFLAGS += ${DYFLAGS}
+override CFLAGS  += -I../include -DLCRSODIR='"$(LCRSODIR)"'
 
 ifeq (${OPENAIS_COMPAT}, LINUX) 
 	LDFLAGS += -ldl

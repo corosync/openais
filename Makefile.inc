@@ -29,12 +29,17 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 # Basic OS detection
 #
+CP=cp
+DESTDIR=
+PREFIX=/usr/local
 UNAME=$(shell uname)
+LCRSODIR=$(PREFIX)/libexec/lcrso
 
 ifeq "$(UNAME)" "Linux"
 	OPENAIS_COMPAT=LINUX
 endif
 ifeq "$(UNAME)" "Darwin"
+	CP=rsync
 	OPENAIS_COMPAT=DARWIN
 endif
 ifneq "" "$(findstring BSD,$(UNAME))"
