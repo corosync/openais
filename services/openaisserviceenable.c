@@ -74,7 +74,6 @@ static int openais_service_enable (
 	unsigned int object_handle;
 
 	for (i = 0; i < sizeof (service_engines) / sizeof (struct service_engine); i++) {
-printf ("enabling %s\n", service_engines[i].name);
 		objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
 			"service", strlen("service"));
 		objdb->object_key_create(object_handle, "name", strlen("name"),
