@@ -1491,7 +1491,7 @@ static void message_handler_req_exec_amf_comp_register (
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = error;
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			comp->conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 	}
 }
@@ -1631,7 +1631,7 @@ static void message_handler_req_exec_amf_response (
 		res_lib.header.id = MESSAGE_RES_AMF_RESPONSE;
 		res_lib.header.size = sizeof (struct res_lib_amf_response);
 		res_lib.header.error = retval;
-		api->ipc_conn_send_response (comp->conn, &res_lib, sizeof (res_lib));
+		api->ipc_response_send (comp->conn, &res_lib, sizeof (res_lib));
 	}
 }
 
@@ -1869,7 +1869,7 @@ static void message_handler_req_lib_amf_componentregister (
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = SA_AIS_ERR_INVALID_PARAM;
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 	}
 }
@@ -1941,7 +1941,7 @@ static void message_handler_req_lib_amf_pmstart (
 	res_lib.header.id = MESSAGE_RES_AMF_PMSTART;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	api->ipc_conn_send_response (conn, &res_lib,
+	api->ipc_response_send (conn, &res_lib,
 								sizeof (struct res_lib_amf_pmstart));
 
 }
@@ -1979,7 +1979,7 @@ static void message_handler_req_lib_amf_pmstop (
 	res_lib.header.id = MESSAGE_RES_AMF_PMSTOP;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	api->ipc_conn_send_response (conn, &res_lib,
+	api->ipc_response_send (conn, &res_lib,
 								sizeof (struct res_lib_amf_pmstop));
 
 }
@@ -2008,7 +2008,7 @@ static void message_handler_req_lib_amf_healthcheckstart (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKSTART;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	api->ipc_conn_send_response (conn, &res_lib,
+	api->ipc_response_send (conn, &res_lib,
 		sizeof (struct res_lib_amf_healthcheckstart));
 }
 
@@ -2033,7 +2033,7 @@ static void message_handler_req_lib_amf_healthcheckconfirm (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKCONFIRM;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	api->ipc_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	api->ipc_response_send (conn, &res_lib, sizeof (res_lib));
 }
 
 static void message_handler_req_lib_amf_healthcheckstop (
@@ -2056,7 +2056,7 @@ static void message_handler_req_lib_amf_healthcheckstop (
 	res_lib.header.id = MESSAGE_RES_AMF_HEALTHCHECKSTOP;
 	res_lib.header.size = sizeof (res_lib);
 	res_lib.header.error = error;
-	api->ipc_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	api->ipc_response_send (conn, &res_lib, sizeof (res_lib));
 }
 
 static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
@@ -2082,7 +2082,7 @@ static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
 	res_lib.header.size = sizeof (struct res_lib_amf_hastateget);
 	res_lib.header.error = error;
 
-	api->ipc_conn_send_response (conn, &res_lib,
+	api->ipc_response_send (conn, &res_lib,
 		sizeof (struct res_lib_amf_hastateget));
 }
 
@@ -2138,7 +2138,7 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 	if (amfProtectionGroup) {
 		res_lib_amf_protectiongrouptrack.header.error = SA_AIS_OK;
 	}
-	api->ipc_conn_send_response (conn, &res_lib_amf_protectiongrouptrack,
+	api->ipc_response_send (conn, &res_lib_amf_protectiongrouptrack,
 		sizeof (struct res_lib_amf_protectiongrouptrack));
 
 	if (amfProtectionGroup &&
@@ -2198,7 +2198,7 @@ static void message_handler_req_lib_amf_protectiongrouptrackstop (
 	if (track) {
 		res_lib_amf_protectiongrouptrackstop.header.error = SA_AIS_OK;
 	}
-	api->ipc_conn_send_response (conn, &res_lib_amf_protectiongrouptrackstop,
+	api->ipc_response_send (conn, &res_lib_amf_protectiongrouptrackstop,
 		sizeof (struct res_lib_amf_protectiongrouptrackstop));
 
 #endif
@@ -2282,7 +2282,7 @@ static void message_handler_req_lib_amf_componenterrorreport (
 		res_lib.header.size = sizeof (struct res_lib_amf_componenterrorreport);
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTERRORREPORT;
 		res_lib.header.error = SA_AIS_ERR_NOT_EXIST;
-		api->ipc_conn_send_response (conn, &res_lib,
+		api->ipc_response_send (conn, &res_lib,
 			sizeof (struct res_lib_amf_componenterrorreport));
 	}
 }
@@ -2393,7 +2393,7 @@ send_response:
 	res_lib.header.id = MESSAGE_RES_AMF_RESPONSE;
 	res_lib.header.size = sizeof (struct res_lib_amf_response);
 	res_lib.header.error = retval;
-	api->ipc_conn_send_response (conn, &res_lib, sizeof (res_lib));
+	api->ipc_response_send (conn, &res_lib, sizeof (res_lib));
 end:
 	return;
 }

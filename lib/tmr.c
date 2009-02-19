@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008 Red Hat, Inc.
+ * Copyright (c) 2008-2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -50,6 +50,7 @@
 #include <saAis.h>
 #include <saTmr.h>
 
+#include <corosync/coroipc.h>
 #include <corosync/list.h>
 #include <corosync/ipc_gen.h>
 
@@ -62,8 +63,7 @@ struct message_overlay {
 };
 
 struct tmrInstance {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	SaTmrCallbacksT callbacks;
 	int finalize;
 	SaTmrHandleT tmrHandle;
@@ -135,12 +135,7 @@ saTmrInitialize (
 		goto error_destroy;
 	}
 
-	tmrInstance->response_fd = -1;
-
-	error = saServiceConnect (
-		&tmrInstance->response_fd,
-		&tmrInstance->dispatch_fd,
-		TMR_SERVICE);
+	error = cslib_service_connect (TMR_SERVICE, &tmrInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -187,7 +182,7 @@ saTmrSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = tmrInstance->dispatch_fd;
+	*selectionObject = cslib_fd_get (&tmrInstance->ipc_ctx);
 
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 
@@ -203,9 +198,7 @@ saTmrDispatch (
 	SaAisErrorT error = SA_AIS_OK;
 	struct tmrInstance *tmrInstance;
 	struct message_overlay dispatch_data;
-	struct pollfd ufds;
 	int dispatch_avail;
-	int poll_fd;
 	int timeout = 1;
 	int cont = 1;
 
@@ -229,28 +222,15 @@ saTmrDispatch (
 	}
 
 	do {
-		poll_fd = tmrInstance->dispatch_fd;
-		ufds.fd = poll_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
+		dispatch_avail = cslib_dispatch_recv (tmrInstance->ipc_ctx,
+			(void *)&dispatch_data, timeout);
 
-		error = saPollRetry (&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto error_put;
-		}
 		pthread_mutex_lock (&tmrInstance->dispatch_mutex);
 
 		if (tmrInstance->finalize == 1) {
 			error = SA_AIS_OK;
 			goto error_unlock;
 		}
-
-		if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
-			error = SA_AIS_ERR_BAD_HANDLE;
-			goto error_unlock;
-		}
-
-		dispatch_avail = (ufds.revents & POLLIN);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
 			pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
@@ -262,21 +242,6 @@ saTmrDispatch (
 		}
 
 		memset (&dispatch_data, 0, sizeof (struct message_overlay));
-
-		error = saRecvRetry (tmrInstance->dispatch_fd,
-			&dispatch_data.header, sizeof (mar_res_header_t));
-		if (error != SA_AIS_OK) {
-			goto error_unlock;
-		}
-
-		if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-			error = saRecvRetry (tmrInstance->dispatch_fd,
-				&dispatch_data.data,
-				(dispatch_data.header.size - sizeof (mar_res_header_t)));
-			if (error != SA_AIS_OK) {
-				goto error_unlock;
-			}
-		}
 
 		memcpy (&callbacks, &tmrInstance->callbacks,
 			sizeof (tmrInstance->callbacks));
@@ -321,7 +286,7 @@ saTmrDispatch (
 
 error_unlock:
 	pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
-error_put:
+
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 error_exit:
 	return (error);
@@ -352,19 +317,11 @@ saTmrFinalize (
 
 	tmrInstance->finalize = 1;
 
+	cslib_service_disconnect (tmrInstance->ipc_ctx);
+
 	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	/* tmrInstanceFinalize (tmrInstance); */
-
-	if (tmrInstance->response_fd != -1) {
-		shutdown (tmrInstance->response_fd, 0);
-		close (tmrInstance->response_fd);
-	}
-
-	if (tmrInstance->dispatch_fd != -1) {
-		shutdown (tmrInstance->dispatch_fd, 0);
-		close (tmrInstance->dispatch_fd);
-	}
 
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 
@@ -384,6 +341,7 @@ saTmrTimerStart (
 
 	struct req_lib_tmr_timerstart req_lib_tmr_timerstart;
 	struct res_lib_tmr_timerstart res_lib_tmr_timerstart;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrTimerStart { data=%p }\n",
@@ -411,13 +369,16 @@ saTmrTimerStart (
 	memcpy (&req_lib_tmr_timerstart.timer_attributes,
 		timerAttributes, sizeof (SaTmrTimerAttributesT));
 
-	req_lib_tmr_timerstart.timer_data = timerData;
+	req_lib_tmr_timerstart.timer_data = (void *)timerData;
+
+	iov.iov_base = &req_lib_tmr_timerstart;
+	iov.iov_len = sizeof (struct req_lib_tmr_timerstart);
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_timerstart,
-		sizeof (struct req_lib_tmr_timerstart),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_timerstart,
 		sizeof (struct res_lib_tmr_timerstart));
 
@@ -430,9 +391,8 @@ saTmrTimerStart (
 		error = res_lib_tmr_timerstart.header.error;
 	}
 
-error_exit:
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
-	return (error);;
+	return (error);
 }
 
 SaAisErrorT
@@ -447,6 +407,7 @@ saTmrTimerReschedule (
 
 	struct req_lib_tmr_timerreschedule req_lib_tmr_timerreschedule;
 	struct res_lib_tmr_timerreschedule res_lib_tmr_timerreschedule;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrTimerReschedule { id=%u }\n",
@@ -471,11 +432,14 @@ saTmrTimerReschedule (
 	memcpy (&req_lib_tmr_timerreschedule.timer_attributes,
 		timerAttributes, sizeof (SaTmrTimerAttributesT));
 
+	iov.iov_base = &req_lib_tmr_timerreschedule,
+	iov.iov_len = sizeof (struct req_lib_tmr_timerreschedule);
+
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_timerreschedule,
-		sizeof (struct req_lib_tmr_timerreschedule),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_timerreschedule,
 		sizeof (struct res_lib_tmr_timerreschedule));
 
@@ -501,6 +465,7 @@ saTmrTimerCancel (
 
 	struct req_lib_tmr_timercancel req_lib_tmr_timercancel;
 	struct res_lib_tmr_timercancel res_lib_tmr_timercancel;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrTimerCancel { id=%u }\n",
@@ -518,11 +483,14 @@ saTmrTimerCancel (
 
 	req_lib_tmr_timercancel.timer_id = timerId;
 
+	iov.iov_base = &req_lib_tmr_timercancel,
+	iov.iov_len = sizeof (struct req_lib_tmr_timercancel);
+
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_timercancel,
-		sizeof (struct req_lib_tmr_timercancel),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_timercancel,
 		sizeof (struct res_lib_tmr_timercancel));
 
@@ -550,6 +518,7 @@ saTmrPeriodicTimerSkip (
 
 	struct req_lib_tmr_periodictimerskip req_lib_tmr_periodictimerskip;
 	struct res_lib_tmr_periodictimerskip res_lib_tmr_periodictimerskip;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrPeriodicTimerSkip { id=%u }\n",
@@ -567,11 +536,14 @@ saTmrPeriodicTimerSkip (
 
 	req_lib_tmr_periodictimerskip.timer_id = timerId;
 
+	iov.iov_base = &req_lib_tmr_periodictimerskip,
+	iov.iov_len = sizeof (struct req_lib_tmr_periodictimerskip);
+
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_periodictimerskip,
-		sizeof (struct req_lib_tmr_periodictimerskip),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_periodictimerskip,
 		sizeof (struct res_lib_tmr_periodictimerskip));
 
@@ -595,6 +567,7 @@ saTmrTimerRemainingTimeGet (
 
 	struct req_lib_tmr_timerremainingtimeget req_lib_tmr_timerremainingtimeget;
 	struct res_lib_tmr_timerremainingtimeget res_lib_tmr_timerremainingtimeget;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTimerRemainingTimeGet { id=%u }\n",
@@ -617,11 +590,14 @@ saTmrTimerRemainingTimeGet (
 
 	req_lib_tmr_timerremainingtimeget.timer_id = timerId;
 
+	iov.iov_base = &req_lib_tmr_timerremainingtimeget,
+	iov.iov_len = sizeof (struct req_lib_tmr_timerremainingtimeget);
+
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_timerremainingtimeget,
-		sizeof (struct req_lib_tmr_timerremainingtimeget),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_timerremainingtimeget,
 		sizeof (struct res_lib_tmr_timerremainingtimeget));
 
@@ -648,6 +624,8 @@ saTmrTimerAttributesGet (
 
 	struct req_lib_tmr_timerattributesget req_lib_tmr_timerattributesget;
 	struct res_lib_tmr_timerattributesget res_lib_tmr_timerattributesget;
+	struct iovec iov;
+
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrTimerAttributesGet { id=%u }\n",
@@ -670,11 +648,14 @@ saTmrTimerAttributesGet (
 
 	req_lib_tmr_timerattributesget.timer_id = timerId;
 
+	iov.iov_base = &req_lib_tmr_timerattributesget,
+	iov.iov_len = sizeof (struct req_lib_tmr_timerattributesget);
+
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_timerattributesget,
-		sizeof (struct req_lib_tmr_timerattributesget),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_timerattributesget,
 		sizeof (struct res_lib_tmr_timerattributesget));
 
@@ -701,6 +682,7 @@ saTmrTimeGet (
 
 	struct req_lib_tmr_timeget req_lib_tmr_timeget;
 	struct res_lib_tmr_timeget res_lib_tmr_timeget;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrTimeGet\n");
@@ -720,11 +702,14 @@ saTmrTimeGet (
 	req_lib_tmr_timeget.header.id =
 		MESSAGE_REQ_TMR_TIMEGET;
 
+	iov.iov_base = &req_lib_tmr_timeget,
+	iov.iov_len = sizeof (struct req_lib_tmr_timeget);
+
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_timeget,
-		sizeof (struct req_lib_tmr_timeget),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_timeget,
 		sizeof (struct res_lib_tmr_timeget));
 
@@ -751,6 +736,7 @@ saTmrClockTickGet (
 
 	struct req_lib_tmr_clocktickget req_lib_tmr_clocktickget;
 	struct res_lib_tmr_clocktickget res_lib_tmr_clocktickget;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrClockTickGet\n");
@@ -770,11 +756,14 @@ saTmrClockTickGet (
 	req_lib_tmr_clocktickget.header.id =
 		MESSAGE_REQ_TMR_CLOCKTICKGET;
 
+	iov.iov_base = &req_lib_tmr_clocktickget,
+	iov.iov_len = sizeof (struct req_lib_tmr_clocktickget);
+
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = saSendReceiveReply (tmrInstance->response_fd,
-		&req_lib_tmr_clocktickget,
-		sizeof (struct req_lib_tmr_clocktickget),
+	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_tmr_clocktickget,
 		sizeof (struct res_lib_tmr_clocktickget));
 

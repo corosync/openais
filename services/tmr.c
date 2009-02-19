@@ -303,8 +303,8 @@ static void tmr_timer_expired (void *data)
 	res_lib_tmr_timerexpiredcallback.expiration_count = timer_instance->expiration_count;
 
 	if (timer_instance->timer_skip == 0) {
-		api->ipc_conn_send_response (
-			api->ipc_conn_partner_get (timer_instance->source.conn),
+		api->ipc_dispatch_send (
+			timer_instance->source.conn,
 			&res_lib_tmr_timerexpiredcallback,
 			sizeof (struct res_lib_tmr_timerexpiredcallback));
 	}
@@ -420,7 +420,7 @@ error_exit:
 	res_lib_tmr_timerstart.timer_id = timer_id;
 	res_lib_tmr_timerstart.call_time = (SaTimeT)(api->timer_time_get());
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_timerstart,
 		sizeof (struct res_lib_tmr_timerstart));
 }
@@ -461,7 +461,7 @@ error_exit:
 		MESSAGE_RES_TMR_TIMERRESCHEDULE;
 	res_lib_tmr_timerreschedule.header.error = error;
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_timerreschedule,
 		sizeof (struct res_lib_tmr_timerreschedule));
 }
@@ -505,7 +505,7 @@ error_exit:
 		MESSAGE_RES_TMR_TIMERCANCEL;
 	res_lib_tmr_timercancel.header.error = error;
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_timercancel,
 		sizeof (struct res_lib_tmr_timercancel));
 }
@@ -549,7 +549,7 @@ error_exit:
 		MESSAGE_RES_TMR_PERIODICTIMERSKIP;
 	res_lib_tmr_periodictimerskip.header.error = error;
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_periodictimerskip,
 		sizeof (struct res_lib_tmr_periodictimerskip));
 }
@@ -590,7 +590,7 @@ error_exit:
 		MESSAGE_RES_TMR_TIMERREMAININGTIMEGET;
 	res_lib_tmr_timerremainingtimeget.header.error = error;
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_timerremainingtimeget,
 		sizeof (struct res_lib_tmr_timerremainingtimeget));
 }
@@ -631,7 +631,7 @@ error_exit:
 		MESSAGE_RES_TMR_TIMERATTRIBUTESGET;
 	res_lib_tmr_timerattributesget.header.error = error;
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_timerattributesget,
 		sizeof (struct res_lib_tmr_timerattributesget));
 }
@@ -654,15 +654,13 @@ static void message_handler_req_lib_tmr_timeget (
 	memcpy (&res_lib_tmr_timeget.current_time,
 		&current_time, sizeof (SaTimeT));
 
-error_exit:
-
 	res_lib_tmr_timeget.header.size =
 		sizeof (struct res_lib_tmr_timeget);
 	res_lib_tmr_timeget.header.id =
 		MESSAGE_RES_TMR_TIMEGET;
 	res_lib_tmr_timeget.header.error = error;
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_timeget,
 		sizeof (struct res_lib_tmr_timeget));
 }
@@ -693,7 +691,7 @@ error_exit:
 		MESSAGE_RES_TMR_CLOCKTICKGET;
 	res_lib_tmr_clocktickget.header.error = error;
 
-	api->ipc_conn_send_response (conn,
+	api->ipc_response_send (conn,
 		&res_lib_tmr_clocktickget,
 		sizeof (struct res_lib_tmr_clocktickget));
 }

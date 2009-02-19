@@ -315,6 +315,7 @@ struct evt_set_opens {
 struct evt_close_unlink_chan {
 	mar_name_t		chcu_name __attribute__((aligned(8)));
 	mar_uint64_t		chcu_unlink_id __attribute__((aligned(8)));
+	mar_message_source_t 	chcu_msgsrc __attribute__((aligned(8)));
 };
 
 struct open_chan_req {
@@ -1290,7 +1291,7 @@ chan_open_end:
 /*
  * Send a request to close a channel with the rest of the cluster.
  */
-static SaAisErrorT evt_close_channel(mar_name_t *cn, uint64_t unlink_id)
+static SaAisErrorT evt_close_channel(mar_name_t *cn, uint64_t unlink_id, void *conn)
 {
 	struct req_evt_chan_command cpkt;
 	struct iovec chn_iovec;
@@ -1310,6 +1311,7 @@ static SaAisErrorT evt_close_channel(mar_name_t *cn, uint64_t unlink_id)
 	cpkt.chc_op = EVT_CLOSE_CHAN_OP;
 	cpkt.u.chcu.chcu_name = *cn;
 	cpkt.u.chcu.chcu_unlink_id = unlink_id;
+	api->ipc_source_set(&cpkt.u.chcu.chcu_msgsrc, conn);
 	chn_iovec.iov_base = (char *)&cpkt;
 	chn_iovec.iov_len = cpkt.chc_head.size;
 	res = api->totem_mcast (&chn_iovec, 1, TOTEM_AGREED);
@@ -1876,8 +1878,7 @@ static void __notify_event(void	*conn)
 		res.evd_head.size = sizeof(res);
 		res.evd_head.id = MESSAGE_RES_EVT_AVAILABLE;
 		res.evd_head.error = SA_AIS_OK;
-		api->ipc_conn_send_response(api->ipc_conn_partner_get(conn),
-				&res, sizeof(res));
+		api->ipc_dispatch_send(conn, &res, sizeof(res));
 	}
 
 }
@@ -2192,7 +2193,6 @@ static int evt_lib_init(void *conn)
 
 	libevt_pd = (struct libevt_pd *)api->ipc_private_data_get(conn);
 
-
 	log_printf(LOG_LEVEL_DEBUG, "saEvtInitialize request.\n");
 
 	/*
@@ -2204,6 +2204,7 @@ static int evt_lib_init(void *conn)
 	 * Initialize the open channel handle database.
 	 */
 	hdb_create(&libevt_pd->esi_hdb);
+printf ("hdb cre %p\n", &libevt_pd->esi_hdb);
 
 	/*
 	 * list of channels open on this instance
@@ -2233,6 +2234,7 @@ static void lib_evt_open_channel(void *conn, void *message)
 
 	req = message;
 
+	api->ipc_refcnt_inc (conn);
 
 	log_printf(CHAN_OPEN_DEBUG,
 		"saEvtChannelOpen (Open channel request)\n");
@@ -2287,7 +2289,7 @@ open_return:
 	res.ico_head.size = sizeof(res);
 	res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 	res.ico_head.error = error;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2344,7 +2346,7 @@ open_return:
 	res.ico_head.size = sizeof(res);
 	res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 	res.ico_head.error = error;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 }
 
 
@@ -2354,7 +2356,7 @@ open_return:
  * when saEvtFinalize is called with channels open.
  */
 static SaAisErrorT
-common_chan_close(struct event_svr_channel_open	*eco, struct libevt_pd *esip)
+common_chan_close(struct event_svr_channel_open	*eco, struct libevt_pd *esip, void *conn)
 {
 	struct event_svr_channel_subscr *ecs;
 	struct list_head *l, *nxt;
@@ -2373,6 +2375,7 @@ common_chan_close(struct event_svr_channel_open	*eco, struct libevt_pd *esip)
 	 * remove it's handle (this frees the memory too).
 	 *
 	 */
+printf ("list del %p\n",eco);
 	list_del(&eco->eco_entry);
 	list_del(&eco->eco_instance_entry);
 
@@ -2396,7 +2399,7 @@ common_chan_close(struct event_svr_channel_open	*eco, struct libevt_pd *esip)
 	 */
 	remove_delivered_channel(eco);
 	return evt_close_channel(&eco->eco_channel->esc_channel_name,
-			eco->eco_channel->esc_unlink_id);
+			eco->eco_channel->esc_unlink_id, conn);
 }
 
 /*
@@ -2429,7 +2432,8 @@ static void lib_evt_close_channel(void *conn, void *message)
 	}
 	eco = ptr;
 
-	common_chan_close(eco, esip);
+printf ("close1\n");
+	common_chan_close(eco, esip, conn);
 	hdb_handle_destroy(&esip->esi_hdb, req->icc_channel_handle);
 	hdb_handle_put(&esip->esi_hdb, req->icc_channel_handle);
 
@@ -2437,7 +2441,7 @@ chan_close_done:
 	res.icc_head.size = sizeof(res);
 	res.icc_head.id = MESSAGE_RES_EVT_CLOSE_CHANNEL;
 	res.icc_head.error = ((ret == 0) ? SA_AIS_OK : SA_AIS_ERR_BAD_HANDLE);
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2508,7 +2512,7 @@ evt_unlink_err:
 	res.iuc_head.size = sizeof(res);
 	res.iuc_head.id = MESSAGE_RES_EVT_UNLINK_CHANNEL;
 	res.iuc_head.error = error;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2612,7 +2616,7 @@ static void lib_evt_event_subscribe(void *conn, void *message)
 	res.ics_head.size = sizeof(res);
 	res.ics_head.id = MESSAGE_RES_EVT_SUBSCRIBE;
 	res.ics_head.error = error;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 
 	/*
 	 * See if an existing event with a retention time
@@ -2645,7 +2649,7 @@ subr_done:
 	res.ics_head.size = sizeof(res);
 	res.ics_head.id = MESSAGE_RES_EVT_SUBSCRIBE;
 	res.ics_head.error = error;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2712,7 +2716,7 @@ unsubr_done:
 	res.icu_head.size = sizeof(res);
 	res.icu_head.id = MESSAGE_RES_EVT_UNSUBSCRIBE;
 	res.icu_head.error = error;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2734,7 +2738,6 @@ static void lib_evt_event_publish(void *conn, void *message)
 	struct libevt_pd *esip;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
-
 
 	req = message;
 
@@ -2784,7 +2787,7 @@ pub_done:
 	res.iep_head.id = MESSAGE_RES_EVT_PUBLISH;
 	res.iep_head.error = error;
 	res.iep_event_id = event_id;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 }
 
 /*
@@ -2847,7 +2850,7 @@ evt_ret_clr_err:
 	res.iec_head.size = sizeof(res);
 	res.iec_head.id = MESSAGE_RES_EVT_CLEAR_RETENTIONTIME;
 	res.iec_head.error = error;
-	api->ipc_conn_send_response(conn, &res, sizeof(res));
+	api->ipc_response_send(conn, &res, sizeof(res));
 
 }
 
@@ -2856,14 +2859,13 @@ evt_ret_clr_err:
  */
 static void lib_evt_event_data_get(void *conn, void *message)
 {
-	struct lib_event_data res;
 	struct chan_event_list *cel;
 	struct event_data *edp;
 	int i;
 	struct libevt_pd *esip;
+	struct iovec iov;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
-
 
 	/*
 	 * Deliver events in publish order within priority
@@ -2885,24 +2887,20 @@ static void lib_evt_event_data_get(void *conn, void *message)
 			edp->ed_event.led_sub_id = cel->cel_sub_id;
 			edp->ed_event.led_head.id = MESSAGE_RES_EVT_EVENT_DATA;
 			edp->ed_event.led_head.error = SA_AIS_OK;
-			free(cel);
-			api->ipc_conn_send_response(conn, &edp->ed_event,
-											edp->ed_event.led_head.size);
+			iov.iov_base = &edp->ed_event;
+			iov.iov_len = edp->ed_event.led_head.size;
+
+			api->ipc_response_iov_send (conn, &iov, 1);
+
 			free_event_data(edp);
-			goto data_get_done;
+			break;
 		}
 	}
-
-	res.led_head.size = sizeof(res.led_head);
-	res.led_head.id = MESSAGE_RES_EVT_EVENT_DATA;
-	res.led_head.error = SA_AIS_ERR_NOT_EXIST;
-	api->ipc_conn_send_response(conn, &res, res.led_head.size);
 
 	/*
 	 * See if there are any events that the app doesn't know about
 	 * because the notify pipe was full.
 	 */
-data_get_done:
 	if (esip->esi_nevents) {
 		__notify_event(conn);
 	}
@@ -3058,8 +3056,9 @@ static int evt_lib_exit(void *conn)
 	struct unlink_chan_pending *ucp;
 	struct retention_time_clear_pending *rtc;
 	struct libevt_pd *esip =
-		api->ipc_private_data_get(api->ipc_conn_partner_get(conn));
+		api->ipc_private_data_get(conn);
 
+printf ("lib_exit (%p)\n", conn);
 	log_printf(LOG_LEVEL_DEBUG, "saEvtFinalize (Event exit request)\n");
 	log_printf(LOG_LEVEL_DEBUG, "saEvtFinalize %d evts on list\n",
 			esip->esi_nevents);
@@ -3070,7 +3069,9 @@ static int evt_lib_exit(void *conn)
 	for (l = esip->esi_open_chans.next; l != &esip->esi_open_chans; l = nxt) {
 		nxt = l->next;
 		eco = list_entry(l, struct event_svr_channel_open, eco_instance_entry);
-		common_chan_close(eco, esip);
+printf ("close2\n");
+		common_chan_close(eco, esip, conn);
+printf ("handle destroy %p %d\n", &esip->esi_hdb, eco->eco_my_handle);
 		hdb_handle_destroy(&esip->esi_hdb, eco->eco_my_handle);
 	}
 
@@ -3108,6 +3109,7 @@ static int evt_lib_exit(void *conn)
 	/*
 	 * Destroy the open channel handle database
 	 */
+printf ("hdb destroy %p\n", &esip->esi_hdb);
 	hdb_destroy(&esip->esi_hdb);
 
 	return 0;
@@ -3202,10 +3204,13 @@ try_deliver_event(struct event_data *evt,
 	struct event_svr_channel_open *eco;
 	struct event_svr_channel_subscr *ecs;
 	int delivered_event = 0;
+printf ("try_deliver_event\n");
 	/*
 	 * Check open channels
 	 */
 	for (l = eci->esc_open_chans.next; l != &eci->esc_open_chans; l = l->next) {
+printf ("l=%p\n", l);
+fflush (stdout);
 		eco = list_entry(l, struct event_svr_channel_open, eco_entry);
 		/*
 		 * See if enabled to receive
@@ -3463,7 +3468,7 @@ static void chan_open_timeout(void *data)
 	res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 	res.ico_head.error = SA_AIS_ERR_TIMEOUT;
 	ocp->ocp_invocation = OPEN_TIMED_OUT;
-	api->ipc_conn_send_response(ocp->ocp_conn, &res, sizeof(res));
+	api->ipc_response_send(ocp->ocp_conn, &res, sizeof(res));
 }
 
 /*
@@ -3496,7 +3501,7 @@ static void evt_chan_open_finish(struct open_chan_pending *ocp,
 	if (ocp->ocp_invocation == OPEN_TIMED_OUT) {
 		log_printf(CHAN_OPEN_DEBUG, "Closing timed out open of %s\n",
 				get_mar_name_t(&ocp->ocp_chan_name));
-		error = evt_close_channel(&ocp->ocp_chan_name, EVT_CHAN_ACTIVE);
+		error = evt_close_channel(&ocp->ocp_chan_name, EVT_CHAN_ACTIVE, NULL);
 		if (error != SA_AIS_OK) {
 			log_printf(CHAN_OPEN_DEBUG,
 					"Close of timed out open failed for %s\n",
@@ -3512,6 +3517,7 @@ static void evt_chan_open_finish(struct open_chan_pending *ocp,
 	 * with this channel open instance.
 	 */
 	ret = hdb_handle_create(&esip->esi_hdb, sizeof(*eco), &handle);
+printf ("hdb handle create %p %d\n", &esip->esi_hdb, handle);
 	if (ret != 0) {
 		goto open_return;
 	}
@@ -3533,6 +3539,7 @@ static void evt_chan_open_finish(struct open_chan_pending *ocp,
 	eco->eco_my_handle = handle;
 	eco->eco_conn = ocp->ocp_conn;
 	list_add_tail(&eco->eco_entry, &eci->esc_open_chans);
+printf ("list add %p to open chans\n", eco);
 	list_add_tail(&eco->eco_instance_entry, &esip->esi_open_chans);
 
 	/*
@@ -3553,7 +3560,7 @@ open_return:
 		resa.ica_channel_handle = handle;
 		resa.ica_c_handle = ocp->ocp_c_handle;
 		resa.ica_invocation = ocp->ocp_invocation;
-		api->ipc_conn_send_response(api->ipc_conn_partner_get(ocp->ocp_conn),
+		api->ipc_dispatch_send(ocp->ocp_conn,
 				&resa, sizeof(resa));
 	} else {
 		struct res_evt_channel_open res;
@@ -3561,7 +3568,7 @@ open_return:
 		res.ico_head.id = MESSAGE_RES_EVT_OPEN_CHANNEL;
 		res.ico_head.error = (ret == 0 ? SA_AIS_OK : SA_AIS_ERR_BAD_HANDLE);
 		res.ico_channel_handle = handle;
-		api->ipc_conn_send_response(ocp->ocp_conn, &res, sizeof(res));
+		api->ipc_response_send(ocp->ocp_conn, &res, sizeof(res));
 	}
 
 	if (timer_del_status == 0) {
@@ -3586,7 +3593,7 @@ static void evt_chan_unlink_finish(struct unlink_chan_pending *ucp)
 	res.iuc_head.size = sizeof(res);
 	res.iuc_head.id = MESSAGE_RES_EVT_UNLINK_CHANNEL;
 	res.iuc_head.error = SA_AIS_OK;
-	api->ipc_conn_send_response(ucp->ucp_conn, &res, sizeof(res));
+	api->ipc_response_send(ucp->ucp_conn, &res, sizeof(res));
 
 	free(ucp);
 }
@@ -3606,7 +3613,7 @@ static void evt_ret_time_clr_finish(struct retention_time_clear_pending *rtc,
 	res.iec_head.size = sizeof(res);
 	res.iec_head.id = MESSAGE_RES_EVT_CLEAR_RETENTIONTIME;
 	res.iec_head.error = ret;
-	api->ipc_conn_send_response(rtc->rtc_conn, &res, sizeof(res));
+	api->ipc_response_send(rtc->rtc_conn, &res, sizeof(res));
 
 	list_del(&rtc->rtc_entry);
 	free(rtc);

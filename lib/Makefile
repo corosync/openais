@@ -36,7 +36,7 @@ subdir ?= lib/
 
 include $(srcdir)Makefile.inc
 
-override LDFLAGS += -L./
+override LDFLAGS += -L./ -L/usr/lib/corosync
 
 all: libSaClm.a libSaClm.so.2.0.0 \
 	libSaCkpt.a libSaCkpt.so.2.0.0 \
@@ -46,9 +46,6 @@ all: libSaClm.a libSaClm.so.2.0.0 \
 	libSaLck.a libSaLck.so.2.0.0 \
 	libSaTmr.a libSaTmr.so.2.0.0
 
-libcoroutil.a: util.o
-	$(AR) -rc libcoroutil.a util.o
-
 ifeq (${OPENAIS_COMPAT}, DARWIN)
 
 DARWIN_OPTS=-dynamiclib -bind_at_load -current_version 2.0.0 -compatibility_version 2.0.0
@@ -57,68 +54,75 @@ libSaAmf.so.2.0.0: util.o amf.o
 	$(CC) $(DARWIN_OPTS) util.o amf.o -o $@
 
 libSaClm.so.2.0.0: util.o clm.o
-	$(CC) $(DARWIN_OPTS) util.o clm.o -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o clm.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaCkpt.so.2.0.0: util.o ckpt.o
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o ckpt.o -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o ckpt.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaEvt.so.2.0.0: util.o evt.o 
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaMsg.so.2.0.0: util.o msg.o
-	$(CC) $(DARWIN_OPTS) util.o msg.o -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o msg.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaLck.so.2.0.0: util.o lck.o
-	$(CC) $(DARWIN_OPTS) util.o lck.o -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o lck.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaTmr.so.2.0.0: util.o tmr.o
-	$(CC) $(DARWIN_OPTS) util.o tmr.o -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o tmr.o /usr/lib/corosync/libcoroipc.a -o $@
 
 else
 
 libSaAmf.so.2.0.0: util.o amf.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaAmf.so.2,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaAmf.so.2,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaClm.so.2.0.0: util.o clm.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions util.o clm.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions util.o clm.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaCkpt.so.2.0.0: util.o ckpt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaEvt.so.2.0.0: util.o evt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=$(srcdir)$(subdir)libSaEvt.versions util.o evt.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=$(srcdir)$(subdir)libSaEvt.versions util.o evt.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaMsg.so.2.0.0: util.o msg.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaMsg.so.2,-version-script=$(srcdir)$(subdir)libSaMsg.versions util.o msg.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaMsg.so.2,-version-script=$(srcdir)$(subdir)libSaMsg.versions util.o msg.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaLck.so.2.0.0: util.o lck.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaTmr.so.2.0.0: util.o tmr.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaTmr.so.2,-version-script=$(srcdir)$(subdir)libSaTmr.versions util.o tmr.o -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaTmr.so.2,-version-script=$(srcdir)$(subdir)libSaTmr.versions util.o tmr.o /usr/lib/corosync/libcoroipc.a -o $@
 
 endif
 
 libSaAmf.a: util.o amf.o
-	$(AR) -rc libSaAmf.a util.o amf.o
+	$(AR) x /usr/lib/corosync/libcoroipc.a
+	$(AR) -rc libSaAmf.a util.o amf.o coroipc.o
 
 libSaCkpt.a: util.o ckpt.o
-	$(AR) -rc libSaCkpt.a util.o ckpt.o
+	$(AR) x /usr/lib/corosync/libcoroipc.a
+	$(AR) -rc libSaCkpt.a util.o ckpt.o coroipc.o
 
 libSaClm.a: util.o clm.o
-	$(AR) -rc libSaClm.a util.o clm.o
+	$(AR) x /usr/lib/corosync/libcoroipc.a
+	$(AR) -rc libSaClm.a util.o clm.o coroipc.o
 
 libSaEvt.a: util.o evt.o
-	$(AR) -rc libSaEvt.a util.o evt.o
+	$(AR) x /usr/lib/corosync/libcoroipc.a
+	$(AR) -rc libSaEvt.a util.o evt.o coroipc.o
 
 libSaMsg.a: util.o msg.o
-	$(AR) -rc libSaMsg.a util.o msg.o
+	$(AR) x /usr/lib/corosync/libcoroipc.a
+	$(AR) -rc libSaMsg.a util.o msg.o coroipc.o
 
 libSaLck.a: util.o lck.o
-	$(AR) -rc libSaLck.a util.o lck.o
+	$(AR) x /usr/lib/corosync/libcoroipc.a
+	$(AR) -rc libSaLck.a util.o lck.o coroipc.o
 
 libSaTmr.a: util.o tmr.o
-	$(AR) -rc libSaTmr.a util.o tmr.o
+	$(AR) x /usr/lib/corosync/libcoroipc.a
+	$(AR) -rc libSaTmr.a util.o tmr.o coroipc.o
 
 clean:
 	rm -f *.o libSa*.so* libSa*.a *.da *.bb *.bbg

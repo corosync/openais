@@ -291,6 +291,7 @@ static void my_cluster_node_load (void)
 	char **status;
 	const char *iface_string;
 
+printf ("nodeid get %d\n", api->totem_nodeid_get());
 	api->totem_ifaces_get (
 		api->totem_nodeid_get (),
 		interfaces,
@@ -447,7 +448,7 @@ static void library_notification_send (
 		/*
 		 * Send notifications to all CLM listeners
 		 */
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			clm_pd->conn,
 			&res_lib_clm_clustertrack,
 			sizeof (struct res_lib_clm_clustertrack));
@@ -707,14 +708,14 @@ static void message_handler_req_lib_clm_clustertrack (void *conn, void *msg)
 		list_add (&clm_pd->list, &library_notification_send_listhead);
 	}
 
-	api->ipc_conn_send_response (conn, &res_lib_clm_clustertrack,
+	api->ipc_response_send (conn, &res_lib_clm_clustertrack,
 		sizeof (struct res_lib_clm_clustertrack));
 
 	if (req_lib_clm_clustertrack->return_in_callback) {
 		res_lib_clm_clustertrack.header.id = MESSAGE_RES_CLM_TRACKCALLBACK;
 
-		api->ipc_conn_send_response (
-			api->ipc_conn_partner_get (conn),
+		api->ipc_dispatch_send (
+			conn,
 			&res_lib_clm_clustertrack,
 			sizeof (struct res_lib_clm_clustertrack));
 	}
@@ -739,7 +740,7 @@ static void message_handler_req_lib_clm_trackstop (void *conn, void *msg)
 	list_del (&clm_pd->list);
 	list_init (&clm_pd->list);
 
-	api->ipc_conn_send_response (conn, &res_lib_clm_trackstop,
+	api->ipc_response_send (conn, &res_lib_clm_trackstop,
 		sizeof (struct res_lib_clm_trackstop));
 }
 
@@ -775,7 +776,7 @@ static void message_handler_req_lib_clm_nodeget (void *conn, void *msg)
 	if (valid) {
 		memcpy (&res_clm_nodeget.cluster_node, cluster_node, sizeof (mar_clm_cluster_node_t));
 	}
-	api->ipc_conn_send_response (conn, &res_clm_nodeget, sizeof (struct res_clm_nodeget));
+	api->ipc_response_send (conn, &res_clm_nodeget, sizeof (struct res_clm_nodeget));
 }
 
 static void message_handler_req_lib_clm_nodegetasync (void *conn, void *msg)
@@ -810,7 +811,7 @@ static void message_handler_req_lib_clm_nodegetasync (void *conn, void *msg)
 	res_clm_nodegetasync.header.id = MESSAGE_RES_CLM_NODEGETASYNC;
 	res_clm_nodegetasync.header.error = SA_AIS_OK;
 
-	api->ipc_conn_send_response (conn, &res_clm_nodegetasync,
+	api->ipc_response_send (conn, &res_clm_nodegetasync,
 		sizeof (struct res_clm_nodegetasync));
 
 	/*
@@ -824,7 +825,7 @@ static void message_handler_req_lib_clm_nodegetasync (void *conn, void *msg)
 		memcpy (&res_clm_nodegetcallback.cluster_node, cluster_node,
 			sizeof (mar_clm_cluster_node_t));
 	}
-	api->ipc_conn_send_response (api->ipc_conn_partner_get (conn),
+	api->ipc_dispatch_send (conn,
 		&res_clm_nodegetcallback,
 		sizeof (struct res_clm_nodegetcallback));
 }

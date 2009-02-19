@@ -621,8 +621,8 @@ static int lib_comp_terminate_request (struct amf_comp *comp)
 		AMF_RESPONSE_COMPONENTTERMINATECALLBACK,
 		component_terminate_callback_data);
 
-	api->ipc_conn_send_response (
-		api->ipc_conn_partner_get (comp->conn),
+	api->ipc_dispatch_send (
+		comp->conn,
 		&res_lib,
 		sizeof (struct res_lib_amf_componentterminatecallback));
 
@@ -1143,8 +1143,8 @@ static void lib_healthcheck_request (struct amf_healthcheck *healthcheck)
 
 	TRACE7 ("sending healthcheck request to component %s",
 		res_lib.compName.value);
-	api->ipc_conn_send_response (
-		api->ipc_conn_partner_get (healthcheck->comp->conn),
+	api->ipc_dispatch_send (
+		healthcheck->comp->conn,
 		&res_lib, sizeof (struct res_lib_amf_healthcheckcallback));
 }
 
@@ -1241,8 +1241,8 @@ static void lib_csi_set_request (
 	res_lib->haState = csi_assignment->requested_ha_state;
 	res_lib->invocation =
 		invocation_create (AMF_RESPONSE_CSISETCALLBACK, csi_assignment);
-	api->ipc_conn_send_response (
-		api->ipc_conn_partner_get (comp->conn), res_lib, res_lib->header.size);
+	api->ipc_dispatch_send (
+		comp->conn, res_lib, res_lib->header.size);
 	
 	free(p);
 }
@@ -1298,7 +1298,7 @@ void amf_comp_error_report (struct amf_comp *comp, amf_comp_t* reporting_comp,
 			res_lib.header.size = sizeof (struct res_lib_amf_componenterrorreport);
 			res_lib.header.id = MESSAGE_RES_AMF_COMPONENTERRORREPORT;
 			res_lib.header.error = SA_AIS_OK;
-			api->ipc_conn_send_response (reporting_comp->conn, &res_lib, sizeof (res_lib));
+			api->ipc_response_send (reporting_comp->conn, &res_lib, sizeof (res_lib));
 		}
 	} else {
 		TRACE2("Exec comp error report on comp'%s' from AMF", comp->name.value);
@@ -2718,8 +2718,8 @@ void amf_comp_csi_remove (amf_comp_t *component,
 
 	TRACE7 ("sending CSI remove request to component %s",
 		res_lib.compName.value);
-	api->ipc_conn_send_response (
-		api->ipc_conn_partner_get (component->conn),
+	api->ipc_dispatch_send (
+		component->conn,
 		&res_lib, sizeof (struct res_lib_amf_csiremovecallback));
 }
 

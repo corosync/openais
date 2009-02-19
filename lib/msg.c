@@ -48,6 +48,7 @@
 #include <saAis.h>
 #include <saMsg.h>
 
+#include <corosync/coroipc.h>
 #include <corosync/list.h>
 #include <corosync/ipc_gen.h>
 
@@ -63,8 +64,7 @@ struct message_overlay {
  * Data structure for instance data
  */
 struct msgInstance {
-	int response_fd;
-	int dispatch_fd;
+	void *ipc_ctx;
 	SaMsgCallbacksT callbacks;
 	int finalize;
 	SaMsgHandleT msgHandle;
@@ -74,7 +74,7 @@ struct msgInstance {
 };
 
 struct msgQueueInstance {
-	int response_fd;
+	void *ipc_ctx;
 	SaMsgHandleT msgHandle;
 	SaMsgQueueHandleT queueHandle;
 	SaMsgQueueOpenFlagsT openFlags;
@@ -222,10 +222,7 @@ saMsgInitialize (
 	printf ("[DEBUG]: saMsgInitialize { msgHandle = %llx }\n",
 		(unsigned long long) *msgHandle);
 
-	msgInstance->response_fd = -1;
-
-	error = saServiceConnect (&msgInstance->response_fd,
-		&msgInstance->dispatch_fd, MSG_SERVICE);
+	error = cslib_service_connect (MSG_SERVICE, &msgInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -276,7 +273,7 @@ saMsgSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = msgInstance->dispatch_fd;
+	*selectionObject = cslib_fd_get (msgInstance->ipc_ctx);
 
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
@@ -288,8 +285,6 @@ saMsgDispatch (
 	const SaMsgHandleT msgHandle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	struct pollfd ufds;
-	int poll_fd;
 	int timeout = 1;
 	SaMsgCallbacksT callbacks;
 	SaAisErrorT error;
@@ -324,31 +319,15 @@ saMsgDispatch (
 	}
 
 	do {
-		/*
-		 * Read data directly from socket
-		 */
-		poll_fd = msgInstance->dispatch_fd;
-		ufds.fd = poll_fd;
-		ufds.events = POLLIN;
-		ufds.revents = 0;
+		dispatch_avail = cslib_dispatch_recv (msgInstance->ipc_ctx,
+			&dispatch_data, timeout);
 
-		error = saPollRetry(&ufds, 1, timeout);
-		if (error != SA_AIS_OK) {
-			goto error_put;
-		}
 		pthread_mutex_lock(&msgInstance->dispatch_mutex);
 
 		if (msgInstance->finalize == 1) {
 			error = SA_AIS_OK;
 			goto error_unlock;
 		}
-
-		if ((ufds.revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
-				error = SA_AIS_ERR_BAD_HANDLE;
-				goto error_unlock;
-		}
-		
-		dispatch_avail = (ufds.revents & POLLIN);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
 			pthread_mutex_unlock(&msgInstance->dispatch_mutex);
@@ -362,20 +341,6 @@ saMsgDispatch (
 		
 		memset(&dispatch_data, 0, sizeof(struct message_overlay));
 
-		error = saRecvRetry (msgInstance->dispatch_fd, &dispatch_data.header,
-			sizeof (mar_res_header_t));
-		if (error != SA_AIS_OK) {
-			goto error_unlock;
-		}
-
-		if (dispatch_data.header.size > sizeof (mar_res_header_t)) {
-			error = saRecvRetry (msgInstance->dispatch_fd, &dispatch_data.data,
-				dispatch_data.header.size - sizeof (mar_res_header_t));
-			if (error != SA_AIS_OK) {
-				goto error_unlock;
-			}
-		}
-
 		/*
 		* Make copy of callbacks, message data, unlock instance,
 		* and call callback. A risk of this dispatch method is that
@@ -386,10 +351,6 @@ saMsgDispatch (
 		       sizeof(msgInstance->callbacks));
 
 		pthread_mutex_unlock(&msgInstance->dispatch_mutex);
-
-		/* DEBUG */
-		printf ("[DEBUG]: saMsgDispatch { id = %d }\n",
-			dispatch_data.header.id);
 
 		/*
 		 * Dispatch incoming response
@@ -497,7 +458,6 @@ saMsgDispatch (
 
 error_unlock:
 	pthread_mutex_unlock(&msgInstance->dispatch_mutex);
-error_put:
 	saHandleInstancePut(&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
@@ -538,15 +498,7 @@ saMsgFinalize (
 	/* TODO */
 	/* msgInstanceFinalize (msgInstance); */
 
-	if (msgInstance->response_fd != -1) {
-		shutdown (msgInstance->response_fd, 0);
-		close (msgInstance->response_fd);
-	}
-
-	if (msgInstance->dispatch_fd != -1) {
-		shutdown (msgInstance->dispatch_fd, 0);
-		close (msgInstance->dispatch_fd);
-	}
+	error = cslib_service_disconnect (msgInstance->ipc_ctx);
 
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
@@ -567,6 +519,7 @@ saMsgQueueOpen (
 	struct msgQueueInstance *msgQueueInstance;
 	struct req_lib_msg_queueopen req_lib_msg_queueopen;
 	struct res_lib_msg_queueopen res_lib_msg_queueopen;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpen { queueName = %s }\n",
@@ -590,7 +543,7 @@ saMsgQueueOpen (
 		goto error_destroy;
 	}
 
-	msgQueueInstance->response_fd = msgInstance->response_fd;
+	msgQueueInstance->ipc_ctx = msgInstance->ipc_ctx;
 	msgQueueInstance->response_mutex = &msgInstance->response_mutex;
 
 	msgQueueInstance->msgHandle = msgHandle;
@@ -621,11 +574,14 @@ saMsgQueueOpen (
 	req_lib_msg_queueopen.queueHandle = *queueHandle; /* ? */
 	req_lib_msg_queueopen.timeout = timeout; /* ? */
 
+	iov.iov_base = &req_lib_msg_queueopen;
+	iov.iov_len = sizeof (struct req_lib_msg_queueopen);
+
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = saSendReceiveReply (msgQueueInstance->response_fd,
-		&req_lib_msg_queueopen,
-		sizeof (struct req_lib_msg_queueopen),
+	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queueopen,
 		sizeof (struct res_lib_msg_queueopen));
 
@@ -666,6 +622,7 @@ saMsgQueueOpenAsync (
 	struct msgQueueInstance *msgQueueInstance;
 	struct req_lib_msg_queueopen req_lib_msg_queueopen;
 	struct res_lib_msg_queueopenasync res_lib_msg_queueopenasync;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpenAsync { queueName = %s }\n",
@@ -694,7 +651,7 @@ saMsgQueueOpenAsync (
 		goto error_destroy;
 	}
 
-	msgQueueInstance->response_fd = msgInstance->response_fd;
+	msgQueueInstance->ipc_ctx = msgInstance->ipc_ctx;
 	msgQueueInstance->response_mutex = &msgInstance->response_mutex;
 
 	msgQueueInstance->msgHandle = msgHandle;
@@ -725,14 +682,17 @@ saMsgQueueOpenAsync (
 	req_lib_msg_queueopen.queueHandle = queueHandle; /* ? */
 	req_lib_msg_queueopen.timeout = 0; /* ? */
 
+	iov.iov_base = &req_lib_msg_queueopen;
+	iov.iov_len = sizeof (struct req_lib_msg_queueopen);
+
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = saSendReceiveReply (msgQueueInstance->response_fd,
-		&req_lib_msg_queueopen,
-		sizeof (struct req_lib_msg_queueopen),
+	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queueopenasync,
 		sizeof (struct res_lib_msg_queueopenasync));
-	
+
 	pthread_mutex_unlock (msgQueueInstance->response_mutex);
 
 	if (res_lib_msg_queueopenasync.header.error != SA_AIS_OK) {
@@ -764,6 +724,7 @@ saMsgQueueClose (
 	struct msgQueueInstance *msgQueueInstance;
 	struct req_lib_msg_queueclose req_lib_msg_queueclose;
 	struct res_lib_msg_queueclose res_lib_msg_queueclose;
+	struct iovec iov;
 
 	error = saHandleInstanceGet (&queueHandleDatabase, queueHandle,
 		(void *)&msgQueueInstance);
@@ -779,11 +740,14 @@ saMsgQueueClose (
 	memcpy (&req_lib_msg_queueclose.queueName, &msgQueueInstance->queueName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queueclose;
+	iov.iov_len = sizeof (struct req_lib_msg_queueclose);
+
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = saSendReceiveReply (msgQueueInstance->response_fd,
-		&req_lib_msg_queueclose,
-		sizeof (struct req_lib_msg_queueclose),
+	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queueclose,
 		sizeof (struct res_lib_msg_queueclose));
 
@@ -813,14 +777,11 @@ saMsgQueueStatusGet (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuestatusget req_lib_msg_queuestatusget;
 	struct res_lib_msg_queuestatusget res_lib_msg_queuestatusget;
+	struct iovec iov;
 
 	if (queueName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueStatusGet { queueName = %s }\n",
-		(char *) queueName->value);
 
 	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
 		(void *)&msgInstance);
@@ -836,11 +797,15 @@ saMsgQueueStatusGet (
 	memcpy (&req_lib_msg_queuestatusget.queueName, queueName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queuestatusget;
+	iov.iov_len = sizeof (struct req_lib_msg_queuestatusget);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queuestatusget,
-		sizeof (struct req_lib_msg_queuestatusget),
+	error = cslib_msg_send_reply_receive (
+		msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queuestatusget,
 		sizeof (struct res_lib_msg_queuestatusget));
 
@@ -888,6 +853,7 @@ saMsgQueueUnlink (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queueunlink req_lib_msg_queueunlink;
 	struct res_lib_msg_queueunlink res_lib_msg_queueunlink;
+	struct iovec iov;
 
 	if (queueName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -911,11 +877,14 @@ saMsgQueueUnlink (
 	memcpy (&req_lib_msg_queueunlink.queueName, queueName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queueunlink;
+	iov.iov_len = sizeof (struct res_lib_msg_queueunlink);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queueunlink,
-		sizeof (struct req_lib_msg_queueunlink),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queueunlink,
 		sizeof (struct res_lib_msg_queueunlink));
 
@@ -936,6 +905,7 @@ saMsgQueueGroupCreate (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuegroupcreate req_lib_msg_queuegroupcreate;
 	struct res_lib_msg_queuegroupcreate res_lib_msg_queuegroupcreate;
+	struct iovec iov;
 
 	if (queueGroupName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -965,11 +935,14 @@ saMsgQueueGroupCreate (
 
 	req_lib_msg_queuegroupcreate.queueGroupPolicy = queueGroupPolicy;
 
+	iov.iov_base = &req_lib_msg_queuegroupcreate;
+	iov.iov_len = sizeof (struct req_lib_msg_queuegroupcreate);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queuegroupcreate,
-		sizeof (struct req_lib_msg_queuegroupcreate),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queuegroupcreate,
 		sizeof (struct res_lib_msg_queuegroupcreate));
 
@@ -990,6 +963,7 @@ saMsgQueueGroupInsert (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuegroupinsert req_lib_msg_queuegroupinsert;
 	struct res_lib_msg_queuegroupinsert res_lib_msg_queuegroupinsert;
+	struct iovec iov;
 
 	if (queueName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1015,11 +989,14 @@ saMsgQueueGroupInsert (
 	memcpy (&req_lib_msg_queuegroupinsert.queueGroupName, queueGroupName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queuegroupinsert;
+	iov.iov_len = sizeof (struct req_lib_msg_queuegroupinsert);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queuegroupinsert,
-		sizeof (struct req_lib_msg_queuegroupinsert),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queuegroupinsert,
 		sizeof (struct res_lib_msg_queuegroupinsert));
 
@@ -1040,6 +1017,7 @@ saMsgQueueGroupRemove (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuegroupremove req_lib_msg_queuegroupremove;
 	struct res_lib_msg_queuegroupremove res_lib_msg_queuegroupremove;
+	struct iovec iov;
 
 	if (queueName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1065,11 +1043,14 @@ saMsgQueueGroupRemove (
 	memcpy (&req_lib_msg_queuegroupremove.queueGroupName, queueGroupName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queuegroupremove;
+	iov.iov_len = sizeof (struct req_lib_msg_queuegroupremove);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queuegroupremove,
-		sizeof (struct req_lib_msg_queuegroupremove),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queuegroupremove,
 		sizeof (struct res_lib_msg_queuegroupremove));
 
@@ -1089,6 +1070,7 @@ saMsgQueueGroupDelete (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuegroupdelete req_lib_msg_queuegroupdelete;
 	struct res_lib_msg_queuegroupdelete res_lib_msg_queuegroupdelete;
+	struct iovec iov;
 
 	if (queueGroupName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1112,11 +1094,14 @@ saMsgQueueGroupDelete (
 	memcpy (&req_lib_msg_queuegroupdelete.queueGroupName, queueGroupName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queuegroupdelete;
+	iov.iov_len = sizeof (struct req_lib_msg_queuegroupdelete);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queuegroupdelete,
-		sizeof (struct req_lib_msg_queuegroupdelete),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queuegroupdelete,
 		sizeof (struct res_lib_msg_queuegroupdelete));
 
@@ -1137,7 +1122,9 @@ saMsgQueueGroupTrack (
 	SaAisErrorT error;
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuegrouptrack req_lib_msg_queuegrouptrack;
-	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
+	struct res_lib_msg_queuegrouptrack *res_lib_msg_queuegrouptrack;
+	struct iovec iov;
+	void *return_buffer;
 
 	if (queueGroupName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1184,38 +1171,29 @@ saMsgQueueGroupTrack (
 	memcpy (&req_lib_msg_queuegrouptrack.queueGroupName, queueGroupName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queuegrouptrack;
+	iov.iov_len = sizeof (req_lib_msg_queuegrouptrack);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	/*
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queuegrouptrack,
-		sizeof (struct req_lib_msg_queuegrouptrack),
-		&res_lib_msg_queuegrouptrack,
-		sizeof (struct res_lib_msg_queuegrouptrack));
-	*/
+	error = cslib_msg_send_reply_receive_in_buf (
+		msgInstance->ipc_ctx,
+		&iov,
+		1,
+		&return_buffer);
 
-	error = saSendRetry (msgInstance->response_fd, &req_lib_msg_queuegrouptrack,
-		sizeof (struct req_lib_msg_queuegrouptrack));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saRecvRetry (msgInstance->response_fd, &res_lib_msg_queuegrouptrack,
-		sizeof (struct res_lib_msg_queuegrouptrack));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
+	res_lib_msg_queuegrouptrack = return_buffer;
 
 	if ((trackFlags & SA_TRACK_CURRENT) && (notificationBuffer != NULL)) {
 		if (notificationBuffer->notification != NULL) {
-			if (notificationBuffer->numberOfItems < res_lib_msg_queuegrouptrack.numberOfMembers) {
+			if (notificationBuffer->numberOfItems < res_lib_msg_queuegrouptrack->numberOfMembers) {
 				error = SA_AIS_ERR_NO_SPACE;
 				goto error_exit;
 			}
 		} else {
 			notificationBuffer->notification =
 				malloc (sizeof (SaMsgQueueGroupNotificationT) *
-					res_lib_msg_queuegrouptrack.numberOfMembers);
+					res_lib_msg_queuegrouptrack->numberOfMembers);
 
 			if (notificationBuffer->notification == NULL) {
 				error = SA_AIS_ERR_NO_MEMORY;
@@ -1224,13 +1202,10 @@ saMsgQueueGroupTrack (
 
 			memset (notificationBuffer->notification, 0,
 				(sizeof (SaMsgQueueGroupNotificationT) *
-				 res_lib_msg_queuegrouptrack.numberOfMembers));
+				 res_lib_msg_queuegrouptrack->numberOfMembers));
 		}
+/* TODO needs some work */
 
-		error = saRecvRetry (msgInstance->response_fd,
-				     notificationBuffer->notification,
-				     (sizeof (SaMsgQueueGroupNotificationT) *
-				      res_lib_msg_queuegrouptrack.numberOfMembers));
 	}
 
 error_exit:
@@ -1238,7 +1213,7 @@ error_exit:
 /* error_put_msg: */
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
-	return (error == SA_AIS_OK ? res_lib_msg_queuegrouptrack.header.error : error);
+	return (error == SA_AIS_OK ? res_lib_msg_queuegrouptrack->header.error : error);
 }
 
 SaAisErrorT
@@ -1250,6 +1225,7 @@ saMsgQueueGroupTrackStop (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuegrouptrackstop req_lib_msg_queuegrouptrackstop;
 	struct res_lib_msg_queuegrouptrackstop res_lib_msg_queuegrouptrackstop;
+	struct iovec iov;
 
 	if (queueGroupName == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1273,11 +1249,14 @@ saMsgQueueGroupTrackStop (
 	memcpy (&req_lib_msg_queuegrouptrackstop.queueGroupName, queueGroupName,
 		sizeof (SaNameT));
 
+	iov.iov_base = &req_lib_msg_queuegrouptrackstop;
+	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrackstop);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_queuegrouptrackstop,
-		sizeof (struct req_lib_msg_queuegrouptrackstop),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_queuegrouptrackstop,
 		sizeof (struct res_lib_msg_queuegrouptrackstop));
 
@@ -1320,6 +1299,7 @@ saMsgMessageSend (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_messagesend req_lib_msg_messagesend;
 	struct res_lib_msg_messagesend res_lib_msg_messagesend;
+	struct iovec iov[2];
 
 	if (destination == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -1354,34 +1334,22 @@ saMsgMessageSend (
 	req_lib_msg_messagesend.async_call = 0;
 	req_lib_msg_messagesend.timeout = timeout;
 
+	iov[0].iov_base = &req_lib_msg_messagesend;
+	iov[0].iov_len = sizeof (struct req_lib_msg_messagesend);
+	iov[1].iov_base = message->data;
+	iov[1].iov_len = message->size;
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	/*
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_messagesend,
-		sizeof (struct req_lib_msg_messagesend),
+	error = cslib_msg_send_reply_receive (
+		msgInstance->ipc_ctx,
+		iov,
+		2,
 		&res_lib_msg_messagesend,
 		sizeof (struct res_lib_msg_messagesend));
-	*/
 
-	error = saSendRetry (msgInstance->response_fd, &req_lib_msg_messagesend,
-		sizeof (struct req_lib_msg_messagesend));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saSendRetry (msgInstance->response_fd,
-		message->data, message->size);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saRecvRetry (msgInstance->response_fd, &res_lib_msg_messagesend,
-		sizeof (struct res_lib_msg_messagesend));
-
-error_exit:
 	pthread_mutex_unlock (&msgInstance->response_mutex);
-/* error_put_msg: */
+
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
 	return (error == SA_AIS_OK ? res_lib_msg_messagesend.header.error : error);
@@ -1399,10 +1367,7 @@ saMsgMessageSendAsync (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_messagesend req_lib_msg_messagesend;
 	struct res_lib_msg_messagesendasync res_lib_msg_messagesendasync;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageSendAsync { msgHandle = %llx }\n",
-		(unsigned long long) msgHandle);
+	struct iovec iov[2];
 
 	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
 		(void *)&msgInstance);
@@ -1425,34 +1390,22 @@ saMsgMessageSendAsync (
 	req_lib_msg_messagesend.async_call = 1;
 	req_lib_msg_messagesend.timeout = 0;
 
+	iov[0].iov_base = &req_lib_msg_messagesend;
+	iov[0].iov_len = sizeof (struct req_lib_msg_messagesend);
+	iov[1].iov_base = message->data;
+	iov[1].iov_len = message->size;
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	/*
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_messagesend,
-		sizeof (struct req_lib_msg_messagesend),
+	error = cslib_msg_send_reply_receive (
+		msgInstance->ipc_ctx,
+		iov,
+		2,
 		&res_lib_msg_messagesendasync,
 		sizeof (struct res_lib_msg_messagesendasync));
-	*/
 
-	error = saSendRetry (msgInstance->response_fd, &req_lib_msg_messagesend,
-		sizeof (struct req_lib_msg_messagesend));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saSendRetry (msgInstance->response_fd,
-		message->data, message->size);
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saRecvRetry (msgInstance->response_fd, &res_lib_msg_messagesendasync,
-		sizeof (struct res_lib_msg_messagesendasync));
-
-error_exit:
 	pthread_mutex_unlock (&msgInstance->response_mutex);
-/* error_put_msg: */
+
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
 	return (error == SA_AIS_OK ? res_lib_msg_messagesendasync.header.error : error);
@@ -1469,7 +1422,9 @@ saMsgMessageGet (
 	SaAisErrorT error;
 	struct msgQueueInstance *msgQueueInstance;
 	struct req_lib_msg_messageget req_lib_msg_messageget;
-	struct res_lib_msg_messageget res_lib_msg_messageget;
+	struct res_lib_msg_messageget *res_lib_msg_messageget;
+	struct iovec iov;
+	void *return_buffer;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageGet { queueHandle = %llx }\n",
@@ -1493,42 +1448,30 @@ saMsgMessageGet (
 
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	/*
-	error = saSendReceiveReply (msgQueueInstance->response_fd,
-		&req_lib_msg_messageget,
-		sizeof (struct req_lib_msg_messageget),
-		&res_lib_msg_messageget,
-		sizeof (struct res_lib_msg_messageget));
-	*/
-
-	error = saSendRetry (msgQueueInstance->response_fd, &req_lib_msg_messageget,
-		sizeof (struct req_lib_msg_messageget));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
-
-	error = saRecvRetry (msgQueueInstance->response_fd, &res_lib_msg_messageget,
-		sizeof (struct res_lib_msg_messageget));
-	if (error != SA_AIS_OK) {
-		goto error_exit;
-	}
+	error = cslib_msg_send_reply_receive_in_buf (
+		msgQueueInstance->ipc_ctx,
+		&iov,
+		2,
+		&return_buffer);
+	res_lib_msg_messageget = return_buffer;
 
 	if (message->data == NULL) {
-		message->size = res_lib_msg_messageget.message.size;
+		message->size = res_lib_msg_messageget->message.size;
 		message->data = malloc (message->size);
 		if (message->data == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
 			goto error_exit;
 		}
 	} else {
-		if (res_lib_msg_messageget.message.size > message->size) {
+		if (res_lib_msg_messageget->message.size > message->size) {
 			error = SA_AIS_ERR_NO_SPACE;
 			goto error_exit;
 		}
 	}
 
-	error = saRecvRetry (msgQueueInstance->response_fd,
-		message->data, message->size);
+	/*
+	 * TODO data is at end of res_lib_msg_messagesend
+	 */
 
 error_exit:
 	pthread_mutex_unlock (msgQueueInstance->response_mutex);
@@ -1536,10 +1479,10 @@ error_exit:
 	saHandleInstancePut (&queueHandleDatabase, queueHandle);
 
 	if (error == SA_AIS_OK)
-		error = res_lib_msg_messageget.header.error;
+		error = res_lib_msg_messageget->header.error;
 	if (error == SA_AIS_OK) {
-		*sendTime = res_lib_msg_messageget.sendTime;
-		memcpy (senderId, &res_lib_msg_messageget.senderId,
+		*sendTime = res_lib_msg_messageget->sendTime;
+		memcpy (senderId, &res_lib_msg_messageget->senderId,
 			sizeof (SaMsgSenderIdT));
 	}
 
@@ -1583,6 +1526,7 @@ saMsgMessageCancel (
 	struct msgQueueInstance *msgQueueInstance;
 	struct req_lib_msg_messagecancel req_lib_msg_messagecancel;
 	struct res_lib_msg_messagecancel res_lib_msg_messagecancel;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageCancel { queueHandle = %llx }\n",
@@ -1599,11 +1543,14 @@ saMsgMessageCancel (
 	req_lib_msg_messagecancel.header.id =
 		MESSAGE_REQ_MSG_MESSAGECANCEL;
 
+	iov.iov_base = &req_lib_msg_messagecancel;
+	iov.iov_len = sizeof (struct req_lib_msg_messagecancel);
+
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = saSendReceiveReply (msgQueueInstance->response_fd,
-		&req_lib_msg_messagecancel,
-		sizeof (struct req_lib_msg_messagecancel),
+	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_messagecancel,
 		sizeof (struct res_lib_msg_messagecancel));
 
@@ -1627,6 +1574,7 @@ saMsgMessageSendReceive (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_messagesendreceive req_lib_msg_messagesendreceive;
 	struct res_lib_msg_messagesendreceive res_lib_msg_messagesendreceive;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageSendReceive { msgHandle = %llx }\n",
@@ -1648,11 +1596,14 @@ saMsgMessageSendReceive (
 
 	req_lib_msg_messagesendreceive.timeout = timeout;
 
+	iov.iov_base = &req_lib_msg_messagesendreceive;
+	iov.iov_len = sizeof (struct req_lib_msg_messagesendreceive);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_messagesendreceive,
-		sizeof (struct req_lib_msg_messagesendreceive),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_messagesendreceive,
 		sizeof (struct res_lib_msg_messagesendreceive));
 
@@ -1680,6 +1631,7 @@ saMsgMessageReply (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_messagereply req_lib_msg_messagereply;
 	struct res_lib_msg_messagereply res_lib_msg_messagereply;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageReply { msgHandle = %llx }\n",
@@ -1699,11 +1651,14 @@ saMsgMessageReply (
 	memcpy (&req_lib_msg_messagereply.senderId, senderId,
 		sizeof (SaMsgSenderIdT));
 
+	iov.iov_base = &req_lib_msg_messagereply;
+	iov.iov_len = sizeof (struct req_lib_msg_messagereply);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_messagereply,
-		sizeof (struct req_lib_msg_messagereply),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_messagereply,
 		sizeof (struct res_lib_msg_messagereply));
 
@@ -1726,6 +1681,7 @@ saMsgMessageReplyAsync (
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_messagereply req_lib_msg_messagereply;
 	struct res_lib_msg_messagereplyasync res_lib_msg_messagereplyasync;
+	struct iovec iov;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageReplyAsync { msgHandle = %llx }\n",
@@ -1745,11 +1701,14 @@ saMsgMessageReplyAsync (
 	memcpy (&req_lib_msg_messagereply.senderId, senderId,
 		sizeof (SaMsgSenderIdT));
 
+	iov.iov_base = &req_lib_msg_messagereply;
+	iov.iov_len = sizeof (struct req_lib_msg_messagereply);
+
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = saSendReceiveReply (msgInstance->response_fd,
-		&req_lib_msg_messagereply,
-		sizeof (struct req_lib_msg_messagereply),
+	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+		&iov,
+		1,
 		&res_lib_msg_messagereplyasync,
 		sizeof (struct res_lib_msg_messagereplyasync));
 

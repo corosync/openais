@@ -40,9 +40,9 @@ ifeq (${OPENAIS_COMPAT}, SOLARIS)
 	override LDFLAGS += -lnsl -lsocket -lrt
 endif
 
-LIBRARIES= ../lib/libSaCkpt.a ../lib/libSaLck.a ../lib/libSaMsg.a ../lib/libSaEvt.a ../lib/libSaTmr.a sa_error.o
+LIBRARIES= ../lib/libSaCkpt.a ../lib/libSaLck.a ../lib/libSaMsg.a ../lib/libSaEvt.a ../lib/libSaTmr.a ../lib/libSaClm.a sa_error.o
 LIBS = $(LIBRARIES) 
-BINARIES= testckpt testlck testlck2 testmsg testmsg2 testmsg3 testevt testtmr
+BINARIES= testckpt testlck testlck2 testmsg testmsg2 testmsg3 testevt testtmr testclm
 
 override CFLAGS += -I../include
 override LDFLAGS += -L../lib
@@ -72,6 +72,9 @@ testmsg3: testmsg3.o $(LIBRARIES)
 
 testevt: testevt.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testevt testevt.o $(LIBS)
+
+testclm: testclm.o $(LIBRARIES)
+	$(CC) $(LDFLAGS) -o testclm testclm.o $(LIBS)
 
 testtmr: testtmr.o $(LIBRARIES)
 	$(CC) $(LDFLAGS) -o testtmr testtmr.o $(LIBS)

@@ -1554,13 +1554,13 @@ error_exit:
 				&req_exec_msg_queueopen->source,
 				sizeof (mar_message_source_t));
 
-			api->ipc_conn_send_response (
+			api->ipc_response_send (
 				req_exec_msg_queueopen->source.conn,
 				&res_lib_msg_queueopenasync,
 				sizeof (struct res_lib_msg_queueopenasync));
 
-			api->ipc_conn_send_response (
-				api->ipc_conn_partner_get (req_exec_msg_queueopen->source.conn),
+			api->ipc_dispatch_send (
+				req_exec_msg_queueopen->source.conn,
 				&res_lib_msg_queueopenasync,
 				sizeof (struct res_lib_msg_queueopenasync));
 		} else {
@@ -1577,7 +1577,7 @@ error_exit:
 				&req_exec_msg_queueopen->source,
 				sizeof (mar_message_source_t));
 
-			api->ipc_conn_send_response (
+			api->ipc_response_send (
 				req_exec_msg_queueopen->source.conn,
 				&res_lib_msg_queueopen,
 				sizeof (struct res_lib_msg_queueopen));
@@ -1629,7 +1629,7 @@ error_exit:
 			MESSAGE_RES_MSG_QUEUECLOSE;
 		res_lib_msg_queueclose.header.error = error;
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_queueclose->source.conn,
 			&res_lib_msg_queueclose,
 			sizeof (struct res_lib_msg_queueclose));
@@ -1702,7 +1702,7 @@ error_exit:
 			MESSAGE_RES_MSG_QUEUEGROUPCREATE;
 		res_lib_msg_queuegroupcreate.header.error = error;
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_queuegroupcreate->source.conn,
 			&res_lib_msg_queuegroupcreate,
 			sizeof (struct res_lib_msg_queuegroupcreate));
@@ -1725,6 +1725,7 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 
 	unsigned int change_count = 0;
 	unsigned int member_count = 0;
+	struct iovec iov[2];
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupInsert %s\n",
 		getSaNameT (&req_exec_msg_queuegroupinsert->queue_group_name));
@@ -1823,7 +1824,7 @@ error_exit:
 			MESSAGE_RES_MSG_QUEUEGROUPINSERT;
 		res_lib_msg_queuegroupinsert.header.error = error;
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_queuegroupinsert->source.conn,
 			&res_lib_msg_queuegroupinsert,
 			sizeof (struct res_lib_msg_queuegroupinsert));
@@ -1849,16 +1850,15 @@ error_exit:
 				&req_exec_msg_queuegroupinsert->queue_group_name,
 				sizeof (SaNameT));
 
-			api->ipc_conn_send_response (
-				api->ipc_conn_partner_get (req_exec_msg_queuegroupinsert->source.conn),
-				&res_lib_msg_queuegrouptrack,
-				sizeof (struct res_lib_msg_queuegrouptrack));
-
-			api->ipc_conn_send_response (
-				api->ipc_conn_partner_get (req_exec_msg_queuegroupinsert->source.conn),
-				notification,
-				(sizeof (SaMsgQueueGroupNotificationT) *
-				 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems));
+			iov[0].iov_base = &res_lib_msg_queuegrouptrack;
+			iov[0].iov_len = sizeof (res_lib_msg_queuegrouptrack);
+			iov[1].iov_base = notification;
+			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) *
+				 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems;
+			api->ipc_dispatch_iov_send (
+				req_exec_msg_queuegroupinsert->source.conn,
+				iov,
+				2);
 		}
 	}
 }
@@ -1879,6 +1879,7 @@ static void message_handler_req_exec_msg_queuegroupremove (
 
 	unsigned int change_count = 0;
 	unsigned int member_count = 0;
+	struct iovec iov[2];
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupRemove %s\n",
 		getSaNameT (&req_exec_msg_queuegroupremove->queue_group_name));
@@ -1967,7 +1968,7 @@ error_exit:
 			MESSAGE_RES_MSG_QUEUEGROUPREMOVE;
 		res_lib_msg_queuegroupremove.header.error = error;
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_queuegroupremove->source.conn,
 			&res_lib_msg_queuegroupremove,
 			sizeof (struct res_lib_msg_queuegroupremove));
@@ -1992,16 +1993,16 @@ error_exit:
 				&req_exec_msg_queuegroupremove->queue_group_name,
 				sizeof (SaNameT));
 
-			api->ipc_conn_send_response (
-				api->ipc_conn_partner_get (req_exec_msg_queuegroupremove->source.conn),
-				&res_lib_msg_queuegrouptrack,
-				sizeof (struct res_lib_msg_queuegrouptrack));
-
-			api->ipc_conn_send_response (
-				api->ipc_conn_partner_get (req_exec_msg_queuegroupremove->source.conn),
-				notification,
-				(sizeof (SaMsgQueueGroupNotificationT) *
-				 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems));
+			iov[0].iov_base = &res_lib_msg_queuegrouptrack;
+			iov[0].iov_len = sizeof (res_lib_msg_queuegrouptrack);
+			iov[1].iov_base = notification;
+			iov[1].iov_len =
+				sizeof (SaMsgQueueGroupNotificationT) *
+				 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems;
+			api->ipc_dispatch_iov_send (
+				req_exec_msg_queuegroupremove->source.conn,
+				iov,
+				2);
 		}
 	}
 }
@@ -2038,7 +2039,7 @@ error_exit:
 			MESSAGE_RES_MSG_QUEUEGROUPDELETE;
 		res_lib_msg_queuegroupdelete.header.error = error;
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_queuegroupdelete->source.conn,
 			&res_lib_msg_queuegroupdelete,
 			sizeof (struct res_lib_msg_queuegroupdelete));
@@ -2057,6 +2058,7 @@ static void message_handler_req_exec_msg_queuegrouptrack (
 
 	unsigned int change_count = 0;
 	unsigned int member_count = 0;
+	struct iovec iov[2];
 
 	SaMsgQueueGroupNotificationT *notification = NULL;
 
@@ -2116,18 +2118,18 @@ error_exit:
 					(sizeof (SaMsgQueueGroupNotificationT) *
 					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems);
 
-				api->ipc_conn_send_response (
+				api->ipc_response_send (
 					req_exec_msg_queuegrouptrack->source.conn,
 					&res_lib_msg_queuegrouptrack,
 					sizeof (struct res_lib_msg_queuegrouptrack));
 
-				api->ipc_conn_send_response (
+				api->ipc_response_send (
 					req_exec_msg_queuegrouptrack->source.conn,
 					notification,
 					(sizeof (SaMsgQueueGroupNotificationT) *
 					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems));
 			} else {
-				api->ipc_conn_send_response (
+				api->ipc_response_send (
 					req_exec_msg_queuegrouptrack->source.conn,
 					&res_lib_msg_queuegrouptrack,
 					sizeof (struct res_lib_msg_queuegrouptrack));
@@ -2136,19 +2138,19 @@ error_exit:
 					(sizeof (SaMsgQueueGroupNotificationT) *
 					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems);
 
-				api->ipc_conn_send_response (
-					api->ipc_conn_partner_get (req_exec_msg_queuegrouptrack->source.conn),
-					&res_lib_msg_queuegrouptrack,
-					sizeof (struct res_lib_msg_queuegrouptrack));
-
-				api->ipc_conn_send_response (
-					api->ipc_conn_partner_get (req_exec_msg_queuegrouptrack->source.conn),
-					notification,
-					(sizeof (SaMsgQueueGroupNotificationT) *
-					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems));
+				iov[0].iov_base = &res_lib_msg_queuegrouptrack;
+				iov[0].iov_len = sizeof (res_lib_msg_queuegrouptrack);
+				iov[1].iov_base = notification;
+				iov[1].iov_len =
+					sizeof (SaMsgQueueGroupNotificationT) *
+					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems;
+				api->ipc_dispatch_iov_send (
+					req_exec_msg_queuegrouptrack->source.conn,
+					iov,
+					2);
 			}
 		} else {
-			api->ipc_conn_send_response (
+			api->ipc_response_send (
 				req_exec_msg_queuegrouptrack->source.conn,
 				&res_lib_msg_queuegrouptrack,
 				sizeof (struct res_lib_msg_queuegrouptrack));
@@ -2193,7 +2195,7 @@ error_exit:
 			MESSAGE_RES_MSG_QUEUEGROUPTRACKSTOP;
 		res_lib_msg_queuegrouptrackstop.header.error = error;
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_queuegrouptrackstop->source.conn,
 			&res_lib_msg_queuegrouptrackstop,
 			sizeof (struct res_lib_msg_queuegrouptrackstop));
@@ -2275,13 +2277,12 @@ error_exit:
 				&req_exec_msg_messagesend->source,
 				sizeof (mar_message_source_t));
 
-			api->ipc_conn_send_response (
+			api->ipc_response_send (
 				req_exec_msg_messagesend->source.conn,
 				&res_lib_msg_messagesendasync,
 				sizeof (struct res_lib_msg_messagesendasync));
-
-			api->ipc_conn_send_response (
-				api->ipc_conn_partner_get (req_exec_msg_messagesend->source.conn),
+			api->ipc_dispatch_send (
+				req_exec_msg_messagesend->source.conn,
 				&res_lib_msg_messagesendasync,
 				sizeof (struct res_lib_msg_messagesendasync));
 		} else {
@@ -2295,7 +2296,7 @@ error_exit:
 				&req_exec_msg_messagesend->source,
 				sizeof (mar_message_source_t));
 
-			api->ipc_conn_send_response (
+			api->ipc_response_send (
 				req_exec_msg_messagesend->source.conn,
 				&res_lib_msg_messagesend,
 				sizeof (struct res_lib_msg_messagesend));
@@ -2358,12 +2359,12 @@ error_exit:
 			&req_exec_msg_messageget->source,
 			sizeof (mar_message_source_t));
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_messageget->source.conn,
 			&res_lib_msg_messageget,
 			sizeof (struct res_lib_msg_messageget));
 
-		api->ipc_conn_send_response (
+		api->ipc_response_send (
 			req_exec_msg_messageget->source.conn,
 			res_lib_msg_messageget.message.data,
 			res_lib_msg_messageget.message.size);
