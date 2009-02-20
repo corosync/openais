@@ -35,7 +35,7 @@ subdir ?= pkgconfig
 
 include $(srcdir)/Makefile.inc
 
-LIBS = SaAmf SaCkpt SaClm SaEvt SaLck SaMsg
+LIBS = SaAmf SaCkpt SaClm SaEvt SaLck SaMsg SaTmr
 
 all:
 	for i in $(LIBS); do \
