@@ -51,7 +51,7 @@ ifeq (${OPENAIS_COMPAT}, DARWIN)
 DARWIN_OPTS=-dynamiclib -bind_at_load -current_version 2.0.0 -compatibility_version 2.0.0
 
 libSaAmf.so.2.0.0: util.o amf.o
-	$(CC) $(DARWIN_OPTS) util.o amf.o -o $@
+	$(CC) $(DARWIN_OPTS) amf.o -o $@
 
 libSaClm.so.2.0.0: util.o clm.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o clm.o /usr/lib/corosync/libcoroipc.a -o $@
@@ -77,7 +77,7 @@ libSaAmf.so.2.0.0: util.o amf.o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaAmf.so.2,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaClm.so.2.0.0: util.o clm.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions util.o clm.o /usr/lib/corosync/libcoroipc.a -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions clm.o /usr/lib/corosync/libcoroipc.a -o $@
 
 libSaCkpt.so.2.0.0: util.o ckpt.o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o /usr/lib/corosync/libcoroipc.a -o $@
