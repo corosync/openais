@@ -21,6 +21,7 @@ PRELIBDIR=$(PREFIX)/lib
 endif
 
 LIBDIR=$(PRELIBDIR)/openais
+COROSYNCLIBDIR=$(PRELIBDIR)/corosync
 PKGCONFIGDIR=$(PRELIBDIR)/pkgconfig
 
 # Do not modify below this line
