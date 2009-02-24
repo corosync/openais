@@ -156,19 +156,19 @@ int main (void)
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_a.value), lock_id, status);
+		result, (char *)(resource_name_a.value), (unsigned int)(lock_id), status);
 
 	result = saLckResourceLock (resource_handle_a, &lock_id,
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_a.value), lock_id, status);
+		result, (char *)(resource_name_a.value), (unsigned int)(lock_id), status);
 
 	result = saLckResourceLock (resource_handle_a, &lock_id,
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_a.value), lock_id, status);
+		result, (char *)(resource_name_a.value), (unsigned int)(lock_id), status);
 
 	/*
 	 * Add resource locks to resource "B"
@@ -177,19 +177,19 @@ int main (void)
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_b.value), lock_id, status);
+		result, (char *)(resource_name_b.value), (unsigned int)(lock_id), status);
 
 	result = saLckResourceLock (resource_handle_b, &lock_id,
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_b.value), lock_id, status);
+		result, (char *)(resource_name_b.value), (unsigned int)(lock_id), status);
 
 	result = saLckResourceLock (resource_handle_b, &lock_id,
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_b.value), lock_id, status);
+		result, (char *)(resource_name_b.value), (unsigned int)(lock_id), status);
 
 	/*
 	 * Add resource locks to resource "C"
@@ -198,19 +198,19 @@ int main (void)
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_c.value), lock_id, status);
+		result, (char *)(resource_name_c.value), (unsigned int)(lock_id), status);
 
 	result = saLckResourceLock (resource_handle_c, &lock_id,
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_c.value), lock_id, status);
+		result, (char *)(resource_name_c.value), (unsigned int)(lock_id), status);
 
 	result = saLckResourceLock (resource_handle_c, &lock_id,
 				   SA_LCK_PR_LOCK_MODE, SA_LCK_LOCK_ORPHAN,
 				   55, SA_TIME_END, &status);
 	printf ("[DEBUG]: (%d) saLckResourceLock { %s } [ id=%x status=%d ]\n",
-		result, (char *)(resource_name_c.value), lock_id, status);
+		result, (char *)(resource_name_c.value), (unsigned int)(lock_id), status);
 
 	sleep (30);
 
