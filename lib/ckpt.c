@@ -615,12 +615,16 @@ saCkptCheckpointOpen (
 	iov.iov_base = &req_lib_ckpt_checkpointopen;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
 
+	pthread_mutex_lock (&ckptInstance->response_mutex);
+
 	error = cslib_msg_send_reply_receive (
 		ckptInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointopen,
 		sizeof (struct res_lib_ckpt_checkpointopen));
+
+	pthread_mutex_unlock (&ckptInstance->response_mutex);
 
 	if (res_lib_ckpt_checkpointopen.header.error != SA_AIS_OK) {
 		error = res_lib_ckpt_checkpointopen.header.error;
@@ -743,6 +747,8 @@ saCkptCheckpointOpenAsync (
 
 	iov.iov_base = &req_lib_ckpt_checkpointopen;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
+
+	pthread_mutex_lock (&ckptInstance->response_mutex);
 
 	error = cslib_msg_send_reply_receive (
 		ckptInstance->ipc_ctx,
