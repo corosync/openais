@@ -74,6 +74,7 @@ struct openais_service_handler {
 	int lib_service_count;
 	struct openais_exec_handler *exec_service;
 	int (*exec_init_fn) (struct objdb_iface_ver0 *);
+	int (*exec_exit_fn) (struct objdb_iface_ver0 *);
 	int (*config_init_fn) (struct objdb_iface_ver0 *);
 	void (*exec_dump_fn) (void);
 	int exec_service_count;
@@ -90,26 +91,37 @@ struct openais_service_handler {
 };
 
 struct openais_service_handler_iface_ver0 {
-	void (*test) (void);
 	struct openais_service_handler *(*openais_get_service_handler_ver0) (void);
 };
 
-extern int openais_service_objdb_add (
-	struct objdb_iface_ver0 *objdb,
-	char *name,
-	int version);
+/*
+ * Link and initialize a service
+ */
+extern unsigned int openais_service_link_and_init (
+    struct objdb_iface_ver0 *objdb,
+    char *service_name,
+    unsigned int service_ver,
+    unsigned int object_handle);
+
+/*
+ * Unlink and exit a service
+ */
+extern unsigned int openais_service_unlink_and_exit (
+    struct objdb_iface_ver0 *objdb,
+    char *service_name,
+    unsigned int service_ver);
+
+/*
+ * Unlink and exit all openais services
+ */
+extern unsigned int openais_service_unlink_all (
+    struct objdb_iface_ver0 *objdb);
 
 
-extern int openais_service_handler_register (
-	struct openais_service_handler *handler);
-
-extern int openais_service_default_objdb_set (struct objdb_iface_ver0 *objdb);
-
-extern int openais_service_link_all (
-	struct objdb_iface_ver0 *objdb);
-
-extern int openais_service_init_all (
-	int service_count,
+/*
+ * Load all of the default services
+ */
+extern unsigned int openais_service_defaults_link_and_init (
 	struct objdb_iface_ver0 *objdb);
 
 extern struct openais_service_handler *ais_service[];

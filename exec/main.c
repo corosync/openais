@@ -91,6 +91,8 @@ static struct totem_logging_configuration totem_logging_configuration;
 
 static char delivery_data[MESSAGE_SIZE_MAX];
 
+static struct objdb_iface_ver0 *objdb = NULL;
+
 SaClmClusterNodeT *(*main_clm_get_by_nodeid) (unsigned int node_id);
 
 static void sigusr2_handler (int num)
@@ -128,8 +130,11 @@ struct totempg_group openais_group = {
 	.group_len	= 1
 };
 
-void sigintr_handler (int signum)
+static void *aisexec_exit (void *arg)
 {
+	if(objdb) {
+		openais_service_unlink_all (objdb);
+	}
 
 #ifdef DEBUG_MEMPOOL
 	int stats_inuse[MEMPOOL_GROUP_SIZE];
@@ -145,12 +150,33 @@ void sigintr_handler (int signum)
 	}
 #endif
 
+	log_flush ();
 	poll_stop (0);
 	totempg_finalize ();
 	openais_ipc_exit ();
 	openais_exit_error (AIS_DONE_EXIT);
+
+	/* never reached */
+	return NULL;
 }
 
+pthread_t aisexec_exit_thread;
+static void init_shutdown(void *data) 
+{
+    pthread_create (&aisexec_exit_thread, NULL, aisexec_exit, NULL);
+}
+
+static poll_timer_handle shutdown_handle;
+static void sigquit_handler (int num)
+{
+    /* avoid creating threads from within the interrupt context */
+    poll_timer_add (aisexec_poll_handle, 500, NULL, init_shutdown, &shutdown_handle);
+}
+
+void sigintr_handler (int signum)
+{
+    poll_timer_add (aisexec_poll_handle, 500, NULL, init_shutdown, &shutdown_handle);
+}
 
 static int pool_sizes[] = { 0, 0, 0, 0, 0, 4096, 0, 1, 0, /* 256 */
 					1024, 0, 1, 4096, 0, 0, 0, 0, /* 65536 */
@@ -282,6 +308,10 @@ static void aisexec_tty_detach (void)
 			/*
 			 * child which is disconnected, run this process
 			 */
+/* 			setset(); */
+			close (0);
+			close (1);
+			close (2);
 			break;
 		default:
 			exit (0);
@@ -374,6 +404,13 @@ static void deliver_fn (
 	 */
 	service = header->id >> 16;
 	fn_id = header->id & 0xffff;
+
+	if(service >= SERVICE_HANDLER_MAXIMUM_COUNT
+	   || ais_service[service] == NULL) {
+	    /* The component is no longer loaded */
+	    return;
+	}
+	
 	if (endian_conversion_required) {
 		ais_service[service]->exec_service[fn_id].exec_endian_convert_fn
 			(header);
@@ -391,7 +428,6 @@ int main (int argc, char **argv)
 	unsigned int objdb_handle;
 	unsigned int config_handle;
 	unsigned int config_version = 0;
-	struct objdb_iface_ver0 *objdb;
 	void *objdb_p;
 	struct config_iface_ver0 *config;
 	void *config_p;
@@ -428,7 +464,8 @@ int main (int argc, char **argv)
 	signal (SIGUSR2, sigusr2_handler);
 	signal (SIGSEGV, sigsegv_handler);
 	signal (SIGABRT, sigabrt_handler);
-
+	signal (SIGQUIT, sigquit_handler);
+	
 	openais_timer_init (
 		serialize_mutex_lock,
 		serialize_mutex_unlock);
@@ -457,7 +494,11 @@ int main (int argc, char **argv)
 
 	objdb->objdb_init ();
 
-	/* User's bootstrap config service */
+	/*
+	 * Bootstrap in the default configuration parser or use
+	 * the openais default built in parser if the configuration parser
+	 * isn't overridden
+	 */
 	config_iface = getenv("OPENAIS_DEFAULT_CONFIG_IFACE");
 	if (!config_iface) {
 		config_iface = "aisparser";
@@ -480,14 +521,6 @@ int main (int argc, char **argv)
 	if (res == -1) {
 		log_printf (LOG_LEVEL_ERROR, error_string);
 		openais_exit_error (AIS_DONE_MAINCONFIGREAD);
-	}
-
-	openais_service_default_objdb_set (objdb);
-
-	res = openais_service_link_all (objdb);
-	if (res == -1) {
-		log_printf (LOG_LEVEL_ERROR, "Could not load services\n");
-		openais_exit_error (AIS_DONE_DYNAMICLOAD);
 	}
 
 	res = openais_main_config_read (objdb, &error_string, &main_config);
@@ -569,11 +602,12 @@ int main (int argc, char **argv)
 	/*
 	 * This must occur after totempg is initialized because "this_ip" must be set
 	 */
-	res = openais_service_init_all (service_count, objdb);
+	res = openais_service_defaults_link_and_init (objdb);
 	if (res == -1) {
-		log_printf (LOG_LEVEL_ERROR, "Could not init services\n");
+		log_printf (LOG_LEVEL_ERROR, "Could not initialize default services\n");
 		openais_exit_error (AIS_DONE_INIT_SERVICES);
 	}
+
 
 	sync_register (openais_sync_callbacks_retrieve, openais_sync_completed,
 		totem_config.vsf_type);
