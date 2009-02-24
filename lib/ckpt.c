@@ -757,6 +757,8 @@ saCkptCheckpointOpenAsync (
 		&res_lib_ckpt_checkpointopenasync,
 		sizeof (struct res_lib_ckpt_checkpointopenasync));
 
+	pthread_mutex_unlock (&ckptInstance->response_mutex);
+
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
