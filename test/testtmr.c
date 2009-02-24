@@ -162,7 +162,7 @@ int main (void)
 	}
 	else {
 		printf ("[DEBUG]: id=%u attributes:\n", (unsigned int)id_a);
-		printf ("[DEBUG]:\t type=%"PRIu64"\n", attrs.type);
+		printf ("[DEBUG]:\t type=%"PRIu32"\n", attrs.type);
 		printf ("[DEBUG]:\t expire=%"PRIu64"\n", attrs.initialExpirationTime);
 		printf ("[DEBUG]:\t duration=%"PRIu64"\n", attrs.timerPeriodDuration);
 	}
@@ -173,7 +173,7 @@ int main (void)
 	}
 	else {
 		printf ("[DEBUG]: id=%u attributes:\n", (unsigned int)id_b);
-		printf ("[DEBUG]:\t type=%"PRIu64"\n", attrs.type);
+		printf ("[DEBUG]:\t type=%"PRIu32"\n", attrs.type);
 		printf ("[DEBUG]:\t expire=%"PRIu64"\n", attrs.initialExpirationTime);
 		printf ("[DEBUG]:\t duration=%"PRIu64"\n", attrs.timerPeriodDuration);
 	}
@@ -199,12 +199,12 @@ int main (void)
 			(unsigned int)id_b, expire_time);
 	}
 
-	result = saTmrTimerReschedule (handle, id_a, &new_attrs_a, &time);
+	result = saTmrTimerReschedule (handle, id_a, &new_attrs_a, &call_time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerReschedule\n", result);
 	}
 
-	result = saTmrTimerReschedule (handle, id_b, &new_attrs_b, &time);
+	result = saTmrTimerReschedule (handle, id_b, &new_attrs_b, &call_time);
 	if (result != SA_AIS_OK) {
 		printf ("[ERROR]: (%d) saTmrTimerReschedule\n", result);
 	}
@@ -215,7 +215,7 @@ int main (void)
 	}
 	else {
 		printf ("[DEBUG]: id=%u attributes:\n", (unsigned int)id_a);
-		printf ("[DEBUG]:\t type=%"PRId64"\n", attrs.type);
+		printf ("[DEBUG]:\t type=%"PRIu32"\n", attrs.type);
 		printf ("[DEBUG]:\t expire=%"PRIi64"\n", attrs.initialExpirationTime);
 		printf ("[DEBUG]:\t duration=%"PRIi64"\n", attrs.timerPeriodDuration);
 	}
@@ -226,7 +226,7 @@ int main (void)
 	}
 	else {
 		printf ("[DEBUG]: id=%u attributes:\n", (unsigned int)id_b);
-		printf ("[DEBUG]:\t type=%"PRId64"\n", attrs.type);
+		printf ("[DEBUG]:\t type=%"PRIu32"\n", attrs.type);
 		printf ("[DEBUG]:\t expire=%"PRIi64"\n", attrs.initialExpirationTime);
 		printf ("[DEBUG]:\t duration=%"PRIi64"\n", attrs.timerPeriodDuration);
 	}
