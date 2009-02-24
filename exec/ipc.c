@@ -204,6 +204,35 @@ struct res_overlay {
 	char buf[4096];
 };
 
+static void
+record_proc_state(const char *file, const char *function, int line, const char *assert_condition)
+{
+	int rc = 0;
+	int pid = 0;
+	int status = 0;
+
+	pid=fork();
+	switch(pid) {
+		case -1:
+			break;
+
+		case 0:	/* Child */
+			abort();
+			break;
+
+		default: /* Parent */
+			log_printf(LOG_LEVEL_ERROR, 
+				   "%s: Forked child %d to record non-fatal error at %s:%d : %s",
+				   function, pid, file, line, assert_condition);
+			do {
+			    rc = waitpid(pid, &status, 0);
+			    
+			} while(rc < 0 && errno == EINTR);
+			break;
+
+	}
+}
+
 static void *pthread_ipc_consumer (void *conn)
 {
 	struct conn_info *conn_info = (struct conn_info *)conn;
@@ -213,6 +242,7 @@ static void *pthread_ipc_consumer (void *conn)
 	struct res_overlay res_overlay;
 	struct iovec send_ok_joined_iovec;
 	int send_ok = 0;
+	int flow_control = 0;
 	int send_ok_joined = 0;
 
 	for (;;) {
@@ -239,12 +269,32 @@ retry_semop:
 		send_ok_joined = totempg_groups_send_ok_joined (openais_group_handle,
 			&send_ok_joined_iovec, 1);
 
-		send_ok =
-			(sync_primary_designated() == 1) && (
-			(ais_service[conn_info->service]->lib_service[header->id].flow_control == OPENAIS_FLOW_CONTROL_NOT_REQUIRED) ||
-			((ais_service[conn_info->service]->lib_service[header->id].flow_control == OPENAIS_FLOW_CONTROL_REQUIRED) &&
-			(send_ok_joined) &&
-			(sync_in_process() == 0)));
+		/* Sanity check service and header.id */
+		if(conn_info->service < 0
+		   || conn_info->service >= SERVICE_HANDLER_MAXIMUM_COUNT
+		   || ais_service[conn_info->service] == NULL) {
+		    log_printf (LOG_LEVEL_ERROR, "Invalid service requested: %d\n", conn_info->service);
+		    record_proc_state(__FILE__, __FUNCTION__, __LINE__, "Invalid service");
+		    continue;
+		    
+		} else if(header->id < 0
+		    || header->id >= ais_service[conn_info->service]->lib_service_count) {
+		    log_printf (LOG_LEVEL_ERROR, "Invalid subtype (%d) requested for service: %d\n",
+				header->id, conn_info->service);
+		    record_proc_state(__FILE__, __FUNCTION__, __LINE__, "Invalid subtype");
+		    continue;
+		}
+		   
+		send_ok = 1;
+		flow_control = ais_service[conn_info->service]->lib_service[header->id].flow_control;
+		if(send_ok && sync_primary_designated() != 1) {
+		    send_ok = 0;
+
+		} else if(send_ok
+		   && flow_control == OPENAIS_FLOW_CONTROL_REQUIRED
+		   && (send_ok_joined == 0 || sync_in_process() != 0)) {
+		    send_ok = 0;
+		}
 
 		if (send_ok) {
 			ais_service[conn_info->service]->lib_service[header->id].lib_handler_fn (conn_info, header);
