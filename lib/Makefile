@@ -38,13 +38,13 @@ include $(srcdir)Makefile.inc
 
 override LDFLAGS += -L./ -L$(COROSYNCLIBDIR)
 
-all: libSaClm.so.2.0.0 \
-	libSaCkpt.so.2.0.0 \
-	libSaAmf.so.2.0.0 \
-	libSaEvt.so.2.0.0 \
-	libSaMsg.so.2.0.0 \
-	libSaLck.so.2.0.0 \
-	libSaTmr.so.2.0.0
+all: libSaClm.a libSaClm.so.2.0.0 \
+	libSaCkpt.a libSaCkpt.so.2.0.0 \
+	libSaAmf.a libSaAmf.so.2.0.0 \
+	libSaEvt.a libSaEvt.so.2.0.0 \
+	libSaMsg.a libSaMsg.so.2.0.0 \
+	libSaLck.a libSaLck.so.2.0.0 \
+	libSaTmr.a libSaTmr.so.2.0.0
 
 ifeq (${OPENAIS_COMPAT}, DARWIN)
 
@@ -123,6 +123,27 @@ libSaTmr.so.2.0.0: util.o tmr.o
 	ln -sf libSaTmr.so.2.0.0 libSaTmr.so
 
 endif
+
+libSaAmf.a: util.o amf.o
+	$(AR) -rc libSaAmf.a util.o amf.o
+
+libSaCkpt.a: util.o ckpt.o
+	$(AR) -rc libSaCkpt.a util.o ckpt.o
+
+libSaClm.a: util.o clm.o
+	$(AR) -rc libSaClm.a util.o clm.o
+
+libSaEvt.a: util.o evt.o
+	$(AR) -rc libSaEvt.a util.o evt.o
+
+libSaMsg.a: util.o msg.o
+	$(AR) -rc libSaMsg.a util.o msg.o
+
+libSaLck.a: util.o lck.o
+	$(AR) -rc libSaLck.a util.o lck.o
+
+libSaTmr.a: util.o tmr.o
+	$(AR) -rc libSaTmr.a util.o tmr.o
 
 clean:
 	rm -f *.o libSa*.so* *.da *.bb *.bbg

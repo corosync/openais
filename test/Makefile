@@ -80,7 +80,7 @@ testtmr: testtmr.o sa_error.o
 	$(CC) $(LDFLAGS) -o testtmr testtmr.o $(LIBS)
 
 clean:
-	rm -f *.o $(LIBRARIES) $(BINARIES)
+	rm -f *.o $(BINARIES)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
