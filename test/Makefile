@@ -40,7 +40,7 @@ ifeq (${OPENAIS_COMPAT}, SOLARIS)
 	override LDFLAGS += -lnsl -lsocket -lrt
 endif
 
-LIBRARIES= ../lib/libSaCkpt.a ../lib/libSaLck.a ../lib/libSaMsg.a ../lib/libSaEvt.a ../lib/libSaTmr.a ../lib/libSaClm.a sa_error.o
+LIBRARIES= -lSaCkpt -lSaLck -lSaMsg -lSaEvt -lSaTmr -lSaClm sa_error.o
 LIBS = $(LIBRARIES) 
 BINARIES= testckpt testlck testlck2 testmsg testmsg2 testmsg3 testevt testtmr testclm
 
@@ -52,31 +52,31 @@ TEST_SRC = testckpt.c
 
 all: $(BINARIES)
 
-testckpt: testckpt.o $(LIBRARIES)
+testckpt: testckpt.o sa_error.o
 	$(CC) $(LDFLAGS) -o testckpt testckpt.o $(LIBS)
 
-testlck: testlck.o $(LIBRARIES)
+testlck: testlck.o sa_error.o
 	$(CC) $(LDFLAGS) -o testlck testlck.o $(LIBS)
 
-testlck2: testlck2.o $(LIBRARIES)
+testlck2: testlck2.o sa_error.o
 	$(CC) $(LDFLAGS) -o testlck2 testlck2.o $(LIBS)
 
-testmsg: testmsg.o $(LIBRARIES)
+testmsg: testmsg.o sa_error.o
 	$(CC) $(LDFLAGS) -o testmsg testmsg.o $(LIBS)
 
-testmsg2: testmsg2.o $(LIBRARIES)
+testmsg2: testmsg2.o sa_error.o
 	$(CC) $(LDFLAGS) -o testmsg2 testmsg2.o $(LIBS)
 
-testmsg3: testmsg3.o $(LIBRARIES)
+testmsg3: testmsg3.o sa_error.o
 	$(CC) $(LDFLAGS) -o testmsg3 testmsg3.o $(LIBS)
 
-testevt: testevt.o $(LIBRARIES)
+testevt: testevt.o sa_error.o
 	$(CC) $(LDFLAGS) -o testevt testevt.o $(LIBS)
 
-testclm: testclm.o $(LIBRARIES)
+testclm: testclm.o sa_error.o
 	$(CC) $(LDFLAGS) -o testclm testclm.o $(LIBS)
 
-testtmr: testtmr.o $(LIBRARIES)
+testtmr: testtmr.o sa_error.o
 	$(CC) $(LDFLAGS) -o testtmr testtmr.o $(LIBS)
 
 clean:
