@@ -112,7 +112,7 @@ openais_cfg_initialize (
 	}
 
 	error = openais_service_connect (CFG_SERVICE, &cfg_instance->ipc_ctx);
-	if (error != 0) {
+	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
 
