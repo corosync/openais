@@ -2234,8 +2234,6 @@ static void lib_evt_open_channel(void *conn, void *message)
 
 	req = message;
 
-	api->ipc_refcnt_inc (conn);
-
 	log_printf(CHAN_OPEN_DEBUG,
 		"saEvtChannelOpen (Open channel request)\n");
 	log_printf(CHAN_OPEN_DEBUG,
