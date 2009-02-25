@@ -135,7 +135,7 @@ struct corosync_api_v1 *api;
 
 static struct openais_clm_services_api_ver1 *clmapi;
 
-static unsigned int clm_services_api_handle;
+static hdb_handle_t clm_services_api_handle;
 
 static struct corosync_lib_handler evt_lib_engine[] = {
 	{
@@ -3118,8 +3118,8 @@ printf ("hdb destroy %p\n", &esip->esi_hdb);
  */
 static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 {
-	unsigned int object_service_handle;
-	unsigned int object_find_handle;
+	hdb_handle_t object_service_handle;
+	hdb_handle_t object_find_handle;
 	char *value;
 
 	api = corosync_api;
@@ -3481,7 +3481,7 @@ static void evt_chan_open_finish(struct open_chan_pending *ocp,
 	unsigned int ret = 0;
 	unsigned int timer_del_status = 0;
 	void *ptr = 0;
-	uint32_t handle = 0;
+	hdb_handle_t handle = 0;
 	struct libevt_pd *esip;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(ocp->ocp_conn);
@@ -3515,7 +3515,6 @@ static void evt_chan_open_finish(struct open_chan_pending *ocp,
 	 * with this channel open instance.
 	 */
 	ret = hdb_handle_create(&esip->esi_hdb, sizeof(*eco), &handle);
-printf ("hdb handle create %p %d\n", &esip->esi_hdb, handle);
 	if (ret != 0) {
 		goto open_return;
 	}

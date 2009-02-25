@@ -1038,10 +1038,10 @@ void amf_runtime_attributes_print (struct amf_cluster *cluster)
 /* to be removed... */
 int amf_enabled (struct corosync_api_v1 *coroapi)
 {
-	unsigned int object_service_handle;
+	hdb_handle_t object_service_handle;
 	char *value;
 	int enabled = 0;
-	unsigned int object_find_handle;
+	hdb_handle_t object_find_handle;
 
 	coroapi->object_find_create (
 		OBJECT_PARENT_HANDLE,

@@ -44,7 +44,7 @@ struct openais_clm_services_api_ver1 {
 static inline struct openais_clm_services_api_ver1 *
 openais_clm_services_api_reference (
 	struct corosync_api_v1 *coroapi,
-	unsigned int *handle)
+	hdb_handle_t *handle)
 {
 	static void *clm_services_api_p;
 	struct openais_clm_services_api_ver1 *return_api;

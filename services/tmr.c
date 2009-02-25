@@ -353,7 +353,7 @@ static void message_handler_req_lib_tmr_timerstart (
 	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
-	unsigned int timer_id;
+	hdb_handle_t timer_id;
 	struct tmr_pd *tmr_pd = (struct tmr_pd *) api->ipc_private_data_get (conn);
 
 	/* DEBUG */

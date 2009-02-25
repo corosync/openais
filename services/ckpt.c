@@ -3030,7 +3030,7 @@ static void message_handler_req_lib_ckpt_sectioniterationinitialize (
 	struct list_head *section_list;
 	struct iteration_instance *iteration_instance;
 	void *iteration_instance_p;
-	unsigned int iteration_handle = 0;
+	hdb_handle_t iteration_handle = 0;
 	int res;
 	SaAisErrorT error = SA_AIS_OK;
 

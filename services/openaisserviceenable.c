@@ -45,9 +45,9 @@
 #include <signal.h>
 #include <string.h>
 
+#include <corosync/engine/objdb.h>
 #include <corosync/engine/config.h>
 #include <corosync/lcr/lcr_comp.h>
-#include <corosync/engine/objdb.h>
 
 static char error_reason[512];
 
@@ -71,7 +71,7 @@ static int openais_service_enable (
 	char **error_string)
 {
 	unsigned int i;
-	unsigned int object_handle;
+	hdb_handle_t object_handle;
 
 	for (i = 0; i < sizeof (service_engines) / sizeof (struct service_engine); i++) {
 		objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
