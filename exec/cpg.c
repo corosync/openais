@@ -487,6 +487,7 @@ static int cpg_lib_exit_fn (void *conn)
 		cpg_node_joinleave_send(gi, pi, MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_PROCDOWN);
 		list_del(&pi->list);
 	}
+	openais_conn_refcount_dec (conn);
 	return (0);
 }
 
@@ -901,7 +902,6 @@ static void message_handler_req_exec_cpg_mcast (
 	res_lib_cpg_mcast->pid = req_exec_cpg_mcast->pid;
 	res_lib_cpg_mcast->nodeid = nodeid;
 	if (message_source_is_local (&req_exec_cpg_mcast->source)) {
-		openais_conn_refcount_dec (req_exec_cpg_mcast->source.conn);
 		process_info = (struct process_info *)openais_conn_private_data_get (req_exec_cpg_mcast->source.conn);
 	}
 	memcpy(&res_lib_cpg_mcast->group_name, &gi->group_name,
@@ -992,7 +992,7 @@ static int cpg_lib_init_fn (void *conn)
 	struct process_info *pi = (struct process_info *)openais_conn_private_data_get (conn);
 	pi->conn = conn;
 
-//	openais_conn_info_refcnt_inc (conn);
+	openais_conn_refcount_inc (conn);
 	log_printf(LOG_LEVEL_DEBUG, "lib_init_fn: conn=%p, pi=%p\n", conn, pi);
 	return (0);
 }
@@ -1102,7 +1102,6 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	req_exec_cpg_iovec[1].iov_len = msglen;
 
 	// TODO: guarantee type...
-	openais_conn_refcount_inc (conn);
 	result = totempg_groups_mcast_joined (openais_group_handle, req_exec_cpg_iovec, 2, TOTEMPG_AGREED);
 	assert(result == 0);
 
