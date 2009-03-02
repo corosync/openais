@@ -116,13 +116,21 @@ union semun {
 };
 #endif
 
+enum conn_state {
+	CONN_STATE_THREAD_INACTIVE = 0,
+	CONN_STATE_THREAD_ACTIVE = 1,
+	CONN_STATE_THREAD_REQUEST_EXIT = 2,
+	CONN_STATE_THREAD_DESTROYED = 3,
+	CONN_STATE_LIB_EXIT_CALLED = 4,
+	CONN_STATE_DISCONNECT_INACTIVE = 5
+};
+
 struct conn_info {
 	int fd;
 	pthread_t thread;
 	pthread_attr_t thread_attr;
 	unsigned int service;
-	int destroyed;
-	int disconnect_requested;
+	enum conn_state state;
 	int notify_flow_control_enabled;
 	int refcount;
 	key_t shmkey;
@@ -148,44 +156,91 @@ static int priv_change (struct conn_info *conn_info);
 
 static void ipc_disconnect (struct conn_info *conn_info);
 
+static int ipc_thread_active (void *conn)
+{
+	struct conn_info *conn_info = (struct conn_info *)conn;
+	int retval = 0;
+
+	pthread_mutex_lock (&conn_info->mutex);
+	if (conn_info->state == CONN_STATE_THREAD_ACTIVE) {
+		retval = 1;
+	}
+	pthread_mutex_unlock (&conn_info->mutex);
+	return (retval);
+}
+
+static int ipc_thread_exiting (void *conn)
+{
+	struct conn_info *conn_info = (struct conn_info *)conn;
+	int retval = 1;
+
+	pthread_mutex_lock (&conn_info->mutex);
+	if (conn_info->state == CONN_STATE_THREAD_INACTIVE) {
+		retval = 0;
+	} else
+	if (conn_info->state == CONN_STATE_THREAD_ACTIVE) {
+		retval = 0;
+	}
+	pthread_mutex_unlock (&conn_info->mutex);
+	return (retval);
+}
+
+/*
+ * returns 0 if should be called again, -1 if finished
+ */
 static inline int conn_info_destroy (struct conn_info *conn_info)
 {
 	unsigned int res;
+	void *retval;
 
 	list_del (&conn_info->list);
 	list_init (&conn_info->list);
 
-	if (conn_info->service == SOCKET_SERVICE_INIT) {
+	if (conn_info->state == CONN_STATE_THREAD_REQUEST_EXIT) {
+		res = pthread_join (conn_info->thread, &retval);
+		conn_info->state = CONN_STATE_THREAD_DESTROYED;
+		return (0);
+	}
+
+	if (conn_info->state == CONN_STATE_THREAD_INACTIVE ||
+		conn_info->state == CONN_STATE_DISCONNECT_INACTIVE) {
 		list_del (&conn_info->list);
 		close (conn_info->fd);
 		free (conn_info);
+		return (-1);
+	}
+
+	if (conn_info->state == CONN_STATE_THREAD_ACTIVE) {
+		pthread_kill (conn_info->thread, SIGUSR1);
 		return (0);
 	}
+
 	/*
-	 * Destroy shared memory segment and semaphore
+	 * Retry library exit function if busy
 	 */
-	if (conn_info->destroyed == 0) {
-		openais_conn_refcount_dec (conn_info);
-		shmdt (conn_info->mem);
-		res = shmctl (conn_info->shmid, IPC_RMID, NULL);
-		semctl (conn_info->semid, 0, IPC_RMID);
-		conn_info->destroyed = 1;
+	if (conn_info->state == CONN_STATE_THREAD_DESTROYED) {
+		res = ais_service[conn_info->service]->lib_exit_fn (conn_info);
+		if (res == -1) {
+			return (0);
+		} else {
+			conn_info->state = CONN_STATE_LIB_EXIT_CALLED;
+		}
 	}
 
 	pthread_mutex_lock (&conn_info->mutex);
 	if (conn_info->refcount > 0) {
 		pthread_mutex_unlock (&conn_info->mutex);
-		return (-1);
+		return (0);
 	}
+	list_del (&conn_info->list);
 	pthread_mutex_unlock (&conn_info->mutex);
 
 	/*
-	 * Retry library exit function if busy
+	 * Destroy shared memory segment and semaphore
 	 */
-	res = ais_service[conn_info->service]->lib_exit_fn (conn_info);
-	if (res == -1) {
-		return (-1);
-	}
+	shmdt (conn_info->mem);
+	res = shmctl (conn_info->shmid, IPC_RMID, NULL);
+	semctl (conn_info->semid, 0, IPC_RMID);
 
 	/*
 	 * Free allocated data needed to retry exiting library IPC connection
@@ -194,9 +249,8 @@ static inline int conn_info_destroy (struct conn_info *conn_info)
 		free (conn_info->private_data);
 	}
 	close (conn_info->fd);
-	list_del (&conn_info->list);
 	free (conn_info);
-	return (0);
+	return (-1);
 }
 
 struct res_overlay {
@@ -250,17 +304,20 @@ static void *pthread_ipc_consumer (void *conn)
 		sop.sem_op = -1;
 		sop.sem_flg = 0;
 retry_semop:
+		if (ipc_thread_active (conn_info) == 0) {
+			openais_conn_refcount_dec (conn_info);
+			pthread_exit (0);
+		}
 		res = semop (conn_info->semid, &sop, 1);
 		if ((res == -1) && (errno == EINTR || errno == EAGAIN)) {
 			goto retry_semop;
 		} else
 		if ((res == -1) && (errno == EINVAL || errno == EIDRM)) {
-			openais_conn_refcount_dec (conn);
-			return (0);
+			openais_conn_refcount_dec (conn_info);
+			pthread_exit (0);
 		}
-		if (conn_info->destroyed || conn_info->disconnect_requested) {
-			break;
-		}
+
+		openais_conn_refcount_inc (conn_info);
 
 		header = (mar_req_header_t *)conn_info->mem->req_buffer;
 
@@ -310,9 +367,9 @@ retry_semop:
 			openais_response_send (conn_info, &res_overlay, 
 				res_overlay.header.size);
 		}
+		openais_conn_refcount_dec (conn);
 	}
-	openais_conn_refcount_dec (conn);
-	return (NULL);
+	pthread_exit (0);
 }
 
 static int
@@ -455,18 +512,6 @@ retry_recv:
 	return (0);
 }
 
-static int poll_handler_connection_destroy(
-	struct conn_info *conn_info)
-{
-	int res;
-	res = conn_info_destroy (conn_info);
-	if (res == -1) {
-		return (0);
-	} else {
-		return (-1);
-	}
-}
-
 static int poll_handler_connection (
 	poll_handle handle,
 	int fd,
@@ -479,11 +524,16 @@ static int poll_handler_connection (
 	char buf;
 
 
+	if (ipc_thread_exiting (conn_info)) {
+		return conn_info_destroy (conn_info);
+	}
+
 	/*
-	 * If an error occurs, try to exit if possible
+	 * If an error occurs, request exit
 	 */
-	if ((conn_info->disconnect_requested) || (revent & (POLLERR|POLLHUP))) {
-		return poll_handler_connection_destroy (conn_info);
+	if (revent & (POLLERR|POLLHUP)) {
+		ipc_disconnect (conn_info);
+		return (0);
 	}
 
 	/*
@@ -509,8 +559,6 @@ static int poll_handler_connection (
 		conn_info->shmkey = req_setup->shmkey;
 		conn_info->semkey = req_setup->semkey;
 		conn_info->service = req_setup->service;
-		conn_info->destroyed = 0;
-		conn_info->disconnect_requested = 0;
 		conn_info->refcount = 0;
 		conn_info->notify_flow_control_enabled = 0;
 		conn_info->setup_bytes_read = 0;
@@ -520,8 +568,12 @@ static int poll_handler_connection (
 		conn_info->mem = shmat (conn_info->shmid, NULL, 0);
 		conn_info->semid = semget (conn_info->semkey, 3, 0600);
 		conn_info->pending_semops = 0;
-		conn_info->refcount = 1;
-		openais_conn_refcount_inc (conn_info);
+
+		/*
+		 * ipc thread is the only reference at startup
+		 */
+		conn_info->refcount = 1; 
+		conn_info->state = CONN_STATE_THREAD_ACTIVE;
 
 		conn_info->private_data = malloc (ais_service[conn_info->service]->private_data_size);
 		memset (conn_info->private_data, 0,
@@ -539,7 +591,7 @@ static int poll_handler_connection (
 		pthread_attr_setstacksize (&conn_info->thread_attr, 200000);
 		#endif
 
-		pthread_attr_setdetachstate (&conn_info->thread_attr, PTHREAD_CREATE_DETACHED);
+		pthread_attr_setdetachstate (&conn_info->thread_attr, PTHREAD_CREATE_JOINABLE);
 		res = pthread_create (&conn_info->thread,
 			&conn_info->thread_attr,
 			pthread_ipc_consumer,
@@ -554,6 +606,7 @@ static int poll_handler_connection (
 		}
 	} else
 	if (revent & POLLIN) {
+		openais_conn_refcount_inc (conn_info);
 		res = recv (fd, &buf, 1, MSG_NOSIGNAL);
 		if (res == 1) {
 			switch (buf) {
@@ -562,26 +615,29 @@ static int poll_handler_connection (
 				break;
 			case MESSAGE_REQ_CHANGE_EUID:
 				if (priv_change (conn_info) == -1) {
-					return poll_handler_connection_destroy (conn_info);
+					ipc_disconnect (conn_info);
 				}
 				break;
 			default:
 				res = 0;
 				break;
 			}
+			openais_conn_refcount_dec (conn_info);
 		}
 #if defined(OPENAIS_SOLARIS) || defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
 		/* On many OS poll never return POLLHUP or POLLERR.
 		 * EOF is detected when recvmsg return 0.
 		 */
 		if (res == 0) {
-			return poll_handler_connection_destroy (conn_info);
+			ipc_disconnect (conn_info);
+			return (0);
 		}
 #endif
 	}
 
+	openais_conn_refcount_inc (conn_info);
 	pthread_mutex_lock (&conn_info->mutex);
-	if ((conn_info->disconnect_requested == 0) && (revent & POLLOUT)) {
+	if ((conn_info->state == CONN_STATE_THREAD_ACTIVE) && (revent & POLLOUT)) {
 		buf = !list_empty (&conn_info->outq_head);
 		for (; conn_info->pending_semops;) {
 			res = send (conn_info->fd, &buf, 1, MSG_NOSIGNAL);
@@ -607,19 +663,25 @@ static int poll_handler_connection (
 		}
 	}
 	pthread_mutex_unlock (&conn_info->mutex);
+	openais_conn_refcount_dec (conn_info);
 
 	return (0);
 }
 
 static void ipc_disconnect (struct conn_info *conn_info)
 {
+	if (conn_info->state == CONN_STATE_THREAD_INACTIVE) {
+		conn_info->state = CONN_STATE_DISCONNECT_INACTIVE;
+		return;
+	}
+	if (conn_info->state != CONN_STATE_THREAD_ACTIVE) {
+		return;
+	}
 	pthread_mutex_lock (&conn_info->mutex);
-	conn_info->disconnect_requested = 1;
+	conn_info->state = CONN_STATE_THREAD_REQUEST_EXIT;
 	pthread_mutex_unlock (&conn_info->mutex);
 
-	poll_dispatch_modify (aisexec_poll_handle,
-		conn_info->fd, POLLOUT|POLLNVAL,
-		poll_handler_connection);
+	pthread_kill (conn_info->thread, SIGUSR1);
 }
 
 static int conn_info_create (int fd)
@@ -634,6 +696,7 @@ static int conn_info_create (int fd)
 
 	conn_info->fd = fd;
 	conn_info->service = SOCKET_SERVICE_INIT;
+	conn_info->state = CONN_STATE_THREAD_INACTIVE;
 	list_init (&conn_info->outq_head);
 	list_init (&conn_info->list);
 	list_add (&conn_info->list, &conn_info_list_head);
@@ -802,7 +865,6 @@ void openais_ipc_exit (void)
 		shmdt (conn_info->mem);
 		shmctl (conn_info->shmid, IPC_RMID, NULL);
 		semctl (conn_info->semid, 0, IPC_RMID);
-		conn_info->destroyed = 1;
 	
 		pthread_kill (conn_info->thread, SIGUSR1);
 	}
@@ -1039,12 +1101,9 @@ static void msg_send_or_queue (void *conn, struct iovec *iov, int iov_len)
 	/*
 	 * Exit transmission if the connection is dead
 	 */
-	pthread_mutex_lock (&conn_info->mutex);
-	if (conn_info->destroyed || conn_info->disconnect_requested) {
-		pthread_mutex_unlock (&conn_info->mutex);
+	if (ipc_thread_active (conn) == 0) {
 		return;
 	}
-	pthread_mutex_unlock (&conn_info->mutex);
 
 	bytes_left = shared_mem_dispatch_bytes_left (conn_info);
 	for (i = 0; i < iov_len; i++) {
