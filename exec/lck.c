@@ -504,11 +504,7 @@ int lck_resource_close (struct resource *resource)
 	iovec.iov_base = (char *)&req_exec_lck_resourceclose;
 	iovec.iov_len = sizeof (req_exec_lck_resourceclose);
 
-	if (totempg_groups_send_ok_joined (openais_group_handle, &iovec, 1)) {
-		assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
-		return (0);
-	}
-
+	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 	return (-1);
 }
 
@@ -1356,9 +1352,7 @@ static void message_handler_req_lib_lck_resourceclose (
 		iovecs[0].iov_base = (char *)&req_exec_lck_resourceclose;
 		iovecs[0].iov_len = sizeof (req_exec_lck_resourceclose);
 
-		if (totempg_groups_send_ok_joined (openais_group_handle, iovecs, 1)) {
-			assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 1, TOTEMPG_AGREED) == 0);
-		}
+		assert (totempg_groups_mcast_joined (openais_group_handle, iovecs, 1, TOTEMPG_AGREED) == 0);
 	}
 	else {
 		log_printf (LOG_LEVEL_ERROR, "#### LCK: Could Not Find the Checkpoint to close so Returning Error. ####\n");

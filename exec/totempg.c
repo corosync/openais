@@ -144,6 +144,8 @@ static unsigned short mcast_packed_msg_lens[FRAME_SIZE_MAX];
 
 static int mcast_packed_msg_count = 0;
 
+static int totempg_reserved = 0;
+
 /*
  * Function and data used to log messages
  */
@@ -221,8 +223,6 @@ static struct hdb_handle_database totempg_groups_instance_database = {
 	.mutex		= PTHREAD_MUTEX_INITIALIZER
 };
 
-static int send_ok (int msg_size);
-
 static unsigned char next_fragment = 1;
 
 static pthread_mutex_t totempg_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -233,6 +233,10 @@ static pthread_mutex_t mcast_msg_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define log_printf(level, format, args...) \
     totempg_log_printf (__FILE__, __LINE__, level, format, ##args)
+
+static int msg_count_send_ok (int msg_count);
+
+static int byte_count_send_ok (int byte_count);
 
 static struct assembly *assembly_ref (unsigned int nodeid)
 {
@@ -757,7 +761,7 @@ static int mcast_msg (
 		total_size += iovec[i].iov_len;
 	}
 
-	if (send_ok (total_size + sizeof(unsigned short) *
+	if (byte_count_send_ok (total_size + sizeof(unsigned short) *
 		(mcast_packed_msg_count+1)) == 0) {
 
 		pthread_mutex_unlock (&mcast_msg_mutex);
@@ -880,23 +884,44 @@ static int mcast_msg (
 /*
  * Determine if a message of msg_size could be queued
  */
-#define FUZZY_AVAIL_SUBTRACT 5
-static int send_ok (
-	int msg_size)
+static int msg_count_send_ok (
+	int msg_count)
 {
 	int avail = 0;
-	int total;
 
-	avail = totemmrp_avail () - FUZZY_AVAIL_SUBTRACT;
+	avail = totemmrp_avail () - totempg_reserved - 1;
 	
-	/*
-	 * msg size less then totempg_totem_config->net_mtu - 25 will take up
-	 * a full message, so add +1
-	 * totempg_totem_config->net_mtu - 25 is for the totempg_mcast header
-	 */
-	total = (msg_size / (totempg_totem_config->net_mtu - 25)) + 1; 
+	return (avail > msg_count);
+}
 
-	return (avail >= total);
+static int byte_count_send_ok (
+	int byte_count)
+{
+	unsigned int msg_count = 0;
+	int avail = 0;
+
+	avail = totemmrp_avail () - totempg_reserved - 1;
+
+	msg_count = (byte_count / (totempg_totem_config->net_mtu - 25)) + 1; 
+
+	return (avail >= msg_count);
+}
+
+static int send_reserve (
+	int msg_size)
+{
+	unsigned int msg_count = 0;
+
+	msg_count = (msg_size / (totempg_totem_config->net_mtu - 25)) + 1; 
+	totempg_reserved += msg_count;
+
+	return (msg_count);
+}
+
+static void send_release (
+	int msg_count)
+{
+	totempg_reserved -= msg_count;
 }
 
 int totempg_callback_token_create (
@@ -1083,7 +1108,7 @@ error_exit:
 	return (res);
 }
 
-int totempg_groups_send_ok_joined (
+int totempg_groups_joined_reserve (
 	totempg_groups_handle handle,
 	struct iovec *iovec,
 	int iov_len)
@@ -1092,6 +1117,7 @@ int totempg_groups_send_ok_joined (
 	unsigned int size = 0;
 	unsigned int i;
 	unsigned int res;
+	unsigned int reserved = 0;
 
 	pthread_mutex_lock (&totempg_mutex);
 	pthread_mutex_lock (&mcast_msg_mutex);
@@ -1108,20 +1134,28 @@ int totempg_groups_send_ok_joined (
 		size += iovec[i].iov_len;
 	}
 
-	/*
-	 * 2000 is a number chosen to represent the maximum size of
-	 * the totempg header used in the transmission of messages
-	 */
-	size += 2000;
-
-	res = send_ok (size);
+	reserved = send_reserve (size);
+	if (msg_count_send_ok (reserved) == 0) {
+		send_release (reserved);
+		reserved = 0;
+	}
 
 	hdb_handle_put (&totempg_groups_instance_database, handle);
 
 error_exit:
 	pthread_mutex_unlock (&mcast_msg_mutex);
 	pthread_mutex_unlock (&totempg_mutex);
-	return (res);
+	return (reserved);
+}
+
+void totempg_groups_joined_release (int msg_count)
+{
+	
+	pthread_mutex_lock (&totempg_mutex);
+	pthread_mutex_lock (&mcast_msg_mutex);
+	send_release (msg_count);
+	pthread_mutex_unlock (&mcast_msg_mutex);
+	pthread_mutex_unlock (&totempg_mutex);
 }
 
 int totempg_groups_mcast_groups (
@@ -1199,7 +1233,7 @@ int totempg_groups_send_ok_groups (
 		size += iovec[i].iov_len;
 	}
 
-	res = send_ok (size);
+	res = msg_count_send_ok (size);
 	 
 	hdb_handle_put (&totempg_groups_instance_database, handle);
 error_exit:
