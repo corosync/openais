@@ -904,7 +904,7 @@ static int byte_count_send_ok (
 
 	msg_count = (byte_count / (totempg_totem_config->net_mtu - 25)) + 1; 
 
-	return (avail >= msg_count);
+	return (avail > msg_count);
 }
 
 static int send_reserve (
