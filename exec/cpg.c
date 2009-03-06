@@ -485,8 +485,8 @@ static int cpg_lib_exit_fn (void *conn)
 		notify_info.nodeid = totempg_my_nodeid_get();
 		notify_info.reason = CONFCHG_CPG_REASON_PROCDOWN;
 		cpg_node_joinleave_send(gi, pi, MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_PROCDOWN);
-		list_del(&pi->list);
 	}
+	list_del(&pi->list);
 	openais_conn_refcount_dec (conn);
 	return (0);
 }
