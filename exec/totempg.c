@@ -894,13 +894,19 @@ static int msg_count_send_ok (
 	return (avail > msg_count);
 }
 
+/*
+ * This function should only be used by multicasting operations to determine
+ * if there is sufficient room in the multicast queue for the message.  Notice
+ * that totempg_reserved is not subtracted because the space is already
+ * reserved.
+ */
 static int byte_count_send_ok (
 	int byte_count)
 {
 	unsigned int msg_count = 0;
 	int avail = 0;
 
-	avail = totemmrp_avail () - totempg_reserved - 1;
+	avail = totemmrp_avail () - 1;
 
 	msg_count = (byte_count / (totempg_totem_config->net_mtu - 25)) + 1; 
 
