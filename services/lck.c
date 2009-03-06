@@ -1126,10 +1126,7 @@ int lck_resource_close (mar_name_t *resource_name)
 	iovec.iov_base = (char *)&req_exec_lck_resourceclose;
 	iovec.iov_len = sizeof (req_exec_lck_resourceclose);
 
-	if (api->totem_send_ok (&iovec, 1)) {
-		assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
-		return (0);
-	}
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 	return (-1);
 }
 
@@ -2235,9 +2232,7 @@ static void message_handler_req_lib_lck_resourceclose (
 		iovecs[0].iov_base = (char *)&req_exec_lck_resourceclose;
 		iovecs[0].iov_len = sizeof (req_exec_lck_resourceclose);
 
-		if (api->totem_send_ok (iovecs, 1)) {
-			assert (api->totem_mcast (iovecs, 1, TOTEM_AGREED) == 0);
-		}
+		assert (api->totem_mcast (iovecs, 1, TOTEM_AGREED) == 0);
 	}
 	else {
 		res_lib_lck_resourceclose.header.size = sizeof (struct res_lib_lck_resourceclose);

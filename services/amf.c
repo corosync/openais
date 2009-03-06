@@ -2342,7 +2342,7 @@ static void message_handler_req_lib_amf_response (void *conn, void *msg)
 {
 	struct res_lib_amf_response res_lib;
 	struct req_lib_amf_response *req_lib = msg;
-	int multicast, send_ok;
+	int multicast;
 	SaAisErrorT retval;
 	SaUint32T interface;
 	SaNameT dn;
@@ -2375,18 +2375,7 @@ static void message_handler_req_lib_amf_response (void *conn, void *msg)
 		req_exec.error = req_lib->error;
 		iovec.iov_base = (char *)&req_exec;
 		iovec.iov_len = sizeof (req_exec);
-		send_ok = api->totem_send_ok (&iovec, 1);
-
-		if (send_ok) {
-			if (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0) {
-				goto end;
-			} else {
-				corosync_fatal_error (COROSYNC_FATAL_ERR);
-			}
-		} else {
-			/* TOTEM queue is full, try again later */
-			retval = SA_AIS_ERR_TRY_AGAIN;
-		}
+		assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 	}
 
 send_response:
