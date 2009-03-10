@@ -3853,6 +3853,22 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 		return;
 	}
 
+	/*
+	 * Discard checkpoints that are used to synchronize the global_ckpt_id
+	 * also setting the global ckpt_id as well.
+	 */
+	if (memcmp (&req_exec_ckpt_sync_checkpoint_section->checkpoint_name.value, 
+		GLOBALID_CHECKPOINT_NAME,
+		req_exec_ckpt_sync_checkpoint_section->checkpoint_name.length) == 0) {
+
+		if (req_exec_ckpt_sync_checkpoint_section->ckpt_id >= global_ckpt_id) {
+			global_ckpt_id = req_exec_ckpt_sync_checkpoint_section->ckpt_id + 1;
+		}
+
+		LEAVE();
+		return;
+	}
+
 	checkpoint = checkpoint_find_specific (
 		&sync_checkpoint_list_head,
 		&req_exec_ckpt_sync_checkpoint_section->checkpoint_name,
@@ -3966,6 +3982,23 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_refcount (
 		LEAVE();
 		return;
 	}
+
+	/*
+	 * Discard checkpoints that are used to synchronize the global_ckpt_id
+	 * also setting the global ckpt_id as well.
+	 */
+	if (memcmp (&req_exec_ckpt_sync_checkpoint_refcount->checkpoint_name.value, 
+		GLOBALID_CHECKPOINT_NAME,
+		req_exec_ckpt_sync_checkpoint_refcount->checkpoint_name.length) == 0) {
+
+		if (req_exec_ckpt_sync_checkpoint_refcount->ckpt_id >= global_ckpt_id) {
+			global_ckpt_id = req_exec_ckpt_sync_checkpoint_refcount->ckpt_id + 1;
+		}
+
+		LEAVE();
+		return;
+	}
+
 
 	checkpoint = checkpoint_find_specific (
 		&sync_checkpoint_list_head,
