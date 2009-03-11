@@ -276,11 +276,28 @@ int _log_init (const char *ident)
 	}
 }
 
+static void print_atfork_prepare(void)
+{
+    pthread_mutex_lock (&log_mode_mutex);
+}
+
+static void print_atfork_done(void)
+{
+    pthread_mutex_unlock (&log_mode_mutex);
+}
+
+
 int log_setup (char **error_string, struct main_config *config)
 {
 	int i;
 	static char error_string_response[512];
 
+	/*
+	 * Prevent deadlocks in the child if one of the parent threads happens
+	 * to be logging when fork() is called
+	 */
+	pthread_atfork(print_atfork_prepare, print_atfork_done, print_atfork_done);
+	
 	if (config->logmode & LOG_MODE_FILE) {
 		log_file_fp = fopen (config->logfile, "a+");
 		if (log_file_fp == 0) {
