@@ -350,6 +350,8 @@ static void ckpt_sync_activate (void);
 static int  ckpt_sync_process (void);
 static void ckpt_sync_abort(void);
 
+static int nodeid_in_membership (unsigned int nodeid);
+
 static void sync_refcount_increment (
 	struct checkpoint *checkpoint, unsigned int nodeid);
 
@@ -819,6 +821,7 @@ static void ckpt_confchg_fn (
 
 		my_should_sync = 1;
 	}
+
 	first_configuration = 0;
 }
 
@@ -995,6 +998,7 @@ void checkpoint_release (struct checkpoint *checkpoint)
 	openais_timer_delete (checkpoint->retention_timer);
 
 	list_del (&checkpoint->expiry_list);
+	list_init (&checkpoint->expiry_list);
 
 	/*
 	 * Release all checkpoint sections for this checkpoint
@@ -1534,6 +1538,7 @@ int callback_expiry (enum totem_callback_token_type type, void *data)
 		}
 
 		list_del (&checkpoint->expiry_list);
+		list_init (&checkpoint->expiry_list);
 		list = my_checkpoint_expiry_list_head.next;
 	}
 	my_token_callback_active = 0;
@@ -3313,6 +3318,21 @@ error_exit:
 /*
  * Recovery after network partition or merge
  */
+int nodeid_in_membership (
+	unsigned int nodeid)
+{
+	unsigned int i;
+	int found = 0;
+
+	for (i = 0; i < my_old_member_list_entries; i++) {
+		if (nodeid == my_old_member_list[i]) {
+			found = 1;
+			break;
+		}
+	}
+	return (found);
+}
+
 void sync_refcount_increment (
 	struct checkpoint *checkpoint,
 	unsigned int nodeid)
@@ -3364,6 +3384,7 @@ void sync_refcount_decrement (
 		}
 		if (checkpoint->refcount_set[i].nodeid == nodeid) {
 			checkpoint->refcount_set[i].refcount -= 1;
+log_printf (LOG_LEVEL_NOTICE, "decrementing node id %d %d\n", nodeid, checkpoint->refcount_set[i].refcount);
 			break;
 		}
 	}
@@ -4008,11 +4029,25 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_refcount (
 	assert (checkpoint != NULL);
 
 	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		/*
+		 * If nodeid is zero, done processing list
+		 */
 		if (req_exec_ckpt_sync_checkpoint_refcount->refcount_set[i].nodeid == 0) {
 			break;
 		}
+
+		/*
+		 * if nodeid not in membership, check next one
+		 */
+		if (nodeid_in_membership (req_exec_ckpt_sync_checkpoint_refcount->refcount_set[i].nodeid) == 0) {
+			continue;
+		}
 		for (j = 0; j < PROCESSOR_COUNT_MAX; j++) {
+			/*
+			 * If new entry in the new checkpoint (nodeid=0) then add it
+			 */
 			if (checkpoint->refcount_set[j].nodeid == 0) {
+
 				checkpoint->refcount_set[j].nodeid =
 					req_exec_ckpt_sync_checkpoint_refcount->refcount_set[i].nodeid;
 				checkpoint->refcount_set[j].refcount =
@@ -4023,6 +4058,9 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_refcount (
 				break;
 			}
 
+			/*
+			 * If old entry in checkpoint equals messages nodeid, add it to reference count
+			 */
 			if (req_exec_ckpt_sync_checkpoint_refcount->refcount_set[i].nodeid == checkpoint->refcount_set[j].nodeid) {
 				checkpoint->refcount_set[j].refcount +=
 					req_exec_ckpt_sync_checkpoint_refcount->refcount_set[i].refcount;
