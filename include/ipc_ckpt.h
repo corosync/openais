@@ -38,6 +38,7 @@
 #include "saAis.h"
 #include "saCkpt.h"
 #include <corosync/ipc_gen.h>
+#include <corosync/hdb.h>
 #include "mar_ckpt.h"
 
 enum req_lib_ckpt_checkpoint_types {
@@ -204,13 +205,13 @@ struct req_lib_ckpt_sectioniterationinitialize {
 
 struct res_lib_ckpt_sectioniterationinitialize {
 	mar_res_header_t header __attribute__((aligned(8)));
-	unsigned int iteration_handle __attribute__((aligned(8)));
+	hdb_handle_t iteration_handle __attribute__((aligned(8)));
 	mar_size_t max_section_id_size;
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectioniterationfinalize {
 	mar_req_header_t header __attribute__((aligned(8)));
-	unsigned int iteration_handle __attribute__((aligned(8)));
+	hdb_handle_t iteration_handle __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectioniterationfinalize {
@@ -219,7 +220,7 @@ struct res_lib_ckpt_sectioniterationfinalize {
 
 struct req_lib_ckpt_sectioniterationnext {
 	mar_req_header_t header __attribute__((aligned(8)));
-	unsigned int iteration_handle __attribute__((aligned(8)));
+	hdb_handle_t iteration_handle __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectioniterationnext {
