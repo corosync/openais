@@ -893,7 +893,7 @@ static struct checkpoint *checkpoint_find_specific (
 
 static void ckpt_checkpoint_remove_cleanup (
 	void *conn,
-	mar_name_t checkpoint_name,
+	mar_name_t *checkpoint_name,
 	mar_uint32_t ckpt_id)
 {
 	struct list_head *list;
@@ -906,7 +906,7 @@ static void ckpt_checkpoint_remove_cleanup (
 
 		checkpoint_cleanup = list_entry (list, struct checkpoint_cleanup, list);
 		if (mar_name_match (&checkpoint_cleanup->checkpoint_name,
-			&checkpoint_name) &&
+			checkpoint_name) &&
 			(checkpoint_cleanup->ckpt_id == ckpt_id)) {
 
 			list_del (&checkpoint_cleanup->list);
@@ -2531,7 +2531,7 @@ static void message_handler_req_lib_ckpt_checkpointclose (
 
 	ckpt_checkpoint_remove_cleanup (
 		conn,
-		req_lib_ckpt_checkpointclose->checkpoint_name,
+		&req_lib_ckpt_checkpointclose->checkpoint_name,
 		req_lib_ckpt_checkpointclose->ckpt_id);
 	assert (totempg_groups_mcast_joined (openais_group_handle, &iovec, 1, TOTEMPG_AGREED) == 0);
 }
