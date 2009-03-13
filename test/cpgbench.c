@@ -107,13 +107,7 @@ void cpg_benchmark (
 		 */
 		cpg_flow_control_state_get (handle, &flow_control_state);
 		if (flow_control_state == CPG_FLOW_CONTROL_DISABLED) {
-retry:
 			res = cpg_mcast_joined (handle, CPG_TYPE_AGREED, &iov, 1);
-			if (res == CPG_ERR_TRY_AGAIN) {
-				break;
-			}
-		} else {
-			break;
 		}
 		res = cpg_dispatch (handle, CPG_DISPATCH_ALL);
 		if (res != CPG_OK) {
