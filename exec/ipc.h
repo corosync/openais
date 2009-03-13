@@ -39,7 +39,10 @@ extern void message_source_set (mar_message_source_t *source, void *conn);
 
 extern int message_source_is_local (mar_message_source_t *source);
 
-extern void openais_ipc_init (unsigned int gid_valid);
+extern void openais_ipc_init (
+	unsigned int gid_valid,
+	void (*serialize_lock_fn) (void),
+	void (*serialize_unlock_fn) (void));
 
 extern void *openais_conn_private_data_get (void *conn);
 

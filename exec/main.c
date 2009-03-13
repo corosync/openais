@@ -242,6 +242,7 @@ static void confchg_fn (
 	/*
 	 * Call configuration change for all services
 	 */
+	serialize_mutex_lock ();
 	for (i = 0; i < service_count; i++) {
 		if (ais_service[i] && ais_service[i]->confchg_fn) {
 			ais_service[i]->confchg_fn (configuration_type,
@@ -250,6 +251,7 @@ static void confchg_fn (
 				joined_list, joined_list_entries, ring_id);
 		}
 	}
+	serialize_mutex_unlock ();
 }
 
 static void aisexec_uid_determine (struct main_config *main_config)
@@ -328,7 +330,7 @@ static void aisexec_setscheduler (void)
 	res = sched_get_priority_max (SCHED_RR);
 	if (res != -1) {
 		sched_param.sched_priority = res;
-		res = sched_setscheduler (0, SCHED_RR, &sched_param);
+//		res = sched_setscheduler (0, SCHED_RR, &sched_param);
 		if (res == -1) {
 			log_printf (LOG_LEVEL_WARNING, "Could not set SCHED_RR at priority %d: %s\n",
 				sched_param.sched_priority, strerror (errno));
@@ -411,6 +413,8 @@ static void deliver_fn (
 	    return;
 	}
 	
+	serialize_mutex_lock ();
+
 	if (endian_conversion_required) {
 		ais_service[service]->exec_service[fn_id].exec_endian_convert_fn
 			(header);
@@ -418,6 +422,8 @@ static void deliver_fn (
 
 	ais_service[service]->exec_service[fn_id].exec_handler_fn
 		(header, nodeid);
+
+	serialize_mutex_unlock ();
 }
 
 int main (int argc, char **argv)
@@ -472,9 +478,7 @@ int main (int argc, char **argv)
 
 	log_printf (LOG_LEVEL_NOTICE, "AIS Executive Service: started and ready to provide service.\n");
 
-	aisexec_poll_handle = poll_create (
-		serialize_mutex_lock,
-		serialize_mutex_unlock);
+	aisexec_poll_handle = poll_create ();
 
 	/*
 	 * Load the object database interface
@@ -625,7 +629,9 @@ int main (int argc, char **argv)
 
 	aisexec_mempool_init ();
 
-	openais_ipc_init (gid_valid);
+	openais_ipc_init (gid_valid,
+		serialize_mutex_lock,
+		serialize_mutex_unlock);
 
 	/*
 	 * Start main processing loop

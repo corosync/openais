@@ -40,9 +40,7 @@
 typedef void * poll_timer_handle;
 typedef unsigned int poll_handle;
 
-poll_handle poll_create (
-	void (*serialize_lock) (void),
-	void (*serialize_unlock) (void));
+poll_handle poll_create (void);
 
 int poll_destroy (poll_handle poll_handle);
 
