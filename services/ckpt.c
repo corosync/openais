@@ -3300,8 +3300,8 @@ int nodeid_in_membership (
 	unsigned int i;
 	int found = 0;
 
-	for (i = 0; i < my_old_member_list_entries; i++) {
-		if (nodeid == my_old_member_list[i]) {
+	for (i = 0; i < my_member_list_entries; i++) {
+		if (nodeid == my_member_list[i]) {
 			found = 1;
 			break;
 		}
