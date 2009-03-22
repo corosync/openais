@@ -49,7 +49,7 @@
 #include <saAmf.h>
 #include <corosync/ipc_gen.h>
 #include <ipc_amf.h>
-#include <corosync/coroipc.h>
+#include <corosync/coroipcc.h>
 #include "util.h"
 
 
@@ -131,7 +131,7 @@ saAmfInitialize (
 		goto error_destroy;
 	}
 
-	error = cslib_service_connect (CPG_SERVICE, &amfInstance->ipc_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, CPG_SERVICE, &amfInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -167,7 +167,7 @@ saAmfSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = cslib_fd_get (amfInstance->ipc_ctx);
+	*selectionObject = coroipcc_fd_get (amfInstance->ipc_ctx);
 
 	saHandleInstancePut (&amfHandleDatabase, amfHandle);
 	return (SA_AIS_OK);
@@ -213,7 +213,7 @@ saAmfDispatch (
 	}
 
 	do {
-		dispatch_avail = cslib_dispatch_recv (amfInstance->ipc_ctx,
+		dispatch_avail = coroipcc_dispatch_recv (amfInstance->ipc_ctx,
 			(void *)&dispatch_data, timeout);
 
 		pthread_mutex_lock (&amfInstance->dispatch_mutex);
@@ -391,7 +391,7 @@ saAmfFinalize (
 
 	amfInstance->finalize = 1;
 
-	cslib_service_disconnect (amfInstance->ipc_ctx);
+	coroipcc_service_disconnect (amfInstance->ipc_ctx);
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
@@ -438,7 +438,7 @@ saAmfComponentRegister (
 	iov.iov_len = sizeof (struct req_lib_amf_componentregister);
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_componentregister,
@@ -490,7 +490,7 @@ saAmfComponentUnregister (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_componentunregister,
@@ -575,7 +575,7 @@ saAmfPmStart (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_pmstart,
@@ -620,7 +620,7 @@ saAmfPmStop (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_pmstop,
@@ -668,7 +668,7 @@ saAmfHealthcheckStart (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_healthcheckstart,
@@ -713,7 +713,7 @@ saAmfHealthcheckConfirm (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_healthcheckconfirm,
@@ -756,7 +756,7 @@ saAmfHealthcheckStop (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_healthcheckstop,
@@ -799,7 +799,7 @@ saAmfHAStateGet (
 	memcpy (&req_lib_amf_hastateget.compName, compName, sizeof (SaNameT));
 	memcpy (&req_lib_amf_hastateget.csiName, csiName, sizeof (SaNameT));
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_hastateget,
@@ -844,7 +844,7 @@ saAmfCSIQuiescingComplete (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	errorResult = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	errorResult = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_csiquiescingcomplete,
@@ -888,7 +888,7 @@ saAmfProtectionGroupTrack (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_protectiongrouptrack,
@@ -926,7 +926,7 @@ saAmfProtectionGroupTrackStop (
 	iov.iov_len = sizeof (struct req_lib_amf_protectiongrouptrackstop),
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_protectiongrouptrackstop,
@@ -969,7 +969,7 @@ saAmfComponentErrorReport (
 	iov.iov_base = &req_lib_amf_componenterrorreport;
 	iov.iov_len = sizeof (struct req_lib_amf_componenterrorreport);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_componenterrorreport,
@@ -1012,7 +1012,7 @@ saAmfComponentErrorClear (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_componenterrorclear,
@@ -1053,7 +1053,7 @@ saAmfResponse (
 
 	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	errorResult = cslib_msg_send_reply_receive (amfInstance->ipc_ctx,
+	errorResult = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_amf_response,

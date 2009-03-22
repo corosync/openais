@@ -56,69 +56,69 @@ libSaAmf.so.2.0.0: util.o amf.o
 	ln -sf libSaAmf.so.2.0.0 libSaAmf.so
 
 libSaClm.so.2.0.0: util.o clm.o
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o clm.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o clm.o -lcoroipcc -o $@
 	ln -sf libSaClm.so.2.0.0 libSaClm.so.2
 	ln -sf libSaClm.so.2.0.0 libSaClm.so
 
 libSaCkpt.so.2.0.0: util.o ckpt.o
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o ckpt.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o ckpt.o -lcoroipcc -o $@
 	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so.2
 	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so
 
 libSaEvt.so.2.0.0: util.o evt.o 
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o -lcoroipcc -o $@
 	ln -sf libSaEvt.so.2.0.0 libSaEvt.so.2
 	ln -sf libSaEvt.so.2.0.0 libSaEvt.so
 
 libSaMsg.so.2.0.0: util.o msg.o
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o msg.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o msg.o -lcoroipcc -o $@
 	ln -sf libSaMsg.so.2.0.0 libSaMsg.so.2
 	ln -sf libSaMsg.so.2.0.0 libSaMsg.so
 
 libSaLck.so.2.0.0: util.o lck.o
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o lck.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o lck.o -lcoroipcc -o $@
 	ln -sf libSaLck.so.2.0.0 libSaLck.so.2
 	ln -sf libSaLck.so.2.0.0 libSaLck.so
 
 libSaTmr.so.2.0.0: util.o tmr.o
-	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o tmr.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o tmr.o -lcoroipcc -o $@
 	ln -sf libSaTmr.so.2.0.0 libSaTmr.so.2
 	ln -sf libSaTmr.so.2.0.0 libSaTmr.so
 
 else
 
 libSaAmf.so.2.0.0: util.o amf.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaAmf.so.2,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaAmf.so.2,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o -lcoroipcc -o $@
 	ln -sf libSaAmf.so.2.0.0 libSaAmf.so.2
 	ln -sf libSaAmf.so.2.0.0 libSaAmf.so
 
 libSaClm.so.2.0.0: util.o clm.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions clm.o util.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions clm.o util.o -lcoroipcc -o $@
 	ln -sf libSaClm.so.2.0.0 libSaClm.so.2
 	ln -sf libSaClm.so.2.0.0 libSaClm.so
 
 libSaCkpt.so.2.0.0: util.o ckpt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o -lcoroipcc -o $@
 	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so.2
 	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so
 
 libSaEvt.so.2.0.0: util.o evt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=$(srcdir)$(subdir)libSaEvt.versions util.o evt.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=$(srcdir)$(subdir)libSaEvt.versions util.o evt.o -lcoroipcc -o $@
 	ln -sf libSaEvt.so.2.0.0 libSaEvt.so.2
 	ln -sf libSaEvt.so.2.0.0 libSaEvt.so
 
 libSaMsg.so.2.0.0: util.o msg.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaMsg.so.2,-version-script=$(srcdir)$(subdir)libSaMsg.versions util.o msg.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaMsg.so.2,-version-script=$(srcdir)$(subdir)libSaMsg.versions util.o msg.o -lcoroipcc -o $@
 	ln -sf libSaMsg.so.2.0.0 libSaMsg.so.2
 	ln -sf libSaMsg.so.2.0.0 libSaMsg.so
 
 libSaLck.so.2.0.0: util.o lck.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -lcoroipcc -o $@
 	ln -sf libSaLck.so.2.0.0 libSaLck.so.2
 	ln -sf libSaLck.so.2.0.0 libSaLck.so
 
 libSaTmr.so.2.0.0: util.o tmr.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaTmr.so.2,-version-script=$(srcdir)$(subdir)libSaTmr.versions util.o tmr.o -lcoroipc -o $@
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaTmr.so.2,-version-script=$(srcdir)$(subdir)libSaTmr.versions util.o tmr.o -lcoroipcc -o $@
 	ln -sf libSaTmr.so.2.0.0 libSaTmr.so.2
 	ln -sf libSaTmr.so.2.0.0 libSaTmr.so
 

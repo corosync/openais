@@ -46,7 +46,7 @@
 #include <sys/un.h>
 
 #include <saAis.h>
-#include <corosync/coroipc.h>
+#include <corosync/coroipcc.h>
 #include <corosync/list.h>
 #include <saLck.h>
 #include <corosync/ipc_gen.h>
@@ -262,7 +262,7 @@ saLckInitialize (
 		goto error_destroy;
 	}
 
-	error = cslib_service_connect (LCK_SERVICE, &lckInstance->ipc_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, LCK_SERVICE, &lckInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -307,7 +307,7 @@ saLckSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = cslib_fd_get (lckInstance->ipc_ctx);
+	*selectionObject = coroipcc_fd_get (lckInstance->ipc_ctx);
 
 	saHandleInstancePut (&lckHandleDatabase, lckHandle);
 
@@ -363,7 +363,7 @@ saLckDispatch (
 	}
 
 	do {
-		dispatch_avail = cslib_dispatch_recv (lckInstance->ipc_ctx,
+		dispatch_avail = coroipcc_dispatch_recv (lckInstance->ipc_ctx,
 			(void *)&dispatch_data, timeout);
 
 		pthread_mutex_lock(&lckInstance->dispatch_mutex);
@@ -568,7 +568,7 @@ saLckFinalize (
 
 	lckInstance->finalize = 1;
 
-	cslib_service_disconnect (lckInstance->ipc_ctx);
+	coroipcc_service_disconnect (lckInstance->ipc_ctx);
 
 	pthread_mutex_unlock (&lckInstance->response_mutex);
 
@@ -641,7 +641,7 @@ saLckResourceOpen (
 
 	pthread_mutex_lock (&lckInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		lckResourceInstance->ipc_ctx, 
 		&iov,
 		1,
@@ -737,7 +737,7 @@ saLckResourceOpenAsync (
 
 	pthread_mutex_lock (&lckInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		lckResourceInstance->ipc_ctx, 
 		&iov,
 		1,
@@ -789,7 +789,7 @@ saLckResourceClose (
 
 	pthread_mutex_lock (lckResourceInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		lckResourceInstance->ipc_ctx, 
 		&iov,
 		1,
@@ -841,7 +841,7 @@ saLckResourceLock (
 		goto error_destroy;
 	}
 
-	error = cslib_service_connect (LCK_SERVICE, &lock_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, LCK_SERVICE, &lock_ctx);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}
@@ -872,7 +872,7 @@ saLckResourceLock (
 	/*
 	 * no mutex needed here since its a new connection
 	 */
-	error = cslib_msg_send_reply_receive (lock_ctx, 
+	error = coroipcc_msg_send_reply_receive (lock_ctx, 
 		&iov,
 		1,
 		&res_lib_lck_resourcelock,
@@ -934,7 +934,7 @@ saLckResourceLockAsync (
 		goto error_destroy;
 	}
 
-	error = cslib_service_connect (LCK_SERVICE, &lock_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, LCK_SERVICE, &lock_ctx);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}
@@ -965,7 +965,7 @@ saLckResourceLockAsync (
 	/*
 	 * no mutex needed here since its a new connection
 	 */
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		lock_ctx, 
 		&iov,
 		1,
@@ -1036,7 +1036,7 @@ saLckResourceUnlock (
 
 	pthread_mutex_lock (lckLockIdInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		lckLockIdInstance->ipc_ctx, 
 		&iov,
 		1,
@@ -1101,7 +1101,7 @@ saLckResourceUnlockAsync (
 
 	pthread_mutex_lock (lckLockIdInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (lckLockIdInstance->ipc_ctx, 
+	error = coroipcc_msg_send_reply_receive (lckLockIdInstance->ipc_ctx, 
 		&iov,
 		1,
 		&res_lib_lck_resourceunlockasync,
@@ -1140,7 +1140,7 @@ saLckLockPurge (
 
 	pthread_mutex_lock (lckResourceInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (lckResourceInstance->ipc_ctx, 
+	error = coroipcc_msg_send_reply_receive (lckResourceInstance->ipc_ctx, 
 		&iov,
 		1,
 		&res_lib_lck_lockpurge,

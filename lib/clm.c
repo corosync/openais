@@ -52,7 +52,7 @@
 #include <saAis.h>
 #include <saClm.h>
 #include <ipc_clm.h>
-#include <corosync/coroipc.h>
+#include <corosync/coroipcc.h>
 #include "../include/mar_clm.h"
 
 #include "util.h"
@@ -171,7 +171,7 @@ saClmInitialize (
 		goto error_destroy;
 	}
 
-	error = cslib_service_connect (CLM_SERVICE, &clmInstance->ipc_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, CLM_SERVICE, &clmInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -237,7 +237,7 @@ saClmSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = cslib_fd_get (clmInstance->ipc_ctx);
+	*selectionObject = coroipcc_fd_get (clmInstance->ipc_ctx);
 
 	saHandleInstancePut (&clmHandleDatabase, clmHandle);
 	return (SA_AIS_OK);
@@ -303,7 +303,7 @@ saClmDispatch (
 	do {
 		pthread_mutex_lock (&clmInstance->dispatch_mutex);
 
-		dispatch_avail = cslib_dispatch_recv (clmInstance->ipc_ctx,
+		dispatch_avail = coroipcc_dispatch_recv (clmInstance->ipc_ctx,
 			(void *)&dispatch_data, timeout);
 
 		pthread_mutex_unlock (&clmInstance->dispatch_mutex);
@@ -459,7 +459,7 @@ saClmFinalize (
 
 	clmInstance->finalize = 1;
 
-	cslib_service_disconnect (clmInstance->ipc_ctx);
+	coroipcc_service_disconnect (clmInstance->ipc_ctx);
 
 	pthread_mutex_unlock (&clmInstance->response_mutex);
 
@@ -529,7 +529,7 @@ saClmClusterTrack (
 		goto error_exit;
 	}
 
-	error = cslib_msg_send_reply_receive (clmInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_clm_clustertrack,
@@ -594,7 +594,7 @@ saClmClusterTrackStop (
 
 	pthread_mutex_lock (&clmInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (clmInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_clm_trackstop,
@@ -646,7 +646,7 @@ saClmClusterNodeGet (
 	req_lib_clm_nodeget.header.id = MESSAGE_REQ_CLM_NODEGET;
 	req_lib_clm_nodeget.node_id = nodeId;
 
-	error = cslib_msg_send_reply_receive (clmInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_clm_nodeget,
@@ -701,7 +701,7 @@ saClmClusterNodeGetAsync (
 	iov.iov_base = &req_lib_clm_nodegetasync;
 	iov.iov_len = sizeof (req_lib_clm_nodegetasync);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		clmInstance->ipc_ctx,
 		&iov,
 		1,

@@ -50,7 +50,7 @@
 #include <saAis.h>
 #include <saTmr.h>
 
-#include <corosync/coroipc.h>
+#include <corosync/coroipcc.h>
 #include <corosync/list.h>
 #include <corosync/ipc_gen.h>
 
@@ -135,7 +135,7 @@ saTmrInitialize (
 		goto error_destroy;
 	}
 
-	error = cslib_service_connect (TMR_SERVICE, &tmrInstance->ipc_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, TMR_SERVICE, &tmrInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -182,7 +182,7 @@ saTmrSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = cslib_fd_get (&tmrInstance->ipc_ctx);
+	*selectionObject = coroipcc_fd_get (&tmrInstance->ipc_ctx);
 
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 
@@ -222,7 +222,7 @@ saTmrDispatch (
 	}
 
 	do {
-		dispatch_avail = cslib_dispatch_recv (tmrInstance->ipc_ctx,
+		dispatch_avail = coroipcc_dispatch_recv (tmrInstance->ipc_ctx,
 			(void *)&dispatch_data, timeout);
 
 		pthread_mutex_lock (&tmrInstance->dispatch_mutex);
@@ -317,7 +317,7 @@ saTmrFinalize (
 
 	tmrInstance->finalize = 1;
 
-	cslib_service_disconnect (tmrInstance->ipc_ctx);
+	coroipcc_service_disconnect (tmrInstance->ipc_ctx);
 
 	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
@@ -376,7 +376,7 @@ saTmrTimerStart (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_timerstart,
@@ -437,7 +437,7 @@ saTmrTimerReschedule (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_timerreschedule,
@@ -488,7 +488,7 @@ saTmrTimerCancel (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_timercancel,
@@ -541,7 +541,7 @@ saTmrPeriodicTimerSkip (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_periodictimerskip,
@@ -595,7 +595,7 @@ saTmrTimerRemainingTimeGet (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_timerremainingtimeget,
@@ -653,7 +653,7 @@ saTmrTimerAttributesGet (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_timerattributesget,
@@ -707,7 +707,7 @@ saTmrTimeGet (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_timeget,
@@ -761,7 +761,7 @@ saTmrClockTickGet (
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_tmr_clocktickget,

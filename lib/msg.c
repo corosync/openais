@@ -48,7 +48,7 @@
 #include <saAis.h>
 #include <saMsg.h>
 
-#include <corosync/coroipc.h>
+#include <corosync/coroipcc.h>
 #include <corosync/list.h>
 #include <corosync/ipc_gen.h>
 
@@ -222,7 +222,7 @@ saMsgInitialize (
 	printf ("[DEBUG]: saMsgInitialize { msgHandle = %llx }\n",
 		(unsigned long long) *msgHandle);
 
-	error = cslib_service_connect (MSG_SERVICE, &msgInstance->ipc_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, MSG_SERVICE, &msgInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -273,7 +273,7 @@ saMsgSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = cslib_fd_get (msgInstance->ipc_ctx);
+	*selectionObject = coroipcc_fd_get (msgInstance->ipc_ctx);
 
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
@@ -319,7 +319,7 @@ saMsgDispatch (
 	}
 
 	do {
-		dispatch_avail = cslib_dispatch_recv (msgInstance->ipc_ctx,
+		dispatch_avail = coroipcc_dispatch_recv (msgInstance->ipc_ctx,
 			&dispatch_data, timeout);
 
 		pthread_mutex_lock(&msgInstance->dispatch_mutex);
@@ -498,7 +498,7 @@ saMsgFinalize (
 	/* TODO */
 	/* msgInstanceFinalize (msgInstance); */
 
-	error = cslib_service_disconnect (msgInstance->ipc_ctx);
+	error = coroipcc_service_disconnect (msgInstance->ipc_ctx);
 
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
 
@@ -579,7 +579,7 @@ saMsgQueueOpen (
 
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queueopen,
@@ -687,7 +687,7 @@ saMsgQueueOpenAsync (
 
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queueopenasync,
@@ -745,7 +745,7 @@ saMsgQueueClose (
 
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queueclose,
@@ -802,7 +802,7 @@ saMsgQueueStatusGet (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_ctx,
 		&iov,
 		1,
@@ -882,7 +882,7 @@ saMsgQueueUnlink (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queueunlink,
@@ -940,7 +940,7 @@ saMsgQueueGroupCreate (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupcreate,
@@ -994,7 +994,7 @@ saMsgQueueGroupInsert (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupinsert,
@@ -1048,7 +1048,7 @@ saMsgQueueGroupRemove (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupremove,
@@ -1099,7 +1099,7 @@ saMsgQueueGroupDelete (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupdelete,
@@ -1176,7 +1176,7 @@ saMsgQueueGroupTrack (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive_in_buf (
+	error = coroipcc_msg_send_reply_receive_in_buf (
 		msgInstance->ipc_ctx,
 		&iov,
 		1,
@@ -1254,7 +1254,7 @@ saMsgQueueGroupTrackStop (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queuegrouptrackstop,
@@ -1341,7 +1341,7 @@ saMsgMessageSend (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_ctx,
 		iov,
 		2,
@@ -1397,7 +1397,7 @@ saMsgMessageSendAsync (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_ctx,
 		iov,
 		2,
@@ -1448,7 +1448,7 @@ saMsgMessageGet (
 
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive_in_buf (
+	error = coroipcc_msg_send_reply_receive_in_buf (
 		msgQueueInstance->ipc_ctx,
 		&iov,
 		2,
@@ -1548,7 +1548,7 @@ saMsgMessageCancel (
 
 	pthread_mutex_lock (msgQueueInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgQueueInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_messagecancel,
@@ -1601,7 +1601,7 @@ saMsgMessageSendReceive (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_messagesendreceive,
@@ -1656,7 +1656,7 @@ saMsgMessageReply (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_messagereply,
@@ -1706,7 +1706,7 @@ saMsgMessageReplyAsync (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_messagereplyasync,

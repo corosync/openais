@@ -39,7 +39,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/socket.h>
-#include <corosync/coroipc.h>
+#include <corosync/coroipcc.h>
 #include <corosync/list.h>
 #include "ipc_evt.h"
 #include "mar_sa.h"
@@ -321,7 +321,7 @@ static void evt_recv_event(void *ipc_ctx, struct lib_event_data **msg)
 	iov.iov_base = &req;
 	iov.iov_len = sizeof (struct res_evt_event_data);
 
-	cslib_msg_send_reply_receive_in_buf (
+	coroipcc_msg_send_reply_receive_in_buf (
 		ipc_ctx,
 		&iov,
 		1,
@@ -387,7 +387,7 @@ saEvtInitialize(
 	/*
 	 * Set up communication with the event server
 	 */
-	error = cslib_service_connect (EVT_SERVICE, &evti->ipc_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, EVT_SERVICE, &evti->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_handle_put;
 	}
@@ -443,7 +443,7 @@ saEvtSelectionObjectGet(
 		return error;
 	}
 
-	*selectionObject = cslib_fd_get (evti->ipc_ctx);
+	*selectionObject = coroipcc_fd_get (evti->ipc_ctx);
 
 	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
 
@@ -620,7 +620,7 @@ saEvtDispatch(
 	}
 
 	do {
-		dispatch_avail = cslib_dispatch_recv (evti->ipc_ctx,
+		dispatch_avail = coroipcc_dispatch_recv (evti->ipc_ctx,
 			&evti->ei_dispatch_data, timeout);
 
 		/*
@@ -802,7 +802,7 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 
 	evti->ei_finalize = 1;
 
-	cslib_service_disconnect (evti->ipc_ctx);
+	coroipcc_service_disconnect (evti->ipc_ctx);
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
 
@@ -894,7 +894,7 @@ saEvtChannelOpen(
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = cslib_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
 		&res, sizeof(res));
 
 	pthread_mutex_unlock (&evti->ei_response_mutex);
@@ -998,7 +998,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = cslib_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
 		&res, sizeof (res));
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
@@ -1120,7 +1120,7 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = cslib_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
 		&res, sizeof (res));
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
@@ -1221,7 +1221,7 @@ saEvtChannelUnlink(
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = cslib_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
 		&res, sizeof (res));
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
@@ -1896,7 +1896,7 @@ saEvtEventPublish(
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
 
-	error = cslib_msg_send_reply_receive(evti->ipc_ctx, &iov, 1, &res,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1, &res,
 		sizeof(res));
 
 	pthread_mutex_unlock (&evti->ei_response_mutex);
@@ -2013,7 +2013,7 @@ saEvtEventSubscribe(
 	iov.iov_len = req->ics_head.size;
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
-	error = cslib_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
 		&res, sizeof(res));
 	pthread_mutex_unlock (&evti->ei_response_mutex);
 	free(req);
@@ -2076,7 +2076,7 @@ saEvtEventUnsubscribe(
 	iov.iov_len = sizeof(req);
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
- 	error = cslib_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+ 	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
  		&res, sizeof(res));
  	pthread_mutex_unlock (&evti->ei_response_mutex);
 
@@ -2147,7 +2147,7 @@ saEvtEventRetentionTimeClear(
 	iov.iov_len = sizeof(req);
 
 	pthread_mutex_lock(&evti->ei_response_mutex);
-	error = cslib_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
 		&res, sizeof(res));
 	pthread_mutex_unlock (&evti->ei_response_mutex);
 

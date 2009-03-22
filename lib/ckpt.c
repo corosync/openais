@@ -46,7 +46,7 @@
 #include <sys/select.h>
 #include <sys/un.h>
 
-#include <corosync/coroipc.h>
+#include <corosync/coroipcc.h>
 #include "../include/saAis.h"
 #include <corosync/mar_gen.h>
 #include <corosync/ipc_gen.h>
@@ -284,7 +284,7 @@ saCkptInitialize (
 		goto error_destroy;
 	}
 
-	error = cslib_service_connect (CKPT_SERVICE, &ckptInstance->ipc_ctx);
+	error = coroipcc_service_connect (IPC_SOCKET_NAME, CKPT_SERVICE, &ckptInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -329,7 +329,7 @@ saCkptSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = cslib_fd_get (ckptInstance->ipc_ctx);
+	*selectionObject = coroipcc_fd_get (ckptInstance->ipc_ctx);
 
 	saHandleInstancePut (&ckptHandleDatabase, ckptHandle);
 
@@ -376,7 +376,7 @@ saCkptDispatch (
 	do {
 		pthread_mutex_lock (&ckptInstance->dispatch_mutex);
 
-		dispatch_avail = cslib_dispatch_recv (ckptInstance->ipc_ctx,
+		dispatch_avail = coroipcc_dispatch_recv (ckptInstance->ipc_ctx,
 			&dispatch_data, timeout);
 
 		pthread_mutex_unlock (&ckptInstance->dispatch_mutex);
@@ -512,7 +512,7 @@ saCkptFinalize (
 
 	ckptInstance->finalize = 1;
 
-	cslib_service_disconnect (ckptInstance->ipc_ctx);
+	coroipcc_service_disconnect (ckptInstance->ipc_ctx);
 
 	pthread_mutex_unlock (&ckptInstance->response_mutex);
 
@@ -617,7 +617,7 @@ saCkptCheckpointOpen (
 
 	pthread_mutex_lock (&ckptInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptInstance->ipc_ctx,
 		&iov,
 		1,
@@ -750,7 +750,7 @@ saCkptCheckpointOpenAsync (
 
 	pthread_mutex_lock (&ckptInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptInstance->ipc_ctx,
 		&iov,
 		1,
@@ -814,7 +814,7 @@ saCkptCheckpointClose (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptCheckpointInstance->ipc_ctx,
 		&iov,
 		1,
@@ -865,7 +865,7 @@ saCkptCheckpointUnlink (
 
 	pthread_mutex_lock (&ckptInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptInstance->ipc_ctx,
 		&iov,
 		1,
@@ -911,7 +911,7 @@ saCkptCheckpointRetentionDurationSet (
 	
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptCheckpointInstance->ipc_ctx,
 		&iov,
 		1,
@@ -957,7 +957,7 @@ saCkptActiveReplicaSet (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptCheckpointInstance->ipc_ctx,
 		&iov,
 		1,
@@ -1005,7 +1005,7 @@ saCkptCheckpointStatusGet (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointstatusget,
@@ -1087,7 +1087,7 @@ saCkptSectionCreate (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptCheckpointInstance->ipc_ctx,
 		iov,
 		iov_len,
@@ -1151,7 +1151,7 @@ saCkptSectionDelete (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
 		iov,
 		iov_len,
 		&res_lib_ckpt_sectiondelete,
@@ -1214,7 +1214,7 @@ saCkptSectionExpirationTimeSet (
 	
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptCheckpointInstance->ipc_ctx,
 		iov,
 		iov_len,
@@ -1306,7 +1306,7 @@ saCkptSectionIterationInitialize (
 
 	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_ckpt_sectioniterationinitialize,
@@ -1378,7 +1378,7 @@ saCkptSectionIterationNext (
 
 	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive_in_buf (
+	error = coroipcc_msg_send_reply_receive_in_buf (
 		ckptSectionIterationInstance->ipc_ctx,
 		&iov,
 		1,
@@ -1450,7 +1450,7 @@ saCkptSectionIterationFinalize (
 
 	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_ckpt_sectioniterationfinalize,
@@ -1553,7 +1553,7 @@ saCkptCheckpointWrite (
 		iov[iov_idx].iov_len = ioVector[i].dataSize;
 		iov_idx++;
 
-		error = cslib_msg_send_reply_receive (
+		error = coroipcc_msg_send_reply_receive (
 			ckptCheckpointInstance->ipc_ctx,
 			iov,
 			iov_idx,
@@ -1644,7 +1644,7 @@ saCkptSectionOverwrite (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
 		iov,
 		iov_idx,
 		&res_lib_ckpt_sectionoverwrite,
@@ -1712,7 +1712,7 @@ saCkptCheckpointRead (
 		iov[1].iov_base = (char *)ioVector[i].sectionId.id;
 		iov[1].iov_len = ioVector[i].sectionId.idLen;
 
-		cslib_msg_send_reply_receive_in_buf (
+		coroipcc_msg_send_reply_receive_in_buf (
 			ckptCheckpointInstance->ipc_ctx,
 			iov,
 			2,
@@ -1810,7 +1810,7 @@ saCkptCheckpointSynchronize (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptCheckpointInstance->ipc_ctx,
 		&iov,
 		1,
@@ -1876,7 +1876,7 @@ saCkptCheckpointSynchronizeAsync (
 
 	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
 
-	error = cslib_msg_send_reply_receive (
+	error = coroipcc_msg_send_reply_receive (
 		ckptCheckpointInstance->ipc_ctx,
 		&iov,
 		1,
