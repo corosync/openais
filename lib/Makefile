@@ -38,89 +38,89 @@ include $(srcdir)Makefile.inc
 
 override LDFLAGS += -L./ -L$(COROSYNCLIBDIR)
 
-all: libSaClm.a libSaClm.so.2.0.0 \
-	libSaCkpt.a libSaCkpt.so.2.0.0 \
-	libSaAmf.a libSaAmf.so.2.0.0 \
-	libSaEvt.a libSaEvt.so.2.0.0 \
-	libSaMsg.a libSaMsg.so.2.0.0 \
-	libSaLck.a libSaLck.so.2.0.0 \
-	libSaTmr.a libSaTmr.so.2.0.0
+all: libSaClm.a libSaClm.so.3.0.0 \
+	libSaCkpt.a libSaCkpt.so.3.0.0 \
+	libSaAmf.a libSaAmf.so.3.0.0 \
+	libSaEvt.a libSaEvt.so.3.0.0 \
+	libSaMsg.a libSaMsg.so.3.0.0 \
+	libSaLck.a libSaLck.so.3.0.0 \
+	libSaTmr.a libSaTmr.so.3.0.0
 
 ifeq (${OPENAIS_COMPAT}, DARWIN)
 
 DARWIN_OPTS=-dynamiclib -bind_at_load -current_version 2.0.0 -compatibility_version 2.0.0
 
-libSaAmf.so.2.0.0: util.o amf.o
+libSaAmf.so.3.0.0: util.o amf.o
 	$(CC) $(DARWIN_OPTS) amf.o -o $@
-	ln -sf libSaAmf.so.2.0.0 libSaAmf.so.2
-	ln -sf libSaAmf.so.2.0.0 libSaAmf.so
+	ln -sf libSaAmf.so.3.0.0 libSaAmf.so.3
+	ln -sf libSaAmf.so.3.0.0 libSaAmf.so
 
-libSaClm.so.2.0.0: util.o clm.o
+libSaClm.so.3.0.0: util.o clm.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o clm.o -lcoroipcc -o $@
-	ln -sf libSaClm.so.2.0.0 libSaClm.so.2
-	ln -sf libSaClm.so.2.0.0 libSaClm.so
+	ln -sf libSaClm.so.3.0.0 libSaClm.so.3
+	ln -sf libSaClm.so.3.0.0 libSaClm.so
 
-libSaCkpt.so.2.0.0: util.o ckpt.o
+libSaCkpt.so.3.0.0: util.o ckpt.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o ckpt.o -lcoroipcc -o $@
-	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so.2
-	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so
+	ln -sf libSaCkpt.so.3.0.0 libSaCkpt.so.3
+	ln -sf libSaCkpt.so.3.0.0 libSaCkpt.so
 
-libSaEvt.so.2.0.0: util.o evt.o 
+libSaEvt.so.3.0.0: util.o evt.o 
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o evt.o -lcoroipcc -o $@
-	ln -sf libSaEvt.so.2.0.0 libSaEvt.so.2
-	ln -sf libSaEvt.so.2.0.0 libSaEvt.so
+	ln -sf libSaEvt.so.3.0.0 libSaEvt.so.3
+	ln -sf libSaEvt.so.3.0.0 libSaEvt.so
 
-libSaMsg.so.2.0.0: util.o msg.o
+libSaMsg.so.3.0.0: util.o msg.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o msg.o -lcoroipcc -o $@
-	ln -sf libSaMsg.so.2.0.0 libSaMsg.so.2
-	ln -sf libSaMsg.so.2.0.0 libSaMsg.so
+	ln -sf libSaMsg.so.3.0.0 libSaMsg.so.3
+	ln -sf libSaMsg.so.3.0.0 libSaMsg.so
 
-libSaLck.so.2.0.0: util.o lck.o
+libSaLck.so.3.0.0: util.o lck.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o lck.o -lcoroipcc -o $@
-	ln -sf libSaLck.so.2.0.0 libSaLck.so.2
-	ln -sf libSaLck.so.2.0.0 libSaLck.so
+	ln -sf libSaLck.so.3.0.0 libSaLck.so.3
+	ln -sf libSaLck.so.3.0.0 libSaLck.so
 
-libSaTmr.so.2.0.0: util.o tmr.o
+libSaTmr.so.3.0.0: util.o tmr.o
 	$(CC) $(LDFLAGS) $(DARWIN_OPTS) util.o tmr.o -lcoroipcc -o $@
-	ln -sf libSaTmr.so.2.0.0 libSaTmr.so.2
-	ln -sf libSaTmr.so.2.0.0 libSaTmr.so
+	ln -sf libSaTmr.so.3.0.0 libSaTmr.so.3
+	ln -sf libSaTmr.so.3.0.0 libSaTmr.so
 
 else
 
-libSaAmf.so.2.0.0: util.o amf.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaAmf.so.2,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o -lcoroipcc -o $@
-	ln -sf libSaAmf.so.2.0.0 libSaAmf.so.2
-	ln -sf libSaAmf.so.2.0.0 libSaAmf.so
+libSaAmf.so.3.0.0: util.o amf.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname=libSaAmf.so.3,-version-script=$(srcdir)$(subdir)libSaAmf.versions util.o amf.o -lcoroipcc -o $@
+	ln -sf libSaAmf.so.3.0.0 libSaAmf.so.3
+	ln -sf libSaAmf.so.3.0.0 libSaAmf.so
 
-libSaClm.so.2.0.0: util.o clm.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaClm.so.2,-version-script=$(srcdir)$(subdir)libSaClm.versions clm.o util.o -lcoroipcc -o $@
-	ln -sf libSaClm.so.2.0.0 libSaClm.so.2
-	ln -sf libSaClm.so.2.0.0 libSaClm.so
+libSaClm.so.3.0.0: util.o clm.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname=libSaClm.so.3,-version-script=$(srcdir)$(subdir)libSaClm.versions clm.o util.o -lcoroipcc -o $@
+	ln -sf libSaClm.so.3.0.0 libSaClm.so.3
+	ln -sf libSaClm.so.3.0.0 libSaClm.so
 
-libSaCkpt.so.2.0.0: util.o ckpt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaCkpt.so.2,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o -lcoroipcc -o $@
-	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so.2
-	ln -sf libSaCkpt.so.2.0.0 libSaCkpt.so
+libSaCkpt.so.3.0.0: util.o ckpt.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname=libSaCkpt.so.3,-version-script=$(srcdir)$(subdir)libSaCkpt.versions util.o ckpt.o -lcoroipcc -o $@
+	ln -sf libSaCkpt.so.3.0.0 libSaCkpt.so.3
+	ln -sf libSaCkpt.so.3.0.0 libSaCkpt.so
 
-libSaEvt.so.2.0.0: util.o evt.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaEvt.so.2,-version-script=$(srcdir)$(subdir)libSaEvt.versions util.o evt.o -lcoroipcc -o $@
-	ln -sf libSaEvt.so.2.0.0 libSaEvt.so.2
-	ln -sf libSaEvt.so.2.0.0 libSaEvt.so
+libSaEvt.so.3.0.0: util.o evt.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname=libSaEvt.so.3,-version-script=$(srcdir)$(subdir)libSaEvt.versions util.o evt.o -lcoroipcc -o $@
+	ln -sf libSaEvt.so.3.0.0 libSaEvt.so.3
+	ln -sf libSaEvt.so.3.0.0 libSaEvt.so
 
-libSaMsg.so.2.0.0: util.o msg.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaMsg.so.2,-version-script=$(srcdir)$(subdir)libSaMsg.versions util.o msg.o -lcoroipcc -o $@
-	ln -sf libSaMsg.so.2.0.0 libSaMsg.so.2
-	ln -sf libSaMsg.so.2.0.0 libSaMsg.so
+libSaMsg.so.3.0.0: util.o msg.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname=libSaMsg.so.3,-version-script=$(srcdir)$(subdir)libSaMsg.versions util.o msg.o -lcoroipcc -o $@
+	ln -sf libSaMsg.so.3.0.0 libSaMsg.so.3
+	ln -sf libSaMsg.so.3.0.0 libSaMsg.so
 
-libSaLck.so.2.0.0: util.o lck.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaLck.so.2,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -lcoroipcc -o $@
-	ln -sf libSaLck.so.2.0.0 libSaLck.so.2
-	ln -sf libSaLck.so.2.0.0 libSaLck.so
+libSaLck.so.3.0.0: util.o lck.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname=libSaLck.so.3,-version-script=$(srcdir)$(subdir)libSaLck.versions util.o lck.o -lcoroipcc -o $@
+	ln -sf libSaLck.so.3.0.0 libSaLck.so.3
+	ln -sf libSaLck.so.3.0.0 libSaLck.so
 
-libSaTmr.so.2.0.0: util.o tmr.o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,libSaTmr.so.2,-version-script=$(srcdir)$(subdir)libSaTmr.versions util.o tmr.o -lcoroipcc -o $@
-	ln -sf libSaTmr.so.2.0.0 libSaTmr.so.2
-	ln -sf libSaTmr.so.2.0.0 libSaTmr.so
+libSaTmr.so.3.0.0: util.o tmr.o
+	$(CC) $(LDFLAGS) -shared -Wl,-soname=libSaTmr.so.3,-version-script=$(srcdir)$(subdir)libSaTmr.versions util.o tmr.o -lcoroipcc -o $@
+	ln -sf libSaTmr.so.3.0.0 libSaTmr.so.3
+	ln -sf libSaTmr.so.3.0.0 libSaTmr.so
 
 endif
 
@@ -146,7 +146,7 @@ libSaTmr.a: util.o tmr.o
 	$(AR) -rc libSaTmr.a util.o tmr.o
 
 clean:
-	rm -f *.o libSa*.so* *.da *.bb *.bbg
+	rm -f *.a *.o libSa*.so* *.da *.bb *.bbg
 
 # -fPIC rules required for all libraries
 %.o: %.c

@@ -105,37 +105,37 @@ vsf_ykd.lcrso: vsf_ykd.o
 else
 
 service_clm.lcrso: clm.o
-	$(CC) -shared -Wl,-soname,service_clm.lcrso clm.o -o $@
+	$(CC) -shared -Wl,-soname=service_clm.lcrso clm.o -o $@
 
 service_amf.lcrso: $(AMF_OBJS)
-	$(CC) -shared -Wl,-soname,service_amf.lcrso $(AMF_OBJS) -o $@
+	$(CC) -shared -Wl,-soname=service_amf.lcrso $(AMF_OBJS) -o $@
 
 service_ckpt.lcrso: ckpt.o
-	$(CC) -shared -Wl,-soname,service_ckpt.lcrso ckpt.o -o $@
+	$(CC) -shared -Wl,-soname=service_ckpt.lcrso ckpt.o -o $@
 
 service_evt.lcrso: evt.o
-	$(CC) -shared -Wl,-soname,service_evt.lcrso evt.o -o $@
+	$(CC) -shared -Wl,-soname=service_evt.lcrso evt.o -o $@
 
 service_lck.lcrso: lck.o
-	$(CC) -shared -Wl,-soname,service_lck.lcrso lck.o -o $@
+	$(CC) -shared -Wl,-soname=service_lck.lcrso lck.o -o $@
 
 service_msg.lcrso: msg.o
-	$(CC) -shared -Wl,-soname,service_msg.lcrso msg.o -o $@
+	$(CC) -shared -Wl,-soname=service_msg.lcrso msg.o -o $@
 
 service_cfg.lcrso: cfg.o
-	$(CC) -shared -Wl,-soname,service_cfg.lcrso cfg.o -o $@
+	$(CC) -shared -Wl,-soname=service_cfg.lcrso cfg.o -o $@
 
 service_tmr.lcrso: tmr.o
-	$(CC) -shared -Wl,-soname,service_tmr.lcrso tmr.o -o $@
+	$(CC) -shared -Wl,-soname=service_tmr.lcrso tmr.o -o $@
 
 openaisparser.lcrso: openaisparser.o
-	$(CC) -shared -Wl,-soname,openaisparser.lcrso openaisparser.o -o $@
+	$(CC) -shared -Wl,-soname=openaisparser.lcrso openaisparser.o -o $@
 
 openaisserviceenable.lcrso: openaisserviceenable.o
-	$(CC) -shared -Wl,-soname,openaisserviceenable.lcrso openaisserviceenable.o -o $@
+	$(CC) -shared -Wl,-soname=openaisserviceenable.lcrso openaisserviceenable.o -o $@
 
 vsf_ykd.lcrso: vsf_ykd.o
-	$(CC) -shared -Wl,-soname,vsf_ykd.lcrso vsf_ykd.o -o $@
+	$(CC) -shared -Wl,-soname=vsf_ykd.lcrso vsf_ykd.o -o $@
 
 endif
 

@@ -110,11 +110,11 @@ install: all
 
 	for aLib in $(AIS_LIBS); do					\
 	    ( cd $(builddir) ;                                          \
-	    ln -sf lib$$aLib.so.2.0.0 lib/lib$$aLib.so;			\
-	    ln -sf lib$$aLib.so.2.0.0 lib/lib$$aLib.so.2;		\
+	    ln -sf lib$$aLib.so.3.0.0 lib/lib$$aLib.so;			\
+	    ln -sf lib$$aLib.so.3.0.0 lib/lib$$aLib.so.3;		\
 	    $(CP) -a lib/lib$$aLib.so $(DESTDIR)$(LIBDIR);		\
-	    $(CP) -a lib/lib$$aLib.so.2 $(DESTDIR)$(LIBDIR);		\
-	    install -m 755 lib/lib$$aLib.so.2.* $(DESTDIR)$(LIBDIR);	\
+	    $(CP) -a lib/lib$$aLib.so.3 $(DESTDIR)$(LIBDIR);		\
+	    install -m 755 lib/lib$$aLib.so.3.* $(DESTDIR)$(LIBDIR);	\
 	    if [ "xYES" = "x$(STATICLIBS)" ]; then			\
 	        install -m 755 lib/lib$$aLib.a $(DESTDIR)$(LIBDIR);	\
 		if [ ${OPENAIS_COMPAT} = "DARWIN" ]; then		\
