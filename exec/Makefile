@@ -59,9 +59,9 @@ LCR_OBJS = evs.o clm.o ckpt.o evt.o lck.o msg.o cfg.o cpg.o aisparser.o vsf_ykd.
 
 # main executive objects
 MAIN_SRC = main.c print.c mempool.c util.c sync.c service.c ipc.c timer.c \
-	totemconfig.c mainconfig.c
+	totemconfig.c mainconfig.c schedwrk.c
 MAIN_OBJS = main.o print.o mempool.o util.o sync.o service.o ipc.o timer.o \
-	totemconfig.o mainconfig.o ../lcr/lcr_ifact.o
+	totemconfig.o mainconfig.o ../lcr/lcr_ifact.o schedwrk.o
 OTHER_OBJS = objdb.o
 
 ifeq (${BUILD_DYNAMIC}, 1) 
@@ -236,6 +236,9 @@ objdb.o: objdb.c
 	$(CC) $(CFLAGS) -c -o $@ $(*F).c
 
 confdb.o: confdb.c
+	$(CC) $(CFLAGS) -c -o $@ $(*F).c
+
+schedwrk.o: schedwrk.c
 	$(CC) $(CFLAGS) -c -o $@ $(*F).c
 
 # -fPIC rules required for lib totem

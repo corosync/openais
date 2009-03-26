@@ -629,6 +629,10 @@ int main (int argc, char **argv)
 
 	aisexec_mempool_init ();
 
+	schedwrk_init (
+		serialize_mutex_lock,
+		serialize_mutex_unlock);
+
 	openais_ipc_init (gid_valid,
 		serialize_mutex_lock,
 		serialize_mutex_unlock);

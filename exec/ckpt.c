@@ -63,6 +63,7 @@
 #include "main.h"
 #include "ipc.h"
 #include "totempg.h"
+#include "schedwrk.h"
 #include "print.h"
 
 #define GLOBALID_CHECKPOINT_NAME "global_checkpoint_name_do_not_use_in_an_application"
@@ -395,7 +396,7 @@ static unsigned int my_should_sync = 0;
 
 static unsigned int my_token_callback_active = 0;
 
-static void * my_token_callback_handle;
+static unsigned int callback_expiry_handle;
 
 struct checkpoint_cleanup {
 	struct list_head list;
@@ -1495,7 +1496,7 @@ free_mem :
 
 }
 
-int callback_expiry (enum totem_callback_token_type type, void *data)
+int callback_expiry (void *data)
 {
 	struct checkpoint *checkpoint = (struct checkpoint *)data;
 	struct req_exec_ckpt_checkpointunlink req_exec_ckpt_checkpointunlink;
@@ -1553,12 +1554,11 @@ void timer_function_retention (void *data)
 	list_add (&checkpoint->expiry_list, &my_checkpoint_expiry_list_head);
 
 	if (my_token_callback_active == 0) {
-		totempg_callback_token_create (
-			&my_token_callback_handle,
-			TOTEM_CALLBACK_TOKEN_SENT,
-			1,
+		schedwrk_create (
+			&callback_expiry_handle,
 			callback_expiry,
 			NULL);
+
 		my_token_callback_active = 1;
 	}
 }
