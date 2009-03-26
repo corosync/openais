@@ -95,7 +95,7 @@ struct ckptSectionIterationInstance {
         SaSizeT maxSectionIdSize;
 	struct list_head sectionIdListHead;
 	pthread_mutex_t response_mutex;
-	unsigned int executive_iteration_handle;
+	hdb_handle_t executive_iteration_handle;
 	struct list_head list;
 };
 
