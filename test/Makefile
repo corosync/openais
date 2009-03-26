@@ -42,7 +42,7 @@ endif
 
 LIBRARIES= -lSaCkpt -lSaLck -lSaMsg -lSaEvt -lSaTmr -lSaClm sa_error.o
 LIBS = $(LIBRARIES) 
-BINARIES= testckpt testlck testlck2 testmsg testmsg2 testmsg3 testevt testtmr testclm
+BINARIES= ckptbench testckpt testlck testlck2 testmsg testmsg2 testmsg3 testevt testtmr testclm
 
 override CFLAGS += -I../include
 override LDFLAGS += -L../lib
@@ -54,6 +54,9 @@ all: $(BINARIES)
 
 testckpt: testckpt.o sa_error.o
 	$(CC) $(LDFLAGS) -o testckpt testckpt.o $(LIBS)
+
+ckptbench: ckptbench.o
+	$(CC) $(LDFLAGS) -o ckptbench ckptbench.o $(LIBS)
 
 testlck: testlck.o sa_error.o
 	$(CC) $(LDFLAGS) -o testlck testlck.o $(LIBS)
