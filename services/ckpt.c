@@ -62,6 +62,8 @@
 
 LOGSYS_DECLARE_SUBSYS ("CKPT", LOG_INFO);
 
+#define GLOBALID_CHECKPOINT_NAME "global_checkpoint_name_do_not_use_in_an_application"
+
 #define CKPT_MAX_SECTION_DATA_SEND (1024*400)
 
 enum ckpt_message_req_types {
@@ -89,6 +91,9 @@ struct checkpoint_section {
 };
 
 enum sync_state {
+	SYNC_STATE_NOT_STARTED,
+	SYNC_STATE_STARTED,
+	SYNC_STATE_GLOBALID,
 	SYNC_STATE_CHECKPOINT,
 	SYNC_STATE_REFCOUNT
 };
@@ -153,6 +158,7 @@ static inline void swab_mar_refcount_set_t (mar_refcount_set_t *to_swab)
 
 struct checkpoint {
 	struct list_head list;
+	struct list_head expiry_list;
 	mar_name_t name;
 	mar_uint32_t ckpt_id;
 	mar_ckpt_checkpoint_creation_attributes_t checkpoint_creation_attributes;
@@ -345,6 +351,8 @@ static void ckpt_sync_abort(void);
 
 static int nodeid_in_membership (unsigned int nodeid);
 
+static int nodeid_in_membership (unsigned int nodeid);
+
 static void sync_refcount_increment (
 	struct checkpoint *checkpoint, unsigned int nodeid);
 
@@ -368,24 +376,33 @@ DECLARE_LIST_INIT(checkpoint_iteration_list_head);
 
 DECLARE_LIST_INIT(checkpoint_recovery_list_head);
 
-static struct corosync_api_v1 *api;
+DECLARE_LIST_INIT(my_checkpoint_expiry_list_head);
 
 static mar_uint32_t global_ckpt_id = 0;
 
-static enum sync_state my_sync_state;
+static enum sync_state my_sync_state = SYNC_STATE_NOT_STARTED;
 
 static enum iteration_state my_iteration_state;
 
-static struct list_head *my_iteration_state_checkpoint;
+static struct list_head *my_iteration_state_checkpoint_list;
 
-static struct list_head *my_iteration_state_section;
+static struct list_head *my_iteration_state_section_list;
 
 static unsigned int my_member_list[PROCESSOR_COUNT_MAX];
 
 static unsigned int my_member_list_entries = 0;
 
-static unsigned int my_lowest_nodeid = 0;
+static unsigned int my_should_sync = 0;
 
+static unsigned int my_token_callback_active = 0;
+
+/* TODO SCHEDWRK
+static hdb_handle_t callback_expiry_handle;
+*/
+
+static void * my_token_callback_handle;
+
+static struct corosync_api_v1 *api;
 struct checkpoint_cleanup {
 	struct list_head list;
 	mar_name_t checkpoint_name;
@@ -759,51 +776,11 @@ struct req_exec_ckpt_sync_checkpoint_refcount {
 	mar_refcount_set_t refcount_set[PROCESSOR_COUNT_MAX] __attribute__((aligned(8)));
 };
 
+static int first_configuration = 1;
+
 /*
  * Implementation
  */
-
-void clean_checkpoint_list(struct list_head *head)
-{
-	struct list_head *checkpoint_list;
-	struct checkpoint *checkpoint;
-
-	if (list_empty(head)) {
-		log_printf (LOG_LEVEL_DEBUG, "clean_checkpoint_list: List is empty \n");
-		return;
-	}
-
-	checkpoint_list = head->next;
-        while (checkpoint_list != head) {
-		checkpoint = list_entry (checkpoint_list,
-                                struct checkpoint, list);
-                assert (checkpoint > 0);
-
-		/*
-		* If checkpoint has been unlinked and this is the last reference, delete it
-		*/
-		 if (checkpoint->unlinked && checkpoint->reference_count == 0) {
-			log_printf (LOG_LEVEL_DEBUG,"clean_checkpoint_list: deallocating checkpoint %s.\n",
-                                                                                                checkpoint->name.value);
-			checkpoint_list = checkpoint_list->next;
-			checkpoint_release (checkpoint);
-			continue;
-
-		}
-		else if (checkpoint->reference_count == 0) {
-			log_printf (LOG_LEVEL_DEBUG, "clean_checkpoint_list: Starting timer to release checkpoint %s.\n",
-				checkpoint->name.value);
-			api->timer_delete (checkpoint->retention_timer);
-			api->timer_add_duration (
-				checkpoint->checkpoint_creation_attributes.retention_duration,
-				checkpoint,
-				timer_function_retention,
-				&checkpoint->retention_timer);
-		}
-		checkpoint_list = checkpoint_list->next;
-        }
-}
-
 static void ckpt_confchg_fn (
 	enum totem_configuration_type configuration_type,
 	unsigned int *member_list, int member_list_entries,
@@ -812,40 +789,46 @@ static void ckpt_confchg_fn (
 	struct memb_ring_id *ring_id)
 {
 	unsigned int i, j;
+	unsigned int lowest_nodeid;
 
-	/*
-	 * Determine lowest nodeid in old regular configuration for the
-	 * purpose of executing the synchronization algorithm
-	 */
-	if (configuration_type == TOTEM_CONFIGURATION_TRANSITIONAL) {
-		for (i = 0; i < left_list_entries; i++) {
-			for (j = 0; j < my_member_list_entries; j++) {
-				if (left_list[i] == my_member_list[j]) {
-					my_member_list[j] = 0;
-				}
-			}
-		}	
-	}
-	
-	my_lowest_nodeid = 0xffffffff;
+	memcpy (&my_saved_ring_id, ring_id,
+		sizeof (struct memb_ring_id));
+       if (configuration_type != TOTEM_CONFIGURATION_REGULAR) {
+                return;
+        }
+        if (my_sync_state != SYNC_STATE_NOT_STARTED) {
+                return;
+        }
+
+	my_sync_state = SYNC_STATE_STARTED;
+
+	my_should_sync = 0;
 
 	/*
 	 * Handle regular configuration
 	 */
-	if (configuration_type == TOTEM_CONFIGURATION_REGULAR) {
-		memcpy (my_member_list, member_list,
-			sizeof (unsigned int) * member_list_entries);
-		my_member_list_entries = member_list_entries;
-		memcpy (&my_saved_ring_id, ring_id,
-			sizeof (struct memb_ring_id));
-		for (i = 0; i < my_member_list_entries; i++) {
-			if ((my_member_list[i] != 0) &&
-				(my_member_list[i] < my_lowest_nodeid)) {
+	lowest_nodeid = 0xffffffff;
 
-				my_lowest_nodeid = my_member_list[i];
+	for (i = 0; i < my_member_list_entries; i++) {
+		for (j = 0; j < member_list_entries; j++) {
+			if (my_member_list[i] == member_list[j]) {
+				if (lowest_nodeid > member_list[j]) {
+					lowest_nodeid = member_list[j];
+				}
 			}
 		}
 	}
+	memcpy (my_member_list, member_list,
+		sizeof (unsigned int) * member_list_entries);
+	my_member_list_entries = member_list_entries;
+
+	if ((first_configuration) ||
+		(lowest_nodeid == api->totem_nodeid_get())) {
+
+		my_should_sync = 1;
+	}
+
+	first_configuration = 0;
 }
 
 static struct checkpoint *checkpoint_find (
@@ -1020,6 +1003,9 @@ void checkpoint_release (struct checkpoint *checkpoint)
 
 	api->timer_delete (checkpoint->retention_timer);
 
+	list_del (&checkpoint->expiry_list);
+	list_init (&checkpoint->expiry_list);
+
 	/*
 	 * Release all checkpoint sections for this checkpoint
 	 */
@@ -1060,14 +1046,12 @@ int ckpt_checkpoint_close (
 	iovec.iov_base = (char *)&req_exec_ckpt_checkpointclose;
 	iovec.iov_len = sizeof (req_exec_ckpt_checkpointclose);
 
-	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
-
-	return (-1);
+	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
 }
 
-static int ckpt_exec_init_fn (struct corosync_api_v1 *corosync_api)
+static int ckpt_exec_init_fn (struct corosync_api_v1 *corosync_api_v1)
 {
-	api = corosync_api;
+	api = corosync_api_v1;
 
 	return (0);
 }
@@ -1304,6 +1288,7 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 		checkpoint->unlinked = 0;
 		list_init (&checkpoint->list);
 		list_init (&checkpoint->sections_list_head);
+		list_init (&checkpoint->expiry_list);
 		list_add (&checkpoint->list, &checkpoint_list_head);
 		checkpoint->reference_count = 1;
 		checkpoint->retention_timer = 0;
@@ -1351,6 +1336,12 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 			checkpoint_section->expiration_timer = 0;
 		}
 	} else {
+        /*
+         * We have to ignore the retention_duration attribute
+         */
+        req_exec_ckpt_checkpointopen->checkpoint_creation_attributes.retention_duration =
+            checkpoint->checkpoint_creation_attributes.retention_duration;
+        
 		if (req_exec_ckpt_checkpointopen->checkpoint_creation_attributes_set &&
 			memcmp (&checkpoint->checkpoint_creation_attributes,
 				&req_exec_ckpt_checkpointopen->checkpoint_creation_attributes,
@@ -1510,29 +1501,80 @@ free_mem :
 
 }
 
+int callback_expiry (enum totem_callback_token_type type, void *data)
+{
+	struct checkpoint *checkpoint = (struct checkpoint *)data;
+	struct req_exec_ckpt_checkpointunlink req_exec_ckpt_checkpointunlink;
+	struct iovec iovec;
+	unsigned int res;
+	struct list_head *list;
+
+	list = my_checkpoint_expiry_list_head.next;
+	while (!list_empty(&my_checkpoint_expiry_list_head)) {
+		checkpoint = list_entry (list,
+			struct checkpoint, expiry_list);
+
+		log_printf (LOG_LEVEL_DEBUG,
+			"refcnt checkpoint %s %d\n",
+			get_mar_name_t (&checkpoint->name), checkpoint->reference_count);
+		if (checkpoint->reference_count == 0) {
+			req_exec_ckpt_checkpointunlink.header.size =
+				sizeof (struct req_exec_ckpt_checkpointunlink);
+			req_exec_ckpt_checkpointunlink.header.id =
+				SERVICE_ID_MAKE (CKPT_SERVICE,
+					MESSAGE_REQ_EXEC_CKPT_CHECKPOINTUNLINK);
+
+			req_exec_ckpt_checkpointunlink.source.conn = 0;
+			req_exec_ckpt_checkpointunlink.source.nodeid = 0;
+
+			memcpy (&req_exec_ckpt_checkpointunlink.checkpoint_name,
+				&checkpoint->name,
+				sizeof (mar_name_t));
+
+			iovec.iov_base = (char *)&req_exec_ckpt_checkpointunlink;
+			iovec.iov_len = sizeof (req_exec_ckpt_checkpointunlink);
+
+			res = api->totem_mcast (&iovec, 1, TOTEM_AGREED);
+			if (res == -1) {
+				return (-1);
+			}
+			log_printf (LOG_LEVEL_DEBUG,
+				"Expiring checkpoint %s\n",
+				get_mar_name_t (&checkpoint->name));
+		}
+
+		list_del (&checkpoint->expiry_list);
+		list_init (&checkpoint->expiry_list);
+		list = my_checkpoint_expiry_list_head.next;
+	}
+	my_token_callback_active = 0;
+	return (0);
+}
+
 void timer_function_retention (void *data)
 {
 	struct checkpoint *checkpoint = (struct checkpoint *)data;
-	struct req_exec_ckpt_checkpointretentiondurationexpire req_exec_ckpt_checkpointretentiondurationexpire;
-	struct iovec iovec;
 
 	checkpoint->retention_timer = 0;
-	req_exec_ckpt_checkpointretentiondurationexpire.header.size =
-		sizeof (struct req_exec_ckpt_checkpointretentiondurationexpire);
-	req_exec_ckpt_checkpointretentiondurationexpire.header.id =
-		SERVICE_ID_MAKE (CKPT_SERVICE,
-			MESSAGE_REQ_EXEC_CKPT_CHECKPOINTRETENTIONDURATIONEXPIRE);
+	list_add (&checkpoint->expiry_list, &my_checkpoint_expiry_list_head);
 
-	memcpy (&req_exec_ckpt_checkpointretentiondurationexpire.checkpoint_name,
-		&checkpoint->name,
-		sizeof (mar_name_t));
-	req_exec_ckpt_checkpointretentiondurationexpire.ckpt_id =
-		checkpoint->ckpt_id;
+	if (my_token_callback_active == 0) {
+		api->totem_callback_token_create (
+			&my_token_callback_handle,
+			TOTEM_CALLBACK_TOKEN_SENT,
+			1,
+			callback_expiry,
+			NULL);
 
-	iovec.iov_base = (char *)&req_exec_ckpt_checkpointretentiondurationexpire;
-	iovec.iov_len = sizeof (req_exec_ckpt_checkpointretentiondurationexpire);
+/* TODO use schedwrk instead of totempg callback token
+		schedwrk_create (
+			&callback_expiry_handle,
+			callback_expiry,
+			NULL);
+*/
 
-	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+		my_token_callback_active = 1;
+	}
 }
 
 static void message_handler_req_exec_ckpt_checkpointclose (
@@ -2395,6 +2437,7 @@ static int ckpt_lib_exit_fn (void *conn)
 	struct checkpoint_cleanup *checkpoint_cleanup;
 	struct list_head *list;
 	struct ckpt_pd *ckpt_pd = (struct ckpt_pd *)api->ipc_private_data_get (conn);
+	int res;
 
 	log_printf (LOG_LEVEL_DEBUG, "checkpoint exit conn %p\n", conn);
 
@@ -2408,9 +2451,16 @@ static int ckpt_lib_exit_fn (void *conn)
 			struct checkpoint_cleanup, list);
 
 		assert (checkpoint_cleanup->checkpoint_name.length != 0);
-		ckpt_checkpoint_close (
+		res = ckpt_checkpoint_close (
 			&checkpoint_cleanup->checkpoint_name,
 			checkpoint_cleanup->ckpt_id);
+		/*
+		 * If checkpoint_close fails because of full totem queue
+		 * return -1 ande try again later
+		 */
+		if (res == -1) {
+			return (-1);
+		}
 
 		list_del (&checkpoint_cleanup->list);
 		free (checkpoint_cleanup);
@@ -2570,15 +2620,11 @@ static void message_handler_req_lib_ckpt_activereplicaset (
 	/*
 	 * Make sure checkpoint is collocated and async update option
 	 */
-	if (checkpoint == NULL) {
-		error = SA_AIS_ERR_NOT_EXIST;
-	} else
 	if (((checkpoint->checkpoint_creation_attributes.creation_flags & SA_CKPT_CHECKPOINT_COLLOCATED) == 0) ||
 		(checkpoint->checkpoint_creation_attributes.creation_flags & (SA_CKPT_WR_ACTIVE_REPLICA | SA_CKPT_WR_ACTIVE_REPLICA_WEAK)) == 0) {
 		error = SA_AIS_ERR_BAD_OPERATION;
-	} else {
-		checkpoint->active_replica_set = 1;
 	}
+	checkpoint->active_replica_set = 1;
 	res_lib_ckpt_activereplicaset.header.size = sizeof (struct res_lib_ckpt_activereplicaset);
 	res_lib_ckpt_activereplicaset.header.id = MESSAGE_RES_CKPT_ACTIVEREPLICASET;
 	res_lib_ckpt_activereplicaset.header.error = error;
@@ -2960,9 +3006,6 @@ static void message_handler_req_lib_ckpt_checkpointsynchronize (
 		&checkpoint_list_head,
 		&req_lib_ckpt_checkpointsynchronize->checkpoint_name,
 		req_lib_ckpt_checkpointsynchronize->ckpt_id);
-	if (checkpoint == NULL) {
-		res_lib_ckpt_checkpointsynchronize.header.error = SA_AIS_ERR_NOT_EXIST;	
-	} else
 	if ((checkpoint->checkpoint_creation_attributes.creation_flags & (SA_CKPT_WR_ACTIVE_REPLICA | SA_CKPT_WR_ACTIVE_REPLICA_WEAK)) == 0) {
 		res_lib_ckpt_checkpointsynchronize.header.error = SA_AIS_ERR_BAD_OPERATION;
 	} else
@@ -2993,9 +3036,6 @@ static void message_handler_req_lib_ckpt_checkpointsynchronizeasync (
 		&checkpoint_list_head,
 		&req_lib_ckpt_checkpointsynchronizeasync->checkpoint_name,
 		req_lib_ckpt_checkpointsynchronizeasync->ckpt_id);
-	if (checkpoint == NULL) {
-		res_lib_ckpt_checkpointsynchronizeasync.header.error = SA_AIS_ERR_NOT_EXIST;
-	} else
 	if ((checkpoint->checkpoint_creation_attributes.creation_flags & (SA_CKPT_WR_ACTIVE_REPLICA | SA_CKPT_WR_ACTIVE_REPLICA_WEAK)) == 0) {
 		res_lib_ckpt_checkpointsynchronizeasync.header.error = SA_AIS_ERR_BAD_OPERATION;
 	} else
@@ -3398,19 +3438,29 @@ void sync_checkpoints_free (struct list_head *ckpt_list_head)
 	list_init (ckpt_list_head);
 }
 
-static inline void sync_checkpoints_enter (void)
+static inline void sync_gloalid_enter (void)
 {
 	struct checkpoint *checkpoint;
 
 	ENTER();
 
-	my_sync_state = SYNC_STATE_CHECKPOINT;
-	my_iteration_state = ITERATION_STATE_CHECKPOINT;
-	my_iteration_state_checkpoint = checkpoint_list_head.next;
+	my_sync_state = SYNC_STATE_GLOBALID;
+
+	my_iteration_state_checkpoint_list = checkpoint_list_head.next;
 
 	checkpoint = list_entry (checkpoint_list_head.next, struct checkpoint,
 		list);
-	my_iteration_state_section = checkpoint->sections_list_head.next;
+	my_iteration_state_section_list = checkpoint->sections_list_head.next;
+
+	LEAVE();
+}
+
+static inline void sync_checkpoints_enter (void)
+{
+	ENTER();
+
+	my_sync_state = SYNC_STATE_CHECKPOINT;
+	my_iteration_state = ITERATION_STATE_CHECKPOINT;
 
 	LEAVE();
 }
@@ -3418,13 +3468,15 @@ static inline void sync_checkpoints_enter (void)
 static inline void sync_refcounts_enter (void)
 {
 	my_sync_state = SYNC_STATE_REFCOUNT;
+
+	my_iteration_state_checkpoint_list = checkpoint_list_head.next;
 }
 
 static void ckpt_sync_init (void)
 {
 	ENTER();
 
-	sync_checkpoints_enter();
+	sync_gloalid_enter();
 
 	LEAVE();
 }
@@ -3464,6 +3516,19 @@ static int sync_checkpoint_transmit (struct checkpoint *checkpoint)
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
 }
 
+static int sync_checkpoint_globalid_transmit (void)
+{
+	struct checkpoint checkpoint;
+
+	strcpy ((char *)checkpoint.name.value, GLOBALID_CHECKPOINT_NAME);
+
+	checkpoint.name.length = strlen (GLOBALID_CHECKPOINT_NAME);
+	checkpoint.ckpt_id = global_ckpt_id;
+
+	return (sync_checkpoint_transmit(&checkpoint));
+}
+
+
 static int sync_checkpoint_section_transmit (
 	struct checkpoint *checkpoint,
 	struct checkpoint_section *checkpoint_section)
@@ -3502,7 +3567,7 @@ static int sync_checkpoint_section_transmit (
 
 	iovecs[0].iov_base = (char *)&req_exec_ckpt_sync_checkpoint_section;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sync_checkpoint_section);
-	iovecs[1].iov_base = (char *)checkpoint_section->section_descriptor.section_id.id;
+	iovecs[1].iov_base = checkpoint_section->section_descriptor.section_id.id;
 	iovecs[1].iov_len = checkpoint_section->section_descriptor.section_id.id_len;
 	iovecs[2].iov_base = checkpoint_section->section_data;
 	iovecs[2].iov_len = checkpoint_section->section_descriptor.section_size;
@@ -3553,25 +3618,62 @@ unsigned int sync_checkpoints_iterate (void)
 	struct list_head *section_list;
 	unsigned int res = 0;
 
-	for (checkpoint_list = checkpoint_list_head.next;
+	/*
+	 * iterate through all checkpoints or sections
+	 * from the last successfully transmitted checkpoint or sectoin
+	 */
+	for (checkpoint_list = my_iteration_state_checkpoint_list;
 		checkpoint_list != &checkpoint_list_head;
 		checkpoint_list = checkpoint_list->next) {
 
 		checkpoint = list_entry (checkpoint_list, struct checkpoint, list);
 
-		res = sync_checkpoint_transmit (checkpoint);
-		if (res != 0) {
-			break;
+		/*
+		 * Synchronize a checkpoint if there is room in the totem
+		 * buffers and we didn't previously synchronize a checkpoint
+		 */
+		if (my_iteration_state == ITERATION_STATE_CHECKPOINT) {
+			res = sync_checkpoint_transmit (checkpoint);
+			if (res != 0) {
+				/*
+				 * Couldn't sync this checkpoint keep processing
+				 */
+				return (-1);
+			}
+			my_iteration_state_section_list = checkpoint->sections_list_head.next;
+			my_iteration_state = ITERATION_STATE_SECTION;
 		}
-		for (section_list = checkpoint->sections_list_head.next;
+
+		/*
+		 * Synchronize a checkpoint section if there is room in the
+		 * totem buffers
+		 */
+		for (section_list = my_iteration_state_section_list;
 			section_list != &checkpoint->sections_list_head;
 			section_list = section_list->next) {
 
 			checkpoint_section = list_entry (section_list, struct checkpoint_section, list);
 			res = sync_checkpoint_section_transmit (checkpoint, checkpoint_section);
+			if (res != 0) {
+				/*
+				 * Couldn't sync this section keep processing
+				 */
+				return (-1);
+			}
+			my_iteration_state_section_list = section_list->next;
 		}
+
+		/*
+		 * Continue to iterating checkpoints
+		 */
+		my_iteration_state = ITERATION_STATE_CHECKPOINT;
+		my_iteration_state_checkpoint_list = checkpoint_list->next;
 	}
-	return (res);
+
+	/*
+	 * all checkpoints and sections iterated
+	 */
+	return (0);
 }
 
 unsigned int sync_refcounts_iterate (void)
@@ -3580,7 +3682,7 @@ unsigned int sync_refcounts_iterate (void)
 	struct list_head *list;
 	unsigned int res = 0;
 
-	for (list = checkpoint_list_head.next;
+	for (list = my_iteration_state_checkpoint_list;
 		list != &checkpoint_list_head;
 		list = list->next) {
 
@@ -3590,48 +3692,68 @@ unsigned int sync_refcounts_iterate (void)
 		if (res != 0) {
 			break;
 		}
+		my_iteration_state_checkpoint_list = list->next;
 	}
 	return (res);
 }
 
 static int ckpt_sync_process (void)
 {
-	unsigned int done_queueing = 1;
-	unsigned int continue_processing = 0;
+	unsigned int done_queueing;
+	unsigned int continue_processing;
 	unsigned int res;
 
 	ENTER();
 
+	continue_processing = 0;
+
 	switch (my_sync_state) {
+        case SYNC_STATE_GLOBALID:
+		done_queueing = 1;
+		continue_processing = 1;
+		if (my_should_sync) {
+			res = sync_checkpoint_globalid_transmit ();
+			if (res != 0) {
+				done_queueing = 0;
+			}
+		}
+		if (done_queueing) {
+			sync_checkpoints_enter ();
+		}
+		break;
+
 	case SYNC_STATE_CHECKPOINT:
-		if (my_lowest_nodeid == api->totem_nodeid_get ()) {
+		done_queueing = 1;
+		continue_processing = 1;
+
+		if (my_should_sync) {
 			TRACE1 ("should transmit checkpoints because lowest member in old configuration.\n");
 			res = sync_checkpoints_iterate ();
 
-			if (res == 0) { 
-				done_queueing = 1;
+			/*
+			 * Not done iterating checkpoints
+			 */
+			if (res != 0) { 
+				done_queueing = 0;
 			}
 		}
 		if (done_queueing) {
 			sync_refcounts_enter ();
 		}
-
-		/*
-		 * TODO recover current iteration state
-		 */
-		continue_processing = 1;
 		break;
 
 	case SYNC_STATE_REFCOUNT:
-		done_queueing = 1;
-		if (my_lowest_nodeid == api->totem_nodeid_get()) {
+		if (my_should_sync) {
 			TRACE1 ("transmit refcounts because this processor is the lowest member in old configuration.\n");
 			res = sync_refcounts_iterate ();
-		}
-		if (done_queueing) {
-			continue_processing = 0;
+			if (res != 0) { 
+				continue_processing = 1;
+			}
 		}
 		break;
+
+	default:
+		assert (0);
 	}
 
 	LEAVE();
@@ -3652,7 +3774,7 @@ static void ckpt_sync_activate (void)
 
 	list_init (&sync_checkpoint_list_head);
 
-	my_sync_state = SYNC_STATE_CHECKPOINT;
+	my_sync_state = SYNC_STATE_NOT_STARTED;
 
 	LEAVE();
 }
@@ -3677,6 +3799,22 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 	 */
 	if (memcmp (&req_exec_ckpt_sync_checkpoint->ring_id,
 		&my_saved_ring_id, sizeof (struct memb_ring_id)) != 0) {
+		return;
+	}
+
+	/*
+	 * Discard checkpoints that are used to synchronize the global_ckpt_id
+	 * also setting the global ckpt_id as well.
+	 */
+	if (memcmp (&req_exec_ckpt_sync_checkpoint->checkpoint_name.value, 
+		GLOBALID_CHECKPOINT_NAME,
+		req_exec_ckpt_sync_checkpoint->checkpoint_name.length) == 0) {
+
+		if (req_exec_ckpt_sync_checkpoint->ckpt_id >= global_ckpt_id) {
+			global_ckpt_id = req_exec_ckpt_sync_checkpoint->ckpt_id + 1;
+		}
+
+		LEAVE();
 		return;
 	}
 
@@ -3718,7 +3856,11 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 
 		list_init (&checkpoint->list);
 		list_init (&checkpoint->sections_list_head);
+		list_init (&checkpoint->expiry_list);
 		list_add (&checkpoint->list, &sync_checkpoint_list_head);
+
+		memset (checkpoint->refcount_set, 0,
+			sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
 	}
 
 	if (checkpoint->ckpt_id >= global_ckpt_id) {
@@ -3746,6 +3888,22 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 	 */
 	if (memcmp (&req_exec_ckpt_sync_checkpoint_section->ring_id,
 		&my_saved_ring_id, sizeof (struct memb_ring_id)) != 0) {
+		LEAVE();
+		return;
+	}
+
+	/*
+	 * Discard checkpoints that are used to synchronize the global_ckpt_id
+	 * also setting the global ckpt_id as well.
+	 */
+	if (memcmp (&req_exec_ckpt_sync_checkpoint_section->checkpoint_name.value, 
+		GLOBALID_CHECKPOINT_NAME,
+		req_exec_ckpt_sync_checkpoint_section->checkpoint_name.length) == 0) {
+
+		if (req_exec_ckpt_sync_checkpoint_section->ckpt_id >= global_ckpt_id) {
+			global_ckpt_id = req_exec_ckpt_sync_checkpoint_section->ckpt_id + 1;
+		}
+
 		LEAVE();
 		return;
 	}
@@ -3809,7 +3967,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 			 */
 			section_id = NULL;
 		}
-
+		
 		memcpy (section_contents,
 		((char *)req_exec_ckpt_sync_checkpoint_section) +
 			sizeof (struct req_exec_ckpt_sync_checkpoint_section) +
@@ -3863,6 +4021,23 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_refcount (
 		LEAVE();
 		return;
 	}
+
+	/*
+	 * Discard checkpoints that are used to synchronize the global_ckpt_id
+	 * also setting the global ckpt_id as well.
+	 */
+	if (memcmp (&req_exec_ckpt_sync_checkpoint_refcount->checkpoint_name.value, 
+		GLOBALID_CHECKPOINT_NAME,
+		req_exec_ckpt_sync_checkpoint_refcount->checkpoint_name.length) == 0) {
+
+		if (req_exec_ckpt_sync_checkpoint_refcount->ckpt_id >= global_ckpt_id) {
+			global_ckpt_id = req_exec_ckpt_sync_checkpoint_refcount->ckpt_id + 1;
+		}
+
+		LEAVE();
+		return;
+	}
+
 
 	checkpoint = checkpoint_find_specific (
 		&sync_checkpoint_list_head,
