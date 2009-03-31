@@ -31,6 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef IPC_MSG_H_DEFINED
 #define IPC_MSG_H_DEFINED
 
@@ -44,20 +45,27 @@ enum req_lib_msg_queue_types {
 	MESSAGE_REQ_MSG_QUEUEOPENASYNC = 1,
 	MESSAGE_REQ_MSG_QUEUECLOSE = 2,
 	MESSAGE_REQ_MSG_QUEUESTATUSGET = 3,
-	MESSAGE_REQ_MSG_QUEUEUNLINK = 4,
-	MESSAGE_REQ_MSG_QUEUEGROUPCREATE = 5,
-	MESSAGE_REQ_MSG_QUEUEGROUPINSERT = 6,
-	MESSAGE_REQ_MSG_QUEUEGROUPREMOVE = 7,
-	MESSAGE_REQ_MSG_QUEUEGROUPDELETE = 8,
-	MESSAGE_REQ_MSG_QUEUEGROUPTRACK = 9,
-	MESSAGE_REQ_MSG_QUEUEGROUPTRACKSTOP = 10,
-	MESSAGE_REQ_MSG_MESSAGESEND = 11,
-	MESSAGE_REQ_MSG_MESSAGESENDASYNC = 12,
-	MESSAGE_REQ_MSG_MESSAGEGET = 13,
-	MESSAGE_REQ_MSG_MESSAGECANCEL = 14,
-	MESSAGE_REQ_MSG_MESSAGESENDRECEIVE = 15,
-	MESSAGE_REQ_MSG_MESSAGEREPLY = 16,
-	MESSAGE_REQ_MSG_MESSAGEREPLYASYNC = 17
+	MESSAGE_REQ_MSG_QUEUERETENTIONTIMESET = 4,
+	MESSAGE_REQ_MSG_QUEUEUNLINK = 5,
+	MESSAGE_REQ_MSG_QUEUEGROUPCREATE = 6,
+	MESSAGE_REQ_MSG_QUEUEGROUPINSERT = 7,
+	MESSAGE_REQ_MSG_QUEUEGROUPREMOVE = 8,
+	MESSAGE_REQ_MSG_QUEUEGROUPDELETE = 9,
+	MESSAGE_REQ_MSG_QUEUEGROUPTRACK = 10,
+	MESSAGE_REQ_MSG_QUEUEGROUPTRACKSTOP = 11,
+	MESSAGE_REQ_MSG_QUEUEGROUPNOTIFICATIONFREE = 12,
+	MESSAGE_REQ_MSG_MESSAGESEND = 13,
+	MESSAGE_REQ_MSG_MESSAGESENDASYNC = 14,
+	MESSAGE_REQ_MSG_MESSAGEGET = 15,
+	MESSAGE_REQ_MSG_MESSAGEDATAFREE = 16,
+	MESSAGE_REQ_MSG_MESSAGECANCEL = 17,
+	MESSAGE_REQ_MSG_MESSAGESENDRECEIVE = 18,
+	MESSAGE_REQ_MSG_MESSAGEREPLY = 19,
+	MESSAGE_REQ_MSG_MESSAGEREPLYASYNC = 20,
+	MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSET = 21,
+	MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDGET = 22,
+	MESSAGE_REQ_MSG_METADATASIZEGET = 23,
+	MESSAGE_REQ_MSG_LIMITGET = 24
 };
 
 enum res_lib_msg_queue_types {
@@ -65,51 +73,67 @@ enum res_lib_msg_queue_types {
 	MESSAGE_RES_MSG_QUEUEOPENASYNC = 1,
 	MESSAGE_RES_MSG_QUEUECLOSE = 2,
 	MESSAGE_RES_MSG_QUEUESTATUSGET = 3,
-	MESSAGE_RES_MSG_QUEUEUNLINK = 4,
-	MESSAGE_RES_MSG_QUEUEGROUPCREATE = 5,
-	MESSAGE_RES_MSG_QUEUEGROUPINSERT = 6,
-	MESSAGE_RES_MSG_QUEUEGROUPREMOVE = 7,
-	MESSAGE_RES_MSG_QUEUEGROUPDELETE = 8,
-	MESSAGE_RES_MSG_QUEUEGROUPTRACK = 9,
-	MESSAGE_RES_MSG_QUEUEGROUPTRACKSTOP = 10,
-	MESSAGE_RES_MSG_MESSAGESEND = 11,
-	MESSAGE_RES_MSG_MESSAGESENDASYNC = 12,
-	MESSAGE_RES_MSG_MESSAGEGET = 13,
-	MESSAGE_RES_MSG_MESSAGECANCEL = 14,
-	MESSAGE_RES_MSG_MESSAGESENDRECEIVE = 15,
-	MESSAGE_RES_MSG_MESSAGEREPLY = 16,
-	MESSAGE_RES_MSG_MESSAGEREPLYASYNC = 17
+	MESSAGE_RES_MSG_QUEUERETENTIONTIMESET = 4,
+	MESSAGE_RES_MSG_QUEUEUNLINK = 5,
+	MESSAGE_RES_MSG_QUEUEGROUPCREATE = 6,
+	MESSAGE_RES_MSG_QUEUEGROUPINSERT = 7,
+	MESSAGE_RES_MSG_QUEUEGROUPREMOVE = 8,
+	MESSAGE_RES_MSG_QUEUEGROUPDELETE = 9,
+	MESSAGE_RES_MSG_QUEUEGROUPTRACK = 10,
+	MESSAGE_RES_MSG_QUEUEGROUPTRACKSTOP = 11,
+	MESSAGE_RES_MSG_QUEUEGROUPNOTIFICATIONFREE = 12,
+	MESSAGE_RES_MSG_MESSAGESEND = 13,
+	MESSAGE_RES_MSG_MESSAGESENDASYNC = 14,
+	MESSAGE_RES_MSG_MESSAGEGET = 15,
+	MESSAGE_RES_MSG_MESSAGEDATAFREE = 16,
+	MESSAGE_RES_MSG_MESSAGECANCEL = 17,
+	MESSAGE_RES_MSG_MESSAGESENDRECEIVE = 18,
+	MESSAGE_RES_MSG_MESSAGEREPLY = 19,
+	MESSAGE_RES_MSG_MESSAGEREPLYASYNC = 20,
+	MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDSET = 21,
+	MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDGET = 22,
+	MESSAGE_RES_MSG_METADATASIZEGET = 23,
+	MESSAGE_RES_MSG_LIMITGET = 24,
+	MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK = 25,
+	MESSAGE_RES_MSG_QUEUEGROUPTRACK_CALLBACK = 26,
+	MESSAGE_RES_MSG_MESSAGEDELIVERED_CALLBACK = 27,
+	MESSAGE_RES_MSG_MESSAGERECEIVED_CALLBACK = 28
 };
 
 struct req_lib_msg_queueopen {
 	mar_req_header_t header;
-	SaInvocationT invocation;
-	SaNameT queueName;
-	SaMsgQueueCreationAttributesT creationAttributes;
-	int creationAttributesSet;
-	SaMsgQueueOpenFlagsT openFlags;
-	SaMsgQueueHandleT queueHandle;
+	SaMsgQueueHandleT queue_handle;
+	SaNameT queue_name;
+	SaUint8T create_attrs_flag;
+	SaMsgQueueCreationAttributesT create_attrs;
+	SaMsgQueueOpenFlagsT open_flags;
 	SaTimeT timeout;
-	int async_call;
 };
 
 struct res_lib_msg_queueopen {
 	mar_res_header_t header;
-	mar_message_source_t source;
-	SaMsgQueueHandleT queueHandle;
+	SaUint32T queue_id;
+};
+
+struct req_lib_msg_queueopenasync {
+	mar_req_header_t header;
+	SaMsgQueueHandleT queue_handle;
+	SaNameT queue_name;
+	SaUint8T create_attrs_flag;
+	SaMsgQueueCreationAttributesT create_attrs;
+	SaMsgQueueOpenFlagsT open_flags;
+	SaInvocationT invocation;
 };
 
 struct res_lib_msg_queueopenasync {
 	mar_res_header_t header;
-	mar_message_source_t source;
-	SaInvocationT invocation;
-	SaMsgQueueHandleT queueHandle;
+	SaUint32T queue_id;
 };
 
 struct req_lib_msg_queueclose {
 	mar_req_header_t header;
-	SaNameT queueName;
-	SaMsgQueueHandleT queueHandle;
+	SaNameT queue_name;
+	SaUint32T queue_id;
 };
 
 struct res_lib_msg_queueclose {
@@ -118,17 +142,28 @@ struct res_lib_msg_queueclose {
 
 struct req_lib_msg_queuestatusget {
 	mar_req_header_t header;
-	SaNameT queueName;
+	SaNameT queue_name;
 };
 
 struct res_lib_msg_queuestatusget {
 	mar_res_header_t header;
-	SaMsgQueueStatusT queueStatus;
+	SaMsgQueueStatusT queue_status;
+};
+
+struct req_lib_msg_queueretentiontimeset {
+	mar_req_header_t header;
+	SaNameT queue_name;
+	SaUint32T queue_id;
+	SaTimeT retention_time;
+};
+
+struct res_lib_msg_queueretentiontimeset {
+	mar_res_header_t header;
 };
 
 struct req_lib_msg_queueunlink {
 	mar_req_header_t header;
-	SaNameT queueName;
+	SaNameT queue_name;
 };
 
 struct res_lib_msg_queueunlink {
@@ -137,8 +172,8 @@ struct res_lib_msg_queueunlink {
 
 struct req_lib_msg_queuegroupcreate {
 	mar_req_header_t header;
-	SaNameT queueGroupName;
-	SaMsgQueueGroupPolicyT queueGroupPolicy;
+	SaNameT group_name;
+	SaMsgQueueGroupPolicyT policy;
 };
 
 struct res_lib_msg_queuegroupcreate {
@@ -147,8 +182,8 @@ struct res_lib_msg_queuegroupcreate {
 
 struct req_lib_msg_queuegroupinsert {
 	mar_req_header_t header;
-	SaNameT queueGroupName;
-	SaNameT queueName;
+	SaNameT group_name;
+	SaNameT queue_name;
 };
 
 struct res_lib_msg_queuegroupinsert {
@@ -157,8 +192,8 @@ struct res_lib_msg_queuegroupinsert {
 
 struct req_lib_msg_queuegroupremove {
 	mar_req_header_t header;
-	SaNameT queueGroupName;
-	SaNameT queueName;
+	SaNameT group_name;
+	SaNameT queue_name;
 };
 
 struct res_lib_msg_queuegroupremove {
@@ -167,74 +202,90 @@ struct res_lib_msg_queuegroupremove {
 
 struct req_lib_msg_queuegroupdelete {
 	mar_req_header_t header;
-	SaNameT queueGroupName;
+	SaNameT group_name;
 };
 
 struct res_lib_msg_queuegroupdelete {
 	mar_res_header_t header;
 };
-	
+
 struct req_lib_msg_queuegrouptrack {
 	mar_req_header_t header;
-	SaNameT queueGroupName;
-	SaUint8T trackFlags;
-	SaUint8T bufferFlag;
+	SaNameT group_name;
+	SaUint8T track_flags;
+	SaUint8T buffer_flag;
 };
 
 struct res_lib_msg_queuegrouptrack {
 	mar_res_header_t header;
-	SaNameT queueGroupName;
-	SaUint32T numberOfMembers;
-	SaMsgQueueGroupNotificationBufferT notificationBuffer;
+	SaMsgQueueGroupNotificationBufferT buffer;
 };
 
 struct req_lib_msg_queuegrouptrackstop {
 	mar_req_header_t header;
-	SaNameT queueGroupName;
+	SaNameT group_name;
 };
 
 struct res_lib_msg_queuegrouptrackstop {
 	mar_res_header_t header;
 };
 
+struct req_lib_msg_queuegroupnotificationfree {
+	mar_req_header_t header;
+};
+
+struct res_lib_msg_queuegroupnotificationfree {
+	mar_res_header_t header;
+};
+
 struct req_lib_msg_messagesend {
 	mar_req_header_t header;
-	SaInvocationT invocation;
 	SaNameT destination;
-	SaMsgMessageT message;
 	SaTimeT timeout;
-	SaMsgAckFlagsT ackFlags;
-	int async_call;
+	SaMsgMessageT message;
 };
 
 struct res_lib_msg_messagesend {
 	mar_res_header_t header;
-	mar_message_source_t source;
+};
+
+struct req_lib_msg_messagesendasync {
+	mar_req_header_t header;
+	SaNameT destination;
+	SaInvocationT invocation;
+	SaMsgMessageT message;
 };
 
 struct res_lib_msg_messagesendasync {
 	mar_res_header_t header;
-	mar_message_source_t source;
-	SaInvocationT invocation;
 };
 
 struct req_lib_msg_messageget {
 	mar_req_header_t header;
-	SaNameT queueName;
+	SaNameT queue_name;
+	SaUint32T queue_id;
 	SaTimeT timeout;
 };
 
 struct res_lib_msg_messageget {
 	mar_res_header_t header;
-	mar_message_source_t source;
-	SaTimeT sendTime;
-	SaMsgSenderIdT senderId;
+	SaTimeT send_time;
+	SaMsgSenderIdT sender_id;
 	SaMsgMessageT message;
+};
+
+struct req_lib_msg_messagedatafree {
+	mar_req_header_t header;
+};
+
+struct res_lib_msg_messagedatafree {
+	mar_res_header_t header;
 };
 
 struct req_lib_msg_messagecancel {
 	mar_req_header_t header;
-	SaNameT queueName;
+	SaNameT queue_name;
+	SaUint32T queue_id;
 };
 
 struct res_lib_msg_messagecancel {
@@ -245,33 +296,94 @@ struct req_lib_msg_messagesendreceive {
 	mar_req_header_t header;
 	SaNameT destination;
 	SaTimeT timeout;
-	SaNameT queueName;
-	SaMsgMessageT sendMessage;
+	SaMsgMessageT message;
 };
 
 struct res_lib_msg_messagesendreceive {
 	mar_res_header_t header;
-	SaTimeT replySendTime;
-	SaMsgMessageT receiveMessage;
 };
 
 struct req_lib_msg_messagereply {
 	mar_req_header_t header;
-	SaInvocationT invocation;
-	SaNameT queueName;
-	SaNameT senderId;
-	SaMsgMessageT replyMessage;
+	SaMsgMessageT reply_message;
+	SaMsgSenderIdT sender_id;
 	SaTimeT timeout;
-	SaMsgAckFlagsT ackFlags;
-	int async_call;
 };
 
 struct res_lib_msg_messagereply {
 	mar_res_header_t header;
+}
+;
+struct req_lib_msg_messagereplyasync {
+	mar_req_header_t header;
+	SaMsgMessageT reply_message;
+	SaMsgSenderIdT sender_id;
+	SaInvocationT invocation;
 };
 
 struct res_lib_msg_messagereplyasync {
 	mar_res_header_t header;
+};
+
+struct req_lib_msg_queuecapacitythresholdset {
+	mar_req_header_t header;
+	SaNameT queue_name;
+	SaUint32T queue_id;
+};
+
+struct res_lib_msg_queuecapacitythresholdset {
+	mar_res_header_t header;
+};
+
+struct req_lib_msg_queuecapacitythresholdget {
+	mar_req_header_t header;
+	SaNameT queue_name;
+	SaUint32T queue_id;
+};
+
+struct res_lib_msg_queuecapacitythresholdget {
+	mar_res_header_t header;
+};
+
+struct req_lib_msg_metadatasizeget {
+	mar_req_header_t header;
+};
+
+struct res_lib_msg_metadatasizeget {
+	mar_res_header_t header;
+};
+
+struct req_lib_msg_limitget {
+	mar_req_header_t header;
+	SaMsgLimitIdT limit_id;
+};
+
+struct res_lib_msg_limitget {
+	mar_res_header_t header;
+	SaUint64T value;
+};
+
+struct res_lib_msg_queueopen_callback {
+	mar_res_header_t header;
+	SaMsgQueueHandleT queue_handle;
+	SaInvocationT invocation;
+};
+
+struct res_lib_msg_queuegrouptrack_callback {
+	mar_res_header_t header;
+	SaNameT group_name;
+	SaMsgQueueGroupNotificationBufferT buffer;
+	SaUint32T member_count;
+};
+
+struct res_lib_msg_messagedelivered_callback {
+	mar_res_header_t header;
+	SaInvocationT invocation;
+};
+
+struct res_lib_msg_messagereceived_callback {
+	mar_res_header_t header;
+	SaMsgQueueHandleT queue_handle;
 };
 
 #endif /* IPC_MSG_H_DEFINED */

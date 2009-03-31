@@ -45,12 +45,17 @@
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
+#include <time.h>
 #include <arpa/inet.h>
+
+#include <assert.h>
+#include <inttypes.h>
 
 #include <corosync/ipc_gen.h>
 #include <corosync/mar_gen.h>
 #include <corosync/swab.h>
 #include <corosync/list.h>
+#include <corosync/hdb.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
 #include <corosync/lcr/lcr_comp.h>
@@ -63,76 +68,126 @@ LOGSYS_DECLARE_SUBSYS ("MSG", LOG_INFO);
 
 enum msg_exec_message_req_types {
 	MESSAGE_REQ_EXEC_MSG_QUEUEOPEN = 0,
-	MESSAGE_REQ_EXEC_MSG_QUEUECLOSE = 1,
-	MESSAGE_REQ_EXEC_MSG_QUEUESTATUSGET = 2,
-	MESSAGE_REQ_EXEC_MSG_QUEUEUNLINK = 3,
-	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPCREATE = 4,
-	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPINSERT = 5,
-	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPREMOVE = 6,
-	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPDELETE = 7,
-	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACK = 8,
-	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACKSTOP = 9,
-	MESSAGE_REQ_EXEC_MSG_MESSAGESEND = 10,
-	MESSAGE_REQ_EXEC_MSG_MESSAGEGET = 11,
-	MESSAGE_REQ_EXEC_MSG_MESSAGECANCEL = 12,
-	MESSAGE_REQ_EXEC_MSG_MESSAGESENDRECEIVE = 13,
-	MESSAGE_REQ_EXEC_MSG_MESSAGEREPLY = 14,
-	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE = 15,
-	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_ENTRY = 16,
-	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP = 17,
-	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP_ENTRY = 18,
+	MESSAGE_REQ_EXEC_MSG_QUEUEOPENASYNC = 1,
+	MESSAGE_REQ_EXEC_MSG_QUEUECLOSE = 2,
+	MESSAGE_REQ_EXEC_MSG_QUEUESTATUSGET = 3,
+	MESSAGE_REQ_EXEC_MSG_QUEUERETENTIONTIMESET = 4,
+	MESSAGE_REQ_EXEC_MSG_QUEUEUNLINK = 5,
+	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPCREATE = 6,
+	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPINSERT = 7,
+	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPREMOVE = 8,
+	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPDELETE = 9,
+	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACK = 10,
+	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACKSTOP = 11,
+	MESSAGE_REQ_EXEC_MSG_QUEUEGROUPNOTIFICATIONFREE = 12,
+	MESSAGE_REQ_EXEC_MSG_MESSAGESEND = 13,
+	MESSAGE_REQ_EXEC_MSG_MESSAGESENDASYNC = 14,
+	MESSAGE_REQ_EXEC_MSG_MESSAGEGET = 15,
+	MESSAGE_REQ_EXEC_MSG_MESSAGEDATAFREE = 16,
+	MESSAGE_REQ_EXEC_MSG_MESSAGECANCEL = 17,
+	MESSAGE_REQ_EXEC_MSG_MESSAGESENDRECEIVE = 18,
+	MESSAGE_REQ_EXEC_MSG_MESSAGEREPLY = 19,
+	MESSAGE_REQ_EXEC_MSG_MESSAGEREPLYASYNC = 20,
+	MESSAGE_REQ_EXEC_MSG_QUEUECAPACITYTHRESHOLDSET = 21,
+	MESSAGE_REQ_EXEC_MSG_QUEUECAPACITYTHRESHOLDGET = 22,
+	MESSAGE_REQ_EXEC_MSG_METADATASIZEGET = 23,
+	MESSAGE_REQ_EXEC_MSG_LIMITGET = 24,
+	MESSAGE_REQ_EXEC_MSG_QUEUE_TIMEOUT = 25,
+	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE = 26,
+	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_MESSAGE = 27,
+	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_REFCOUNT = 28,
+	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP = 29,
+	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP_MEMBER = 30
+};
+
+enum msg_sync_state {
+	MSG_SYNC_STATE_QUEUE,
+	MSG_SYNC_STATE_GROUP,
+};
+
+enum msg_sync_iteration_state {
+	MSG_SYNC_ITERATION_STATE_QUEUE,
+	MSG_SYNC_ITERATION_STATE_QUEUE_REFCOUNT,
+	MSG_SYNC_ITERATION_STATE_QUEUE_MESSAGE,
+	MSG_SYNC_ITERATION_STATE_GROUP,
+	MSG_SYNC_ITERATION_STATE_GROUP_MEMBER,
+};
+
+struct refcount_set {
+	unsigned int refcount;
+	unsigned int nodeid;
 };
 
 struct message_entry {
-	SaTimeT time;
+	SaTimeT send_time;
+	SaMsgSenderIdT sender_id;
 	SaMsgMessageT message;
+	struct list_head queue_list;
 	struct list_head list;
 };
 
-struct message_queue {
-	SaNameT name;
-	SaUint8T refcount;
-	SaMsgQueueGroupChangesT change;
-	struct list_head group_list;
-	struct list_head queue_list;
+struct queue_cleanup {
+	SaNameT queue_name;
+	SaUint32T queue_id;
+	SaMsgQueueHandleT queue_handle;
+	struct list_head list;
+};
+
+struct priority_area {
+	SaSizeT queue_size;
+	SaSizeT queue_used;
+	SaUint32T message_count;
 	struct list_head message_head;
 };
 
-struct queue_group {
-	SaNameT name;
+struct pending_entry {
+	mar_message_source_t source;
+	struct list_head list;
+};
+
+struct queue_entry {
+	SaNameT queue_name;
+	SaTimeT close_time;
+	SaUint32T refcount;
+	SaUint32T queue_id;
+	SaUint8T unlink_flag;
+	SaMsgQueueOpenFlagsT open_flags;
+	SaMsgQueueGroupChangesT change_flag;
+	SaMsgQueueCreationAttributesT create_attrs;
+	struct group_entry *group;
+	struct list_head queue_list;
+	struct list_head group_list;
+	struct list_head message_head;
+	struct list_head pending_head;
+	struct priority_area priority[SA_MSG_MESSAGE_LOWEST_PRIORITY+1];
+	struct refcount_set refcount_set[PROCESSOR_COUNT_MAX];
+	corosync_timer_handle_t timer_handle;
+};
+
+struct group_entry {
+	SaNameT group_name;
 	SaUint8T track_flags;
+	SaUint32T change_count;
+	SaUint32T member_count;
 	SaMsgQueueGroupPolicyT policy;
-	struct message_queue *rr_queue;
+	struct queue_entry *next_queue;
 	struct list_head group_list;
 	struct list_head queue_head;
 };
 
-enum sync_state {
-	SYNC_STATE_GROUP,
-	SYNC_STATE_QUEUE,
-};
-
-enum iteration_state {
-	ITERATION_STATE_GROUP,
-	ITERATION_STATE_QUEUE,
-};
-
-/*
-struct queue_group_entry {
-	SaMsgQueueGroupChangesT change;
-	struct message_queue *message_queue;
-	struct list_head list;
-};
-*/
-
-/*
-struct queue_cleanup {
-	struct message_queue *queue;
-	SaMsgResourceHandleT queue_handle;
-	struct list_head queue_lock_list_head;
-	struct list_head list;
-};
-*/
+/* 
+ * Define the limits for the message service.
+ * These limits are implementation specific and
+ * can be obtained via the library call saMsgLimitGet
+ * by passing the appropriate limitId (see saMsg.h).
+ */
+#define MAX_PRIORITY_AREA_SIZE 128000
+#define MAX_QUEUE_SIZE         512000
+#define MAX_NUM_QUEUES            32
+#define MAX_NUM_QUEUE_GROUPS      16
+#define MAX_NUM_QUEUES_PER_GROUP  16
+#define MAX_MESSAGE_SIZE          16
+#define MAX_REPLY_SIZE            16
 
 DECLARE_LIST_INIT(queue_list_head);
 DECLARE_LIST_INIT(group_list_head);
@@ -142,33 +197,22 @@ DECLARE_LIST_INIT(sync_group_list_head);
 
 static struct corosync_api_v1 *api;
 
-static int msg_exec_init_fn (struct corosync_api_v1 *);
+static SaUint32T global_queue_id = 0;
+static SaUint32T global_sender_id = 0;
+static SaUint32T global_queue_count = 0;
+static SaUint32T global_group_count = 0;
 
+static void msg_exec_dump_fn (void);
+
+static int msg_exec_init_fn (struct corosync_api_v1 *);
+static int msg_lib_init_fn (void *conn);
 static int msg_lib_exit_fn (void *conn);
 
-static int msg_lib_init_fn (void *conn);
-
-static enum sync_state my_sync_state;
-
-static enum iteration_state my_iteration_state;
-
-static struct list_head *my_iteration_state_group;
-
-static struct list_head *my_iteration_state_queue;
-
-static struct list_head *my_iteration_state_entry;
-
-static unsigned int my_member_list[PROCESSOR_COUNT_MAX];
-
-static unsigned int my_member_list_entries = 0;
-
-static unsigned int my_lowest_nodeid = 0;
-
-/*
-static int msg_dump_fn (void);
-*/
-
 static void message_handler_req_exec_msg_queueopen (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_queueopenasync (
 	void *message,
 	unsigned int nodeid);
 
@@ -177,6 +221,10 @@ static void message_handler_req_exec_msg_queueclose (
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuestatusget (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_queueretentiontimeset (
 	void *message,
 	unsigned int nodeid);
 
@@ -208,11 +256,23 @@ static void message_handler_req_exec_msg_queuegrouptrackstop (
 	void *message,
 	unsigned int nodeid);
 
+static void message_handler_req_exec_msg_queuegroupnotificationfree (
+	void *message,
+	unsigned int nodeid);
+
 static void message_handler_req_exec_msg_messagesend (
 	void *message,
 	unsigned int nodeid);
 
+static void message_handler_req_exec_msg_messagesendasync (
+	void *message,
+	unsigned int nodeid);
+
 static void message_handler_req_exec_msg_messageget (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_messagedatafree (
 	void *message,
 	unsigned int nodeid);
 
@@ -228,11 +288,39 @@ static void message_handler_req_exec_msg_messagereply (
 	void *message,
 	unsigned int nodeid);
 
+static void message_handler_req_exec_msg_messagereplyasync (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_queuecapacitythresholdset (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_queuecapacitythresholdget (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_metadatasizeget (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_limitget (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_queue_timeout (
+	void *message,
+	unsigned int nodeid);
+
 static void message_handler_req_exec_msg_sync_queue (
 	void *message,
 	unsigned int nodeid);
 
-static void message_handler_req_exec_msg_sync_queue_entry (
+static void message_handler_req_exec_msg_sync_queue_message (
+	void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_sync_queue_refcount (
 	void *message,
 	unsigned int nodeid);
 
@@ -240,7 +328,7 @@ static void message_handler_req_exec_msg_sync_group (
 	void *message,
 	unsigned int nodeid);
 
-static void message_handler_req_exec_msg_sync_group_entry (
+static void message_handler_req_exec_msg_sync_group_member (
 	void *message,
 	unsigned int nodeid);
 
@@ -257,6 +345,10 @@ static void message_handler_req_lib_msg_queueclose (
 	void *msg);
 
 static void message_handler_req_lib_msg_queuestatusget (
+	void *conn,
+	void *msg);
+
+static void message_handler_req_lib_msg_queueretentiontimeset (
 	void *conn,
 	void *msg);
 
@@ -288,6 +380,10 @@ static void message_handler_req_lib_msg_queuegrouptrackstop (
 	void *conn,
 	void *msg);
 
+static void message_handler_req_lib_msg_queuegroupnotificationfree (
+	void *conn,
+	void *msg);
+
 static void message_handler_req_lib_msg_messagesend (
 	void *conn,
 	void *msg);
@@ -297,6 +393,10 @@ static void message_handler_req_lib_msg_messagesendasync (
 	void *msg);
 
 static void message_handler_req_lib_msg_messageget (
+	void *conn,
+	void *msg);
+
+static void message_handler_req_lib_msg_messagedatafree (
 	void *conn,
 	void *msg);
 
@@ -316,16 +416,48 @@ static void message_handler_req_lib_msg_messagereplyasync (
 	void *conn,
 	void *msg);
 
+static void message_handler_req_lib_msg_queuecapacitythresholdset (
+	void *conn,
+	void *msg);
+
+static void message_handler_req_lib_msg_queuecapacitythresholdget (
+	void *conn,
+	void *msg);
+
+static void message_handler_req_lib_msg_metadatasizeget (
+	void *conn,
+	void *msg);
+
+static void message_handler_req_lib_msg_limitget (
+	void *conn,
+	void *msg);
+
+static enum msg_sync_state msg_sync_state;
+static enum msg_sync_iteration_state msg_sync_iteration_state;
+
+static struct list_head *msg_sync_iteration_queue;
+static struct list_head *msg_sync_iteration_group;
+static struct list_head *msg_sync_iteration_message;
+static struct list_head *msg_sync_iteration_refcount;
+
 static void msg_sync_init (void);
 static int  msg_sync_process (void);
 static void msg_sync_activate (void);
-static void msg_sync_abort(void);
+static void msg_sync_abort (void);
 
-void queue_entry_release (struct message_entry *entry);
-void queue_release (struct message_queue *queue);
-void grouo_release (struct queue_group *group);
+static void msg_sync_refcount_increment (
+	struct queue_entry *queue, unsigned int nodeid);
+static void msg_sync_refcount_decrement (
+	struct queue_entry *queue, unsigned int nodeid);
+static void msg_sync_refcount_calculate (
+	struct queue_entry *queue);
 
-static struct memb_ring_id my_saved_ring_id;
+static unsigned int member_list[PROCESSOR_COUNT_MAX];
+static unsigned int member_list_entries = 0;
+static unsigned int lowest_nodeid = 0;
+static struct memb_ring_id saved_ring_id;
+
+static int msg_find_member_nodeid (unsigned int nodeid);
 
 static void msg_confchg_fn (
 	enum totem_configuration_type configuration_type,
@@ -339,206 +471,281 @@ struct msg_pd {
 	struct list_head queue_cleanup_list;
 };
 
-/*
- * Executive Handler Definition
- */
 struct corosync_lib_handler msg_lib_engine[] =
 {
-	{ /* 0 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueopen,
 		.response_size		= sizeof (struct res_lib_msg_queueopen),
 		.response_id		= MESSAGE_RES_MSG_QUEUEOPEN,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 1 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueopenasync,
 		.response_size		= sizeof (struct res_lib_msg_queueopenasync),
 		.response_id		= MESSAGE_RES_MSG_QUEUEOPENASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 2 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueclose,
 		.response_size		= sizeof (struct res_lib_msg_queueclose),
 		.response_id		= MESSAGE_RES_MSG_QUEUECLOSE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 3 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuestatusget,
 		.response_size		= sizeof (struct res_lib_msg_queuestatusget),
 		.response_id		= MESSAGE_RES_MSG_QUEUESTATUSGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 4 */
+	{
+		.lib_handler_fn		= message_handler_req_lib_msg_queueretentiontimeset,
+		.response_size		= sizeof (struct res_lib_msg_queueretentiontimeset),
+		.response_id		= MESSAGE_RES_MSG_QUEUERETENTIONTIMESET,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueunlink,
 		.response_size		= sizeof (struct res_lib_msg_queueunlink),
 		.response_id		= MESSAGE_RES_MSG_QUEUEUNLINK,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 5 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupcreate,
 		.response_size		= sizeof (struct res_lib_msg_queuegroupcreate),
 		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPCREATE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 6 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupinsert,
 		.response_size		= sizeof (struct res_lib_msg_queuegroupinsert),
 		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPINSERT,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 7 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupremove,
 		.response_size		= sizeof (struct res_lib_msg_queuegroupremove),
 		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPREMOVE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 8 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupdelete,
 		.response_size		= sizeof (struct res_lib_msg_queuegroupdelete),
 		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPDELETE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 9 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegrouptrack,
 		.response_size		= sizeof (struct res_lib_msg_queuegrouptrack),
 		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPTRACK,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 10 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegrouptrackstop,
 		.response_size		= sizeof (struct res_lib_msg_queuegrouptrackstop),
 		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPTRACKSTOP,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 11 */
+	{
+		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupnotificationfree,
+		.response_size		= sizeof (struct res_lib_msg_queuegroupnotificationfree),
+		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPNOTIFICATIONFREE,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagesend,
 		.response_size		= sizeof (struct res_lib_msg_messagesend),
 		.response_id		= MESSAGE_RES_MSG_MESSAGESEND,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 12 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagesendasync,
 		.response_size		= sizeof (struct res_lib_msg_messagesendasync),
 		.response_id		= MESSAGE_RES_MSG_MESSAGESENDASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 13 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messageget,
 		.response_size		= sizeof (struct res_lib_msg_messageget),
 		.response_id		= MESSAGE_RES_MSG_MESSAGEGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 14 */
+	{
+		.lib_handler_fn		= message_handler_req_lib_msg_messagedatafree,
+		.response_size		= sizeof (struct res_lib_msg_messagedatafree),
+		.response_id		= MESSAGE_RES_MSG_MESSAGEDATAFREE,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagecancel,
 		.response_size		= sizeof (struct res_lib_msg_messagecancel),
 		.response_id		= MESSAGE_RES_MSG_MESSAGECANCEL,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 15 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagesendreceive,
 		.response_size		= sizeof (struct res_lib_msg_messagesendreceive),
 		.response_id		= MESSAGE_RES_MSG_MESSAGESENDRECEIVE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 16 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagereply,
 		.response_size		= sizeof (struct res_lib_msg_messagereply),
 		.response_id		= MESSAGE_RES_MSG_MESSAGEREPLY,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 17 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagereplyasync,
 		.response_size		= sizeof (struct res_lib_msg_messagereplyasync),
 		.response_id		= MESSAGE_RES_MSG_MESSAGEREPLYASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
+	{
+		.lib_handler_fn		= message_handler_req_lib_msg_queuecapacitythresholdset,
+		.response_size		= sizeof (struct res_lib_msg_queuecapacitythresholdset),
+		.response_id		= MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDSET,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
+	{
+		.lib_handler_fn		= message_handler_req_lib_msg_queuecapacitythresholdget,
+		.response_size		= sizeof (struct res_lib_msg_queuecapacitythresholdget),
+		.response_id		= MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDGET,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
+	{
+		.lib_handler_fn		= message_handler_req_lib_msg_metadatasizeget,
+		.response_size		= sizeof (struct res_lib_msg_metadatasizeget),
+		.response_id		= MESSAGE_RES_MSG_METADATASIZEGET,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
+	{
+		.lib_handler_fn		= message_handler_req_lib_msg_limitget,
+		.response_size		= sizeof (struct res_lib_msg_limitget),
+		.response_id		= MESSAGE_RES_MSG_LIMITGET,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
 };
 
-
-static struct corosync_exec_handler msg_exec_engine[] = {
+static struct corosync_exec_handler msg_exec_engine[] =
+{
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queueopen,
+		.exec_handler_fn	= message_handler_req_exec_msg_queueopen,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queueclose,
+		.exec_handler_fn	= message_handler_req_exec_msg_queueopenasync,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queuestatusget,
+		.exec_handler_fn	= message_handler_req_exec_msg_queueclose,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queueunlink,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuestatusget,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queuegroupcreate,
+		.exec_handler_fn	= message_handler_req_exec_msg_queueretentiontimeset,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queuegroupinsert,
+		.exec_handler_fn	= message_handler_req_exec_msg_queueunlink,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queuegroupremove,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuegroupcreate,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queuegroupdelete,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuegroupinsert,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queuegrouptrack,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuegroupremove,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_queuegrouptrackstop,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuegroupdelete,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_messagesend,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuegrouptrack,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_messageget,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuegrouptrackstop,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_messagecancel,
+		.exec_handler_fn	= message_handler_req_exec_msg_queuegroupnotificationfree,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_messagesendreceive,
+		.exec_handler_fn	= message_handler_req_exec_msg_messagesend,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_messagereply,
+		.exec_handler_fn	= message_handler_req_exec_msg_messagesendasync,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_sync_queue,
+		.exec_handler_fn	= message_handler_req_exec_msg_messageget,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_sync_queue_entry,
+		.exec_handler_fn	= message_handler_req_exec_msg_messagedatafree,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_sync_group,
+		.exec_handler_fn	= message_handler_req_exec_msg_messagecancel,
 	},
 	{
-		.exec_handler_fn		= message_handler_req_exec_msg_sync_group_entry,
+		.exec_handler_fn	= message_handler_req_exec_msg_messagesendreceive,
 	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_messagereply,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_messagereplyasync,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_queuecapacitythresholdset,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_queuecapacitythresholdget,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_metadatasizeget,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_limitget,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_queue_timeout,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_sync_queue,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_sync_queue_message,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_sync_queue_refcount,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_sync_group,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_sync_group_member,
+	}
 };
 
 struct corosync_service_engine msg_service_engine = {
-	.name				= "openais message service B.01.01",
-	.id				= MSG_SERVICE,
-	.private_data_size		= sizeof (struct msg_pd),
-	.flow_control			= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED, 
-	.lib_init_fn			= msg_lib_init_fn,
-	.lib_exit_fn			= msg_lib_exit_fn,
-	.lib_engine			= msg_lib_engine,
-	.lib_engine_count		= sizeof (msg_lib_engine) / sizeof (struct corosync_lib_handler),
-	.exec_init_fn			= msg_exec_init_fn,
-	.exec_dump_fn			= NULL,
-	.exec_engine			= msg_exec_engine,
-	.exec_engine_count		= sizeof (msg_exec_engine) / sizeof (struct corosync_exec_handler),
-	.confchg_fn			= msg_confchg_fn,
-	.sync_init			= msg_sync_init,
-	.sync_process			= msg_sync_process,
-	.sync_activate			= msg_sync_activate,
-	.sync_abort			= msg_sync_abort,
+	.name			= "openais message service B.03.01",
+	.id			= MSG_SERVICE,
+	.private_data_size	= sizeof (struct msg_pd),
+	.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED,
+	.lib_init_fn		= msg_lib_init_fn,
+	.lib_exit_fn		= msg_lib_exit_fn,
+	.lib_engine		= msg_lib_engine,
+	.lib_engine_count	= sizeof (msg_lib_engine) / sizeof (struct corosync_lib_handler),
+	.exec_init_fn		= msg_exec_init_fn,
+	.exec_dump_fn		= msg_exec_dump_fn,
+	.exec_engine		= msg_exec_engine,
+	.exec_engine_count	= sizeof (msg_exec_engine)/ sizeof (struct corosync_exec_handler),
+	.confchg_fn		= msg_confchg_fn,
+	.sync_init		= msg_sync_init,
+	.sync_process		= msg_sync_process,
+	.sync_activate		= msg_sync_activate,
+	.sync_abort		= msg_sync_abort,
 };
 
 static struct corosync_service_engine *msg_get_engine_ver0 (void);
 
 static struct corosync_service_engine_iface_ver0 msg_service_engine_iface = {
-	.corosync_get_service_engine_ver0	= msg_get_engine_ver0
+	.corosync_get_service_engine_ver0 = msg_get_engine_ver0
 };
 
 static struct lcr_iface openais_msg_ver0[1] = {
@@ -546,18 +753,18 @@ static struct lcr_iface openais_msg_ver0[1] = {
 		.name			= "openais_msg",
 		.version		= 0,
 		.versions_replace	= 0,
-		.versions_replace_count = 0,
+		.versions_replace_count	= 0,
 		.dependencies		= 0,
 		.dependency_count	= 0,
 		.constructor		= NULL,
 		.destructor		= NULL,
-		.interfaces		= NULL
+		.interfaces		= NULL,
 	}
 };
 
 static struct lcr_comp msg_comp_ver0 = {
-	.iface_count			= 1,
-	.ifaces				= openais_msg_ver0
+	.iface_count	= 1,
+	.ifaces		= openais_msg_ver0
 };
 
 static struct corosync_service_engine *msg_get_engine_ver0 (void)
@@ -565,37 +772,53 @@ static struct corosync_service_engine *msg_get_engine_ver0 (void)
 	return (&msg_service_engine);
 }
 
-__attribute__ ((constructor)) static void register_this_component (void) {
+__attribute__ ((constructor)) static void register_this_component (void)
+{
 	lcr_interfaces_set (&openais_msg_ver0[0], &msg_service_engine_iface);
-
 	lcr_component_register (&msg_comp_ver0);
 }
 
-/*
- * All data types used for executive messages
- */
 struct req_exec_msg_queueopen {
 	mar_req_header_t header;
 	mar_message_source_t source;
-	int async_call;
 	SaNameT queue_name;
-	SaInvocationT invocation;
 	SaMsgQueueHandleT queue_handle;
-	SaMsgQueueCreationAttributesT creation_attributes;
-	SaMsgQueueOpenFlagsT openFlags;
+	SaUint8T create_attrs_flag;
+	SaMsgQueueCreationAttributesT create_attrs;
+	SaMsgQueueOpenFlagsT open_flags;
 	SaTimeT timeout;
+};
+
+struct req_exec_msg_queueopenasync {
+	mar_req_header_t header;
+	mar_message_source_t source;
+	SaNameT queue_name;
+	SaMsgQueueHandleT queue_handle;
+	SaUint8T create_attrs_flag;
+	SaMsgQueueCreationAttributesT create_attrs;
+	SaMsgQueueOpenFlagsT open_flags;
+	SaInvocationT invocation;
 };
 
 struct req_exec_msg_queueclose {
 	mar_req_header_t header;
 	mar_message_source_t source;
 	SaNameT queue_name;
+	SaUint32T queue_id;
 };
 
 struct req_exec_msg_queuestatusget {
 	mar_req_header_t header;
 	mar_message_source_t source;
 	SaNameT queue_name;
+};
+
+struct req_exec_msg_queueretentiontimeset {
+	mar_req_header_t header;
+	mar_message_source_t source;
+	SaNameT queue_name;
+	SaUint32T queue_id;
+	SaTimeT retention_time;
 };
 
 struct req_exec_msg_queueunlink {
@@ -607,34 +830,34 @@ struct req_exec_msg_queueunlink {
 struct req_exec_msg_queuegroupcreate {
 	mar_req_header_t header;
 	mar_message_source_t source;
-	SaNameT queue_group_name;
+	SaNameT group_name;
 	SaMsgQueueGroupPolicyT policy;
 };
 
 struct req_exec_msg_queuegroupinsert {
 	mar_req_header_t header;
 	mar_message_source_t source;
+	SaNameT group_name;
 	SaNameT queue_name;
-	SaNameT queue_group_name;
 };
 
 struct req_exec_msg_queuegroupremove {
 	mar_req_header_t header;
 	mar_message_source_t source;
+	SaNameT group_name;
 	SaNameT queue_name;
-	SaNameT queue_group_name;
 };
 
 struct req_exec_msg_queuegroupdelete {
 	mar_req_header_t header;
 	mar_message_source_t source;
-	SaNameT queue_group_name;
+	SaNameT group_name;
 };
 
 struct req_exec_msg_queuegrouptrack {
 	mar_req_header_t header;
 	mar_message_source_t source;
-	SaNameT queue_group_name;
+	SaNameT group_name;
 	SaUint8T track_flags;
 	SaUint8T buffer_flag;
 };
@@ -642,7 +865,12 @@ struct req_exec_msg_queuegrouptrack {
 struct req_exec_msg_queuegrouptrackstop {
 	mar_req_header_t header;
 	mar_message_source_t source;
-	SaNameT queue_group_name;
+	SaNameT group_name;
+};
+
+struct req_exec_msg_queuegroupnotificationfree {
+	mar_req_header_t header;
+	mar_message_source_t source;
 };
 
 struct req_exec_msg_messagesend {
@@ -651,50 +879,120 @@ struct req_exec_msg_messagesend {
 	SaNameT destination;
 	SaTimeT timeout;
 	SaMsgMessageT message;
+};
+
+struct req_exec_msg_messagesendasync {
+	mar_req_header_t header;
+	mar_message_source_t source;
+	SaNameT destination;
 	SaInvocationT invocation;
-	SaMsgAckFlagsT ack_flags;
-	int async_call;
+	SaMsgMessageT message;
 };
 
 struct req_exec_msg_messageget {
 	mar_req_header_t header;
 	mar_message_source_t source;
 	SaNameT queue_name;
+	SaUint32T queue_id;
+	SaTimeT timeout;
+};
+
+struct req_exec_msg_messagedatafree {
+	mar_req_header_t header;
+	mar_message_source_t source;
 };
 
 struct req_exec_msg_messagecancel {
 	mar_req_header_t header;
 	mar_message_source_t source;
 	SaNameT queue_name;
+	SaUint32T queue_id;
 };
 
 struct req_exec_msg_messagesendreceive {
 	mar_req_header_t header;
 	mar_message_source_t source;
-	SaNameT queue_name;
+	SaNameT destination;
+	SaTimeT timeout;
+	SaMsgMessageT message;
+	SaMsgSenderIdT sender_id;
 };
 
 struct req_exec_msg_messagereply {
 	mar_req_header_t header;
 	mar_message_source_t source;
+	SaMsgMessageT reply_message;
+	SaMsgSenderIdT sender_id;
+	SaTimeT timeout;
+};
+
+struct req_exec_msg_messagereplyasync {
+	mar_req_header_t header;
+	mar_message_source_t source;
+	SaMsgMessageT reply_message;
+	SaMsgSenderIdT sender_id;
+	SaInvocationT invocation;
+};
+
+struct req_exec_msg_queuecapacitythresholdset {
+	mar_req_header_t header;
+	mar_message_source_t source;
 	SaNameT queue_name;
-	int async_call;
+	SaUint32T queue_id;
+};
+
+struct req_exec_msg_queuecapacitythresholdget {
+	mar_req_header_t header;
+	mar_message_source_t source;
+	SaNameT queue_name;
+	SaUint32T queue_id;
+};
+
+struct req_exec_msg_metadatasizeget {
+	mar_req_header_t header;
+	mar_message_source_t source;
+};
+
+struct req_exec_msg_limitget {
+	mar_req_header_t header;
+	mar_message_source_t source;
+	SaMsgLimitIdT limit_id;
+};
+
+struct req_exec_msg_queue_timeout {
+	mar_req_header_t header;
+	SaNameT queue_name;
 };
 
 struct req_exec_msg_sync_queue {
 	mar_req_header_t header;
 	struct memb_ring_id ring_id;
-	SaNameT group_name;
 	SaNameT queue_name;
-	SaMsgQueueGroupChangesT change;
+	SaUint32T queue_id;
+	SaTimeT close_time;
+	SaUint8T unlink_flag;
+	SaMsgQueueOpenFlagsT open_flags;
+	SaMsgQueueGroupChangesT change_flag;
+	SaMsgQueueCreationAttributesT create_attrs;
+	/* corosync_timer_handle_t ? */
 };
 
-struct req_exec_msg_sync_queue_entry {
+struct req_exec_msg_sync_queue_message {
 	mar_req_header_t header;
 	struct memb_ring_id ring_id;
 	SaNameT queue_name;
-	SaTimeT time;
+	SaUint32T queue_id;
+	SaTimeT send_time;
+	SaMsgSenderIdT sender_id;
 	SaMsgMessageT message;
+};
+
+struct req_exec_msg_sync_queue_refcount {
+	mar_req_header_t header;
+	struct memb_ring_id ring_id;
+	SaNameT queue_name;
+	SaUint32T queue_id;
+	struct refcount_set refcount_set[PROCESSOR_COUNT_MAX];
 };
 
 struct req_exec_msg_sync_group {
@@ -703,508 +1001,78 @@ struct req_exec_msg_sync_group {
 	SaNameT group_name;
 	SaUint8T track_flags;
 	SaMsgQueueGroupPolicyT policy;
-	SaNameT rr_queue_name;
 };
 
-struct req_exec_msg_sync_group_entry {
+struct req_exec_msg_sync_group_member {
 	mar_req_header_t header;
 	struct memb_ring_id ring_id;
 	SaNameT group_name;
 	SaNameT queue_name;
+	SaUint32T queue_id;
 };
 
-char *getSaNameT (SaNameT *name)
+static int msg_find_member_nodeid (
+	unsigned int nodeid)
 {
-#if 0
-        static char ret_name[300];
+	unsigned int i;
 
-        memset (ret_name, 0, sizeof (ret_name));
-        if (name->length > 299) {
-                memcpy (ret_name, name->value, 299);
-        } else {
-
-                memcpy (ret_name, name->value, name->length);
-        }
-        return (ret_name);
-#endif
-// TODO
-        return ((char *)name->value);
-}
-
-int name_match(SaNameT *name1, SaNameT *name2)
-{
-	if (name1->length == name2->length) {
-	return ((strncmp ((char *)name1->value, (char *)name2->value, name1->length)) == 0);
-	}
-	return 0;
-}
-
-SaTimeT cluster_time_now(void)
-{
-	struct timeval tv;
-	SaTimeT time_now;
-
-	if (gettimeofday(&tv, 0)) {
-		return 0ULL;
-	}
-
-	time_now = (SaTimeT)(tv.tv_sec) * 1000000000ULL;
-	time_now += (SaTimeT)(tv.tv_usec) * 1000ULL;
-
-	return time_now;
-}
-
-#if 0
-static void print_entry_list (struct message_queue *queue)
-{
-	struct list_head *list;
-	struct message_entry *entry;
-
-	for (list = queue->message_head.next;
-	     list != &queue->message_head;
-	     list = list->next)
-	{
-		entry = list_entry (list, struct message_entry, list);
-
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: print_entry_list ( %s )\n",
-			    (char *)(entry->message.data));
-	}
-}
-#endif
-
-#if 0
-static void print_queue_list (struct list_head *head)
-{
-	struct list_head *list;
-	struct message_queue *queue;
-
-	for (list = head->next;
-	     list != head;
-	     list = list->next)
-	{
-		queue = list_entry (list, struct message_queue, queue_list);
-
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: print_queue_list ( %s )\n",
-			    getSaNameT (&queue->name));
-	}
-}
-#endif
-
-#if 0
-static void print_group_list (struct list_head *head)
-{
-	struct list_head *list;
-	struct queue_group *group;
-
-	for (list = head->next;
-	     list != head;
-	     list = list->next)
-	{
-		group = list_entry (list, struct queue_group, group_list);
-
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: print_group_list ( %s )\n",
-			    getSaNameT (&group->name));
-	}
-}
-#endif
-
-#if 0
-static void print_group_queue_list (struct queue_group *group)
-{
-	struct list_head *list;
-	struct message_queue *queue;
-
-	for (list = group->queue_head.next;
-	     list != &group->queue_head;
-	     list = list->next)
-	{
-		queue = list_entry (list, struct message_queue, group_list);
-
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: print_queue_in_group ( %s )\n",
-			    getSaNameT (&queue->name));
-	}
-}
-#endif
-
-void queue_entry_release (struct message_entry *entry)
-{
-	if (entry->message.data) {
-		free (entry->message.data);
-	}
-	free (entry);
-}
-
-void queue_release (struct message_queue *queue)
-{
-	struct list_head *list;
-	struct message_entry *entry;
-
-	for (list = queue->message_head.next;
-	     list != &queue->message_head;) {
-
-		entry = list_entry (list, struct message_entry, list);
-
-		list = list->next;
-		queue_entry_release (entry);
-	}
-	list_del (&queue->queue_list);
-	list_del (&queue->group_list);
-	free (queue);
-}
-
-void group_release (struct queue_group *group)
-{
-	list_del (&group->group_list);
-	free (group);
-}
-
-#if 0
-static struct message_queue *sync_queue_find (SaNameT *name)
-{
-	struct list_head *list;
-	struct message_queue *queue;
-
-	for (list = sync_queue_list_head.next;
-	     list != &sync_queue_list_head;
-	     list = list->next)
-	{
-	        queue = list_entry (list, struct message_queue, queue_list);
-
-		if (name_match (name, &queue->name)) {
-			return (queue);
+	for (i = 0; i < member_list_entries; i++) {
+		if (nodeid == member_list[i]) {
+			return (1);
 		}
 	}
 	return (0);
 }
-#endif
 
-#if 0
-static struct queue_group *sync_group_find (SaNameT *name)
+void msg_sync_refcount_increment (
+	struct queue_entry *queue,
+	unsigned int nodeid)
 {
-	struct list_head *list;
-	struct queue_group *group;
+	unsigned int i;
 
-	for (list = sync_group_list_head.next;
-	     list != &sync_group_list_head;
-	     list = list->next)
-	{
-	        group = list_entry (list, struct queue_group, group_list);
-
-		if (name_match (name, &group->name)) {
-			return (group);
-		}
-	}
-	return (0);
-}
-#endif
-
-static inline void sync_group_free (struct list_head *group_head)
-{
-	struct queue_group *group;
-	struct list_head *list;
-
-	list = group_head->next;
-
-	while (list != group_head) {
-		group = list_entry (list, struct queue_group, group_list);
-		list = list->next;
-		group_release (group);
-	}
-
-	list_init (group_head);
-}
-
-static inline void sync_queue_free (struct list_head *queue_head)
-{
-	struct message_queue *queue;
-	struct list_head *list;
-
-	list = queue_head->next;
-
-	while (list != queue_head) {
-		queue = list_entry (list, struct message_queue, queue_list);
-		list = list->next;
-		queue_release (queue);
-	}
-
-	list_init (queue_head);
-}
-
-static inline void sync_queue_enter (void)
-{
-	struct message_queue *queue;
-
-	ENTER();
-
-	my_sync_state = SYNC_STATE_QUEUE;
-	my_iteration_state = ITERATION_STATE_QUEUE;
-	my_iteration_state_queue = queue_list_head.next;
-
-	queue = list_entry (queue_list_head.next, struct message_queue, queue_list);
-
-	my_iteration_state_entry = queue->message_head.next;
-
-	LEAVE();
-}
-
-static inline void sync_group_enter (void)
-{
-	my_sync_state = SYNC_STATE_GROUP;
-}
-
-static int sync_queue_transmit (
-	struct message_queue *queue)
-{
-	struct req_exec_msg_sync_queue req_exec_msg_sync_queue;
-	struct iovec iovec;
-
-	memset (&req_exec_msg_sync_queue, 0,
-		sizeof (struct req_exec_msg_sync_queue));
-
-	req_exec_msg_sync_queue.header.size =
-		sizeof (struct req_exec_msg_sync_queue);
-	req_exec_msg_sync_queue.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE);
-
-	memcpy (&req_exec_msg_sync_queue.ring_id,
-		&my_saved_ring_id, sizeof (struct memb_ring_id));
-	memcpy (&req_exec_msg_sync_queue.queue_name,
-		&queue->name, sizeof (SaNameT));
-
-	req_exec_msg_sync_queue.change = queue->change;
-
-	iovec.iov_base = (char *)&req_exec_msg_sync_queue;
-	iovec.iov_len = sizeof (req_exec_msg_sync_queue);
-
-	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
-}
-
-static int sync_queue_entry_transmit (
-	struct message_queue *queue,
-	struct message_entry *entry)
-{
-	struct req_exec_msg_sync_queue_entry req_exec_msg_sync_queue_entry;
-	struct iovec iovec[2];
-
-	memset (&req_exec_msg_sync_queue_entry, 0,
-		sizeof (struct req_exec_msg_sync_queue_entry));
-
-	req_exec_msg_sync_queue_entry.header.size =
-		sizeof (struct req_exec_msg_sync_queue_entry);
-	req_exec_msg_sync_queue_entry.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_ENTRY);
-
-	memcpy (&req_exec_msg_sync_queue_entry.ring_id,
-		&my_saved_ring_id, sizeof (struct memb_ring_id));
-	memcpy (&req_exec_msg_sync_queue_entry.queue_name,
-		&queue->name, sizeof (SaNameT));
-	memcpy (&req_exec_msg_sync_queue_entry.message,
-		&entry->message, sizeof (SaMsgMessageT));
-
-	req_exec_msg_sync_queue_entry.time = entry->time;
-
-	iovec[0].iov_base = (char *)&req_exec_msg_sync_queue_entry;
-	iovec[0].iov_len = sizeof (req_exec_msg_sync_queue_entry);
-	iovec[1].iov_base = entry->message.data;
-	iovec[1].iov_len = entry->message.size;
-
-	return (api->totem_mcast (iovec, 2, TOTEM_AGREED));
-}
-
-static int sync_group_transmit (
-	struct queue_group *group)
-{
-	struct req_exec_msg_sync_group req_exec_msg_sync_group;
-	struct iovec iovec;
-
-	memset (&req_exec_msg_sync_group, 0,
-		sizeof (struct req_exec_msg_sync_group));
-
-	req_exec_msg_sync_group.header.size =
-		sizeof (struct req_exec_msg_sync_group);
-	req_exec_msg_sync_group.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_GROUP);
-
-	memcpy (&req_exec_msg_sync_group.ring_id,
-		&my_saved_ring_id, sizeof (struct memb_ring_id));
-	memcpy (&req_exec_msg_sync_group.group_name,
-		&group->name, sizeof (SaNameT));
-
-	if (group->rr_queue != NULL) {
-		memcpy (&req_exec_msg_sync_group.rr_queue_name,
-			&group->rr_queue->name, sizeof (SaNameT));
-	}
-
-	req_exec_msg_sync_group.policy = group->policy;
-	req_exec_msg_sync_group.track_flags = group->track_flags;
-
-	iovec.iov_base = (char *)&req_exec_msg_sync_group;
-	iovec.iov_len = sizeof (req_exec_msg_sync_group);
-
-	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
-}
-
-static int sync_group_entry_transmit (
-	struct queue_group *group,
-	struct message_queue *queue)
-{
-	struct req_exec_msg_sync_group_entry req_exec_msg_sync_group_entry;
-	struct iovec iovec;
-
-	memset (&req_exec_msg_sync_group_entry, 0,
-		sizeof (struct  req_exec_msg_sync_group_entry));
-
-	req_exec_msg_sync_group_entry.header.size =
-		sizeof (struct req_exec_msg_sync_group_entry);
-	req_exec_msg_sync_group_entry.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_GROUP_ENTRY);
-
-	memcpy (&req_exec_msg_sync_group_entry.ring_id,
-		&my_saved_ring_id, sizeof (struct memb_ring_id));
-	memcpy (&req_exec_msg_sync_group_entry.group_name,
-		&group->name, sizeof (SaNameT));
-	memcpy (&req_exec_msg_sync_group_entry.queue_name,
-		&queue->name, sizeof (SaNameT));
-
-	iovec.iov_base = (char *)&req_exec_msg_sync_group_entry;
-	iovec.iov_len = sizeof (req_exec_msg_sync_group_entry);
-
-	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
-}
-
-static int sync_queue_iterate (void)
-{
-	struct message_queue *queue;
-	struct message_entry *entry;
-	struct list_head *queue_list;
-	struct list_head *entry_list;
-	unsigned int res = 0;
-
-	for (queue_list = queue_list_head.next;
-	     queue_list != &queue_list_head;
-	     queue_list = queue_list->next)
-	{
-		queue = list_entry (queue_list, struct message_queue, queue_list);
-
-		res = sync_queue_transmit (queue);
-		if (res != 0) {
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		if (queue->refcount_set[i].nodeid == 0) {
+			queue->refcount_set[i].nodeid = nodeid;
+			queue->refcount_set[i].refcount = 1;
 			break;
 		}
-
-		for (entry_list = queue->message_head.next;
-		     entry_list != &queue->message_head;
-		     entry_list = entry_list->next)
-		{
-			entry = list_entry (entry_list, struct message_entry, list);
-			res = sync_queue_entry_transmit (queue, entry);
-		}
-	}
-
-	return (res);
-}
-
-static int sync_group_iterate (void)
-{
-	struct queue_group *group;
-	struct message_queue *queue;
-	struct list_head *group_list;
-	struct list_head *queue_list;
-	unsigned int res = 0;
-
-	for (group_list = group_list_head.next;
-	     group_list != &group_list_head;
-	     group_list = group_list->next)
-	{
-		group = list_entry (group_list, struct queue_group, group_list);
-
-		res = sync_group_transmit (group);
-		if (res != 0) {
+		if (queue->refcount_set[i].nodeid == nodeid) {
+			queue->refcount_set[i].refcount += 1;
 			break;
 		}
-
-		for (queue_list = group->queue_head.next;
-		     queue_list != &group->queue_head;
-		     queue_list = queue_list->next)
-		{
-			queue = list_entry (queue_list, struct message_queue, group_list);
-			res = sync_group_entry_transmit (group, queue);
-		}
 	}
-
-	return (res);
 }
 
-static void msg_sync_init (void) 
+void msg_sync_refcount_decrement (
+	struct queue_entry *queue,
+	unsigned int nodeid)
 {
-	ENTER();
+	unsigned int i;
 
-	sync_queue_enter ();
-
-	LEAVE();
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		if (queue->refcount_set[i].nodeid == 0) {
+			break;
+		}
+		if (queue->refcount_set[i].nodeid == nodeid) {
+			queue->refcount_set[i].refcount -= 1;
+			break;
+		}
+	}
 }
 
-static int msg_sync_process (void)
+void msg_sync_refcount_calculate (
+	struct queue_entry *queue)
 {
-	unsigned int done_queueing = 1;
-	unsigned int continue_processing = 0;
-	unsigned int res;
+	unsigned int i;
 
-	switch (my_sync_state)
-	{
-	case SYNC_STATE_QUEUE:
-		if (my_lowest_nodeid == api->totem_nodeid_get ()) {
-			TRACE1 ("transmit queues because lowest member in old configuration.\n");
+	queue->refcount = 0;
 
-			res = sync_queue_iterate ();
-			if (res == 0) {
-				done_queueing = 1;
-			}
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		if (queue->refcount_set[i].nodeid == 0) {
+			break;
 		}
-		if (done_queueing) {
-			sync_group_enter ();
-		}
-
-		continue_processing = 1;
-		break;
-
-	case SYNC_STATE_GROUP:
-		if (my_lowest_nodeid == api->totem_nodeid_get ()) {
-			TRACE1 ("transmit groups because lowest member in old configuration.\n");
-
-			res = sync_group_iterate ();
-		}
-		if (done_queueing) {
-			continue_processing = 0;
-		}
-		break;
+		queue->refcount += queue->refcount_set[i].refcount;
 	}
-
-	return (continue_processing);
-}
-
-static void msg_sync_activate (void) 
-{
-	sync_group_free (&group_list_head);
-	sync_queue_free (&queue_list_head);
-
-	if (!list_empty (&sync_group_list_head)) {
-		list_splice (&sync_group_list_head, &group_list_head);
-	}
-
-	if (!list_empty (&sync_queue_list_head)) {
-		list_splice (&sync_queue_list_head, &queue_list_head);
-	}
-
-	list_init (&sync_group_list_head);
-	list_init (&sync_queue_list_head);
-
- 	return;
-}
-
-static void msg_sync_abort (void) 
-{
-	sync_group_free (&sync_group_list_head);
-	sync_queue_free (&sync_queue_list_head);
 }
 
 static void msg_confchg_fn (
@@ -1216,259 +1084,1117 @@ static void msg_confchg_fn (
 {
 	unsigned int i, j;
 
-	/*
-	 * Determine lowest nodeid in old regular configuration for the
-	 * purpose of executing the synchronization algorithm
-	 */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_confchg_fn\n");
+
 	if (configuration_type == TOTEM_CONFIGURATION_TRANSITIONAL) {
 		for (i = 0; i < left_list_entries; i++) {
-			for (j = 0; j < my_member_list_entries; j++) {
-				if (left_list[i] == my_member_list[j]) {
-					my_member_list[j] = 0;
+			for (j = 0; j < member_list_entries; j++) {
+				if (left_list[i] == member_list[j]) {
+					member_list[j] = 0;
 				}
 			}
 		}
 	}
 
-	my_lowest_nodeid = 0xffffffff;
+	lowest_nodeid = 0xffffffff;
 
-	/*
-	 * Handle regular configuration
-	 */
 	if (configuration_type == TOTEM_CONFIGURATION_REGULAR) {
-		memcpy (my_member_list, member_list,
+		memcpy (member_list, member_list,
 			sizeof (unsigned int) * member_list_entries);
-		my_member_list_entries = member_list_entries;
-		memcpy (&my_saved_ring_id, ring_id,
+		member_list_entries = member_list_entries;
+		memcpy (&saved_ring_id, ring_id,
 			sizeof (struct memb_ring_id));
-		for (i = 0; i < my_member_list_entries; i++) {
-			if ((my_member_list[i] != 0) &&
-			    (my_member_list[i] < my_lowest_nodeid)) {
-				my_lowest_nodeid = my_member_list[i];
+		for (i = 0; i < member_list_entries; i++) {
+			if ((member_list[i] != 0) &&
+			    (member_list[i] < lowest_nodeid)) {
+				lowest_nodeid = member_list[i];
 			}
 		}
 	}
 }
 
-static struct message_queue *group_queue_find(
-	struct queue_group *group,
-	SaNameT *name)
+static int msg_name_match (SaNameT *name_a, SaNameT *name_b)
 {
-	struct list_head *list;
-	struct message_queue *queue;
-
-	for (list = group->queue_head.next;
-	     list != &group->queue_head;
-	     list = list->next)
-	{
-		queue = list_entry (list, struct message_queue, group_list);
-
-		if (name_match (name, &queue->name)) {
-			return (queue);
-		}
+	if (name_a->length == name_b->length) {
+		return ((strncmp ((char *)name_a->value, (char *)name_b->value, (int)name_b->length)) == 0);
 	}
 	return (0);
 }
 
-static struct message_queue *queue_find (
-	struct list_head *head,
-	SaNameT *name)
+static void msg_print_queue_cleanup_list (
+	struct list_head *cleanup_head)
 {
 	struct list_head *list;
-	struct message_queue *queue;
+	struct queue_cleanup *cleanup;
 
-	for (list = head->next;
-	     list != head;
+	for (list = cleanup_head->next;
+	     list != cleanup_head;
 	     list = list->next)
 	{
-	        queue = list_entry (list, struct message_queue, queue_list);
+		cleanup = list_entry (list, struct queue_cleanup, list);
 
-		if (name_match (name, &queue->name)) {
-			return (queue);
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: cleanup queue=%s id=%u handle=0x%04x\n",
+			    (char *)(cleanup->queue_name.value),
+			    (unsigned int)(cleanup->queue_id),
+			    (unsigned int)(cleanup->queue_handle));
+	}
+	return;
+}
+
+static void msg_print_queue_priority_list (
+	struct list_head *message_head)
+{
+	struct list_head *list;
+	struct message_entry *msg;
+
+	for (list = message_head->next;
+	     list != message_head;
+	     list = list->next)
+	{
+		msg = list_entry (list, struct message_entry, list);
+
+		/* DEBUG */
+		/* log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t message = %s\n", 
+		   (char *)(msg->message.data)); */
+	}
+	return;
+}
+
+static void msg_print_queue_message_list (
+	struct list_head *message_head)
+{
+	struct list_head *list;
+	struct message_entry *msg;
+
+	for (list = message_head->next;
+	     list != message_head;
+	     list = list->next)
+	{
+		msg = list_entry (list, struct message_entry, queue_list);
+
+		/* DEBUG */
+		/* log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t message = %s\n",
+		   (char *)(msg->message.data)); */
+	}
+	return;
+}
+
+static void msg_print_group_member_list (
+	struct list_head *queue_list_head)
+{
+	struct list_head *list;
+	struct queue_entry *queue;
+
+	for (list = queue_list_head->next;
+	     list != queue_list_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, group_list);
+
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t queue = %s\n",
+			    (char *)(queue->queue_name.value));
+	}
+	return;
+}
+
+static void msg_print_queue_list (
+	struct list_head *queue_list_head)
+{
+	struct list_head *list;
+	struct queue_entry *queue;
+	int i;
+
+	for (list = queue_list_head->next;
+	     list != queue_list_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, queue_list);
+
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: queue = %s (refcount=%u)\n",
+			    (char *)(queue->queue_name.value),
+			    (unsigned int)(queue->refcount));
+
+		/* msg_print_queue_message_list (&queue->message_head); */
+
+		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+			/* DEBUG */
+			log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t priority = %d ( %u )\n",
+				    i, (unsigned int)(queue->priority[i].message_count));
+
+			msg_print_queue_priority_list (&queue->priority[i].message_head);
 		}
 	}
-	return (0);
+	return;
 }
 
-static struct queue_group *group_find (
-	struct list_head *head,
-	SaNameT *name)
+static void msg_print_group_list (
+	struct list_head *group_list_head)
 {
 	struct list_head *list;
-	struct queue_group *group;
+	struct group_entry *group;
 
-	for (list = head->next;
-	     list != head;
+	for (list = group_list_head->next;
+	     list != group_list_head;
 	     list = list->next)
 	{
-	        group = list_entry (list, struct queue_group, group_list);
+		group = list_entry (list, struct group_entry, group_list);
 
-		if (name_match (name, &group->name)) {
-			return (group);
-		}
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: group = %s\n",
+			    (char *)(group->group_name.value));
+
+		msg_print_group_member_list (&group->queue_head);
 	}
-	return (0);
+	return;
 }
 
-static unsigned int queue_group_member_count (struct queue_group *group)
+static unsigned int msg_group_track_current (
+	struct group_entry *group,
+	SaMsgQueueGroupNotificationT *notification)
 {
+	struct queue_entry *queue;
 	struct list_head *list;
-
-	unsigned int count = 0;
-
-	for (list = group->queue_head.next;
-	     list != &group->queue_head;
-	     list = list->next)
-	{
-		count++;
-	}
-	return (count);
-}
-
-static unsigned int queue_group_change_count (struct queue_group *group)
-{
-	struct list_head *list;
-	struct message_queue *queue;
-
-	unsigned int count = 0;
-
-	for (list = group->queue_head.next;
-	     list != &group->queue_head;
-	     list = list->next)
-	{
-		queue = list_entry (list, struct message_queue, group_list);
-
-		if (queue->change != SA_MSG_QUEUE_GROUP_NO_CHANGE) {
-			count++;
-		}
-	}
-	return (count);
-}
-
-static unsigned int queue_group_track (
-	struct queue_group *group,
-	unsigned int flags,
-	void *buffer)
-{
-	struct list_head *list;
-	struct message_queue *queue;
-
 	unsigned int i = 0;
 
-	SaMsgQueueGroupNotificationT *notification =
-		(SaMsgQueueGroupNotificationT *) buffer;
+	for (list = group->queue_head.next;
+	     list != &group->queue_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, group_list);
 
-
-	switch (flags) {
-
-	case SA_TRACK_CURRENT:
-	case SA_TRACK_CHANGES:
-
-		for (list = group->queue_head.next;
-		     list != &group->queue_head;
-		     list = list->next)
-		{
-			queue = list_entry (list, struct message_queue, group_list);
-			memcpy (&notification[i].member.queueName,
-				&queue->name, sizeof (SaNameT));
-			notification[i].change = queue->change;
-			i++;
-		}
-		break;
-
-	case SA_TRACK_CHANGES_ONLY:
-
-		for (list = group->queue_head.next;
-		     list != &group->queue_head;
-		     list = list->next)
-		{
-			queue = list_entry (list, struct message_queue, group_list);
-			if (queue->change != SA_MSG_QUEUE_GROUP_NO_CHANGE) {
-				memcpy (&notification[i].member.queueName,
-					&queue->name, sizeof (SaNameT));
-				notification[i].change = queue->change;
-				i++;
-			}
-		}
-		break;
-
-	default:
-		break;
+		memcpy (&notification[i].member.queueName,
+			&queue->queue_name, sizeof (SaNameT));
+		notification[i].change = queue->change_flag;
+		i++;
 	}
 
 	return (i);
 }
 
-static struct message_queue *next_rr_queue (struct queue_group *group)
+static unsigned int msg_group_track_changes (
+	struct group_entry *group,
+	SaMsgQueueGroupNotificationT *notification)
 {
-	struct message_queue *queue;
+	struct queue_entry *queue;
+	struct list_head *list;
+	unsigned int i = 0;
 
-	if (group->rr_queue->group_list.next == &group->queue_head) {
+	for (list = group->queue_head.next;
+	     list != &group->queue_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, group_list);
+
+		memcpy (&notification[i].member.queueName,
+			&queue->queue_name, sizeof (SaNameT));
+		notification[i].change = queue->change_flag;
+		i++;
+	}
+
+	return (i);
+}
+
+static unsigned int msg_group_track_changes_only (
+	struct group_entry *group,
+	SaMsgQueueGroupNotificationT *notification)
+{
+	struct queue_entry *queue;
+	struct list_head *list;
+	unsigned int i = 0;
+
+	for (list = group->queue_head.next;
+	     list != &group->queue_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, group_list);
+
+		if (queue->change_flag != SA_MSG_QUEUE_GROUP_NO_CHANGE) {
+			memcpy (&notification[i].member.queueName,
+				&queue->queue_name, sizeof (SaNameT));
+			notification[i].change = queue->change_flag;
+			i++;
+		}
+	}
+
+	return (i);
+}
+
+static void msg_deliver_pending_message (
+	void *conn,
+	struct message_entry *msg)
+{
+	struct res_lib_msg_messageget res_lib_msg_messageget;
+	struct iovec iov[2];
+
+	res_lib_msg_messageget.header.size =
+		sizeof (struct res_lib_msg_messageget);
+	res_lib_msg_messageget.header.id =
+		MESSAGE_RES_MSG_MESSAGEGET;
+	res_lib_msg_messageget.header.error = SA_AIS_OK;
+
+	memcpy (&res_lib_msg_messageget.message, &msg->message,
+		sizeof (SaMsgMessageT));
+
+	res_lib_msg_messageget.send_time = msg->send_time;
+	res_lib_msg_messageget.sender_id = msg->sender_id;
+
+	iov[0].iov_base = &res_lib_msg_messageget;
+	iov[0].iov_len = sizeof (struct res_lib_msg_messageget);
+
+	iov[1].iov_base = msg->message.data;
+	iov[1].iov_len = msg->message.size;
+
+	api->ipc_response_iov_send (conn, iov, 2);
+
+	return;
+}
+
+static struct queue_entry *msg_next_group_member (
+	struct group_entry *group)
+{
+	struct queue_entry *queue;
+
+	if (group->next_queue->group_list.next == &group->queue_head) {
 		queue = list_entry (group->queue_head.next,
-				    struct message_queue,
+				    struct queue_entry,
 				    group_list);
-	} else {
-		queue =	list_entry (group->rr_queue->group_list.next,
-				    struct message_queue,
+	}
+	else {
+		queue = list_entry (group->next_queue->group_list.next,
+				    struct queue_entry,
 				    group_list);
 	}
 
 	return (queue);
 }
 
-static int msg_exec_init_fn (struct corosync_api_v1 *corosync_api)
+static struct message_entry *msg_get_message (
+	struct queue_entry *queue)
 {
-	api = corosync_api;
+	struct message_entry *msg = NULL;
+	int i;
 
-	/*
-	 *  Initialize the saved ring ID.
-	 */
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		if (queue->priority[i].message_count != 0) {
+			msg = list_entry (queue->priority[i].message_head.next, struct message_entry, list);
+			break;
+		}
+	}
 
-	/* saved_ring_id.seq = 0; */
-	/* saved_ring_id.rep.s_addr = this_ip->sin_addr.s_addr; */
+	return (msg);
+}
+
+static struct queue_entry *msg_find_group_member (
+	struct list_head *queue_list_head,
+	SaNameT *queue_name)
+{
+	struct list_head *list;
+	struct queue_entry *queue;
+
+	for (list = queue_list_head->next;
+	     list != queue_list_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, group_list);
+
+		if (msg_name_match (queue_name, &queue->queue_name))
+		{
+			return (queue);
+		}
+	}
+	return (0);
+}
+
+static struct queue_cleanup *msg_find_queue_cleanup (
+	void *conn,
+	SaNameT *queue_name,
+	SaUint32T queue_id)
+{
+	struct list_head *list;
+	struct queue_cleanup *cleanup;
+	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get (conn);
+
+	for (list = msg_pd->queue_cleanup_list.next;
+	     list != &msg_pd->queue_cleanup_list;
+	     list = list->next)
+	{
+		cleanup = list_entry (list, struct queue_cleanup, list);
+
+		if ((msg_name_match (queue_name, &cleanup->queue_name)) &&
+		    (queue_id == cleanup->queue_id))
+		{
+			return (cleanup);
+		}
+	}
+	return (0);
+}
+
+static struct queue_entry *msg_find_queue_id (
+	struct list_head *queue_list_head,
+	SaNameT *queue_name,
+	SaUint32T queue_id)
+{
+	struct list_head *list;
+	struct queue_entry *queue;
+
+	for (list = queue_list_head->next;
+	     list != queue_list_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, queue_list);
+
+		if ((msg_name_match (queue_name, &queue->queue_name)) &&
+		    (queue_id == queue->queue_id))
+		{
+			return (queue);
+		}
+	}
+	return (0);
+}
+
+static struct queue_entry *msg_find_queue (
+	struct list_head *queue_list_head,
+	SaNameT *queue_name)
+{
+	struct list_head *list;
+	struct queue_entry *queue;
+
+	for (list = queue_list_head->next;
+	     list != queue_list_head;
+	     list = list->next)
+	{
+		queue = list_entry (list, struct queue_entry, queue_list);
+
+		if ((msg_name_match (queue_name, &queue->queue_name)) &&
+		    (queue->unlink_flag == 0))
+		{
+			return (queue);
+		}
+	}
+	return (0);
+}
+
+static struct group_entry *msg_find_group (
+	struct list_head *group_list_head,
+	SaNameT *group_name)
+{
+	struct list_head *list;
+	struct group_entry *group;
+
+	for (list = group_list_head->next;
+	     list != group_list_head;
+	     list = list->next)
+	{
+		group = list_entry (list, struct group_entry, group_list);
+
+		if (msg_name_match (group_name, &group->group_name))
+		{
+			return (group);
+		}
+	}
+	return (0);
+}
+
+static int msg_close_queue (
+	SaNameT *queue_name,
+	SaUint32T queue_id)
+{
+	struct req_exec_msg_queueclose req_exec_msg_queueclose;
+	struct iovec iov;
+
+	req_exec_msg_queueclose.header.size =
+		sizeof (struct req_exec_msg_queueclose);
+	req_exec_msg_queueclose.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUECLOSE);
+
+	memset (&req_exec_msg_queueclose.source, 0,
+		sizeof (mar_message_source_t));
+	memcpy (&req_exec_msg_queueclose.queue_name,
+		queue_name, sizeof (SaNameT));
+
+	req_exec_msg_queueclose.queue_id = queue_id;
+
+	iov.iov_base = (char *)&req_exec_msg_queueclose;
+	iov.iov_len = sizeof (struct req_exec_msg_queueclose);
+
+	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
+}
+
+static void msg_release_queue_cleanup (
+	void *conn,
+	SaNameT *queue_name,
+	SaUint32T queue_id)
+{
+	struct list_head *list;
+	struct queue_cleanup *cleanup;
+	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get (conn);
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t msg_release_queue_cleanup ( %s )\n",
+		    (char *)(queue_name->value));
+
+	for (list = msg_pd->queue_cleanup_list.next;
+	     list != &msg_pd->queue_cleanup_list;
+	     list = list->next)
+	{
+		cleanup = list_entry (list, struct queue_cleanup, list);
+
+		if ((msg_name_match (queue_name, &cleanup->queue_name)) &&
+		    (queue_id == cleanup->queue_id))
+		{
+			list_del (&cleanup->list);
+			free (cleanup);
+			return;
+		}
+	}
+	return;
+}
+	
+
+static void msg_release_queue (
+	struct queue_entry *queue)
+{
+	struct message_entry *msg;
+	struct list_head *list;
+	int i;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t msg_release_queue ( %s )\n",
+		    (char *)(queue->queue_name.value));
+
+	list_del (&queue->queue_list);
+	list_init (&queue->queue_list);
+
+	if (queue->group != NULL) {
+		queue->group = NULL;
+		list_del (&queue->group_list);
+		list_init (&queue->group_list);
+	}
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
+	{
+		list = queue->priority[i].message_head.next;
+
+		while (!list_empty (&queue->priority[i].message_head)) {
+			msg = list_entry (list, struct message_entry, list);
+
+			list_del (&msg->list);
+			list_init (&msg->list);
+
+			list_del (&msg->queue_list);
+			list_init (&msg->queue_list);
+
+			free (msg->message.data);
+			free (msg);
+
+			list = queue->priority[i].message_head.next;
+		}
+	}
+
+	global_queue_count -= 1;
+
+	free (queue);
+
+	return;
+}
+
+static void msg_release_group (
+	struct group_entry *group)
+{
+	struct list_head *list = group->queue_head.next;
+	struct queue_entry *queue;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t msg_release_group ( %s )\n",
+		    (char *)(group->group_name.value));
+
+	while (!list_empty (&group->queue_head)) {
+		queue = list_entry (list, struct queue_entry, group_list);
+
+		list_del (&queue->group_list);
+		list_init (&queue->group_list);
+
+		list = group->queue_head.next;
+	}
+
+	list_del (&group->group_list);
+	list_init (&group->group_list);
+
+	global_group_count -= 1;
+
+	free (group);
+
+	return;
+}
+
+static void msg_expire_queue (void *data)
+{
+	struct req_exec_msg_queue_timeout req_exec_msg_queue_timeout;
+	struct iovec iovec;
+
+	struct queue_entry *queue = (struct queue_entry *)data;
+
+	req_exec_msg_queue_timeout.header.size =
+		sizeof (struct req_exec_msg_queue_timeout);
+	req_exec_msg_queue_timeout.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUE_TIMEOUT);
+
+	memcpy (&req_exec_msg_queue_timeout.queue_name,
+		&queue->queue_name, sizeof (SaNameT));
+
+	iovec.iov_base = (char *)&req_exec_msg_queue_timeout;
+	iovec.iov_len = sizeof (struct req_exec_msg_queue_timeout);
+
+	api->totem_mcast (&iovec, 1, TOTEM_AGREED);
+
+	return;
+}
+
+static inline void msg_sync_queue_free (
+	struct list_head *queue_head)
+{
+	struct queue_entry *queue;
+	struct list_head *list;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_free\n");
+
+	list = queue_head->next;
+
+	while (list != queue_head) {
+		queue = list_entry (list, struct queue_entry, queue_list);
+		list = list->next;
+		msg_release_queue (queue);
+	}
+
+	list_init (queue_head);
+}
+
+
+static inline void msg_sync_group_free (
+	struct list_head *group_head)
+{
+	struct group_entry *group;
+	struct list_head *list;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_free\n");
+
+	list = group_head->next;
+
+	while (list != group_head) {
+		group = list_entry (list, struct group_entry, group_list);
+		list = list->next;
+		msg_release_group (group);
+	}
+
+	list_init (group_head);
+}
+
+static int msg_sync_queue_transmit (
+	struct queue_entry *queue)
+{
+	struct req_exec_msg_sync_queue req_exec_msg_sync_queue;
+	struct iovec iov;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_transmit { queue=%s id=%u }\n",
+		    (char *)(queue->queue_name.value),
+		    (unsigned int)(queue->queue_id));
+
+	memset (&req_exec_msg_sync_queue, 0,
+		sizeof (struct req_exec_msg_sync_queue));
+
+	req_exec_msg_sync_queue.header.size =
+		sizeof (struct req_exec_msg_sync_queue);
+	req_exec_msg_sync_queue.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE);
+
+	memcpy (&req_exec_msg_sync_queue.ring_id,
+		&saved_ring_id, sizeof (struct memb_ring_id));
+	memcpy (&req_exec_msg_sync_queue.queue_name,
+		&queue->queue_name, sizeof (SaNameT));
+	memcpy (&req_exec_msg_sync_queue.create_attrs,
+		&queue->create_attrs, sizeof (SaMsgQueueCreationAttributesT));
+
+	req_exec_msg_sync_queue.queue_id = queue->queue_id;
+	req_exec_msg_sync_queue.close_time = queue->close_time;
+	req_exec_msg_sync_queue.unlink_flag = queue->unlink_flag;
+	req_exec_msg_sync_queue.open_flags = queue->open_flags;
+	req_exec_msg_sync_queue.change_flag = queue->change_flag;
+
+	iov.iov_base = (char *)&req_exec_msg_sync_queue;
+	iov.iov_len = sizeof (struct req_exec_msg_sync_queue);
+
+	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
+}
+
+static int msg_sync_queue_message_transmit (
+	struct queue_entry *queue,
+	struct message_entry *msg)
+{
+	struct req_exec_msg_sync_queue_message req_exec_msg_sync_queue_message;
+	struct iovec iov[2];
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_message_transmit { queue=%s id=%u}\n",
+		    (char *)(queue->queue_name.value),
+		    (unsigned int)(queue->queue_id));
+
+	memset (&req_exec_msg_sync_queue_message, 0,
+		sizeof (struct req_exec_msg_sync_queue_message));
+
+	req_exec_msg_sync_queue_message.header.size =
+		sizeof (struct req_exec_msg_sync_queue_message);
+	req_exec_msg_sync_queue_message.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_MESSAGE);
+
+	memcpy (&req_exec_msg_sync_queue_message.ring_id,
+		&saved_ring_id, sizeof (struct memb_ring_id));
+	memcpy (&req_exec_msg_sync_queue_message.queue_name,
+		&queue->queue_name, sizeof (SaNameT));
+	memcpy (&req_exec_msg_sync_queue_message.message,
+		&msg->message, sizeof (SaMsgMessageT));
+
+	req_exec_msg_sync_queue_message.queue_id = queue->queue_id;
+	req_exec_msg_sync_queue_message.send_time = msg->send_time;
+	req_exec_msg_sync_queue_message.sender_id = msg->sender_id;
+
+	iov[0].iov_base = (char *)&req_exec_msg_sync_queue_message;
+	iov[0].iov_len = sizeof (struct req_exec_msg_sync_queue_message);
+	iov[1].iov_base = msg->message.data;
+	iov[1].iov_len = msg->message.size;
+
+	return (api->totem_mcast (iov, 2, TOTEM_AGREED));
+}
+
+static int msg_sync_queue_refcount_transmit (
+	struct queue_entry *queue)
+{
+	struct req_exec_msg_sync_queue_refcount req_exec_msg_sync_queue_refcount;
+	struct iovec iov;
+
+	int i;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_refcount_transmit { queue=%s id=%u }\n",
+		    (char *)(queue->queue_name.value),
+		    (unsigned int)(queue->queue_id));
+
+	memset (&req_exec_msg_sync_queue_refcount, 0,
+		sizeof (struct req_exec_msg_sync_queue_refcount));
+
+	req_exec_msg_sync_queue_refcount.header.size =
+		sizeof (struct req_exec_msg_sync_queue_refcount);
+	req_exec_msg_sync_queue_refcount.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_REFCOUNT);
+
+	memcpy (&req_exec_msg_sync_queue_refcount.ring_id,
+		&saved_ring_id, sizeof (struct memb_ring_id));
+	memcpy (&req_exec_msg_sync_queue_refcount.queue_name,
+		&queue->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_sync_queue_refcount.queue_id = queue->queue_id;
+
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+		req_exec_msg_sync_queue_refcount.refcount_set[i].refcount =
+			queue->refcount_set[i].refcount;
+		req_exec_msg_sync_queue_refcount.refcount_set[i].nodeid =
+			queue->refcount_set[i].nodeid;
+	}
+
+	iov.iov_base = (char *)&req_exec_msg_sync_queue_refcount;
+	iov.iov_len = sizeof (struct req_exec_msg_sync_queue_refcount);
+
+	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
+}
+
+static int msg_sync_group_transmit (
+	struct group_entry *group)
+{
+	struct req_exec_msg_sync_group req_exec_msg_sync_group;
+	struct iovec iov;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_transmit { group=%s }\n",
+		    (char *)(group->group_name.value));
+
+	memset (&req_exec_msg_sync_group, 0,
+		sizeof (struct req_exec_msg_sync_group));
+
+	req_exec_msg_sync_group.header.size =
+		sizeof (struct req_exec_msg_sync_group);
+	req_exec_msg_sync_group.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_GROUP);
+
+	memcpy (&req_exec_msg_sync_group.ring_id,
+		&saved_ring_id, sizeof (struct memb_ring_id));
+	memcpy (&req_exec_msg_sync_group.group_name,
+		&group->group_name, sizeof (SaNameT));
+
+	req_exec_msg_sync_group.track_flags = group->track_flags;
+	req_exec_msg_sync_group.policy = group->policy;
+
+	iov.iov_base = (char *)&req_exec_msg_sync_group;
+	iov.iov_len = sizeof (struct req_exec_msg_sync_group);
+
+	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
+}
+
+static int msg_sync_group_member_transmit (
+	struct group_entry *group,
+	struct queue_entry *queue)
+{
+	struct req_exec_msg_sync_group_member req_exec_msg_sync_group_member;
+	struct iovec iov;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_member_transmit { group=%s queue=%s }\n",
+		    (char *)(group->group_name.value),
+		    (char *)(queue->queue_name.value));
+
+	memset (&req_exec_msg_sync_group_member, 0,
+		sizeof (struct req_exec_msg_sync_group_member));
+
+	req_exec_msg_sync_group_member.header.size =
+		sizeof (struct req_exec_msg_sync_group_member);
+	req_exec_msg_sync_group_member.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_SYNC_GROUP_MEMBER);
+
+	memcpy (&req_exec_msg_sync_group_member.ring_id,
+		&saved_ring_id, sizeof (struct memb_ring_id));
+	memcpy (&req_exec_msg_sync_group_member.group_name,
+		&group->group_name, sizeof (SaNameT));
+	memcpy (&req_exec_msg_sync_group_member.queue_name,
+		&queue->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_sync_group_member.queue_id = queue->queue_id;
+
+	iov.iov_base = (char *)&req_exec_msg_sync_group_member;
+	iov.iov_len = sizeof (struct req_exec_msg_sync_group_member);
+
+	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
+}
+
+static int msg_sync_queue_iterate (void)
+{
+	struct queue_entry *queue;
+	struct list_head *queue_list;
+
+	struct message_entry *msg;
+	struct list_head *message_list;
+
+	int result;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_iterate\n");
+
+	for (queue_list = msg_sync_iteration_queue;
+	     queue_list != &queue_list_head;
+	     queue_list = queue_list->next)
+	{
+		queue = list_entry (queue_list, struct queue_entry, queue_list);
+
+		if (msg_sync_iteration_state == MSG_SYNC_ITERATION_STATE_QUEUE)
+		{
+			result = msg_sync_queue_transmit (queue);
+			if (result != 0) {
+				return (-1);
+			}
+			msg_sync_iteration_state = MSG_SYNC_ITERATION_STATE_QUEUE_REFCOUNT;
+		}
+
+		if (msg_sync_iteration_state == MSG_SYNC_ITERATION_STATE_QUEUE_REFCOUNT)
+		{
+			result = msg_sync_queue_refcount_transmit (queue);
+			if (result != 0) {
+				return (-1);
+			}
+			msg_sync_iteration_message = queue->message_head.next;
+			msg_sync_iteration_state = MSG_SYNC_ITERATION_STATE_QUEUE_MESSAGE;
+		}
+
+		if (msg_sync_iteration_state == MSG_SYNC_ITERATION_STATE_QUEUE_MESSAGE)
+		{
+			for (message_list = msg_sync_iteration_message;
+			     message_list != &queue->message_head;
+			     message_list = message_list->next)
+			{
+				msg = list_entry (message_list, struct message_entry, queue_list);
+
+				result = msg_sync_queue_message_transmit (queue, msg);
+				if (result != 0) {
+					return (-1);
+				}
+				msg_sync_iteration_message = message_list->next;
+			}
+		}
+
+		msg_sync_iteration_state = MSG_SYNC_ITERATION_STATE_QUEUE;
+		msg_sync_iteration_queue = queue_list->next;
+	}
 
 	return (0);
 }
 
-static int msg_lib_exit_fn (void *conn)
+static int msg_sync_group_iterate (void)
 {
-	/*
-	 * struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get (conn);
-	 */
+	struct group_entry *group;
+	struct list_head *group_list;
 
-#ifdef COMPILE_OUT
-	struct queue_cleanup *queue_cleanup;
-	struct list_head *list;
-	
-	/*
-	 * close all queues opened on this fd
-	 */
-	list = conn_info->conn_info_partner->ais_ci.u.libmsg_ci.queue_cleanup_list.next;	
-	while (!list_empty(&conn_info->conn_info_partner->ais_ci.u.libmsg_ci.queue_cleanup_list)) {
-		
-		queue_cleanup = list_entry (list, struct queue_cleanup, list);
+	struct queue_entry *queue;
+	struct list_head *queue_list;
 
-		if (queue_cleanup->queue->name.length > 0) {
-			msg_queue_cleanup_lock_remove (queue_cleanup);
-			msg_queue_close (queue_cleanup->queue);
+	int result;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_iterate\n");
+
+	for (group_list = msg_sync_iteration_group;
+	     group_list != &group_list_head;
+	     group_list = group_list->next)
+	{
+		group = list_entry (group_list, struct group_entry, group_list);
+
+		if (msg_sync_iteration_state == MSG_SYNC_ITERATION_STATE_GROUP)
+		{
+			result = msg_sync_group_transmit (group);
+			if (result != 0) {
+				return (-1);
+			}
+			msg_sync_iteration_queue = group->queue_head.next;
+			msg_sync_iteration_state = MSG_SYNC_ITERATION_STATE_GROUP_MEMBER;
 		}
 
-		list_del (&queue_cleanup->list);	
-		free (queue_cleanup);
-                
-		list = conn_info->conn_info_partner->ais_ci.u.libmsg_ci.queue_cleanup_list.next;
+		if (msg_sync_iteration_state == MSG_SYNC_ITERATION_STATE_GROUP_MEMBER)
+		{
+			for (queue_list = msg_sync_iteration_queue;
+			     queue_list != &group->queue_head;
+			     queue_list = queue_list->next)
+			{
+				queue = list_entry (queue_list, struct queue_entry, group_list);
+
+				result = msg_sync_group_member_transmit (group, queue);
+				if (result != 0) {
+					return (-1);
+				}
+				msg_sync_iteration_queue = queue_list->next;
+			}
+		}
+
+		msg_sync_iteration_state = MSG_SYNC_ITERATION_STATE_GROUP;
+		msg_sync_iteration_group = group_list->next;
 	}
-#endif	/* COMPILE_OUT */
+
+	return (0);
+}
+
+static void msg_sync_queue_enter (void)
+{
+	struct queue_entry *queue;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_enter\n");
+
+	queue = list_entry (queue_list_head.next, struct queue_entry, queue_list);
+
+	msg_sync_state = MSG_SYNC_STATE_QUEUE;
+	msg_sync_iteration_state = MSG_SYNC_ITERATION_STATE_QUEUE;
+
+	msg_sync_iteration_queue = queue_list_head.next;
+	msg_sync_iteration_message = queue->message_head.next;
+}
+
+static void msg_sync_group_enter (void)
+{
+	struct group_entry *group;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_enter\n");
+
+	group = list_entry (group_list_head.next, struct group_entry, group_list);
+
+	msg_sync_state = MSG_SYNC_STATE_GROUP;
+	msg_sync_iteration_state = MSG_SYNC_ITERATION_STATE_GROUP;
+
+	msg_sync_iteration_group = group_list_head.next;
+	msg_sync_iteration_queue = group->queue_head.next; /* ! */
+}
+
+static void msg_sync_init (void)
+{
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_init\n");
+
+	msg_sync_queue_enter ();
+
+	/* DEBUG */
+	/* msg_print_queue_list (&queue_list_head); */
+	/* msg_print_group_list (&group_list_head); */
+
+	return;
+}
+
+static int msg_sync_process (void)
+{
+	int continue_process = 0;
+	int iterate_result;
+	int iterate_finish;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_process\n");
+
+	switch (msg_sync_state)
+	{
+	case MSG_SYNC_STATE_QUEUE:
+		iterate_finish = 1;
+		continue_process = 1;
+
+		if (lowest_nodeid == api->totem_nodeid_get ()) {
+			TRACE1 ("transmit queues because lowest member in old configuration.\n");
+
+			iterate_result = msg_sync_queue_iterate ();
+			if (iterate_result != 0) {
+				iterate_finish = 0;
+			}
+		}
+
+		if (iterate_finish == 1) {
+			msg_sync_group_enter ();
+		}
+
+		break;
+
+	case MSG_SYNC_STATE_GROUP:
+		iterate_finish = 1;
+		continue_process = 1;
+
+		if (lowest_nodeid == api->totem_nodeid_get ()) {
+			TRACE1 ("transmit groups because lowest member in old configuration.\n");
+
+			iterate_result = msg_sync_group_iterate ();
+			if (iterate_result != 0) {
+				iterate_finish = 0;
+			}
+		}
+
+		if (iterate_finish == 1) {
+			continue_process = 0;
+		}
+
+		break;
+	}
+
+	return (continue_process);
+}
+
+static void msg_sync_activate (void)
+{
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_activate\n");
+
+	/* DEBUG */
+	/* msg_sync_queue_free (&queue_list_head);
+	   msg_sync_group_free (&group_list_head); */
+
+	if (!list_empty (&sync_queue_list_head)) {
+		list_splice (&sync_queue_list_head, &queue_list_head);
+	}
+
+	if (!list_empty (&sync_group_list_head)) {
+		list_splice (&sync_group_list_head, &group_list_head);
+	}
+
+	list_init (&sync_queue_list_head);
+	list_init (&sync_group_list_head);
+
+	/* DEBUG */
+	/* msg_print_queue_list (&queue_list_head);
+	   msg_print_group_list (&group_list_head); */
+
+	return;
+}
+
+static void msg_sync_abort (void)
+{
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_abort\n");
+
+	msg_sync_queue_free (&sync_queue_list_head);
+	msg_sync_group_free (&sync_group_list_head);
+
+	list_init (&sync_queue_list_head);
+	list_init (&sync_group_list_head);
+
+	return;
+}
+
+static void msg_exec_dump_fn (void)
+{
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_exec_dump_fn\n");
+
+	return;
+}
+
+static int msg_exec_init_fn (struct corosync_api_v1 *corosync_api)
+{
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_exec_init_fn\n");
+
+	api = corosync_api;
 
 	return (0);
 }
 
 static int msg_lib_init_fn (void *conn)
 {
-	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get (conn);
+	struct msg_pd *msg_pd = (struct msg_pd *)(api->ipc_private_data_get (conn));
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_lib_init_fn\n");
 
 	list_init (&msg_pd->queue_list);
 	list_init (&msg_pd->queue_cleanup_list);
+
+	return (0);
+}
+
+static int msg_lib_exit_fn (void *conn)
+{
+	struct queue_cleanup *cleanup;
+	struct list_head *cleanup_list;
+	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get(conn);
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_lib_exit_fn\n");
+
+	/* DEBUG */
+	/* msg_print_queue_list (&queue_list_head);
+	   msg_print_group_list (&group_list_head); */
+
+	cleanup_list = msg_pd->queue_cleanup_list.next;
+
+	while (!list_empty (&msg_pd->queue_cleanup_list))
+	{
+		cleanup = list_entry (cleanup_list, struct queue_cleanup, list);
+
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: cleanup queue=%s id=%u handle=0x%04x\n",
+			    (char *)(cleanup->queue_name.value),
+			    (unsigned int)(cleanup->queue_id),
+			    (unsigned int)(cleanup->queue_handle));
+
+		msg_close_queue (&cleanup->queue_name, cleanup->queue_id);
+
+		list_del (&cleanup->list);
+		free (cleanup);
+
+		cleanup_list = msg_pd->queue_cleanup_list.next;
+	}
 
 	return (0);
 }
@@ -1480,108 +2206,301 @@ static void message_handler_req_exec_msg_queueopen (
 	struct req_exec_msg_queueopen *req_exec_msg_queueopen =
 		(struct req_exec_msg_queueopen *)message;
 	struct res_lib_msg_queueopen res_lib_msg_queueopen;
-	struct res_lib_msg_queueopenasync res_lib_msg_queueopenasync;
-	struct message_queue *queue = NULL;
-	/* struct queue_cleanup *queue_cleanup; */
 	SaAisErrorT error = SA_AIS_OK;
+	SaSizeT queue_size = 0;
+	struct queue_cleanup *cleanup = NULL;
+	struct queue_entry *queue = NULL;
+	struct msg_pd *msg_pd = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueOpen %s\n",
-		getSaNameT (&req_exec_msg_queueopen->queue_name));
+	int i;
 
-	queue = queue_find (&queue_list_head,
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueOpen\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t handle = 0x%04x\n",
+		    (unsigned int)(req_exec_msg_queueopen->queue_handle));
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s\n",
+		    (char *)(req_exec_msg_queueopen->queue_name.value));
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		if (req_exec_msg_queueopen->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
+			error = SA_AIS_ERR_TOO_BIG;
+			goto error_exit;
+		}
+		queue_size += req_exec_msg_queueopen->create_attrs.size[i];
+	}
+
+	if (queue_size > MAX_QUEUE_SIZE) {
+		error = SA_AIS_ERR_TOO_BIG;
+		goto error_exit;
+	}
+
+	if ((global_queue_count + 1) > MAX_NUM_QUEUES) {
+		error = SA_AIS_ERR_NO_RESOURCES;
+		goto error_exit;
+	}
+
+	cleanup = malloc (sizeof (struct queue_cleanup));
+	if (cleanup == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+
+	queue = msg_find_queue (&queue_list_head,
 		&req_exec_msg_queueopen->queue_name);
+
 	if (queue == NULL) {
-		if ((req_exec_msg_queueopen->openFlags & SA_MSG_QUEUE_CREATE) == 0) {
+		if ((req_exec_msg_queueopen->create_attrs_flag == 0) ||
+		    (req_exec_msg_queueopen->open_flags & SA_MSG_QUEUE_CREATE) == 0)
+		{
 			error = SA_AIS_ERR_NOT_EXIST;
 			goto error_exit;
 		}
-		queue = malloc (sizeof (struct message_queue));
+
+		queue = malloc (sizeof (struct queue_entry));
 		if (queue == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
 			goto error_exit;
 		}
-		memset (queue, 0, sizeof (struct message_queue));
-		memcpy (&queue->name,
+		memset (queue, 0, sizeof (struct queue_entry));
+		memcpy (&queue->queue_name,
 			&req_exec_msg_queueopen->queue_name,
 			sizeof (SaNameT));
+		memcpy (&queue->create_attrs,
+			&req_exec_msg_queueopen->create_attrs,
+			sizeof (SaMsgQueueCreationAttributesT));
+
+		queue->open_flags = req_exec_msg_queueopen->open_flags;
+
+		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+			queue->priority[i].queue_size = queue->create_attrs.size[i];
+			list_init (&queue->priority[i].message_head);
+		}
 
 		list_init (&queue->group_list);
 		list_init (&queue->queue_list);
 		list_init (&queue->message_head);
-		list_add (&queue->queue_list, &queue_list_head);
+		list_init (&queue->pending_head);
 
+		list_add_tail  (&queue->queue_list, &queue_list_head);
+
+		global_queue_count += 1;
+		queue->queue_id = (global_queue_id += 1);
 		queue->refcount = 0;
 	}
-	queue->refcount += 1;
-
-#ifdef COMPILE_OUT
-	/*
-	 * Setup connection information and mark queue as referenced
-	 */
-	queue_cleanup = malloc (sizeof (struct queue_cleanup));
-	if (queue_cleanup == NULL) {
-		free (queue);
-		error = SA_AIS_ERR_NO_MEMORY;
-	} else {
-		list_init (&queue_cleanup->list);
-		list_init (&queue_cleanup->queue_lock_list_head);
-		queue_cleanup->queue = queue;
-		queue_cleanup->queue_handle = req_exec_msg_queueopen->queue_handle;
-		list_add (
-			&queue_cleanup->list,
-			&req_exec_msg_queueopen->source.conn_info->ais_ci.u.libmsg_ci.queue_cleanup_list);
-	}
-	queue->refcount += 1;
-#endif	/* COMPILE_OUT */
-	
-error_exit:
-
-	if (api->ipc_source_is_local (&req_exec_msg_queueopen->source)) {
-		if (req_exec_msg_queueopen->async_call)
-		{
-			res_lib_msg_queueopenasync.header.size =
-				sizeof (struct res_lib_msg_queueopenasync);
-			res_lib_msg_queueopenasync.header.id =
-				MESSAGE_RES_MSG_QUEUEOPENASYNC;
-			res_lib_msg_queueopenasync.header.error = error;
-
-			res_lib_msg_queueopenasync.invocation =
-				req_exec_msg_queueopen->invocation;
-			res_lib_msg_queueopenasync.queueHandle =
-				req_exec_msg_queueopen->queue_handle;
-
-			memcpy (&res_lib_msg_queueopenasync.source,
-				&req_exec_msg_queueopen->source,
-				sizeof (mar_message_source_t));
-
-			api->ipc_response_send (
-				req_exec_msg_queueopen->source.conn,
-				&res_lib_msg_queueopenasync,
-				sizeof (struct res_lib_msg_queueopenasync));
-
-			api->ipc_dispatch_send (
-				req_exec_msg_queueopen->source.conn,
-				&res_lib_msg_queueopenasync,
-				sizeof (struct res_lib_msg_queueopenasync));
-		} else {
-			res_lib_msg_queueopen.header.size =
-				sizeof (struct res_lib_msg_queueopen);
-			res_lib_msg_queueopen.header.id =
-				MESSAGE_RES_MSG_QUEUEOPEN;
-			res_lib_msg_queueopen.header.error = error;
-
-			res_lib_msg_queueopen.queueHandle =
-				req_exec_msg_queueopen->queue_handle;
-
-			memcpy (&res_lib_msg_queueopen.source,
-				&req_exec_msg_queueopen->source,
-				sizeof (mar_message_source_t));
-
-			api->ipc_response_send (
-				req_exec_msg_queueopen->source.conn,
-				&res_lib_msg_queueopen,
-				sizeof (struct res_lib_msg_queueopen));
+	else {
+		if (queue->timer_handle != 0) {
+			api->timer_delete (queue->timer_handle);
 		}
+		if (req_exec_msg_queueopen->open_flags & SA_MSG_QUEUE_EMPTY) {
+			/* DEBUG */
+			log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t empty queue = %s\n",
+				    (char *)(req_exec_msg_queueopen->queue_name.value));
+
+			/* 
+			 * If this queue already exists and is opened by another
+			 * process with the SA_MSG_QUEUE_EMPTY flag set, then we
+			 * should delete all existing messages in the queue.
+			 */
+		}
+	}
+
+	queue->close_time = 0;
+
+	msg_sync_refcount_increment (queue, nodeid);
+	msg_sync_refcount_calculate (queue);
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t refcount = %u\n",
+		    (unsigned int)(queue->refcount));
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_queueopen->source))
+	{
+		res_lib_msg_queueopen.header.size =
+			sizeof (struct res_lib_msg_queueopen);
+		res_lib_msg_queueopen.header.id =
+			MESSAGE_RES_MSG_QUEUEOPEN;
+		res_lib_msg_queueopen.header.error = error;
+
+		if (error == SA_AIS_OK) {
+			msg_pd = api->ipc_private_data_get (req_exec_msg_queueopen->source.conn);
+			memcpy (&cleanup->queue_name, &queue->queue_name, sizeof (SaNameT));
+			cleanup->queue_handle = req_exec_msg_queueopen->queue_handle;
+			cleanup->queue_id = queue->queue_id;
+			res_lib_msg_queueopen.queue_id = queue->queue_id;
+			list_init (&cleanup->list);
+			list_add_tail (&cleanup->list, &msg_pd->queue_cleanup_list);
+		}
+		else {
+			free (cleanup);
+		}
+
+		api->ipc_response_send (
+			req_exec_msg_queueopen->source.conn,
+			&res_lib_msg_queueopen,
+			sizeof (struct res_lib_msg_queueopen));
+	}
+}
+
+static void message_handler_req_exec_msg_queueopenasync (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_queueopenasync *req_exec_msg_queueopenasync =
+		(struct req_exec_msg_queueopenasync *)message;
+	struct res_lib_msg_queueopenasync res_lib_msg_queueopenasync;
+	struct res_lib_msg_queueopen_callback res_lib_msg_queueopen_callback;
+	SaAisErrorT error = SA_AIS_OK;
+	SaSizeT queue_size = 0;
+	struct queue_cleanup *cleanup = NULL;
+	struct queue_entry *queue = NULL;
+	struct msg_pd *msg_pd = NULL;
+
+	int i;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueOpenAsync\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t handle = 0x%04x\n",
+		    (unsigned int)(req_exec_msg_queueopenasync->queue_handle));
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s\n",
+		    (char *)(req_exec_msg_queueopenasync->queue_name.value));
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		if (req_exec_msg_queueopenasync->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
+			error = SA_AIS_ERR_TOO_BIG;
+			goto error_exit;
+		}
+		queue_size += req_exec_msg_queueopenasync->create_attrs.size[i];
+	}
+
+	if (queue_size > MAX_QUEUE_SIZE) {
+		error = SA_AIS_ERR_TOO_BIG;
+		goto error_exit;
+	}
+
+	if ((global_queue_count + 1) > MAX_NUM_QUEUES) {
+		error = SA_AIS_ERR_NO_RESOURCES;
+		goto error_exit;
+	}
+
+	cleanup = malloc (sizeof (struct queue_cleanup));
+	if (cleanup == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_queueopenasync->queue_name);
+
+	if (queue == NULL) {
+		if ((req_exec_msg_queueopenasync->create_attrs_flag == 0) &&
+		    (req_exec_msg_queueopenasync->open_flags & SA_MSG_QUEUE_CREATE) == 0)
+		{
+			error = SA_AIS_ERR_NOT_EXIST;
+			goto error_exit;
+		}
+
+		queue = malloc (sizeof (struct queue_entry));
+		if (queue == NULL) {
+			error = SA_AIS_ERR_NO_MEMORY;
+			goto error_exit;
+		}
+		memset (queue, 0, sizeof (struct queue_entry));
+		memcpy (&queue->queue_name,
+			&req_exec_msg_queueopenasync->queue_name,
+			sizeof (SaNameT));
+		memcpy (&queue->create_attrs,
+			&req_exec_msg_queueopenasync->create_attrs,
+			sizeof (SaMsgQueueCreationAttributesT));
+
+		queue->open_flags = req_exec_msg_queueopenasync->open_flags;
+
+		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+			queue->priority[i].queue_size = queue->create_attrs.size[i];
+			list_init (&queue->priority[i].message_head);
+		}
+
+		list_init (&queue->group_list);
+		list_init (&queue->queue_list);
+		list_init (&queue->message_head);
+		list_init (&queue->pending_head);
+
+		list_add_tail  (&queue->queue_list, &queue_list_head);
+
+		global_queue_count += 1;
+		queue->queue_id = (global_queue_id += 1);
+		queue->refcount = 0;
+	}
+	else {
+		if (queue->timer_handle != 0) {
+			api->timer_delete (queue->timer_handle);
+		}
+		if (req_exec_msg_queueopenasync->open_flags & SA_MSG_QUEUE_EMPTY) {
+			/* DEBUG */
+			log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t empty queue = %s\n",
+				    (char *)(req_exec_msg_queueopenasync->queue_name.value));
+
+			/* 
+			 * If this queue already exists and is opened by another
+			 * process with the SA_MSG_QUEUE_EMPTY flag set, then we
+			 * should delete all existing messages in the queue.
+			 */
+		}
+	}
+
+	queue->close_time = 0;
+
+	msg_sync_refcount_increment (queue, nodeid);
+	msg_sync_refcount_calculate (queue);
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t refcount = %u\n",
+		    (unsigned int)(queue->refcount));
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_queueopenasync->source))
+	{
+		res_lib_msg_queueopenasync.header.size =
+			sizeof (struct res_lib_msg_queueopenasync);
+		res_lib_msg_queueopenasync.header.id =
+			MESSAGE_RES_MSG_QUEUEOPENASYNC;
+		res_lib_msg_queueopenasync.header.error = error;
+
+		if (error == SA_AIS_OK) {
+			msg_pd = api->ipc_private_data_get (req_exec_msg_queueopenasync->source.conn);
+			memcpy (&cleanup->queue_name, &queue->queue_name, sizeof (SaNameT));
+			cleanup->queue_handle = req_exec_msg_queueopenasync->queue_handle;
+			cleanup->queue_id = queue->queue_id;
+			res_lib_msg_queueopenasync.queue_id = queue->queue_id;
+			list_init (&cleanup->list);
+			list_add_tail (&cleanup->list, &msg_pd->queue_cleanup_list);
+		}
+		else {
+			free (cleanup);
+		}
+
+		api->ipc_response_send (
+			req_exec_msg_queueopenasync->source.conn,
+			&res_lib_msg_queueopenasync,
+			sizeof (struct res_lib_msg_queueopenasync));
+
+		res_lib_msg_queueopen_callback.header.size =
+			sizeof (struct res_lib_msg_queueopen_callback);
+		res_lib_msg_queueopen_callback.header.id =
+			MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK;
+		res_lib_msg_queueopen_callback.header.error = error;
+
+		res_lib_msg_queueopen_callback.queue_handle =
+			req_exec_msg_queueopenasync->queue_handle;
+		res_lib_msg_queueopen_callback.invocation =
+			req_exec_msg_queueopenasync->invocation;
+
+		api->ipc_dispatch_send (
+			req_exec_msg_queueopenasync->source.conn,
+			&res_lib_msg_queueopen_callback,
+			sizeof (struct res_lib_msg_queueopen_callback));
 	}
 }
 
@@ -1592,37 +2511,53 @@ static void message_handler_req_exec_msg_queueclose (
 	struct req_exec_msg_queueclose *req_exec_msg_queueclose =
 		(struct req_exec_msg_queueclose *)message;
 	struct res_lib_msg_queueclose res_lib_msg_queueclose;
-	struct message_queue *queue = 0;
 	SaAisErrorT error = SA_AIS_OK;
+	struct queue_entry *queue = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueClose %s\n",
-		getSaNameT (&req_exec_msg_queueclose->queue_name));
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueClose\n");
 
-	queue = queue_find (&queue_list_head,
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(req_exec_msg_queueclose->queue_name.value),
+		    (unsigned int)(req_exec_msg_queueclose->queue_id));
+
+	queue = msg_find_queue (&queue_list_head,
 		&req_exec_msg_queueclose->queue_name);
 	if (queue == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	queue->refcount -= 1;
+	msg_sync_refcount_decrement (queue, nodeid);
+	msg_sync_refcount_calculate (queue);
 
-	if (queue->refcount == 0) {
-		/* free queue */
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t refcount = %u\n",
+		    (unsigned int)(queue->refcount));
+
+	if (queue->refcount == 0)
+	{
+		queue->close_time = api->timer_time_get();
+
+		/* 
+		 * If this queue is non-persistent and we are the lowest nodeid,
+		 * create a timer that will expire based on the retention time
+		 * (specified at queue creation time). When the timer expires,
+		 * the queue will be deleted.
+		 */
+		if ((queue->create_attrs.creationFlags != SA_MSG_QUEUE_PERSISTENT) &&
+		    (lowest_nodeid == api->totem_nodeid_get()))
+		{
+			api->timer_add_duration (
+				queue->create_attrs.retentionTime,
+				(void *)(queue), msg_expire_queue,
+				&queue->timer_handle);
+		}
 	}
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_queueclose->source))
+	if (api->ipc_source_is_local (&req_exec_msg_queueclose->source))
 	{
-
-		/* TODO */
-
-		/*
-		 * msg_queue_cleanup_remove (
-		 *	req_exec_msg_queueclose->source.conn_info,
-		 *	req_exec_msg_queueclose->queue_handle);
-		 */
-
 		res_lib_msg_queueclose.header.size =
 			sizeof (struct res_lib_msg_queueclose);
 		res_lib_msg_queueclose.header.id =
@@ -1640,22 +2575,165 @@ static void message_handler_req_exec_msg_queuestatusget (
 	void *message,
 	unsigned int nodeid)
 {
-#if 0
 	struct req_exec_msg_queuestatusget *req_exec_msg_queuestatusget =
 		(struct req_exec_msg_queuestatusget *)message;
 	struct res_lib_msg_queuestatusget res_lib_msg_queuestatusget;
-#endif
+	SaAisErrorT error = SA_AIS_OK;
+	struct queue_entry *queue = NULL;
+
+	int i;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueStatusGet\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s\n",
+		    (char *)(req_exec_msg_queuestatusget->queue_name.value));
+
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_queuestatusget->queue_name);
+	if (queue == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	res_lib_msg_queuestatusget.queue_status.creationFlags =
+		queue->create_attrs.creationFlags;
+	res_lib_msg_queuestatusget.queue_status.retentionTime =
+		queue->create_attrs.retentionTime;
+	res_lib_msg_queuestatusget.queue_status.closeTime =
+		queue->close_time;
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		res_lib_msg_queuestatusget.queue_status.saMsgQueueUsage[i].queueSize =
+			queue->priority[i].queue_size;
+		res_lib_msg_queuestatusget.queue_status.saMsgQueueUsage[i].queueUsed =
+			queue->priority[i].queue_used;
+		res_lib_msg_queuestatusget.queue_status.saMsgQueueUsage[i].numberOfMessages =
+			queue->priority[i].message_count;
+	}
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t close_time = %llu\n",
+		    (unsigned long long)(queue->close_time));
+	log_printf (LOG_LEVEL_NOTICE, "\t retention_time = %llu\n",
+		    (unsigned long long)(queue->create_attrs.retentionTime));
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_queuestatusget->source))
+	{
+		res_lib_msg_queuestatusget.header.size =
+			sizeof (struct res_lib_msg_queuestatusget);
+		res_lib_msg_queuestatusget.header.id =
+			MESSAGE_RES_MSG_QUEUESTATUSGET;
+		res_lib_msg_queuestatusget.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_queuestatusget->source.conn,
+			&res_lib_msg_queuestatusget,
+			sizeof (struct res_lib_msg_queuestatusget));
+	}
+}
+
+static void message_handler_req_exec_msg_queueretentiontimeset (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_queueretentiontimeset *req_exec_msg_queueretentiontimeset =
+		(struct req_exec_msg_queueretentiontimeset *)message;
+	struct res_lib_msg_queueretentiontimeset res_lib_msg_queueretentiontimeset;
+	SaAisErrorT error = SA_AIS_OK;
+	struct queue_entry *queue = NULL;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueRetentionTimeSet\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(req_exec_msg_queueretentiontimeset->queue_name.value),
+		    (unsigned int)(req_exec_msg_queueretentiontimeset->queue_id));
+
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_queueretentiontimeset->queue_name);
+	if (queue == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	if (queue->create_attrs.creationFlags == SA_MSG_QUEUE_PERSISTENT) {
+		error = SA_AIS_ERR_BAD_OPERATION;
+		goto error_exit;
+	}
+
+	/* 
+	 * Note that if this queue has an active retention timer,
+	 * changing the retention time has no effect on that timer.
+	 * Alternative is to delete any active retention timer and
+	 * replace with new timer using new retention time.
+	 */
+
+	queue->create_attrs.retentionTime =
+		req_exec_msg_queueretentiontimeset->retention_time;
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_queueretentiontimeset->source))
+	{
+		res_lib_msg_queueretentiontimeset.header.size =
+			sizeof (struct res_lib_msg_queueretentiontimeset);
+		res_lib_msg_queueretentiontimeset.header.id =
+			MESSAGE_RES_MSG_QUEUERETENTIONTIMESET;
+		res_lib_msg_queueretentiontimeset.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_queueretentiontimeset->source.conn,
+			&res_lib_msg_queueretentiontimeset,
+			sizeof (struct res_lib_msg_queueretentiontimeset));
+	}
 }
 
 static void message_handler_req_exec_msg_queueunlink (
 	void *message,
 	unsigned int nodeid)
 {
-#if 0
 	struct req_exec_msg_queueunlink *req_exec_msg_queueunlink =
 		(struct req_exec_msg_queueunlink *)message;
 	struct res_lib_msg_queueunlink res_lib_msg_queueunlink;
-#endif
+	SaAisErrorT error = SA_AIS_OK;
+	struct queue_entry *queue = NULL;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueUnlink\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s\n",
+		    (char *)(req_exec_msg_queueunlink->queue_name.value));
+
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_queueunlink->queue_name);
+	if (queue == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	assert (queue->unlink_flag == 0);
+
+	queue->unlink_flag = 1;
+
+	if (queue->refcount == 0) {
+		msg_release_queue (queue);
+	}
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_queueunlink->source))
+	{
+		res_lib_msg_queueunlink.header.size =
+			sizeof (struct res_lib_msg_queueunlink);
+		res_lib_msg_queueunlink.header.id =
+			MESSAGE_RES_MSG_QUEUEUNLINK;
+		res_lib_msg_queueunlink.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_queueunlink->source.conn,
+			&res_lib_msg_queueunlink,
+			sizeof (struct res_lib_msg_queueunlink));
+	}
 }
 
 static void message_handler_req_exec_msg_queuegroupcreate (
@@ -1665,37 +2743,51 @@ static void message_handler_req_exec_msg_queuegroupcreate (
 	struct req_exec_msg_queuegroupcreate *req_exec_msg_queuegroupcreate =
 		(struct req_exec_msg_queuegroupcreate *)message;
 	struct res_lib_msg_queuegroupcreate res_lib_msg_queuegroupcreate;
-	struct queue_group *group = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+	struct group_entry *group = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupCreate %s\n",
-		getSaNameT (&req_exec_msg_queuegroupcreate->queue_group_name));
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupCreate\n");
 
-	group = group_find (&group_list_head,
-		&req_exec_msg_queuegroupcreate->queue_group_name);
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s\n",
+		    (char *)(req_exec_msg_queuegroupcreate->group_name.value));
+
+	if ((global_group_count + 1) > MAX_NUM_QUEUE_GROUPS) {
+		error = SA_AIS_ERR_NO_RESOURCES;
+		goto error_exit;
+	}
+
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_queuegroupcreate->group_name);
+
 	if (group == NULL) {
-		group = malloc (sizeof (struct queue_group));
+		group = malloc (sizeof (struct group_entry));
 		if (group == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
 			goto error_exit;
 		}
-		memset (group, 0, sizeof (struct queue_group));
-		memcpy (&group->name,
-			&req_exec_msg_queuegroupcreate->queue_group_name,
+		memset (group, 0, sizeof (struct group_entry));
+		memcpy (&group->group_name,
+			&req_exec_msg_queuegroupcreate->group_name,
 			sizeof (SaNameT));
 
 		group->policy = req_exec_msg_queuegroupcreate->policy;
 
-		list_init (&group->group_list);
 		list_init (&group->queue_head);
-		list_add (&group->group_list, &group_list_head);
-	} else {
+		list_init (&group->group_list);
+
+		list_add_tail  (&group->group_list, &group_list_head);
+
+		global_group_count += 1;
+	}
+	else {
 		error = SA_AIS_ERR_EXIST;
+		goto error_exit;
 	}
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_queuegroupcreate->source)) {
+	if (api->ipc_source_is_local (&req_exec_msg_queuegroupcreate->source))
+	{
 		res_lib_msg_queuegroupcreate.header.size =
 			sizeof (struct res_lib_msg_queuegroupcreate);
 		res_lib_msg_queuegroupcreate.header.id =
@@ -1716,108 +2808,66 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 	struct req_exec_msg_queuegroupinsert *req_exec_msg_queuegroupinsert =
 		(struct req_exec_msg_queuegroupinsert *)message;
 	struct res_lib_msg_queuegroupinsert res_lib_msg_queuegroupinsert;
-	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
-	struct message_queue *queue = NULL;
-	struct queue_group *group = NULL;
-	SaMsgQueueGroupNotificationT *notification = NULL;
+	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
+	/* SaMsgQueueGroupNotificationT *notification = NULL; */
 	SaAisErrorT error = SA_AIS_OK;
-	SaAisErrorT error_cb = SA_AIS_OK;
+	struct group_entry *group = NULL;
+	struct queue_entry *queue = NULL;
 
-	unsigned int change_count = 0;
-	unsigned int member_count = 0;
-	struct iovec iov[2];
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupInsert\n");
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupInsert %s\n",
-		getSaNameT (&req_exec_msg_queuegroupinsert->queue_group_name));
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s\n",
+		    (char *)(req_exec_msg_queuegroupinsert->group_name.value));
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s\n",
+		    (char *)(req_exec_msg_queuegroupinsert->queue_name.value));
 
-	/*
-	 * Check that the group actually exists.
-	 */
-	group = group_find (&group_list_head,
-		&req_exec_msg_queuegroupinsert->queue_group_name);
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_queuegroupinsert->group_name);
 	if (group == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	/*
-	 * Check to see if queue to be inserted is already in the group.
-	 */
-	queue = group_queue_find (group,
+	queue = msg_find_group_member (&group->queue_head,
 		&req_exec_msg_queuegroupinsert->queue_name);
 	if (queue != NULL) {
 		error = SA_AIS_ERR_EXIST;
 		goto error_exit;
 	}
 
-	/*
-	 * Check that the queue to be inserted actually exists.
-	 */
-	queue = queue_find (&queue_list_head,
+	queue = msg_find_queue (&queue_list_head,
 		&req_exec_msg_queuegroupinsert->queue_name);
 	if (queue == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	/*
-	 * If the policy is SA_MSG_QUEUE_GROUP_ROUND_ROBIN and the
-	 * rr_queue is NULL, then this is the first queue in the group.
-	 */
-	if ((group->policy == SA_MSG_QUEUE_GROUP_ROUND_ROBIN) &&
-	    (group->rr_queue == NULL))
-	{
-		group->rr_queue = queue;
+	if (( group->member_count + 1) > MAX_NUM_QUEUES_PER_GROUP) {
+		error = SA_AIS_ERR_NO_RESOURCES;
+		goto error_exit;
 	}
+
+	if ((group->policy == SA_MSG_QUEUE_GROUP_ROUND_ROBIN) &&
+	    (group->next_queue == NULL))
+	{
+		group->next_queue = queue;
+	}
+
+	queue->group = group;
 
 	list_init (&queue->group_list);
-	list_add (&queue->group_list, &group->queue_head);
+	list_add_tail (&queue->group_list, &group->queue_head);
 
-	queue->change = SA_MSG_QUEUE_GROUP_ADDED;
+	group->member_count += 1;
 
-	if (group->track_flags & SA_TRACK_CHANGES) {
-		member_count = queue_group_member_count (group);
-		change_count = queue_group_change_count (group);
-
-		notification = malloc (sizeof (SaMsgQueueGroupNotificationT) * member_count);
-
-		if (notification == NULL) {
-			error_cb = SA_AIS_ERR_NO_MEMORY;
-			goto error_track;
-		}
-
-		memset (notification, 0, sizeof (SaMsgQueueGroupNotificationT) * member_count);
-
-		res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems =
-			queue_group_track (group, SA_TRACK_CHANGES,
-					   (void *)(notification));
-	}
-
-	if (group->track_flags & SA_TRACK_CHANGES_ONLY) {
-		member_count = queue_group_member_count (group);
-		change_count = queue_group_change_count (group);
-
-		notification = malloc (sizeof (SaMsgQueueGroupNotificationT) * change_count);
-
-		if (notification == NULL) {
-			error_cb = SA_AIS_ERR_NO_MEMORY;
-			goto error_track;
-		}
-
-		memset (notification, 0, sizeof (SaMsgQueueGroupNotificationT) * change_count);
-
-		res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems =
-			queue_group_track (group, SA_TRACK_CHANGES_ONLY,
-					   (void *)(notification));
-	}
-
-error_track:
-
-	queue->change = SA_MSG_QUEUE_GROUP_NO_CHANGE;
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t member_count = %u\n",
+		    (unsigned int)(group->member_count));
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_queuegroupinsert->source)) {
+	if (api->ipc_source_is_local (&req_exec_msg_queuegroupinsert->source))
+	{
 		res_lib_msg_queuegroupinsert.header.size =
 			sizeof (struct res_lib_msg_queuegroupinsert);
 		res_lib_msg_queuegroupinsert.header.id =
@@ -1829,36 +2879,14 @@ error_exit:
 			&res_lib_msg_queuegroupinsert,
 			sizeof (struct res_lib_msg_queuegroupinsert));
 
-		/*
-		 * Track changes (callback) if tracking is enabled
-		 */
+		if (error == SA_AIS_OK) {
+			if (group->track_flags & SA_TRACK_CHANGES) {
+				/* !! */
+			}
 
-		if ((error == SA_AIS_OK) &&
-		    ((group->track_flags & SA_TRACK_CHANGES) ||
-		     (group->track_flags & SA_TRACK_CHANGES_ONLY)))
-		{
-			res_lib_msg_queuegrouptrack.header.size =
-				(sizeof (struct res_lib_msg_queuegrouptrack) +
-				 (sizeof (SaMsgQueueGroupNotificationT) *
-				  res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems));
-			res_lib_msg_queuegrouptrack.header.id =
-				MESSAGE_RES_MSG_QUEUEGROUPTRACK;
-			res_lib_msg_queuegrouptrack.header.error = error_cb;
-			res_lib_msg_queuegrouptrack.numberOfMembers = member_count;
-
-			memcpy (&res_lib_msg_queuegrouptrack.queueGroupName,
-				&req_exec_msg_queuegroupinsert->queue_group_name,
-				sizeof (SaNameT));
-
-			iov[0].iov_base = &res_lib_msg_queuegrouptrack;
-			iov[0].iov_len = sizeof (res_lib_msg_queuegrouptrack);
-			iov[1].iov_base = notification;
-			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) *
-				 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems;
-			api->ipc_dispatch_iov_send (
-				req_exec_msg_queuegroupinsert->source.conn,
-				iov,
-				2);
+			if (group->track_flags & SA_TRACK_CHANGES_ONLY) {
+				/* !! */
+			}
 		}
 	}
 }
@@ -1870,98 +2898,56 @@ static void message_handler_req_exec_msg_queuegroupremove (
 	struct req_exec_msg_queuegroupremove *req_exec_msg_queuegroupremove =
 		(struct req_exec_msg_queuegroupremove *)message;
 	struct res_lib_msg_queuegroupremove res_lib_msg_queuegroupremove;
-	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
-	struct queue_group *group = NULL;
-	struct message_queue *queue = NULL;
-	SaMsgQueueGroupNotificationT *notification = NULL;
+	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
+	/* SaMsgQueueGroupNotificationT *notification = NULL; */
 	SaAisErrorT error = SA_AIS_OK;
-	SaAisErrorT error_cb = SA_AIS_OK;
+	struct group_entry *group = NULL;
+	struct queue_entry *queue = NULL;
 
-	unsigned int change_count = 0;
-	unsigned int member_count = 0;
-	struct iovec iov[2];
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupRemove\n");
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupRemove %s\n",
-		getSaNameT (&req_exec_msg_queuegroupremove->queue_group_name));
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s\n",
+		    (char *)(req_exec_msg_queuegroupremove->group_name.value));
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s\n",
+		    (char *)(req_exec_msg_queuegroupremove->queue_name.value));
 
-	group = group_find (&group_list_head,
-		&req_exec_msg_queuegroupremove->queue_group_name);
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_queuegroupremove->group_name);
 	if (group == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	/*
-	queue = queue_find (&queue_list_head,
-		&req_exec_msg_queuegroupremove->queue_name);
-	if (queue == NULL) {
-		error = SA_AIS_ERR_NOT_EXIST;
-		goto error_exit;
-	}
-	*/
-
-	queue = group_queue_find (group,
+	queue = msg_find_group_member (&group->queue_head,
 		&req_exec_msg_queuegroupremove->queue_name);
 	if (queue == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	queue->change = SA_MSG_QUEUE_GROUP_REMOVED;
-
-	if (group->track_flags & SA_TRACK_CHANGES) {
-		member_count = queue_group_member_count (group);
-		change_count = queue_group_change_count (group);
-
-		notification = malloc (sizeof (SaMsgQueueGroupNotificationT) * member_count);
-
-		if (notification == NULL) {
-			error_cb = SA_AIS_ERR_NO_MEMORY;
-			goto error_track;
-		}
-
-		memset (notification, 0, (sizeof (SaMsgQueueGroupNotificationT) * member_count));
-
-		res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems =
-			queue_group_track (group, SA_TRACK_CHANGES,
-					   (void *)(notification));
+	if (group->next_queue == queue) {
+		group->next_queue = msg_next_group_member (group);
 	}
 
-	if (group->track_flags & SA_TRACK_CHANGES_ONLY) {
-		member_count = queue_group_member_count (group);
-		change_count = queue_group_change_count (group);
-
-		notification = malloc (sizeof (SaMsgQueueGroupNotificationT) * change_count);
-
-		if (notification == NULL) {
-			error_cb = SA_AIS_ERR_NO_MEMORY;
-			goto error_track;
-		}
-
-		memset (notification, 0, (sizeof (SaMsgQueueGroupNotificationT) * change_count));
-
-		res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems =
-			queue_group_track (group, SA_TRACK_CHANGES_ONLY,
-					   (void *)(notification));
-	}
-
-error_track:
-
-	queue->change = SA_MSG_QUEUE_GROUP_NO_CHANGE;
-
-	/*
-	 * If the queue we are removing is also the next rr_queue,
-	 * we should set rr_queue to the next queue on the list.
-	 */
-	if (group->rr_queue == queue) {
-		group->rr_queue = next_rr_queue (group);
-	}
+	queue->group = NULL;
 
 	list_del (&queue->group_list);
+	list_init (&queue->group_list);
+
+	group->member_count -= 1;
+
+	if (group->member_count == 0) {
+		group->next_queue = NULL;
+	}
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t member_count = %u\n",
+		    (unsigned int)(group->member_count));
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_queuegroupremove->source)) {
+	if (api->ipc_source_is_local (&req_exec_msg_queuegroupremove->source))
+	{
 		res_lib_msg_queuegroupremove.header.size =
 			sizeof (struct res_lib_msg_queuegroupremove);
 		res_lib_msg_queuegroupremove.header.id =
@@ -1973,36 +2959,14 @@ error_exit:
 			&res_lib_msg_queuegroupremove,
 			sizeof (struct res_lib_msg_queuegroupremove));
 
-		/*
-		 * Track changes (callback) if tracking is enabled
-		 */
+		if (error == SA_AIS_OK) {
+			if (group->track_flags & SA_TRACK_CHANGES) {
+				/* !! */
+			}
 
-		if ((group->track_flags & SA_TRACK_CHANGES) ||
-		    (group->track_flags & SA_TRACK_CHANGES_ONLY))
-		{
-			res_lib_msg_queuegrouptrack.header.size =
-				(sizeof (struct res_lib_msg_queuegrouptrack) +
-				 (sizeof (SaMsgQueueGroupNotificationT) *
-				  res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems));
-			res_lib_msg_queuegrouptrack.header.id =
-				MESSAGE_RES_MSG_QUEUEGROUPTRACK;
-			res_lib_msg_queuegrouptrack.header.error = error_cb;
-			res_lib_msg_queuegrouptrack.numberOfMembers = member_count;
-
-			memcpy (&res_lib_msg_queuegrouptrack.queueGroupName,
-				&req_exec_msg_queuegroupremove->queue_group_name,
-				sizeof (SaNameT));
-
-			iov[0].iov_base = &res_lib_msg_queuegrouptrack;
-			iov[0].iov_len = sizeof (res_lib_msg_queuegrouptrack);
-			iov[1].iov_base = notification;
-			iov[1].iov_len =
-				sizeof (SaMsgQueueGroupNotificationT) *
-				 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems;
-			api->ipc_dispatch_iov_send (
-				req_exec_msg_queuegroupremove->source.conn,
-				iov,
-				2);
+			if (group->track_flags & SA_TRACK_CHANGES_ONLY) {
+				/* !! */
+			}
 		}
 	}
 }
@@ -2014,25 +2978,27 @@ static void message_handler_req_exec_msg_queuegroupdelete (
 	struct req_exec_msg_queuegroupdelete *req_exec_msg_queuegroupdelete =
 		(struct req_exec_msg_queuegroupdelete *)message;
 	struct res_lib_msg_queuegroupdelete res_lib_msg_queuegroupdelete;
-	struct queue_group *group = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+	struct group_entry *group = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupDelete %s\n",
-		getSaNameT (&req_exec_msg_queuegroupdelete->queue_group_name));
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupDelete\n");
 
-	group = group_find (&group_list_head,
-		&req_exec_msg_queuegroupdelete->queue_group_name);
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s\n",
+		    (char *)(req_exec_msg_queuegroupdelete->group_name.value));
+
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_queuegroupdelete->group_name);
 	if (group == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	list_del (&group->group_list);
-	free (group);
+	msg_release_group (group);
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_queuegroupdelete->source)) {
+	if (api->ipc_source_is_local (&req_exec_msg_queuegroupdelete->source))
+	{
 		res_lib_msg_queuegroupdelete.header.size =
 			sizeof (struct res_lib_msg_queuegroupdelete);
 		res_lib_msg_queuegroupdelete.header.id =
@@ -2053,41 +3019,27 @@ static void message_handler_req_exec_msg_queuegrouptrack (
 	struct req_exec_msg_queuegrouptrack *req_exec_msg_queuegrouptrack =
 		(struct req_exec_msg_queuegrouptrack *)message;
 	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
-	struct queue_group *group = NULL;
+	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
+	/* SaMsgQueueGroupNotificationT *notification = NULL; */
 	SaAisErrorT error = SA_AIS_OK;
+	struct group_entry *group = NULL;
 
-	unsigned int change_count = 0;
-	unsigned int member_count = 0;
-	struct iovec iov[2];
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrack\n");
 
-	SaMsgQueueGroupNotificationT *notification = NULL;
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s\n",
+		    (char *)(req_exec_msg_queuegrouptrack->group_name.value));
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrack %s\n",
-		getSaNameT (&req_exec_msg_queuegrouptrack->queue_group_name));
-
-	group = group_find (&group_list_head,
-		&req_exec_msg_queuegrouptrack->queue_group_name);
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_queuegrouptrack->group_name);
 	if (group == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	member_count = queue_group_member_count (group);
-	change_count = queue_group_change_count (group);
-
 	if (req_exec_msg_queuegrouptrack->track_flags & SA_TRACK_CURRENT) {
-		notification = malloc (sizeof (SaMsgQueueGroupNotificationT) * member_count);
-
-		if (notification == NULL) {
-			error = SA_AIS_ERR_NO_MEMORY;
-			goto error_exit;
-		}
-
-		memset (notification, 0, sizeof (SaMsgQueueGroupNotificationT) * member_count);
-
-		res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems =
-			queue_group_track (group, SA_TRACK_CURRENT,
-					   (void *)(notification));
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "\t SA_TRACK_CURRENT\n");
 	}
 
 	if (req_exec_msg_queuegrouptrack->track_flags & SA_TRACK_CHANGES) {
@@ -2099,62 +3051,18 @@ static void message_handler_req_exec_msg_queuegrouptrack (
 	}
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_queuegrouptrack->source)) {
+	if (api->ipc_source_is_local (&req_exec_msg_queuegrouptrack->source))
+	{
 		res_lib_msg_queuegrouptrack.header.size =
 			sizeof (struct res_lib_msg_queuegrouptrack);
 		res_lib_msg_queuegrouptrack.header.id =
 			MESSAGE_RES_MSG_QUEUEGROUPTRACK;
 		res_lib_msg_queuegrouptrack.header.error = error;
-		res_lib_msg_queuegrouptrack.numberOfMembers = member_count;
 
-		memcpy (&res_lib_msg_queuegrouptrack.queueGroupName,
-			&req_exec_msg_queuegrouptrack->queue_group_name,
-			sizeof (SaNameT));
-
-		if (req_exec_msg_queuegrouptrack->track_flags & SA_TRACK_CURRENT) {
-			if (req_exec_msg_queuegrouptrack->buffer_flag) {
-				res_lib_msg_queuegrouptrack.header.size +=
-					(sizeof (SaMsgQueueGroupNotificationT) *
-					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems);
-
-				api->ipc_response_send (
-					req_exec_msg_queuegrouptrack->source.conn,
-					&res_lib_msg_queuegrouptrack,
-					sizeof (struct res_lib_msg_queuegrouptrack));
-
-				api->ipc_response_send (
-					req_exec_msg_queuegrouptrack->source.conn,
-					notification,
-					(sizeof (SaMsgQueueGroupNotificationT) *
-					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems));
-			} else {
-				api->ipc_response_send (
-					req_exec_msg_queuegrouptrack->source.conn,
-					&res_lib_msg_queuegrouptrack,
-					sizeof (struct res_lib_msg_queuegrouptrack));
-
-				res_lib_msg_queuegrouptrack.header.size +=
-					(sizeof (SaMsgQueueGroupNotificationT) *
-					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems);
-
-				iov[0].iov_base = &res_lib_msg_queuegrouptrack;
-				iov[0].iov_len = sizeof (res_lib_msg_queuegrouptrack);
-				iov[1].iov_base = notification;
-				iov[1].iov_len =
-					sizeof (SaMsgQueueGroupNotificationT) *
-					 res_lib_msg_queuegrouptrack.notificationBuffer.numberOfItems;
-				api->ipc_dispatch_iov_send (
-					req_exec_msg_queuegrouptrack->source.conn,
-					iov,
-					2);
-			}
-		} else {
-			api->ipc_response_send (
-				req_exec_msg_queuegrouptrack->source.conn,
-				&res_lib_msg_queuegrouptrack,
-				sizeof (struct res_lib_msg_queuegrouptrack));
-		}
+		api->ipc_response_send (
+			req_exec_msg_queuegrouptrack->source.conn,
+			&res_lib_msg_queuegrouptrack,
+			sizeof (struct res_lib_msg_queuegrouptrack));
 	}
 }
 
@@ -2165,21 +3073,18 @@ static void message_handler_req_exec_msg_queuegrouptrackstop (
 	struct req_exec_msg_queuegrouptrackstop *req_exec_msg_queuegrouptrackstop =
 		(struct req_exec_msg_queuegrouptrackstop *)message;
 	struct res_lib_msg_queuegrouptrackstop res_lib_msg_queuegrouptrackstop;
-	struct queue_group *group = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+	struct group_entry *group = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrackStop %s\n",
-		getSaNameT (&req_exec_msg_queuegrouptrackstop->queue_group_name));
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrackStop\n");
 
-	group = group_find (&group_list_head,
-		&req_exec_msg_queuegrouptrackstop->queue_group_name);
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s\n",
+		    (char *)(req_exec_msg_queuegrouptrackstop->group_name.value));
+
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_queuegrouptrackstop->group_name);
 	if (group == NULL) {
-		error = SA_AIS_ERR_NOT_EXIST;
-		goto error_exit;
-	}
-
-	if ((group->track_flags != SA_TRACK_CHANGES) &&
-	    (group->track_flags != SA_TRACK_CHANGES_ONLY)) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -2187,8 +3092,8 @@ static void message_handler_req_exec_msg_queuegrouptrackstop (
 	group->track_flags = 0;
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_queuegrouptrackstop->source)) {
+	if (api->ipc_source_is_local (&req_exec_msg_queuegrouptrackstop->source))
+	{
 		res_lib_msg_queuegrouptrackstop.header.size =
 			sizeof (struct res_lib_msg_queuegrouptrackstop);
 		res_lib_msg_queuegrouptrackstop.header.id =
@@ -2202,6 +3107,33 @@ error_exit:
 	}
 }
 
+static void message_handler_req_exec_msg_queuegroupnotificationfree (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_queuegroupnotificationfree *req_exec_msg_queuegroupnotificationfree =
+		(struct req_exec_msg_queuegroupnotificationfree *)message;
+	struct res_lib_msg_queuegroupnotificationfree res_lib_msg_queuegroupnotificationfree;
+	SaAisErrorT error = SA_AIS_OK;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupNotificationFree\n");
+
+/* error_exit: */
+	if (api->ipc_source_is_local (&req_exec_msg_queuegroupnotificationfree->source))
+	{
+		res_lib_msg_queuegroupnotificationfree.header.size =
+			sizeof (struct res_lib_msg_queuegroupnotificationfree);
+		res_lib_msg_queuegroupnotificationfree.header.id =
+			MESSAGE_RES_MSG_QUEUEGROUPNOTIFICATIONFREE;
+		res_lib_msg_queuegroupnotificationfree.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_queuegroupnotificationfree->source.conn,
+			&res_lib_msg_queuegroupnotificationfree,
+			sizeof (struct res_lib_msg_queuegroupnotificationfree));
+	}
+}
+
 static void message_handler_req_exec_msg_messagesend (
 	void *message,
 	unsigned int nodeid)
@@ -2209,98 +3141,324 @@ static void message_handler_req_exec_msg_messagesend (
 	struct req_exec_msg_messagesend *req_exec_msg_messagesend =
 		(struct req_exec_msg_messagesend *)message;
 	struct res_lib_msg_messagesend res_lib_msg_messagesend;
-	struct res_lib_msg_messagesendasync res_lib_msg_messagesendasync;
-	struct queue_group *group = NULL;
-	struct message_queue *queue = NULL;
-	struct message_entry *entry = NULL;
+	struct res_lib_msg_messagereceived_callback res_lib_msg_messagereceived_callback;
+	struct queue_cleanup *cleanup = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+	SaUint8T priority;
+
+	struct group_entry *group = NULL;
+	struct queue_entry *queue = NULL;
+	struct message_entry *msg = NULL;
+	struct pending_entry *get = NULL;
 
 	char *data = ((char *)(req_exec_msg_messagesend) +
 		      sizeof (struct req_exec_msg_messagesend));
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageSend %s\n",
-		getSaNameT (&req_exec_msg_messagesend->destination));
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageSend\n");
 
-	group = group_find (&group_list_head,
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t destination = %s\n",
+		    (char *)(req_exec_msg_messagesend->destination.value));
+	log_printf (LOG_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+
+	group = msg_find_group (&group_list_head,
 		&req_exec_msg_messagesend->destination);
 	if (group == NULL) {
-		queue = queue_find (&queue_list_head,
+		queue = msg_find_queue (&queue_list_head,
 			&req_exec_msg_messagesend->destination);
 		if (queue == NULL) {
 			error = SA_AIS_ERR_NOT_EXIST;
 			goto error_exit;
 		}
 	}
+	else {
+		queue = group->next_queue;
+		if (queue == NULL) {
+			error = SA_AIS_ERR_QUEUE_NOT_AVAILABLE;
+			goto error_exit;
+		}
+	}
 
-	entry = malloc (sizeof (struct message_entry));
-	if (entry == NULL) {
+	if (req_exec_msg_messagesend->message.size > MAX_MESSAGE_SIZE) {
+		error = SA_AIS_ERR_TOO_BIG;
+		goto error_exit;
+	}
+
+	priority = req_exec_msg_messagesend->message.priority;
+
+	if ((queue->priority[priority].queue_size -
+	     queue->priority[priority].queue_used) < req_exec_msg_messagesend->message.size)
+	{
+		error = SA_AIS_ERR_QUEUE_FULL;
+		goto error_exit;
+	}
+
+	msg = malloc (sizeof (struct message_entry));
+	if (msg == NULL) {
 		error = SA_AIS_ERR_NO_MEMORY;
 		goto error_exit;
 	}
 
-	memset (entry, 0, sizeof (struct message_entry));
-	memcpy (&entry->message, &req_exec_msg_messagesend->message,
-		sizeof (SaMsgMessageT));
+	memset (msg, 0, sizeof (struct message_entry));
+	memcpy (&msg->message, &req_exec_msg_messagesend->message, sizeof (SaMsgMessageT));
 
-	entry->message.data = malloc (entry->message.size);
-	if (entry->message.data == NULL) {
+	msg->message.data = malloc (msg->message.size);
+	if (msg->message.data == NULL) {
 		error = SA_AIS_ERR_NO_MEMORY;
 		goto error_exit;
 	}
 
-	memset (entry->message.data, 0, entry->message.size);
-	memcpy (entry->message.data, (void *)(data), entry->message.size);
+	memset (msg->message.data, 0, msg->message.size);
+	memcpy (msg->message.data, (char *)(data), msg->message.size);
 
-	entry->time = cluster_time_now();
+	msg->sender_id = 0;
+	msg->send_time = api->timer_time_get();
+
+	if (list_empty (&queue->pending_head)) {
+		list_add_tail (&msg->queue_list, &queue->message_head);
+		list_add_tail (&msg->list, &queue->priority[(msg->message.priority)].message_head);
+		queue->priority[(msg->message.priority)].queue_used += msg->message.size;
+		queue->priority[(msg->message.priority)].message_count += 1;
+
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+			    (char *)(queue->queue_name.value),
+			    (unsigned int)(msg->message.priority),
+			    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
+	}
+	else {
+		get = list_entry (queue->pending_head.next, struct pending_entry, list);
+		if (get == NULL) {
+			error = SA_AIS_ERR_LIBRARY; /* ? */
+			goto error_exit;
+		}
+
+		list_del (&get->list);
+		list_init (&get->list);
+
+		if (api->ipc_source_is_local (&get->source)) {
+			msg_deliver_pending_message (get->source.conn, msg);
+		}
+
+		free (get);
+	}
 
 	if (group != NULL) {
-		/* if (group->policy == SA_MSG_QUEUE_GROUP_ROUND_ROBIN) */
-		list_add_tail (&entry->list, &group->rr_queue->message_head);
-		group->rr_queue = next_rr_queue (group);
-	} else {
-		list_add_tail (&entry->list, &queue->message_head);
+		group->next_queue = msg_next_group_member (group);
 	}
 
 error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_messagesend->source))
+	{
+		res_lib_msg_messagesend.header.size =
+			sizeof (struct res_lib_msg_messagesend);
+		res_lib_msg_messagesend.header.id =
+			MESSAGE_RES_MSG_MESSAGESEND;
+		res_lib_msg_messagesend.header.error = error;
 
-	if (api->ipc_source_is_local(&req_exec_msg_messagesend->source)) {
-		if (req_exec_msg_messagesend->async_call) {
-			res_lib_msg_messagesendasync.header.size =
-				sizeof (struct res_lib_msg_messagesendasync);
-			res_lib_msg_messagesendasync.header.id =
-				MESSAGE_RES_MSG_MESSAGESENDASYNC;
-			res_lib_msg_messagesendasync.header.error = error;
-			res_lib_msg_messagesendasync.invocation =
-				req_exec_msg_messagesend->invocation;
+		api->ipc_response_send (
+			req_exec_msg_messagesend->source.conn,
+			&res_lib_msg_messagesend,
+			sizeof (struct res_lib_msg_messagesend));
 
-			memcpy (&res_lib_msg_messagesendasync.source,
-				&req_exec_msg_messagesend->source,
-				sizeof (mar_message_source_t));
+		if ((queue->open_flags & SA_MSG_QUEUE_RECEIVE_CALLBACK) && (error == SA_AIS_OK))
+		{
+			res_lib_msg_messagereceived_callback.header.size =
+				sizeof (struct res_lib_msg_messagereceived_callback);
+			res_lib_msg_messagereceived_callback.header.id =
+				MESSAGE_RES_MSG_MESSAGERECEIVED_CALLBACK;
+			res_lib_msg_messagereceived_callback.header.error = SA_AIS_OK;
 
-			api->ipc_response_send (
+			cleanup = msg_find_queue_cleanup (
 				req_exec_msg_messagesend->source.conn,
-				&res_lib_msg_messagesendasync,
-				sizeof (struct res_lib_msg_messagesendasync));
+				&queue->queue_name, queue->queue_id);
+
+			res_lib_msg_messagereceived_callback.queue_handle = cleanup->queue_handle;
+
 			api->ipc_dispatch_send (
 				req_exec_msg_messagesend->source.conn,
-				&res_lib_msg_messagesendasync,
-				sizeof (struct res_lib_msg_messagesendasync));
-		} else {
-			res_lib_msg_messagesend.header.size =
-				sizeof (struct res_lib_msg_messagesend);
-			res_lib_msg_messagesend.header.id =
-				MESSAGE_RES_MSG_MESSAGESEND;
-			res_lib_msg_messagesend.header.error = error;
-
-			memcpy (&res_lib_msg_messagesend.source,
-				&req_exec_msg_messagesend->source,
-				sizeof (mar_message_source_t));
-
-			api->ipc_response_send (
-				req_exec_msg_messagesend->source.conn,
-				&res_lib_msg_messagesend,
-				sizeof (struct res_lib_msg_messagesend));
+				&res_lib_msg_messagereceived_callback,
+				sizeof (struct res_lib_msg_messagereceived_callback));
 		}
+	}
+
+	/* ? */
+	if ((error != SA_AIS_OK) && (msg != NULL)) {
+		if (msg->message.data != NULL) {
+			free (msg->message.data);
+		}
+		free (msg);
+	}
+}
+
+static void message_handler_req_exec_msg_messagesendasync (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_messagesendasync *req_exec_msg_messagesendasync =
+		(struct req_exec_msg_messagesendasync *)message;
+	struct res_lib_msg_messagesendasync res_lib_msg_messagesendasync;
+	struct res_lib_msg_messagereceived_callback res_lib_msg_messagereceived_callback;
+	struct res_lib_msg_messagedelivered_callback res_lib_msg_messagedelivered_callback;
+	struct queue_cleanup *cleanup = NULL;
+	SaAisErrorT error = SA_AIS_OK;
+	SaUint8T priority;
+
+	struct group_entry *group = NULL;
+	struct queue_entry *queue = NULL;
+	struct message_entry *msg = NULL;
+	struct pending_entry *get = NULL;
+
+	char *data = ((char *)(req_exec_msg_messagesendasync) +
+		      sizeof (struct req_exec_msg_messagesendasync));
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageSendAsync\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t destination = %s\n",
+		    (char *)(req_exec_msg_messagesendasync->destination.value));
+	log_printf (LOG_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_messagesendasync->destination);
+	if (group == NULL) {
+		queue = msg_find_queue (&queue_list_head,
+			&req_exec_msg_messagesendasync->destination);
+		if (queue == NULL) {
+			error = SA_AIS_ERR_NOT_EXIST;
+			goto error_exit;
+		}
+	}
+	else {
+		queue = group->next_queue;
+		if (queue == NULL) {
+			error = SA_AIS_ERR_QUEUE_NOT_AVAILABLE;
+			goto error_exit;
+		}
+	}
+	if (req_exec_msg_messagesendasync->message.size > MAX_MESSAGE_SIZE) {
+		error = SA_AIS_ERR_TOO_BIG;
+		goto error_exit;
+	}
+
+	priority = req_exec_msg_messagesendasync->message.priority;
+
+	if ((queue->priority[priority].queue_size -
+	     queue->priority[priority].queue_used) < req_exec_msg_messagesendasync->message.size)
+	{
+		error = SA_AIS_ERR_QUEUE_FULL;
+		goto error_exit;
+	}
+
+	msg = malloc (sizeof (struct message_entry));
+	if (msg == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+
+	memset (msg, 0, sizeof (struct message_entry));
+	memcpy (&msg->message, &req_exec_msg_messagesendasync->message, sizeof (SaMsgMessageT));
+
+	msg->message.data = malloc (msg->message.size);
+	if (msg->message.data == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+
+	memset (msg->message.data, 0, msg->message.size);
+	memcpy (msg->message.data, (char *)(data), msg->message.size);
+
+	msg->sender_id = 0;
+	msg->send_time = api->timer_time_get();
+
+	if (list_empty (&queue->pending_head)) {
+		list_add_tail (&msg->queue_list, &queue->message_head);
+		list_add_tail (&msg->list, &queue->priority[(msg->message.priority)].message_head);
+		queue->priority[(msg->message.priority)].queue_used += msg->message.size;
+		queue->priority[(msg->message.priority)].message_count += 1;
+
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+			    (char *)(queue->queue_name.value),
+			    (unsigned int)(msg->message.priority),
+			    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
+	}
+	else {
+		get = list_entry (queue->pending_head.next, struct pending_entry, list);
+		if (get == NULL) {
+			error = SA_AIS_ERR_LIBRARY; /* ? */
+			goto error_exit;
+		}
+
+		list_del (&get->list);
+		list_init (&get->list);
+
+		if (api->ipc_source_is_local (&get->source)) {
+			msg_deliver_pending_message (get->source.conn, msg);
+		}
+
+		free (get);
+	}
+
+	if (group != NULL) {
+		group->next_queue = msg_next_group_member (group);
+	}
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_messagesendasync->source))
+	{
+		res_lib_msg_messagesendasync.header.size =
+			sizeof (struct res_lib_msg_messagesendasync);
+		res_lib_msg_messagesendasync.header.id =
+			MESSAGE_RES_MSG_MESSAGESENDASYNC;
+		res_lib_msg_messagesendasync.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_messagesendasync->source.conn,
+			&res_lib_msg_messagesendasync,
+			sizeof (struct res_lib_msg_messagesendasync));
+
+		res_lib_msg_messagedelivered_callback.header.size =
+			sizeof (struct res_lib_msg_messagedelivered_callback);
+		res_lib_msg_messagedelivered_callback.header.id =
+			MESSAGE_RES_MSG_MESSAGEDELIVERED_CALLBACK;
+		res_lib_msg_messagedelivered_callback.header.error = error;
+
+		res_lib_msg_messagedelivered_callback.invocation =
+			req_exec_msg_messagesendasync->invocation;
+
+		api->ipc_dispatch_send (
+			req_exec_msg_messagesendasync->source.conn,
+			&res_lib_msg_messagedelivered_callback,
+			sizeof (struct res_lib_msg_messagedelivered_callback));
+
+		if ((queue->open_flags & SA_MSG_QUEUE_RECEIVE_CALLBACK) && (error == SA_AIS_OK))
+		{
+			res_lib_msg_messagereceived_callback.header.size =
+				sizeof (struct res_lib_msg_messagereceived_callback);
+			res_lib_msg_messagereceived_callback.header.id =
+				MESSAGE_RES_MSG_MESSAGERECEIVED_CALLBACK;
+			res_lib_msg_messagereceived_callback.header.error = SA_AIS_OK;
+
+			cleanup = msg_find_queue_cleanup (
+				req_exec_msg_messagesendasync->source.conn,
+				&queue->queue_name, queue->queue_id);
+
+			res_lib_msg_messagereceived_callback.queue_handle = cleanup->queue_handle;
+
+			api->ipc_dispatch_send (
+				req_exec_msg_messagesendasync->source.conn,
+				&res_lib_msg_messagereceived_callback,
+				sizeof (struct res_lib_msg_messagereceived_callback));
+		}
+	}
+
+	/* ? */
+	if ((error != SA_AIS_OK) && (msg != NULL)) {
+		if (msg->message.data != NULL) {
+			free (msg->message.data);
+		}
+		free (msg);
 	}
 }
 
@@ -2311,63 +3469,112 @@ static void message_handler_req_exec_msg_messageget (
 	struct req_exec_msg_messageget *req_exec_msg_messageget =
 		(struct req_exec_msg_messageget *)message;
 	struct res_lib_msg_messageget res_lib_msg_messageget;
-	struct message_queue *queue = NULL;
-	struct message_entry *entry = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+	struct queue_entry *queue = NULL;
+	struct message_entry *msg = NULL;
+	struct pending_entry *get = NULL;
+	struct iovec iov[2];
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageGet %s\n",
-		getSaNameT (&req_exec_msg_messageget->queue_name));
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageGet\n");
 
-	queue = queue_find (&queue_list_head,
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(req_exec_msg_messageget->queue_name.value),
+		    (unsigned int)(req_exec_msg_messageget->queue_id));
+
+	queue = msg_find_queue (&queue_list_head,
 		&req_exec_msg_messageget->queue_name);
 	if (queue == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	if (list_empty (queue->message_head.next)) {
-		error = SA_AIS_ERR_TIMEOUT; /* FIX ME */
-		goto error_exit;
+	msg = msg_get_message (queue);
+
+	if (msg == NULL)
+	{
+		get = malloc (sizeof (struct pending_entry));
+		if (get == NULL) {
+			error = SA_AIS_ERR_NO_MEMORY;
+			goto error_exit;
+		}
+
+		memcpy (&get->source,
+			&req_exec_msg_messageget->source,
+			sizeof (mar_message_source_t));
+
+		list_add_tail (&get->list, &queue->pending_head);
+
+		/* start timer */
+
+		return;
 	}
 
-	entry = list_entry (queue->message_head.next, struct message_entry, list);
-	if (entry == NULL) {
-		error = SA_AIS_ERR_LIBRARY; /* FIX ME */
-		goto error_exit;
-	}
+	res_lib_msg_messageget.send_time = msg->send_time;
+	res_lib_msg_messageget.sender_id = msg->sender_id;
 
-	list_del (queue->message_head.next);
+	/* list_del (queue->priority[msg->message.priority].message_head.next); */
+
+	list_del (&msg->list);
+	list_del (&msg->queue_list);
+
+	queue->priority[msg->message.priority].message_count -= 1;
 
 error_exit:
-
-	if (api->ipc_source_is_local(&req_exec_msg_messageget->source)) {
+	if (api->ipc_source_is_local (&req_exec_msg_messageget->source))
+	{
 		res_lib_msg_messageget.header.size =
 			sizeof (struct res_lib_msg_messageget);
 		res_lib_msg_messageget.header.id =
 			MESSAGE_RES_MSG_MESSAGEGET;
 		res_lib_msg_messageget.header.error = error;
 
+		memcpy (&res_lib_msg_messageget.message, &msg->message,
+			sizeof (SaMsgMessageT)); /* ? */
+
+		iov[0].iov_base = &res_lib_msg_messageget;
+		iov[0].iov_len = sizeof (struct res_lib_msg_messageget);
+
 		if (error == SA_AIS_OK) {
-			memcpy (&res_lib_msg_messageget.message, &entry->message,
-				sizeof (SaMsgMessageT));
-		} else {
-			memset (&res_lib_msg_messageget.message, 0,
-				sizeof (SaMsgMessageT));
+			iov[1].iov_base = msg->message.data;
+			iov[1].iov_len = msg->message.size;
+
+			api->ipc_response_iov_send (req_exec_msg_messageget->source.conn, iov, 2);
 		}
+		else {
+			api->ipc_response_iov_send (req_exec_msg_messageget->source.conn, iov, 1);
+		}
+	}
 
-		memcpy (&res_lib_msg_messageget.source,
-			&req_exec_msg_messageget->source,
-			sizeof (mar_message_source_t));
+	if (msg != NULL) {
+		free (msg);
+	}
+}
+
+static void message_handler_req_exec_msg_messagedatafree (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_messagedatafree *req_exec_msg_messagedatafree =
+		(struct req_exec_msg_messagedatafree *)message;
+	struct res_lib_msg_messagedatafree res_lib_msg_messagedatafree;
+	SaAisErrorT error = SA_AIS_OK;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageDataFree\n");
+
+/* error_exit: */
+	if (api->ipc_source_is_local (&req_exec_msg_messagedatafree->source))
+	{
+		res_lib_msg_messagedatafree.header.size =
+			sizeof (struct res_lib_msg_messagedatafree);
+		res_lib_msg_messagedatafree.header.id =
+			MESSAGE_RES_MSG_MESSAGEDATAFREE;
+		res_lib_msg_messagedatafree.header.error = error;
 
 		api->ipc_response_send (
-			req_exec_msg_messageget->source.conn,
-			&res_lib_msg_messageget,
-			sizeof (struct res_lib_msg_messageget));
-
-		api->ipc_response_send (
-			req_exec_msg_messageget->source.conn,
-			res_lib_msg_messageget.message.data,
-			res_lib_msg_messageget.message.size);
+			req_exec_msg_messagedatafree->source.conn,
+			&res_lib_msg_messagedatafree,
+			sizeof (struct res_lib_msg_messagedatafree));
 	}
 }
 
@@ -2375,33 +3582,421 @@ static void message_handler_req_exec_msg_messagecancel (
 	void *message,
 	unsigned int nodeid)
 {
-#if 0
 	struct req_exec_msg_messagecancel *req_exec_msg_messagecancel =
 		(struct req_exec_msg_messagecancel *)message;
 	struct res_lib_msg_messagecancel res_lib_msg_messagecancel;
-#endif
+	SaAisErrorT error = SA_AIS_OK;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageCancel\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(req_exec_msg_messagecancel->queue_name.value),
+		    (unsigned int)(req_exec_msg_messagecancel->queue_id));
+
+/* error_exit: */
+	if (api->ipc_source_is_local (&req_exec_msg_messagecancel->source))
+	{
+		res_lib_msg_messagecancel.header.size =
+			sizeof (struct res_lib_msg_messagecancel);
+		res_lib_msg_messagecancel.header.id =
+			MESSAGE_RES_MSG_MESSAGECANCEL;
+		res_lib_msg_messagecancel.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_messagecancel->source.conn,
+			&res_lib_msg_messagecancel,
+			sizeof (struct res_lib_msg_messagecancel));
+	}
 }
 
 static void message_handler_req_exec_msg_messagesendreceive (
 	void *message,
 	unsigned int nodeid)
 {
-#if 0
 	struct req_exec_msg_messagesendreceive *req_exec_msg_messagesendreceive =
 		(struct req_exec_msg_messagesendreceive *)message;
 	struct res_lib_msg_messagesendreceive res_lib_msg_messagesendreceive;
-#endif
+	SaAisErrorT error = SA_AIS_OK;
+	SaUint8T priority;
+
+	struct group_entry *group = NULL;
+	struct queue_entry *queue = NULL;
+	struct message_entry *msg = NULL;
+	struct pending_entry *get = NULL;
+
+	char *data = ((char *)(req_exec_msg_messagesendreceive) +
+		      sizeof (struct req_exec_msg_messagesendreceive));
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageSendReceive\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t destination = %s\n",
+		    (char *)(req_exec_msg_messagesendreceive->destination.value));
+	log_printf (LOG_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+
+	group = msg_find_group (&group_list_head,
+		&req_exec_msg_messagesendreceive->destination);
+	if (group == NULL) {
+		queue = msg_find_queue (&queue_list_head,
+			&req_exec_msg_messagesendreceive->destination);
+		if (queue == NULL) {
+			error = SA_AIS_ERR_NOT_EXIST;
+			goto error_exit;
+		}
+	}
+	else {
+		queue = group->next_queue;
+		if (queue == NULL) {
+			error = SA_AIS_ERR_QUEUE_NOT_AVAILABLE;
+			goto error_exit;
+		}
+	}
+
+	if (req_exec_msg_messagesendreceive->message.size > MAX_MESSAGE_SIZE) {
+		error = SA_AIS_ERR_TOO_BIG;
+		goto error_exit;
+	}
+
+	priority = req_exec_msg_messagesendreceive->message.priority;
+
+	if ((queue->priority[priority].queue_size -
+	     queue->priority[priority].queue_used) < req_exec_msg_messagesendreceive->message.size)
+	{
+		error = SA_AIS_ERR_QUEUE_FULL;
+		goto error_exit;
+	}
+
+	msg = malloc (sizeof (struct message_entry));
+	if (msg == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+
+	memset (msg, 0, sizeof (struct message_entry));
+	memcpy (&msg->message, &req_exec_msg_messagesendreceive->message, sizeof (SaMsgMessageT));
+
+	msg->message.data = malloc (msg->message.size);
+	if (msg->message.data == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+
+	memset (msg->message.data, 0, msg->message.size);
+	memcpy (msg->message.data, (char *)(data), msg->message.size);
+
+	msg->sender_id = req_exec_msg_messagesendreceive->sender_id;
+	msg->send_time = api->timer_time_get();
+
+	if (list_empty (&queue->pending_head)) {
+		list_add_tail (&msg->queue_list, &queue->message_head);
+		list_add_tail (&msg->list, &queue->priority[(msg->message.priority)].message_head);
+		queue->priority[(msg->message.priority)].queue_used += msg->message.size;
+		queue->priority[(msg->message.priority)].message_count += 1;
+
+		/* DEBUG */
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+			    (char *)(queue->queue_name.value),
+			    (unsigned int)(msg->message.priority),
+			    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
+	}
+	else {
+		get = list_entry (queue->pending_head.next, struct pending_entry, list);
+		if (get == NULL) {
+			error = SA_AIS_ERR_LIBRARY; /* ? */
+			goto error_exit;
+		}
+
+		list_del (&get->list);
+		list_init (&get->list);
+
+		if (api->ipc_source_is_local (&get->source)) {
+			msg_deliver_pending_message (get->source.conn, msg);
+		}
+
+		free (get);
+	}
+
+	if (group != NULL) {
+		group->next_queue = msg_next_group_member (group);
+	}
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_messagesendreceive->source))
+	{
+		res_lib_msg_messagesendreceive.header.size =
+			sizeof (struct res_lib_msg_messagesendreceive);
+		res_lib_msg_messagesendreceive.header.id =
+			MESSAGE_RES_MSG_MESSAGESENDRECEIVE;
+		res_lib_msg_messagesendreceive.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_messagesendreceive->source.conn,
+			&res_lib_msg_messagesendreceive,
+			sizeof (struct res_lib_msg_messagesendreceive));
+	}
+
+	/* ? */
+	if ((error != SA_AIS_OK) && (msg != NULL)) {
+		if (msg->message.data != NULL) {
+			free (msg->message.data);
+		}
+		free (msg);
+	}
 }
 
 static void message_handler_req_exec_msg_messagereply (
 	void *message,
 	unsigned int nodeid)
 {
-#if 0
 	struct req_exec_msg_messagereply *req_exec_msg_messagereply =
 		(struct req_exec_msg_messagereply *)message;
 	struct res_lib_msg_messagereply res_lib_msg_messagereply;
-#endif
+	SaAisErrorT error = SA_AIS_OK;
+
+	char *data = ((char *)(req_exec_msg_messagereply) +
+		      sizeof (struct req_exec_msg_messagereply));
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageReply\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t sender_id = 0x%04x\n",
+		    (unsigned int)(req_exec_msg_messagereply->sender_id));
+	log_printf (LOG_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+
+	if (req_exec_msg_messagereply->reply_message.size > MAX_REPLY_SIZE) {
+		error = SA_AIS_ERR_TOO_BIG;
+		goto error_exit;
+	}
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_messagereply->source))
+	{
+		res_lib_msg_messagereply.header.size =
+			sizeof (struct res_lib_msg_messagereply);
+		res_lib_msg_messagereply.header.id =
+			MESSAGE_RES_MSG_MESSAGEREPLY;
+		res_lib_msg_messagereply.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_messagereply->source.conn,
+			&res_lib_msg_messagereply,
+			sizeof (struct res_lib_msg_messagereply));
+	}
+}
+
+static void message_handler_req_exec_msg_messagereplyasync (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_messagereplyasync *req_exec_msg_messagereplyasync =
+		(struct req_exec_msg_messagereplyasync *)message;
+	struct res_lib_msg_messagereplyasync res_lib_msg_messagereplyasync;
+	SaAisErrorT error = SA_AIS_OK;
+
+	char *data = ((char *)(req_exec_msg_messagereplyasync) +
+		      sizeof (struct req_exec_msg_messagereplyasync));
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMessageReplyAsync\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t sender_id = 0x%04x\n",
+		    (unsigned int)(req_exec_msg_messagereplyasync->sender_id));
+	log_printf (LOG_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+
+	if (req_exec_msg_messagereplyasync->reply_message.size > MAX_REPLY_SIZE) {
+		error = SA_AIS_ERR_TOO_BIG;
+		goto error_exit;
+	}
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_msg_messagereplyasync->source))
+	{
+		res_lib_msg_messagereplyasync.header.size =
+			sizeof (struct res_lib_msg_messagereplyasync);
+		res_lib_msg_messagereplyasync.header.id =
+			MESSAGE_RES_MSG_MESSAGEREPLYASYNC;
+		res_lib_msg_messagereplyasync.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_messagereplyasync->source.conn,
+			&res_lib_msg_messagereplyasync,
+			sizeof (struct res_lib_msg_messagereplyasync));
+	}
+}
+
+static void message_handler_req_exec_msg_queuecapacitythresholdset (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_queuecapacitythresholdset *req_exec_msg_queuecapacitythresholdset =
+		(struct req_exec_msg_queuecapacitythresholdset *)message;
+	struct res_lib_msg_queuecapacitythresholdset res_lib_msg_queuecapacitythresholdset;
+	SaAisErrorT error = SA_AIS_OK;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueCapacityThresholdSet\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(req_exec_msg_queuecapacitythresholdset->queue_name.value),
+		    (unsigned int)(req_exec_msg_queuecapacitythresholdset->queue_id));
+
+/* error_exit: */
+	if (api->ipc_source_is_local (&req_exec_msg_queuecapacitythresholdset->source))
+	{
+		res_lib_msg_queuecapacitythresholdset.header.size =
+			sizeof (struct res_lib_msg_queuecapacitythresholdset);
+		res_lib_msg_queuecapacitythresholdset.header.id =
+			MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDSET;
+		res_lib_msg_queuecapacitythresholdset.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_queuecapacitythresholdset->source.conn,
+			&res_lib_msg_queuecapacitythresholdset,
+			sizeof (struct res_lib_msg_queuecapacitythresholdset));
+	}
+}
+
+static void message_handler_req_exec_msg_queuecapacitythresholdget (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_queuecapacitythresholdget *req_exec_msg_queuecapacitythresholdget =
+		(struct req_exec_msg_queuecapacitythresholdget *)message;
+	struct res_lib_msg_queuecapacitythresholdget res_lib_msg_queuecapacitythresholdget;
+	SaAisErrorT error = SA_AIS_OK;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgQueueCapacityThresholdGet\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(req_exec_msg_queuecapacitythresholdget->queue_name.value),
+		    (unsigned int)(req_exec_msg_queuecapacitythresholdget->queue_id));
+
+/* error_exit: */
+	if (api->ipc_source_is_local (&req_exec_msg_queuecapacitythresholdget->source))
+	{
+		res_lib_msg_queuecapacitythresholdget.header.size =
+			sizeof (struct res_lib_msg_queuecapacitythresholdget);
+		res_lib_msg_queuecapacitythresholdget.header.id =
+			MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDGET;
+		res_lib_msg_queuecapacitythresholdget.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_queuecapacitythresholdget->source.conn,
+			&res_lib_msg_queuecapacitythresholdget,
+			sizeof (struct res_lib_msg_queuecapacitythresholdget));
+	}
+}
+
+static void message_handler_req_exec_msg_metadatasizeget (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_metadatasizeget *req_exec_msg_metadatasizeget =
+		(struct req_exec_msg_metadatasizeget *)message;
+	struct res_lib_msg_metadatasizeget res_lib_msg_metadatasizeget;
+	SaAisErrorT error = SA_AIS_OK;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgMetadataSizeGet\n");
+
+/* error_exit: */
+	if (api->ipc_source_is_local (&req_exec_msg_metadatasizeget->source))
+	{
+		res_lib_msg_metadatasizeget.header.size =
+			sizeof (struct res_lib_msg_metadatasizeget);
+		res_lib_msg_metadatasizeget.header.id =
+			MESSAGE_RES_MSG_METADATASIZEGET;
+		res_lib_msg_metadatasizeget.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_msg_metadatasizeget->source.conn,
+			&res_lib_msg_metadatasizeget,
+			sizeof (struct res_lib_msg_metadatasizeget));
+	}
+}
+
+static void message_handler_req_exec_msg_limitget (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_limitget *req_exec_msg_limitget =
+		(struct req_exec_msg_limitget *)message;
+	struct res_lib_msg_limitget res_lib_msg_limitget;
+	SaAisErrorT error = SA_AIS_OK;
+	SaUint64T value = 0;
+
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saMsgLimitGet\n");
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t limit_id = %u\n",
+		    (unsigned int)(req_exec_msg_limitget->limit_id));
+
+	switch (req_exec_msg_limitget->limit_id)
+	{
+	case SA_MSG_MAX_PRIORITY_AREA_SIZE_ID:
+		value = MAX_PRIORITY_AREA_SIZE;
+		break;
+	case SA_MSG_MAX_QUEUE_SIZE_ID:
+		value = MAX_QUEUE_SIZE;
+		break;
+	case SA_MSG_MAX_NUM_QUEUES_ID:
+		value = MAX_NUM_QUEUES;
+		break;
+	case SA_MSG_MAX_NUM_QUEUE_GROUPS_ID:
+		value = MAX_NUM_QUEUE_GROUPS;
+		break;
+	case SA_MSG_MAX_NUM_QUEUES_PER_GROUP_ID:
+		value = MAX_NUM_QUEUES_PER_GROUP;
+		break;
+	case SA_MSG_MAX_MESSAGE_SIZE_ID:
+		value = MAX_MESSAGE_SIZE;
+		break;
+	case SA_MSG_MAX_REPLY_SIZE_ID:
+		value = MAX_REPLY_SIZE;
+		break;
+	default:
+		error = SA_AIS_ERR_INVALID_PARAM;
+		break;
+	}
+
+/* error_exit: */
+	if (api->ipc_source_is_local (&req_exec_msg_limitget->source))
+	{
+		res_lib_msg_limitget.header.size =
+			sizeof (struct res_lib_msg_limitget);
+		res_lib_msg_limitget.header.id =
+			MESSAGE_RES_MSG_LIMITGET;
+		res_lib_msg_limitget.header.error = error;
+		res_lib_msg_limitget.value = value;
+
+		api->ipc_response_send (
+			req_exec_msg_limitget->source.conn,
+			&res_lib_msg_limitget,
+			sizeof (struct res_lib_msg_limitget));
+	}
+}
+
+static void message_handler_req_exec_msg_queue_timeout (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_queue_timeout *req_exec_msg_queue_timeout =
+		(struct req_exec_msg_queue_timeout *)message;
+	struct queue_entry *queue = NULL;
+
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_queue_timeout->queue_name);
+
+	assert (queue != NULL);	/* ? */
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: retention timeout { queue = %s }\n",
+		    (char *)(queue->queue_name.value));
+
+	msg_release_queue (queue);
+
+	return;
 }
 
 static void message_handler_req_exec_msg_sync_queue (
@@ -2410,91 +4005,185 @@ static void message_handler_req_exec_msg_sync_queue (
 {
 	struct req_exec_msg_sync_queue *req_exec_msg_sync_queue =
 		(struct req_exec_msg_sync_queue *)message;
-	struct message_queue *queue = NULL;
+	struct queue_entry *queue = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync queue %s\n",
-		getSaNameT (&req_exec_msg_sync_queue->queue_name));
+	int i;
 
-	/*
-	 * Ignore messages from previous ring
-	 */
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync queue\n");
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(&req_exec_msg_sync_queue->queue_name.value),
+		    (unsigned int)(req_exec_msg_sync_queue->queue_id));
+
 	if (memcmp (&req_exec_msg_sync_queue->ring_id,
-		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
 	{
 		return;
 	}
 
-	queue = queue_find (&sync_queue_list_head,
-		&req_exec_msg_sync_queue->queue_name);
-	if (queue == NULL)
-	{
-		queue = malloc (sizeof (struct message_queue));
-		if (queue == NULL) {
-			api->error_memory_failure ();
-		}
-		memset (queue, 0, sizeof (struct message_queue));
-		memcpy (&queue->name,
-			&req_exec_msg_sync_queue->queue_name,
-			sizeof (SaNameT));
+	queue = msg_find_queue_id (&sync_queue_list_head,
+		&req_exec_msg_sync_queue->queue_name,
+		req_exec_msg_sync_queue->queue_id);
+	/* 
+	 * This queue should not exist yet.
+	 */
+	assert (queue == NULL);
 
-		queue->change = req_exec_msg_sync_queue->change;
-
-		list_init (&queue->group_list);
-		list_init (&queue->queue_list);
-		list_init (&queue->message_head);
-		list_add (&queue->queue_list, &sync_queue_list_head);
+	queue = malloc (sizeof (struct queue_entry));
+	if (queue == NULL) {
+		corosync_fatal_error (COROSYNC_OUT_OF_MEMORY);
 	}
+	memset (queue, 0, sizeof (struct queue_entry));
+	memcpy (&queue->queue_name,
+		&req_exec_msg_sync_queue->queue_name,
+		sizeof (SaNameT));
+	memcpy (&queue->create_attrs,
+		&req_exec_msg_sync_queue->create_attrs,
+		sizeof (SaMsgQueueCreationAttributesT));
+
+	queue->queue_id = req_exec_msg_sync_queue->queue_id;
+	queue->open_flags = req_exec_msg_sync_queue->open_flags;
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		queue->priority[i].queue_size = queue->create_attrs.size[i];
+		list_init (&queue->priority[i].message_head);
+	}
+
+	list_init (&queue->group_list);
+	list_init (&queue->queue_list);
+	list_init (&queue->message_head);
+	list_init (&queue->pending_head);
+
+	list_add_tail (&queue->queue_list, &sync_queue_list_head);
+
+	/* global_queue_count */
+
+	if (queue->queue_id >= global_queue_id) {
+		global_queue_id = queue->queue_id + 1;
+	}
+
+	return;
 }
 
-static void message_handler_req_exec_msg_sync_queue_entry (
+static void message_handler_req_exec_msg_sync_queue_message (
 	void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_sync_queue_entry *req_exec_msg_sync_queue_entry =
-		(struct req_exec_msg_sync_queue_entry *)message;
-	struct message_queue *queue = NULL;
-	struct message_entry *entry = NULL;
+	struct req_exec_msg_sync_queue_message *req_exec_msg_sync_queue_message =
+		(struct req_exec_msg_sync_queue_message *)message;
+	struct queue_entry *queue = NULL;
+	struct message_entry *msg = NULL;
 
-	char *data = ((char *)(req_exec_msg_sync_queue_entry) +
-		      sizeof (struct req_exec_msg_sync_queue_entry));
+	char *data = ((char *)(req_exec_msg_sync_queue_message) +
+		      sizeof (struct req_exec_msg_sync_queue_message));
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync queue entry %s\n",
-		getSaNameT (&req_exec_msg_sync_queue_entry->queue_name));
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync queue message\n");
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%s)\n",
+		    (char *)(&req_exec_msg_sync_queue_message->queue_name.value),
+		    (char *)(data));
 
-	/*
-	 * Ignore messages from previous ring
-	 */
-	if (memcmp (&req_exec_msg_sync_queue_entry->ring_id,
-		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+	if (memcmp (&req_exec_msg_sync_queue_message->ring_id,
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
 	{
 		return;
 	}
 
-	queue = queue_find (&sync_queue_list_head,
-		&req_exec_msg_sync_queue_entry->queue_name);
+	queue = msg_find_queue_id (&sync_queue_list_head,
+		&req_exec_msg_sync_queue_message->queue_name,
+		req_exec_msg_sync_queue_message->queue_id);
 
 	assert (queue != NULL);
 
-	entry = malloc (sizeof (struct message_entry));
-	if (entry == NULL) {
-		api->error_memory_failure ();
+	msg = malloc (sizeof (struct message_entry));
+	if (msg == NULL) {
+		corosync_fatal_error (COROSYNC_OUT_OF_MEMORY);
+	}
+	memset (msg, 0, sizeof (struct message_entry));
+	memcpy (&msg->message, &req_exec_msg_sync_queue_message->message, sizeof (SaMsgMessageT));
+
+	msg->message.data = malloc (msg->message.size);
+	if (msg->message.data == NULL) {
+		corosync_fatal_error (COROSYNC_OUT_OF_MEMORY);
+	}
+	memset (msg->message.data, 0, msg->message.size);
+	memcpy (msg->message.data, (char *)(data), msg->message.size);
+
+	msg->sender_id = req_exec_msg_sync_queue_message->sender_id;
+	msg->send_time = req_exec_msg_sync_queue_message->send_time;
+
+	list_add_tail (&msg->queue_list, &queue->message_head);
+	list_add_tail (&msg->list, &queue->priority[(msg->message.priority)].message_head);
+	queue->priority[(msg->message.priority)].queue_used += msg->message.size;
+	queue->priority[(msg->message.priority)].message_count += 1;
+
+	return;
+}
+
+static void message_handler_req_exec_msg_sync_queue_refcount (
+	void *message,
+	unsigned int nodeid)
+{
+	struct req_exec_msg_sync_queue_refcount *req_exec_msg_sync_queue_refcount =
+		(struct req_exec_msg_sync_queue_refcount *)message;
+	struct queue_entry *queue = NULL;
+
+	unsigned int i;
+	unsigned int j;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync refcount\n");
+
+	if (memcmp (&req_exec_msg_sync_queue_refcount->ring_id,
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+	{
+		return;
 	}
 
-	memset (entry, 0, sizeof (struct message_entry));
-	memcpy (&entry->message, &req_exec_msg_sync_queue_entry->message,
-		sizeof (SaMsgMessageT));
+	queue = msg_find_queue_id (&sync_queue_list_head,
+		&req_exec_msg_sync_queue_refcount->queue_name,
+		req_exec_msg_sync_queue_refcount->queue_id);
 
-	entry->message.data = malloc (entry->message.size);
-	if (entry->message.data == NULL) {
-		api->error_memory_failure ();
+	assert (queue != NULL);
+
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++)
+	{
+		if (req_exec_msg_sync_queue_refcount->refcount_set[i].nodeid == 0) {
+			break;
+		}
+
+		if (msg_find_member_nodeid (req_exec_msg_sync_queue_refcount->refcount_set[i].nodeid) == 0) {
+			continue;
+		}
+
+		for (j = 0; j < PROCESSOR_COUNT_MAX; j++)
+		{
+			if (queue->refcount_set[j].nodeid == 0)
+			{
+				queue->refcount_set[j].nodeid =
+					req_exec_msg_sync_queue_refcount->refcount_set[i].nodeid;
+				queue->refcount_set[j].refcount =
+					req_exec_msg_sync_queue_refcount->refcount_set[i].refcount;
+				break;
+			}
+
+			if (req_exec_msg_sync_queue_refcount->refcount_set[i].nodeid == queue->refcount_set[j].nodeid)
+			{
+				queue->refcount_set[j].refcount +=
+					req_exec_msg_sync_queue_refcount->refcount_set[i].refcount;
+				break;
+			}
+		}
 	}
 
-	memset (entry->message.data, 0, entry->message.size);
-	memcpy (entry->message.data, (void *)(data), entry->message.size);
+	msg_sync_refcount_calculate (queue);
 
-	entry->time = req_exec_msg_sync_queue_entry->time;
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "\t queue=%s refcount=%u\n",
+		    (char *)(queue->queue_name.value),
+		    (unsigned int)(queue->queue_id));
 
-	list_add_tail (&entry->list, &queue->message_head);
+	return;
 }
 
 static void message_handler_req_exec_msg_sync_group (
@@ -2503,83 +4192,92 @@ static void message_handler_req_exec_msg_sync_group (
 {
 	struct req_exec_msg_sync_group *req_exec_msg_sync_group =
 		(struct req_exec_msg_sync_group *)message;
-	struct queue_group *group = NULL;
-	struct message_queue *queue = NULL;
+	struct group_entry *group = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync group %s\n",
-		getSaNameT (&req_exec_msg_sync_group->group_name));
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync group\n");
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s \n",
+		    (char *)(&req_exec_msg_sync_group->group_name.value));
 
-	/*
-	 * Ignore messages from previous ring
-	 */
 	if (memcmp (&req_exec_msg_sync_group->ring_id,
-		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
 	{
 		return;
 	}
 
-	group = group_find (&sync_group_list_head,
+	group = msg_find_group (&sync_group_list_head,
 		&req_exec_msg_sync_group->group_name);
-	if (group == NULL)
-	{
-		group = malloc (sizeof (struct queue_group));
-		if (group == NULL) {
-			api->error_memory_failure ();
-		}
-		memset (group, 0, sizeof (struct queue_group));
-		memcpy (&group->name,
-			&req_exec_msg_sync_group->group_name,
-			sizeof (SaNameT));
 
-		group->track_flags = req_exec_msg_sync_group->policy;
-
-		if (req_exec_msg_sync_group->rr_queue_name.length != 0) {
-			queue = queue_find (&sync_queue_list_head,
-				&req_exec_msg_sync_group->rr_queue_name);
-			assert (queue != NULL);
-		}
-
-		group->rr_queue = queue;
-
-		list_init (&group->group_list);
-		list_init (&group->queue_head);
-		list_add (&group->group_list, &sync_group_list_head);
+	/* 
+	 * This group should not exist yet.
+	 */
+	assert (group == NULL);
+	
+	group = malloc (sizeof (struct group_entry));
+	if (group == NULL) {
+		corosync_fatal_error (COROSYNC_OUT_OF_MEMORY);
 	}
+	memset (group, 0, sizeof (struct group_entry));
+	memcpy (&group->group_name,
+		&req_exec_msg_sync_group->group_name,
+		sizeof (SaNameT));
+
+	group->track_flags = req_exec_msg_sync_group->track_flags;
+	group->policy = req_exec_msg_sync_group->policy;
+
+	list_init (&group->queue_head);
+	list_init (&group->group_list);
+
+	list_add_tail  (&group->group_list, &sync_group_list_head);
+
+	/* global_group_count += 1; */
+
+	return;
 }
 
-static void message_handler_req_exec_msg_sync_group_entry (
+static void message_handler_req_exec_msg_sync_group_member (
 	void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_sync_group_entry *req_exec_msg_sync_group_entry =
-		(struct req_exec_msg_sync_group_entry *)message;
-	struct queue_group *group = NULL;
-	struct message_queue *queue = NULL;
+	struct req_exec_msg_sync_group_member *req_exec_msg_sync_group_member =
+		(struct req_exec_msg_sync_group_member *)message;
+	struct group_entry *group = NULL;
+	struct queue_entry *queue = NULL;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync group entry %s\n",
-		getSaNameT (&req_exec_msg_sync_group_entry->group_name));
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync group member\n");
+	log_printf (LOG_LEVEL_NOTICE, "\t group = %s\n",
+		    (char *)(&req_exec_msg_sync_group_member->group_name.value));
+	log_printf (LOG_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+		    (char *)(&req_exec_msg_sync_group_member->queue_name.value),
+		    (unsigned int)(req_exec_msg_sync_group_member->queue_id));
 
-	/*
-	 * Ignore messages from previous ring
-	 */
-	if (memcmp (&req_exec_msg_sync_group_entry->ring_id,
-		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+	if (memcmp (&req_exec_msg_sync_group_member->ring_id,
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
 	{
 		return;
 	}
 
-	group = group_find (&sync_group_list_head,
-		&req_exec_msg_sync_group_entry->group_name);
-	queue = queue_find (&sync_queue_list_head,
-		&req_exec_msg_sync_group_entry->queue_name);
+	group = msg_find_group (&sync_group_list_head,
+		&req_exec_msg_sync_group_member->group_name);
+	queue = msg_find_queue_id (&sync_queue_list_head,
+		&req_exec_msg_sync_group_member->queue_name,
+		req_exec_msg_sync_group_member->queue_id);
 
+	/* 
+	 * Both the group and the queue must already exist.
+	 */
 	assert (group != NULL);
 	assert (queue != NULL);
 
-	/*
+	queue->group = group;
+
 	list_init (&queue->group_list);
-	list_add (&queue->group_list, &group->queue_head);
-	*/
+	list_add_tail (&queue->group_list, &group->queue_head);
+
+	group->member_count += 1;
+
+	return;
 }
 
 static void message_handler_req_lib_msg_queueopen (
@@ -2591,47 +4289,7 @@ static void message_handler_req_lib_msg_queueopen (
 	struct req_exec_msg_queueopen req_exec_msg_queueopen;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueOpen %s\n",
-		getSaNameT (&req_lib_msg_queueopen->queueName));
-
-	req_exec_msg_queueopen.header.size =
-		sizeof (struct req_exec_msg_queueopen);
-	req_exec_msg_queueopen.header.id = 
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEOPEN);
-
-	api->ipc_source_set (&req_exec_msg_queueopen.source, conn);
-
-	memcpy (&req_exec_msg_queueopen.queue_name,
-		&req_lib_msg_queueopen->queueName, sizeof (SaNameT));
-
-	memcpy (&req_exec_msg_queueopen.creation_attributes,
-		&req_lib_msg_queueopen->creationAttributes,
-		sizeof (SaMsgQueueCreationAttributesT));
-
-	req_exec_msg_queueopen.async_call = 0;
-	req_exec_msg_queueopen.invocation = 0;
-	req_exec_msg_queueopen.queue_handle = req_lib_msg_queueopen->queueHandle;
-	req_exec_msg_queueopen.openFlags = req_lib_msg_queueopen->openFlags;
-	req_exec_msg_queueopen.timeout = req_lib_msg_queueopen->timeout;
-
-	iovec.iov_base = (char *)&req_exec_msg_queueopen;
-	iovec.iov_len = sizeof (req_exec_msg_queueopen);
-
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
-}
-
-static void message_handler_req_lib_msg_queueopenasync (
-	void *conn,
-	void *msg)
-{
-	struct req_lib_msg_queueopen *req_lib_msg_queueopen =
-		(struct req_lib_msg_queueopen *)msg;
-	struct req_exec_msg_queueopen req_exec_msg_queueopen;
-	struct iovec iovec;
-
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueOpenAsync %s\n",
-		getSaNameT (&req_lib_msg_queueopen->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueOpen\n");
 
 	req_exec_msg_queueopen.header.size =
 		sizeof (struct req_exec_msg_queueopen);
@@ -2641,23 +4299,61 @@ static void message_handler_req_lib_msg_queueopenasync (
 	api->ipc_source_set (&req_exec_msg_queueopen.source, conn);
 
 	memcpy (&req_exec_msg_queueopen.queue_name,
-		&req_lib_msg_queueopen->queueName, sizeof (SaNameT));
+		&req_lib_msg_queueopen->queue_name, sizeof (SaNameT));
+	memcpy (&req_exec_msg_queueopen.create_attrs,
+		&req_lib_msg_queueopen->create_attrs, sizeof (SaMsgQueueCreationAttributesT));
 
-	memcpy (&req_exec_msg_queueopen.creation_attributes,
-		&req_lib_msg_queueopen->creationAttributes,
-		sizeof (SaMsgQueueCreationAttributesT));
-
-	req_exec_msg_queueopen.async_call = 1;
-	req_exec_msg_queueopen.invocation = req_lib_msg_queueopen->invocation;
-	req_exec_msg_queueopen.queue_handle = req_lib_msg_queueopen->queueHandle;
-	req_exec_msg_queueopen.openFlags = req_lib_msg_queueopen->openFlags;
-	req_exec_msg_queueopen.timeout = SA_TIME_END;
+	req_exec_msg_queueopen.queue_handle =
+		req_lib_msg_queueopen->queue_handle;
+	req_exec_msg_queueopen.open_flags =
+		req_lib_msg_queueopen->open_flags;
+	req_exec_msg_queueopen.create_attrs_flag =
+		req_lib_msg_queueopen->create_attrs_flag;
+	req_exec_msg_queueopen.timeout =
+		req_lib_msg_queueopen->timeout;
 
 	iovec.iov_base = (char *)&req_exec_msg_queueopen;
 	iovec.iov_len = sizeof (req_exec_msg_queueopen);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_queueopenasync (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_queueopenasync *req_lib_msg_queueopenasync =
+		(struct req_lib_msg_queueopenasync *)msg;
+	struct req_exec_msg_queueopenasync req_exec_msg_queueopenasync;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueOpenAsync\n");
+
+	req_exec_msg_queueopenasync.header.size =
+		sizeof (struct req_exec_msg_queueopenasync);
+	req_exec_msg_queueopenasync.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEOPENASYNC);
+
+	api->ipc_source_set (&req_exec_msg_queueopenasync.source, conn);
+
+	memcpy (&req_exec_msg_queueopenasync.queue_name,
+		&req_lib_msg_queueopenasync->queue_name, sizeof (SaNameT));
+	memcpy (&req_exec_msg_queueopenasync.create_attrs,
+		&req_lib_msg_queueopenasync->create_attrs, sizeof (SaMsgQueueCreationAttributesT));
+
+	req_exec_msg_queueopenasync.queue_handle =
+		req_lib_msg_queueopenasync->queue_handle;
+	req_exec_msg_queueopenasync.open_flags =
+		req_lib_msg_queueopenasync->open_flags;
+	req_exec_msg_queueopenasync.create_attrs_flag =
+		req_lib_msg_queueopenasync->create_attrs_flag;
+	req_exec_msg_queueopenasync.invocation =
+		req_lib_msg_queueopenasync->invocation;
+
+	iovec.iov_base = (char *)&req_exec_msg_queueopenasync;
+	iovec.iov_len = sizeof (req_exec_msg_queueopenasync);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queueclose (
@@ -2669,24 +4365,29 @@ static void message_handler_req_lib_msg_queueclose (
 	struct req_exec_msg_queueclose req_exec_msg_queueclose;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueClose %s\n",
-		getSaNameT (&req_lib_msg_queueclose->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueClose\n");
 
 	req_exec_msg_queueclose.header.size =
 		sizeof (struct req_exec_msg_queueclose);
-	req_exec_msg_queueclose.header.id = 
+	req_exec_msg_queueclose.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUECLOSE);
 
 	api->ipc_source_set (&req_exec_msg_queueclose.source, conn);
 
 	memcpy (&req_exec_msg_queueclose.queue_name,
-		&req_lib_msg_queueclose->queueName, sizeof (SaNameT));
+		&req_lib_msg_queueclose->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_queueclose.queue_id =
+		req_lib_msg_queueclose->queue_id;
 
 	iovec.iov_base = (char *)&req_exec_msg_queueclose;
 	iovec.iov_len = sizeof (req_exec_msg_queueclose);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	msg_release_queue_cleanup (conn,
+		&req_lib_msg_queueclose->queue_name,
+		req_lib_msg_queueclose->queue_id);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queuestatusget (
@@ -2698,8 +4399,7 @@ static void message_handler_req_lib_msg_queuestatusget (
 	struct req_exec_msg_queuestatusget req_exec_msg_queuestatusget;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueStatusGet %s\n",
-		getSaNameT (&req_lib_msg_queuestatusget->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueStatusGet\n");
 
 	req_exec_msg_queuestatusget.header.size =
 		sizeof (struct req_exec_msg_queuestatusget);
@@ -2709,13 +4409,44 @@ static void message_handler_req_lib_msg_queuestatusget (
 	api->ipc_source_set (&req_exec_msg_queuestatusget.source, conn);
 
 	memcpy (&req_exec_msg_queuestatusget.queue_name,
-		&req_lib_msg_queuestatusget->queueName, sizeof (SaNameT));
+		&req_lib_msg_queuestatusget->queue_name, sizeof (SaNameT));
 
 	iovec.iov_base = (char *)&req_exec_msg_queuestatusget;
 	iovec.iov_len = sizeof (req_exec_msg_queuestatusget);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_queueretentiontimeset (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_queueretentiontimeset *req_lib_msg_queueretentiontimeset =
+		(struct req_lib_msg_queueretentiontimeset *)msg;
+	struct req_exec_msg_queueretentiontimeset req_exec_msg_queueretentiontimeset;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueRetentionTimeSet\n");
+
+	req_exec_msg_queueretentiontimeset.header.size =
+		sizeof (struct req_exec_msg_queueretentiontimeset);
+	req_exec_msg_queueretentiontimeset.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUERETENTIONTIMESET);
+
+	api->ipc_source_set (&req_exec_msg_queueretentiontimeset.source, conn);
+
+	memcpy (&req_exec_msg_queueretentiontimeset.queue_name,
+		&req_lib_msg_queueretentiontimeset->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_queueretentiontimeset.queue_id =
+		req_lib_msg_queueretentiontimeset->queue_id;
+	req_exec_msg_queueretentiontimeset.retention_time =
+		req_lib_msg_queueretentiontimeset->retention_time;
+
+	iovec.iov_base = (char *)&req_exec_msg_queueretentiontimeset;
+	iovec.iov_len = sizeof (req_exec_msg_queueretentiontimeset);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queueunlink (
@@ -2727,24 +4458,22 @@ static void message_handler_req_lib_msg_queueunlink (
 	struct req_exec_msg_queueunlink req_exec_msg_queueunlink;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueUnlink %s\n",
-		getSaNameT (&req_lib_msg_queueunlink->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueUnlink\n");
 
 	req_exec_msg_queueunlink.header.size =
 		sizeof (struct req_exec_msg_queueunlink);
 	req_exec_msg_queueunlink.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEUNLINK);
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUESTATUSGET);
 
 	api->ipc_source_set (&req_exec_msg_queueunlink.source, conn);
 
 	memcpy (&req_exec_msg_queueunlink.queue_name,
-		&req_lib_msg_queueunlink->queueName, sizeof (SaNameT));
+		&req_lib_msg_queueunlink->queue_name, sizeof (SaNameT));
 
 	iovec.iov_base = (char *)&req_exec_msg_queueunlink;
 	iovec.iov_len = sizeof (req_exec_msg_queueunlink);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queuegroupcreate (
@@ -2756,8 +4485,7 @@ static void message_handler_req_lib_msg_queuegroupcreate (
 	struct req_exec_msg_queuegroupcreate req_exec_msg_queuegroupcreate;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupCreate %s\n",
-		getSaNameT (&req_lib_msg_queuegroupcreate->queueGroupName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupCreate\n");
 
 	req_exec_msg_queuegroupcreate.header.size =
 		sizeof (struct req_exec_msg_queuegroupcreate);
@@ -2766,17 +4494,16 @@ static void message_handler_req_lib_msg_queuegroupcreate (
 
 	api->ipc_source_set (&req_exec_msg_queuegroupcreate.source, conn);
 
-	memcpy (&req_exec_msg_queuegroupcreate.queue_group_name,
-		&req_lib_msg_queuegroupcreate->queueGroupName, sizeof (SaNameT));
+	memcpy (&req_exec_msg_queuegroupcreate.group_name,
+		&req_lib_msg_queuegroupcreate->group_name, sizeof (SaNameT));
 
 	req_exec_msg_queuegroupcreate.policy =
-		req_lib_msg_queuegroupcreate->queueGroupPolicy;
+		req_lib_msg_queuegroupcreate->policy;
 
 	iovec.iov_base = (char *)&req_exec_msg_queuegroupcreate;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupcreate);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queuegroupinsert (
@@ -2788,8 +4515,7 @@ static void message_handler_req_lib_msg_queuegroupinsert (
 	struct req_exec_msg_queuegroupinsert req_exec_msg_queuegroupinsert;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupInsert %s\n",
-		getSaNameT (&req_lib_msg_queuegroupinsert->queueGroupName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupInsert\n");
 
 	req_exec_msg_queuegroupinsert.header.size =
 		sizeof (struct req_exec_msg_queuegroupinsert);
@@ -2798,16 +4524,15 @@ static void message_handler_req_lib_msg_queuegroupinsert (
 
 	api->ipc_source_set (&req_exec_msg_queuegroupinsert.source, conn);
 
+	memcpy (&req_exec_msg_queuegroupinsert.group_name,
+		&req_lib_msg_queuegroupinsert->group_name, sizeof (SaNameT));
 	memcpy (&req_exec_msg_queuegroupinsert.queue_name,
-		&req_lib_msg_queuegroupinsert->queueName, sizeof (SaNameT));
-	memcpy (&req_exec_msg_queuegroupinsert.queue_group_name,
-		&req_lib_msg_queuegroupinsert->queueGroupName, sizeof (SaNameT));
+		&req_lib_msg_queuegroupinsert->queue_name, sizeof (SaNameT));
 
 	iovec.iov_base = (char *)&req_exec_msg_queuegroupinsert;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupinsert);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queuegroupremove (
@@ -2819,26 +4544,24 @@ static void message_handler_req_lib_msg_queuegroupremove (
 	struct req_exec_msg_queuegroupremove req_exec_msg_queuegroupremove;
 	struct iovec iovec;
 
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupRemove\n");
+
 	req_exec_msg_queuegroupremove.header.size =
 		sizeof (struct req_exec_msg_queuegroupremove);
 	req_exec_msg_queuegroupremove.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEGROUPREMOVE);
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupRemove %s\n",
-		getSaNameT (&req_lib_msg_queuegroupremove->queueGroupName));
-
 	api->ipc_source_set (&req_exec_msg_queuegroupremove.source, conn);
 
+	memcpy (&req_exec_msg_queuegroupremove.group_name,
+		&req_lib_msg_queuegroupremove->group_name, sizeof (SaNameT));
 	memcpy (&req_exec_msg_queuegroupremove.queue_name,
-		&req_lib_msg_queuegroupremove->queueName, sizeof (SaNameT));
-	memcpy (&req_exec_msg_queuegroupremove.queue_group_name,
-		&req_lib_msg_queuegroupremove->queueGroupName, sizeof (SaNameT));
+		&req_lib_msg_queuegroupremove->queue_name, sizeof (SaNameT));
 
 	iovec.iov_base = (char *)&req_exec_msg_queuegroupremove;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupremove);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queuegroupdelete (
@@ -2850,24 +4573,22 @@ static void message_handler_req_lib_msg_queuegroupdelete (
 	struct req_exec_msg_queuegroupdelete req_exec_msg_queuegroupdelete;
 	struct iovec iovec;
 
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupDelete\n");
+
 	req_exec_msg_queuegroupdelete.header.size =
 		sizeof (struct req_exec_msg_queuegroupdelete);
 	req_exec_msg_queuegroupdelete.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEGROUPDELETE);
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupDelete %s\n",
-		getSaNameT (&req_lib_msg_queuegroupdelete->queueGroupName));
-
 	api->ipc_source_set (&req_exec_msg_queuegroupdelete.source, conn);
 
-	memcpy (&req_exec_msg_queuegroupdelete.queue_group_name,
-		&req_lib_msg_queuegroupdelete->queueGroupName, sizeof (SaNameT));
+	memcpy (&req_exec_msg_queuegroupdelete.group_name,
+		&req_lib_msg_queuegroupdelete->group_name, sizeof (SaNameT));
 
 	iovec.iov_base = (char *)&req_exec_msg_queuegroupdelete;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupdelete);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queuegrouptrack (
@@ -2879,29 +4600,27 @@ static void message_handler_req_lib_msg_queuegrouptrack (
 	struct req_exec_msg_queuegrouptrack req_exec_msg_queuegrouptrack;
 	struct iovec iovec;
 
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrack\n");
+
 	req_exec_msg_queuegrouptrack.header.size =
 		sizeof (struct req_exec_msg_queuegrouptrack);
 	req_exec_msg_queuegrouptrack.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACK);
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrack %s\n",
-		getSaNameT (&req_lib_msg_queuegrouptrack->queueGroupName));
-
 	api->ipc_source_set (&req_exec_msg_queuegrouptrack.source, conn);
 
-	memcpy (&req_exec_msg_queuegrouptrack.queue_group_name,
-		&req_lib_msg_queuegrouptrack->queueGroupName, sizeof (SaNameT));
+	memcpy (&req_exec_msg_queuegrouptrack.group_name,
+		&req_lib_msg_queuegrouptrack->group_name, sizeof (SaNameT));
 
 	req_exec_msg_queuegrouptrack.track_flags =
-		req_lib_msg_queuegrouptrack->trackFlags;
+		req_lib_msg_queuegrouptrack->track_flags;
 	req_exec_msg_queuegrouptrack.buffer_flag =
-		req_lib_msg_queuegrouptrack->bufferFlag;
+		req_lib_msg_queuegrouptrack->buffer_flag;
 
 	iovec.iov_base = (char *)&req_exec_msg_queuegrouptrack;
 	iovec.iov_len = sizeof (req_exec_msg_queuegrouptrack);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_queuegrouptrackstop (
@@ -2913,24 +4632,46 @@ static void message_handler_req_lib_msg_queuegrouptrackstop (
 	struct req_exec_msg_queuegrouptrackstop req_exec_msg_queuegrouptrackstop;
 	struct iovec iovec;
 
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrackstopStop\n");
+
 	req_exec_msg_queuegrouptrackstop.header.size =
 		sizeof (struct req_exec_msg_queuegrouptrackstop);
 	req_exec_msg_queuegrouptrackstop.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACKSTOP);
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrackStop %s\n",
-		getSaNameT (&req_lib_msg_queuegrouptrackstop->queueGroupName));
-
 	api->ipc_source_set (&req_exec_msg_queuegrouptrackstop.source, conn);
 
-	memcpy (&req_exec_msg_queuegrouptrackstop.queue_group_name,
-		&req_lib_msg_queuegrouptrackstop->queueGroupName, sizeof (SaNameT));
+	memcpy (&req_exec_msg_queuegrouptrackstop.group_name,
+		&req_lib_msg_queuegrouptrackstop->group_name, sizeof (SaNameT));
 
 	iovec.iov_base = (char *)&req_exec_msg_queuegrouptrackstop;
 	iovec.iov_len = sizeof (req_exec_msg_queuegrouptrackstop);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_queuegroupnotificationfree (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_queuegroupnotificationfree *req_lib_msg_queuegroupnotificationfree =
+		(struct req_lib_msg_queuegroupnotificationfree *)msg;
+	struct req_exec_msg_queuegroupnotificationfree req_exec_msg_queuegroupnotificationfree;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueGroupNotificationFree\n");
+
+	req_exec_msg_queuegroupnotificationfree.header.size =
+		sizeof (struct req_exec_msg_queuegroupnotificationfree);
+	req_exec_msg_queuegroupnotificationfree.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEGROUPNOTIFICATIONFREE);
+
+	api->ipc_source_set (&req_exec_msg_queuegroupnotificationfree.source, conn);
+
+	iovec.iov_base = (char *)&req_exec_msg_queuegroupnotificationfree;
+	iovec.iov_len = sizeof (req_exec_msg_queuegroupnotificationfree);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_messagesend (
@@ -2940,16 +4681,14 @@ static void message_handler_req_lib_msg_messagesend (
 	struct req_lib_msg_messagesend *req_lib_msg_messagesend =
 		(struct req_lib_msg_messagesend *)msg;
 	struct req_exec_msg_messagesend req_exec_msg_messagesend;
-	struct iovec iovecs[2];
+	struct iovec iovec[2];
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageSend\n");
 
 	req_exec_msg_messagesend.header.size =
 		sizeof (struct req_exec_msg_messagesend);
 	req_exec_msg_messagesend.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_MESSAGESEND);
-	req_exec_msg_messagesend.async_call = 0;
-
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageSend %s\n",
-		getSaNameT (&req_lib_msg_messagesend->destination));
 
 	api->ipc_source_set (&req_exec_msg_messagesend.source, conn);
 
@@ -2958,27 +4697,23 @@ static void message_handler_req_lib_msg_messagesend (
 	memcpy (&req_exec_msg_messagesend.message,
 		&req_lib_msg_messagesend->message, sizeof (SaMsgMessageT));
 
-	req_exec_msg_messagesend.async_call = 0;
-	req_exec_msg_messagesend.invocation = 0;
-	req_exec_msg_messagesend.ack_flags = req_lib_msg_messagesend->ackFlags;
-	req_exec_msg_messagesend.timeout = req_lib_msg_messagesend->timeout;
+	req_exec_msg_messagesend.timeout =
+		req_lib_msg_messagesend->timeout;
 
-	iovecs[0].iov_base = (char *)&req_exec_msg_messagesend;
-	iovecs[0].iov_len = sizeof (req_exec_msg_messagesend);
+	iovec[0].iov_base = (char *)&req_exec_msg_messagesend;
+	iovec[0].iov_len = sizeof (struct req_exec_msg_messagesend);
 
-	iovecs[1].iov_base = ((char *)req_lib_msg_messagesend) +
+	iovec[1].iov_base = ((char *)req_lib_msg_messagesend) +
 		sizeof (struct req_lib_msg_messagesend);
-	iovecs[1].iov_len = req_lib_msg_messagesend->header.size -
+	iovec[1].iov_len = req_lib_msg_messagesend->header.size -
 		sizeof (struct req_lib_msg_messagesend);
 
-	req_exec_msg_messagesend.header.size += iovecs[1].iov_len;
+	req_exec_msg_messagesend.header.size += iovec[1].iov_len;
 
-	if (iovecs[1].iov_len > 0) {
-		assert (api->totem_mcast (iovecs, 2,
-			TOTEM_AGREED) == 0);
+	if (iovec[1].iov_len > 0) {
+		assert (api->totem_mcast (iovec, 2, TOTEM_AGREED) == 0);
 	} else {
-		assert (api->totem_mcast (iovecs, 1,
-			TOTEM_AGREED) == 0);
+		assert (api->totem_mcast (iovec, 1, TOTEM_AGREED) == 0);
 	}
 }
 
@@ -2986,47 +4721,42 @@ static void message_handler_req_lib_msg_messagesendasync (
 	void *conn,
 	void *msg)
 {
-	struct req_lib_msg_messagesend *req_lib_msg_messagesend =
-		(struct req_lib_msg_messagesend *)msg;
-	struct req_exec_msg_messagesend req_exec_msg_messagesend;
-	struct iovec iovecs[2];
+	struct req_lib_msg_messagesendasync *req_lib_msg_messagesendasync =
+		(struct req_lib_msg_messagesendasync *)msg;
+	struct req_exec_msg_messagesendasync req_exec_msg_messagesendasync;
+	struct iovec iovec[2];
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageSendAsync %s\n",
-		getSaNameT (&req_lib_msg_messagesend->destination));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageSendAsync\n");
 
-	req_exec_msg_messagesend.header.size =
-		sizeof (struct req_exec_msg_messagesend);
-	req_exec_msg_messagesend.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_MESSAGESEND);
+	req_exec_msg_messagesendasync.header.size =
+		sizeof (struct req_exec_msg_messagesendasync);
+	req_exec_msg_messagesendasync.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_MESSAGESENDASYNC);
 
-	api->ipc_source_set (&req_exec_msg_messagesend.source, conn);
+	api->ipc_source_set (&req_exec_msg_messagesendasync.source, conn);
 
-	memcpy (&req_exec_msg_messagesend.destination,
-		&req_lib_msg_messagesend->destination, sizeof (SaNameT));
-	memcpy (&req_exec_msg_messagesend.message,
-		&req_lib_msg_messagesend->message, sizeof (SaMsgMessageT));
+	memcpy (&req_exec_msg_messagesendasync.destination,
+		&req_lib_msg_messagesendasync->destination, sizeof (SaNameT));
+	memcpy (&req_exec_msg_messagesendasync.message,
+		&req_lib_msg_messagesendasync->message, sizeof (SaMsgMessageT));
 
-	req_exec_msg_messagesend.async_call = 1;
-	req_exec_msg_messagesend.invocation = req_lib_msg_messagesend->invocation;
-	req_exec_msg_messagesend.ack_flags = req_lib_msg_messagesend->ackFlags;
-	req_exec_msg_messagesend.timeout = SA_TIME_END;
+	req_exec_msg_messagesendasync.invocation =
+		req_lib_msg_messagesendasync->invocation;
 
-	iovecs[0].iov_base = (char *)&req_exec_msg_messagesend;
-	iovecs[0].iov_len = sizeof (req_exec_msg_messagesend);
+	iovec[0].iov_base = (char *)&req_exec_msg_messagesendasync;
+	iovec[0].iov_len = sizeof (struct req_exec_msg_messagesendasync);
 
-	iovecs[1].iov_base = ((char *)req_lib_msg_messagesend) +
-		sizeof (struct req_lib_msg_messagesend);
-	iovecs[1].iov_len = req_lib_msg_messagesend->header.size -
-		sizeof (struct req_lib_msg_messagesend);
+	iovec[1].iov_base = ((char *)req_lib_msg_messagesendasync) +
+		sizeof (struct req_lib_msg_messagesendasync);
+	iovec[1].iov_len = req_lib_msg_messagesendasync->header.size -
+		sizeof (struct req_lib_msg_messagesendasync);
 
-	req_exec_msg_messagesend.header.size += iovecs[1].iov_len;
+	req_exec_msg_messagesendasync.header.size += iovec[1].iov_len;
 
-	if (iovecs[1].iov_len > 0) {
-		assert (api->totem_mcast (iovecs, 2,
-			TOTEM_AGREED) == 0);
+	if (iovec[1].iov_len > 0) {
+		assert (api->totem_mcast (iovec, 2, TOTEM_AGREED) == 0);
 	} else {
-		assert (api->totem_mcast (iovecs, 2,
-			TOTEM_AGREED) == 0);
+		assert (api->totem_mcast (iovec, 1, TOTEM_AGREED) == 0);
 	}
 }
 
@@ -3039,8 +4769,7 @@ static void message_handler_req_lib_msg_messageget (
 	struct req_exec_msg_messageget req_exec_msg_messageget;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageGet %s\n",
-		getSaNameT (&req_lib_msg_messageget->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageGet\n");
 
 	req_exec_msg_messageget.header.size =
 		sizeof (struct req_exec_msg_messageget);
@@ -3050,13 +4779,41 @@ static void message_handler_req_lib_msg_messageget (
 	api->ipc_source_set (&req_exec_msg_messageget.source, conn);
 
 	memcpy (&req_exec_msg_messageget.queue_name,
-		&req_lib_msg_messageget->queueName, sizeof (SaNameT));
+		&req_lib_msg_messageget->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_messageget.queue_id =
+		req_lib_msg_messageget->queue_id;
+	req_exec_msg_messageget.timeout =
+		req_lib_msg_messageget->timeout;
 
 	iovec.iov_base = (char *)&req_exec_msg_messageget;
 	iovec.iov_len = sizeof (req_exec_msg_messageget);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_messagedatafree (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_messagedatafree *req_lib_msg_messagedatafree =
+		(struct req_lib_msg_messagedatafree *)msg;
+	struct req_exec_msg_messagedatafree req_exec_msg_messagedatafree;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageDataFree\n");
+
+	req_exec_msg_messagedatafree.header.size =
+		sizeof (struct req_exec_msg_messagedatafree);
+	req_exec_msg_messagedatafree.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_MESSAGEDATAFREE);
+
+	api->ipc_source_set (&req_exec_msg_messagedatafree.source, conn);
+
+	iovec.iov_base = (char *)&req_exec_msg_messagedatafree;
+	iovec.iov_len = sizeof (req_exec_msg_messagedatafree);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_messagecancel (
@@ -3068,8 +4825,7 @@ static void message_handler_req_lib_msg_messagecancel (
 	struct req_exec_msg_messagecancel req_exec_msg_messagecancel;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageCancel %s\n",
-		getSaNameT (&req_lib_msg_messagecancel->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageCancel\n");
 
 	req_exec_msg_messagecancel.header.size =
 		sizeof (struct req_exec_msg_messagecancel);
@@ -3079,13 +4835,15 @@ static void message_handler_req_lib_msg_messagecancel (
 	api->ipc_source_set (&req_exec_msg_messagecancel.source, conn);
 
 	memcpy (&req_exec_msg_messagecancel.queue_name,
-		&req_lib_msg_messagecancel->queueName, sizeof (SaNameT));
+		&req_lib_msg_messagecancel->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_messagecancel.queue_id =
+		req_lib_msg_messagecancel->queue_id;
 
 	iovec.iov_base = (char *)&req_exec_msg_messagecancel;
 	iovec.iov_len = sizeof (req_exec_msg_messagecancel);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_messagesendreceive (
@@ -3095,10 +4853,9 @@ static void message_handler_req_lib_msg_messagesendreceive (
 	struct req_lib_msg_messagesendreceive *req_lib_msg_messagesendreceive =
 		(struct req_lib_msg_messagesendreceive *)msg;
 	struct req_exec_msg_messagesendreceive req_exec_msg_messagesendreceive;
-	struct iovec iovec;
+	struct iovec iovec[2];
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageSendReceive %s\n",
-		getSaNameT (&req_lib_msg_messagesendreceive->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageSendReceive\n");
 
 	req_exec_msg_messagesendreceive.header.size =
 		sizeof (struct req_exec_msg_messagesendreceive);
@@ -3107,14 +4864,32 @@ static void message_handler_req_lib_msg_messagesendreceive (
 
 	api->ipc_source_set (&req_exec_msg_messagesendreceive.source, conn);
 
-	memcpy (&req_exec_msg_messagesendreceive.queue_name,
-		&req_lib_msg_messagesendreceive->queueName, sizeof (SaNameT));
+	memcpy (&req_exec_msg_messagesendreceive.destination,
+		&req_lib_msg_messagesendreceive->destination, sizeof (SaNameT));
+	memcpy (&req_exec_msg_messagesendreceive.message,
+		&req_lib_msg_messagesendreceive->message, sizeof (SaMsgMessageT));
 
-	iovec.iov_base = (char *)&req_exec_msg_messagesendreceive;
-	iovec.iov_len = sizeof (req_exec_msg_messagesendreceive);
+	req_exec_msg_messagesendreceive.timeout =
+		req_lib_msg_messagesendreceive->timeout;
+	req_exec_msg_messagesendreceive.sender_id =
+		(SaMsgSenderIdT)((global_sender_id++) |
+		((unsigned long long)req_exec_msg_messagesendreceive.source.nodeid) << 32);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	iovec[0].iov_base = (char *)&req_exec_msg_messagesendreceive;
+	iovec[0].iov_len = sizeof (req_exec_msg_messagesendreceive);
+
+	iovec[1].iov_base = ((char *)req_lib_msg_messagesendreceive) +
+		sizeof (struct req_lib_msg_messagesendreceive);
+	iovec[1].iov_len = req_lib_msg_messagesendreceive->header.size -
+		sizeof (struct req_lib_msg_messagesendreceive);
+
+	req_exec_msg_messagesendreceive.header.size += iovec[1].iov_len;
+
+	if (iovec[1].iov_len > 0) {
+		assert (api->totem_mcast (iovec, 2, TOTEM_AGREED) == 0);
+	} else {
+		assert (api->totem_mcast (iovec, 1, TOTEM_AGREED) == 0);
+	}
 }
 
 static void message_handler_req_lib_msg_messagereply (
@@ -3126,52 +4901,167 @@ static void message_handler_req_lib_msg_messagereply (
 	struct req_exec_msg_messagereply req_exec_msg_messagereply;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageReply %s\n",
-		getSaNameT (&req_lib_msg_messagereply->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageReply\n");
 
 	req_exec_msg_messagereply.header.size =
 		sizeof (struct req_exec_msg_messagereply);
 	req_exec_msg_messagereply.header.id =
 		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_MESSAGEREPLY);
-	req_exec_msg_messagereply.async_call = 0;
 
 	api->ipc_source_set (&req_exec_msg_messagereply.source, conn);
 
-	memcpy (&req_exec_msg_messagereply.queue_name,
-		&req_lib_msg_messagereply->queueName, sizeof (SaNameT));
+	memcpy (&req_exec_msg_messagereply.reply_message,
+		&req_lib_msg_messagereply->reply_message, sizeof (SaMsgMessageT));
+
+	req_exec_msg_messagereply.sender_id =
+		req_lib_msg_messagereply->sender_id;
+	req_exec_msg_messagereply.timeout =
+		req_lib_msg_messagereply->timeout;
 
 	iovec.iov_base = (char *)&req_exec_msg_messagereply;
 	iovec.iov_len = sizeof (req_exec_msg_messagereply);
 
-	assert (api->totem_mcast (&iovec, 1,
-		TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_msg_messagereplyasync (
 	void *conn,
 	void *msg)
 {
-	struct req_lib_msg_messagereply *req_lib_msg_messagereply =
-		(struct req_lib_msg_messagereply *)msg;
-	struct req_exec_msg_messagereply req_exec_msg_messagereply;
+	struct req_lib_msg_messagereplyasync *req_lib_msg_messagereplyasync =
+		(struct req_lib_msg_messagereplyasync *)msg;
+	struct req_exec_msg_messagereplyasync req_exec_msg_messagereplyasync;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageReplyAsync %s\n",
-		getSaNameT (&req_lib_msg_messagereply->queueName));
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMessageReplyAsync\n");
 
-	req_exec_msg_messagereply.header.size =
-		sizeof (struct req_exec_msg_messagereply);
-	req_exec_msg_messagereply.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_MESSAGEREPLY);
-	req_exec_msg_messagereply.async_call = 1;
+	req_exec_msg_messagereplyasync.header.size =
+		sizeof (struct req_exec_msg_messagereplyasync);
+	req_exec_msg_messagereplyasync.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_MESSAGEREPLYASYNC);
 
-	api->ipc_source_set (&req_exec_msg_messagereply.source, conn);
+	api->ipc_source_set (&req_exec_msg_messagereplyasync.source, conn);
 
-	memcpy (&req_exec_msg_messagereply.queue_name,
-		&req_lib_msg_messagereply->queueName, sizeof (SaNameT));
+	memcpy (&req_exec_msg_messagereplyasync.reply_message,
+		&req_lib_msg_messagereplyasync->reply_message, sizeof (SaMsgMessageT));
 
-	iovec.iov_base = (char *)&req_exec_msg_messagereply;
-	iovec.iov_len = sizeof (req_exec_msg_messagereply);
+	req_exec_msg_messagereplyasync.sender_id =
+		req_lib_msg_messagereplyasync->sender_id;
+	req_exec_msg_messagereplyasync.invocation =
+		req_lib_msg_messagereplyasync->invocation;
+
+	iovec.iov_base = (char *)&req_exec_msg_messagereplyasync;
+	iovec.iov_len = sizeof (req_exec_msg_messagereplyasync);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_queuecapacitythresholdset (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_queuecapacitythresholdset *req_lib_msg_queuecapacitythresholdset =
+		(struct req_lib_msg_queuecapacitythresholdset *)msg;
+	struct req_exec_msg_queuecapacitythresholdget req_exec_msg_queuecapacitythresholdset;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueCapacityThresholdSet\n");
+
+	req_exec_msg_queuecapacitythresholdset.header.size =
+		sizeof (struct req_exec_msg_queuecapacitythresholdset);
+	req_exec_msg_queuecapacitythresholdset.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUECAPACITYTHRESHOLDSET);
+
+	api->ipc_source_set (&req_exec_msg_queuecapacitythresholdset.source, conn);
+
+	memcpy (&req_exec_msg_queuecapacitythresholdset.queue_name,
+		&req_lib_msg_queuecapacitythresholdset->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_queuecapacitythresholdset.queue_id =
+		req_lib_msg_queuecapacitythresholdset->queue_id;
+
+	iovec.iov_base = (char *)&req_exec_msg_queuecapacitythresholdset;
+	iovec.iov_len = sizeof (req_exec_msg_queuecapacitythresholdset);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_queuecapacitythresholdget (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_queuecapacitythresholdget *req_lib_msg_queuecapacitythresholdget =
+		(struct req_lib_msg_queuecapacitythresholdget *)msg;
+	struct req_exec_msg_queuecapacitythresholdget req_exec_msg_queuecapacitythresholdget;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgQueueCapacityThresholdGet\n");
+
+	req_exec_msg_queuecapacitythresholdget.header.size =
+		sizeof (struct req_exec_msg_queuecapacitythresholdget);
+	req_exec_msg_queuecapacitythresholdget.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUECAPACITYTHRESHOLDGET);
+
+	api->ipc_source_set (&req_exec_msg_queuecapacitythresholdget.source, conn);
+
+	memcpy (&req_exec_msg_queuecapacitythresholdget.queue_name,
+		&req_lib_msg_queuecapacitythresholdget->queue_name, sizeof (SaNameT));
+
+	req_exec_msg_queuecapacitythresholdget.queue_id =
+		req_lib_msg_queuecapacitythresholdget->queue_id;
+
+	iovec.iov_base = (char *)&req_exec_msg_queuecapacitythresholdget;
+	iovec.iov_len = sizeof (req_exec_msg_queuecapacitythresholdget);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_metadatasizeget (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_metadatasizeget *req_lib_msg_metadatasizeget =
+		(struct req_lib_msg_metadatasizeget *)msg;
+	struct req_exec_msg_metadatasizeget req_exec_msg_metadatasizeget;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgMetadataSizeGet\n");
+
+	req_exec_msg_metadatasizeget.header.size =
+		sizeof (struct req_exec_msg_metadatasizeget);
+	req_exec_msg_metadatasizeget.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_METADATASIZEGET);
+
+	api->ipc_source_set (&req_exec_msg_metadatasizeget.source, conn);
+
+	iovec.iov_base = (char *)&req_exec_msg_metadatasizeget;
+	iovec.iov_len = sizeof (req_exec_msg_metadatasizeget);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_msg_limitget (
+	void *conn,
+	void *msg)
+{
+	struct req_lib_msg_limitget *req_lib_msg_limitget =
+		(struct req_lib_msg_limitget *)msg;
+	struct req_exec_msg_limitget req_exec_msg_limitget;
+	struct iovec iovec;
+
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saMsgLimitGet\n");
+
+	req_exec_msg_limitget.header.size =
+		sizeof (struct req_exec_msg_limitget);
+	req_exec_msg_limitget.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_LIMITGET);
+
+	api->ipc_source_set (&req_exec_msg_limitget.source, conn);
+
+	req_exec_msg_limitget.limit_id = req_lib_msg_limitget->limit_id;
+
+	iovec.iov_base = (char *)&req_exec_msg_limitget;
+	iovec.iov_len = sizeof (req_exec_msg_limitget);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }

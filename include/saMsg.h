@@ -62,13 +62,6 @@ typedef struct {
 	SaTimeT retentionTime;
 } SaMsgQueueCreationAttributesT;
 
-typedef enum {
-	SA_MSG_QUEUE_GROUP_ROUND_ROBIN = 1,
-	SA_MSG_QUEUE_GROUP_LOCAL_ROUND_ROBIN = 2,
-	SA_MSG_QUEUE_GROUP_LOCAL_BEST_QUEUE = 3,
-	SA_MSG_QUEUE_GROUP_BROADCAST = 4
-} SaMsgQueueGroupPolicyT;
-
 #define SA_MSG_QUEUE_CREATE 0x1
 #define SA_MSG_QUEUE_RECEIVE_CALLBACK 0x2
 #define SA_MSG_QUEUE_EMPTY 0x4
@@ -87,6 +80,13 @@ typedef struct {
 	SaTimeT closeTime;
 	SaMsgQueueUsageT saMsgQueueUsage[SA_MSG_MESSAGE_LOWEST_PRIORITY + 1];
 } SaMsgQueueStatusT;
+
+typedef enum {
+	SA_MSG_QUEUE_GROUP_ROUND_ROBIN = 1,
+	SA_MSG_QUEUE_GROUP_LOCAL_ROUND_ROBIN = 2,
+	SA_MSG_QUEUE_GROUP_LOCAL_BEST_QUEUE = 3,
+	SA_MSG_QUEUE_GROUP_BROADCAST = 4
+} SaMsgQueueGroupPolicyT;
 
 typedef enum {
 	SA_MSG_QUEUE_GROUP_NO_CHANGE = 1,
@@ -133,7 +133,7 @@ typedef void (*SaMsgQueueGroupTrackCallbackT) (
 typedef void (*SaMsgMessageDeliveredCallbackT) (
 	SaInvocationT invocation,
 	SaAisErrorT error);
-	
+
 typedef void (*SaMsgMessageReceivedCallbackT) (
 	SaMsgQueueHandleT queueHandle);
 
@@ -209,7 +209,7 @@ saMsgQueueOpenAsync (
 
 SaAisErrorT
 saMsgQueueClose (
-	SaMsgQueueHandleT msgHandle);
+	SaMsgQueueHandleT queueHandle);
 
 SaAisErrorT
 saMsgQueueStatusGet (
@@ -224,7 +224,7 @@ saMsgQueueRetentionTimeSet (
 
 SaAisErrorT
 saMsgQueueUnlink (
-	SaMsgQueueHandleT msgHandle,
+	SaMsgHandleT msgHandle,
 	const SaNameT *queueName);
 
 SaAisErrorT
@@ -286,7 +286,7 @@ SaAisErrorT
 saMsgMessageGet (
 	SaMsgQueueHandleT queueHandle,
 	SaMsgMessageT *message,
-	SaTimeT *sendTIme,
+	SaTimeT *sendTime,
 	SaMsgSenderIdT *senderId,
 	SaTimeT timeout);
 
