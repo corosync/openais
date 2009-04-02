@@ -413,7 +413,13 @@ saTmrTimerReschedule (
 	printf ("[DEBUG]: saTmrTimerReschedule { id=%u }\n",
 		(unsigned int)(timerId));
 
-	if (timerAttributes == NULL) {
+	if ((timerAttributes == NULL) || (callTime == NULL)) {
+		return (SA_AIS_ERR_INVALID_PARAM);
+	}
+
+	if ((timerAttributes->type != SA_TIME_ABSOLUTE) &&
+	    (timerAttributes->type != SA_TIME_DURATION))
+	{
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 

@@ -434,6 +434,7 @@ static void message_handler_req_lib_tmr_timerreschedule (
 	struct res_lib_tmr_timerreschedule res_lib_tmr_timerreschedule;
 	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+	SaTimeT current_time = 0;
 
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerReschedule { id=%u }\n",
@@ -447,9 +448,31 @@ static void message_handler_req_lib_tmr_timerreschedule (
 		goto error_exit;
 	}
 
+	current_time = (SaTimeT)(api->timer_time_get());
+
+	if (current_time > req_lib_tmr_timerreschedule->timer_attributes.initialExpirationTime) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_put;
+	}
+
+	if (timer_instance->timer_attributes.timerPeriodDuration != 0) {
+		if (req_lib_tmr_timerreschedule->timer_attributes.timerPeriodDuration <= 0) {
+			error = SA_AIS_ERR_INVALID_PARAM;
+			goto error_put;
+		}
+	}
+	else {
+		if (req_lib_tmr_timerreschedule->timer_attributes.timerPeriodDuration != 0) {
+			error = SA_AIS_ERR_INVALID_PARAM;
+			goto error_put;
+		}
+	}
+
 	memcpy (&timer_instance->timer_attributes,
 		&req_lib_tmr_timerreschedule->timer_attributes,
 		sizeof (SaTmrTimerAttributesT));
+
+error_put:
 
 	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
 
