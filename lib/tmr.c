@@ -347,18 +347,35 @@ saTmrTimerStart (
 	printf ("[DEBUG]: saTmrTimerStart { data=%p }\n",
 		(void *)(timerData));
 
-	if (timerAttributes == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+	if ((timerAttributes == NULL) || (callTime == NULL) || (timerId == NULL)) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	if ((timerAttributes->type != SA_TIME_ABSOLUTE) &&
 	    (timerAttributes->type != SA_TIME_DURATION)) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if (timerAttributes->initialExpirationTime < 0) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if (timerAttributes->timerPeriodDuration < 0) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
+	}
+
+	if (tmrInstance->callbacks.saTmrTimerExpiredCallback == NULL) {
+		error = SA_AIS_ERR_INIT;
+		goto error_put;
 	}
 
 	req_lib_tmr_timerstart.header.size =
@@ -391,7 +408,9 @@ saTmrTimerStart (
 		error = res_lib_tmr_timerstart.header.error;
 	}
 
+error_put:
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+error_exit:
 	return (error);
 }
 
