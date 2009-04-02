@@ -55,7 +55,7 @@ all: $(BINARIES)
 testckpt: testckpt.o sa_error.o
 	$(CC) $(LDFLAGS) -o testckpt testckpt.o $(LIBS)
 
-ckptbench: ckptbench.o
+ckptbench: ckptbench.o sa_error.o
 	$(CC) $(LDFLAGS) -o ckptbench ckptbench.o $(LIBS)
 
 testlck: testlck.o sa_error.o
