@@ -265,7 +265,7 @@ static int tmr_lib_exit_fn (void *conn)
 		timer_instance = list_entry (cleanup_list, struct timer_instance, cleanup_list);
 
 		/* DEBUG */
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: cleanup timer { id=%u }\n",
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: cleanup timer { id=0x%04x }\n",
 			    (unsigned int)(timer_instance->timer_id));
 
 		api->timer_delete (timer_instance->timer_handle);
@@ -289,7 +289,7 @@ static void tmr_timer_expired (void *data)
 	timer_instance->expiration_count += 1;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: tmr_timer_expired { id=%u }\n",
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: tmr_timer_expired { id=0x%04x }\n",
 		    (unsigned int)(timer_instance->timer_id));
 
 	res_lib_tmr_timerexpiredcallback.header.size =
@@ -310,7 +310,7 @@ static void tmr_timer_expired (void *data)
 	}
 	else {
 		/* DEBUG */
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: skipping timer { id=%u }\n",
+		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: skipping timer { id=0x%04x }\n",
 			    (unsigned int)(timer_instance->timer_id));
 
 		timer_instance->timer_skip -= 1;
@@ -437,11 +437,11 @@ static void message_handler_req_lib_tmr_timerreschedule (
 	SaTimeT current_time = 0;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerReschedule { id=%u }\n",
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerReschedule { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timerreschedule->timer_id));
 
 	hdb_handle_get (&timer_hdb,
-		(unsigned int)(req_lib_tmr_timerreschedule->timer_id),
+		(hdb_handle_t)(req_lib_tmr_timerreschedule->timer_id),
 		(void *)&timer_instance);
 	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
@@ -474,7 +474,7 @@ static void message_handler_req_lib_tmr_timerreschedule (
 
 error_put:
 
-	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
+	hdb_handle_put (&timer_hdb, (hdb_handle_t)(timer_instance->timer_id));
 
 error_exit:
 
@@ -500,11 +500,11 @@ static void message_handler_req_lib_tmr_timercancel (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerCancel { id=%u }\n",
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerCancel { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timercancel->timer_id));
 
 	hdb_handle_get (&timer_hdb,
-		(unsigned int)(req_lib_tmr_timercancel->timer_id),
+		(hdb_handle_t)(req_lib_tmr_timercancel->timer_id),
 		(void *)&timer_instance);
 	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
@@ -517,8 +517,8 @@ static void message_handler_req_lib_tmr_timercancel (
 
 	list_del (&timer_instance->cleanup_list);
 
-	hdb_handle_destroy (&timer_hdb, (unsigned int)(timer_instance->timer_id));
-	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
+	hdb_handle_destroy (&timer_hdb, (hdb_handle_t)(timer_instance->timer_id));
+	hdb_handle_put (&timer_hdb, (hdb_handle_t)(timer_instance->timer_id));
 
 error_exit:
 
@@ -544,11 +544,11 @@ static void message_handler_req_lib_tmr_periodictimerskip (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrPeriodicTimerSkip { id=%u }\n",
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrPeriodicTimerSkip { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_periodictimerskip->timer_id));
 
 	hdb_handle_get (&timer_hdb,
-		(unsigned int)(req_lib_tmr_periodictimerskip->timer_id),
+		(hdb_handle_t)(req_lib_tmr_periodictimerskip->timer_id),
 		(void *)&timer_instance);
 	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
@@ -562,7 +562,7 @@ static void message_handler_req_lib_tmr_periodictimerskip (
 
 	timer_instance->timer_skip += 1;
 
-	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
+	hdb_handle_put (&timer_hdb, (hdb_handle_t)(timer_instance->timer_id));
 
 error_exit:
 
@@ -588,11 +588,11 @@ static void message_handler_req_lib_tmr_timerremainingtimeget (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerRemainingTimeGet { id=%u }\n",
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerRemainingTimeGet { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timerremainingtimeget->timer_id));
 
 	hdb_handle_get (&timer_hdb,
-		(unsigned int)(req_lib_tmr_timerremainingtimeget->timer_id),
+		(hdb_handle_t)(req_lib_tmr_timerremainingtimeget->timer_id),
 		(void *)&timer_instance);
 	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
@@ -603,7 +603,7 @@ static void message_handler_req_lib_tmr_timerremainingtimeget (
 		(SaTimeT)((api->timer_expire_time_get(timer_instance->timer_handle)) -
 			  (api->timer_time_get()));
 
-	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
+	hdb_handle_put (&timer_hdb, (hdb_handle_t)(timer_instance->timer_id));
 
 error_exit:
 
@@ -629,11 +629,11 @@ static void message_handler_req_lib_tmr_timerattributesget (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerAttributesGet { id=%u }\n",
+	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerAttributesGet { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timerattributesget->timer_id));
 
 	hdb_handle_get (&timer_hdb,
-		(unsigned int)(req_lib_tmr_timerattributesget->timer_id),
+		(hdb_handle_t)(req_lib_tmr_timerattributesget->timer_id),
 		(void *)&timer_instance);
 	if (timer_instance == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
@@ -644,7 +644,7 @@ static void message_handler_req_lib_tmr_timerattributesget (
 		&timer_instance->timer_attributes,
 		sizeof (SaTmrTimerAttributesT));
 
-	hdb_handle_put (&timer_hdb, (unsigned int)(timer_instance->timer_id));
+	hdb_handle_put (&timer_hdb, (hdb_handle_t)(timer_instance->timer_id));
 
 error_exit:
 
