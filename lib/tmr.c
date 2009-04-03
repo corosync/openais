@@ -504,7 +504,7 @@ saTmrTimerCancel (
 	printf ("[DEBUG]: saTmrTimerCancel { id=%u }\n",
 		(unsigned int)(timerId));
 
-	if (*timerDataP == NULL) {
+	if (timerDataP == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
