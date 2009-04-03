@@ -117,17 +117,18 @@ saTmrInitialize (
 	printf ("[DEBUG]: saTmrInitialize\n");
 
 	if (tmrHandle == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = saVersionVerify (&tmrVersionDatabase, version);
 	if (error != SA_AIS_OK) {
-		goto error_no_destroy;
+		goto error_exit;
 	}
 
 	error = saHandleCreate (&tmrHandleDatabase, sizeof (struct tmrInstance), tmrHandle);
 	if (error != SA_AIS_OK) {
-		goto error_no_destroy;
+		goto error_exit;
 	}
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, *tmrHandle, (void *)&tmrInstance);
@@ -158,7 +159,7 @@ error_put_destroy:
 	saHandleInstancePut (&tmrHandleDatabase, *tmrHandle);
 error_destroy:
 	saHandleDestroy (&tmrHandleDatabase, *tmrHandle);
-error_no_destroy:
+error_exit:
 	return (error);
 }
 
@@ -174,18 +175,20 @@ saTmrSelectionObjectGet (
 	printf ("[DEBUG]: saTmrSelectionObjectGet\n");
 
 	if (selectionObject == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	*selectionObject = coroipcc_fd_get (&tmrInstance->ipc_ctx);
 
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 
+error_exit:
 	return (SA_AIS_OK);
 }
 
@@ -208,7 +211,8 @@ saTmrDispatch (
 	    dispatchFlags != SA_DISPATCH_ALL &&
 	    dispatchFlags != SA_DISPATCH_BLOCKING)
 	{
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle,
@@ -286,7 +290,6 @@ saTmrDispatch (
 
 error_unlock:
 	pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
-
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 error_exit:
 	return (error);
@@ -304,7 +307,7 @@ saTmrFinalize (
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	pthread_mutex_lock (&tmrInstance->response_mutex);
@@ -312,7 +315,8 @@ saTmrFinalize (
 	if (tmrInstance->finalize) {
 		pthread_mutex_unlock (&tmrInstance->response_mutex);
 		saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
-		return (SA_AIS_ERR_BAD_HANDLE);
+		error = SA_AIS_ERR_BAD_HANDLE;
+		goto error_exit;
 	}
 
 	tmrInstance->finalize = 1;
@@ -325,6 +329,7 @@ saTmrFinalize (
 
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 
+error_exit:
 	return (SA_AIS_OK);
 }
 
@@ -433,18 +438,20 @@ saTmrTimerReschedule (
 		(unsigned int)(timerId));
 
 	if ((timerAttributes == NULL) || (callTime == NULL)) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	if ((timerAttributes->type != SA_TIME_ABSOLUTE) &&
 	    (timerAttributes->type != SA_TIME_DURATION))
 	{
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	req_lib_tmr_timerreschedule.header.size =
@@ -476,6 +483,7 @@ saTmrTimerReschedule (
 
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 
+error_exit:
 	return (error);
 }
 
@@ -495,6 +503,11 @@ saTmrTimerCancel (
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrTimerCancel { id=%u }\n",
 		(unsigned int)(timerId));
+
+	if (*timerDataP == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
@@ -551,7 +564,7 @@ saTmrPeriodicTimerSkip (
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	req_lib_tmr_periodictimerskip.header.size =
@@ -578,6 +591,7 @@ saTmrPeriodicTimerSkip (
 		error = res_lib_tmr_periodictimerskip.header.error;
 	}
 
+error_exit:
 	return (error);
 }
 
@@ -605,7 +619,7 @@ saTmrTimerRemainingTimeGet (
 
 	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	req_lib_tmr_timerremainingtimeget.header.size =
@@ -650,7 +664,6 @@ saTmrTimerAttributesGet (
 	struct req_lib_tmr_timerattributesget req_lib_tmr_timerattributesget;
 	struct res_lib_tmr_timerattributesget res_lib_tmr_timerattributesget;
 	struct iovec iov;
-
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrTimerAttributesGet { id=%u }\n",
