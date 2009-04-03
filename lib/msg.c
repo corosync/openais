@@ -426,6 +426,13 @@ saMsgQueueOpen (
 		goto error_exit;
 	}
 
+	if ((openFlags & SA_MSG_QUEUE_RECEIVE_CALLBACK) &&
+	    (msgInstance->callbacks.saMsgMessageReceivedCallback == NULL))
+	{
+		error = SA_AIS_ERR_INIT;
+		goto error_exit;
+	}
+
 	error = saHandleCreate (&queueHandleDatabase,
 		sizeof (struct queueInstance), queueHandle);
 	if (error != SA_AIS_OK) {
@@ -535,6 +542,17 @@ saMsgQueueOpenAsync (
 		(void *)&msgInstance);
 	if (error != SA_AIS_OK) {
 		goto error_exit;
+	}
+
+	if ((openFlags & SA_MSG_QUEUE_RECEIVE_CALLBACK) &&
+	    (msgInstance->callbacks.saMsgMessageReceivedCallback == NULL)) {
+		error = SA_AIS_ERR_INIT;
+		goto error_put;
+	}
+
+	if (msgInstance->callbacks.saMsgQueueOpenCallback == NULL) {
+		error = SA_AIS_ERR_INIT;
+		goto error_put;
 	}
 
 	error = saHandleCreate (&queueHandleDatabase,
@@ -1134,13 +1152,15 @@ saMsgQueueGroupTrack (
 	printf ("[DEBUG]: saMsgQueueGroupTrack\n");
 
 	if (queueGroupName == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	if ((notificationBuffer != NULL) &&
 	    (notificationBuffer->notification != NULL) &&
 	    (notificationBuffer->numberOfItems == 0)) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	if ((notificationBuffer != NULL) &&
@@ -1150,13 +1170,21 @@ saMsgQueueGroupTrack (
 
 	if ((trackFlags & SA_TRACK_CHANGES) &&
 	    (trackFlags & SA_TRACK_CHANGES_ONLY)) {
-		return (SA_AIS_ERR_BAD_FLAGS);
+		error = SA_AIS_ERR_BAD_FLAGS;
+		goto error_exit;
 	}
 
 	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
 		(void *)&msgInstance);
 	if (error != SA_AIS_OK) {
 		goto error_exit;
+	}
+
+	if ((trackFlags == SA_TRACK_CURRENT) && (notificationBuffer != NULL) &&
+	    (msgInstance->callbacks.saMsgQueueGroupTrackCallback == NULL))
+	{
+		error = SA_AIS_ERR_INIT;
+		goto error_put;
 	}
 
 	/* DEBUG */
@@ -1428,6 +1456,13 @@ saMsgMessageSendAsync (
 	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
 		(void *)&msgInstance);
 	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	if ((ackFlags & SA_MSG_MESSAGE_DELIVERED_ACK) &&
+	    (msgInstance->callbacks.saMsgMessageDeliveredCallback == NULL))
+	{
+		error = SA_AIS_ERR_INIT;
 		goto error_exit;
 	}
 
@@ -1839,6 +1874,13 @@ saMsgMessageReplyAsync (
 	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
 		(void *)&msgInstance);
 	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	if ((ackFlags & SA_MSG_MESSAGE_DELIVERED_ACK) &&
+	    (msgInstance->callbacks.saMsgMessageDeliveredCallback == NULL))
+	{
+		error = SA_AIS_ERR_INIT;
 		goto error_exit;
 	}
 
