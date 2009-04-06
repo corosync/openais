@@ -257,8 +257,8 @@ saMsgDispatch (
 	do {
 		pthread_mutex_lock (&msgInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (
-			msgInstance->ipc_ctx, &dispatch_data, timeout);
+		dispatch_avail = coroipcc_dispatch_recv (msgInstance->ipc_ctx,
+			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
 
 		pthread_mutex_unlock (&msgInstance->dispatch_mutex);
 

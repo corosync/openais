@@ -377,7 +377,7 @@ saCkptDispatch (
 		pthread_mutex_lock (&ckptInstance->dispatch_mutex);
 
 		dispatch_avail = coroipcc_dispatch_recv (ckptInstance->ipc_ctx,
-			&dispatch_data, timeout);
+			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
 
 		pthread_mutex_unlock (&ckptInstance->dispatch_mutex);
 

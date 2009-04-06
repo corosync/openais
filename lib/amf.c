@@ -214,7 +214,7 @@ saAmfDispatch (
 
 	do {
 		dispatch_avail = coroipcc_dispatch_recv (amfInstance->ipc_ctx,
-			(void *)&dispatch_data, timeout);
+			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
 
 		pthread_mutex_lock (&amfInstance->dispatch_mutex);
 

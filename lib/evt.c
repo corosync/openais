@@ -621,7 +621,7 @@ saEvtDispatch(
 
 	do {
 		dispatch_avail = coroipcc_dispatch_recv (evti->ipc_ctx,
-			&evti->ei_dispatch_data, timeout);
+			(void *)&evti->ei_dispatch_data, sizeof (evti->ei_dispatch_data), timeout);
 
 		/*
 		 * Handle has been finalized in another thread

@@ -304,7 +304,7 @@ saClmDispatch (
 		pthread_mutex_lock (&clmInstance->dispatch_mutex);
 
 		dispatch_avail = coroipcc_dispatch_recv (clmInstance->ipc_ctx,
-			(void *)&dispatch_data, timeout);
+			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
 
 		pthread_mutex_unlock (&clmInstance->dispatch_mutex);
 
