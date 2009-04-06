@@ -1523,6 +1523,43 @@ static int msg_close_queue (
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
 }
 
+static void msg_release_queue_message (
+	struct queue_entry *queue)
+{
+	struct message_entry *msg;
+	struct list_head *list;
+	int i;
+
+	/* DEBUG */
+	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t msg_release_queue_message ( %s )\n",
+		    (char *)(queue->queue_name.value));
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
+	{
+		list = queue->priority[i].message_head.next;
+
+		while (!list_empty (&queue->priority[i].message_head)) {
+			msg = list_entry (list, struct message_entry, list);
+
+			/* DEBUG */
+			log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t msg = %s ( %d )\n",
+				    (char *)(msg->message.data), (int)(i));
+
+			list_del (&msg->list);
+			list_init (&msg->list);
+
+			list_del (&msg->queue_list);
+			list_init (&msg->queue_list);
+
+			free (msg->message.data);
+			free (msg);
+
+			list = queue->priority[i].message_head.next;
+		}
+	}
+	return;
+}
+
 static void msg_release_queue_cleanup (
 	void *conn,
 	SaNameT *queue_name,
@@ -1552,7 +1589,6 @@ static void msg_release_queue_cleanup (
 	}
 	return;
 }
-	
 
 static void msg_release_queue (
 	struct queue_entry *queue)
@@ -1672,7 +1708,6 @@ static inline void msg_sync_queue_free (
 
 	list_init (queue_head);
 }
-
 
 static inline void msg_sync_group_free (
 	struct list_head *group_head)
@@ -2096,9 +2131,8 @@ static void msg_sync_activate (void)
 	/* DEBUG */
 	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_sync_activate\n");
 
-	/* DEBUG */
-	/* msg_sync_queue_free (&queue_list_head);
-	   msg_sync_group_free (&group_list_head); */
+	msg_sync_queue_free (&queue_list_head);
+	msg_sync_group_free (&group_list_head);
 
 	if (!list_empty (&sync_queue_list_head)) {
 		list_splice (&sync_queue_list_head, &queue_list_head);
@@ -2302,6 +2336,8 @@ static void message_handler_req_exec_msg_queueopen (
 			 * process with the SA_MSG_QUEUE_EMPTY flag set, then we
 			 * should delete all existing messages in the queue.
 			 */
+
+			msg_release_queue_message (queue);
 		}
 	}
 
@@ -2447,6 +2483,8 @@ static void message_handler_req_exec_msg_queueopenasync (
 			 * process with the SA_MSG_QUEUE_EMPTY flag set, then we
 			 * should delete all existing messages in the queue.
 			 */
+
+			msg_release_queue_message (queue);
 		}
 	}
 
