@@ -1556,6 +1556,8 @@ static void msg_release_queue_message (
 
 			list = queue->priority[i].message_head.next;
 		}
+		queue->priority[i].queue_used = 0;
+		queue->priority[i].message_count = 0;
 	}
 	return;
 }
@@ -1628,6 +1630,8 @@ static void msg_release_queue (
 
 			list = queue->priority[i].message_head.next;
 		}
+		queue->priority[i].queue_used = 0;
+		queue->priority[i].message_count = 0;
 	}
 
 	global_queue_count -= 1;
