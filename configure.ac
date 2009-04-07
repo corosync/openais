@@ -14,6 +14,28 @@ AC_CANONICAL_HOST
 
 AC_LANG([C])
 
+dnl Fix default variables - "prefix" variable if not specified
+if test "$prefix" = "NONE"; then
+	prefix="/usr"
+
+	dnl Fix "localstatedir" variable if not specified
+	if test "$localstatedir" = "\${prefix}/var"; then
+		localstatedir="/var"
+	fi
+	dnl Fix "sysconfdir" variable if not specified
+	if test "$sysconfdir" = "\${prefix}/etc"; then
+		sysconfdir="/etc"
+	fi
+	dnl Fix "libdir" variable if not specified
+	if test "$libdir" = "\${exec_prefix}/lib"; then
+		if test -e /usr/lib64; then
+			libdir="/usr/lib64"
+		else
+			libdir="/usr/lib"
+		fi
+	fi
+fi
+
 # Checks for programs.
 
 # check stolen from gnulib/m4/gnu-make.m4
