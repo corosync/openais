@@ -1,7 +1,8 @@
 # Copyright (c) 2009 Red Hat, Inc.
 # 
-# All rights reserved.
-# 
+# Authors: Andrew Beekhof
+#	   Steven Dake (sdake@redhat.com)
+#
 # This software licensed under BSD license, the text of which follows:
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -22,29 +23,34 @@
 # ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
 # LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
 # CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR ENGINES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
 # INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-# Include configuration
-#
-srcdir ?= $(CURDIR)/../
-subdir ?= pkgconfig
+EXTRA_DIST              = autogen.sh conf/openais.conf
+AUTOMAKE_OPTIONS	= foreign
 
-include $(srcdir)/Makefile.inc
+MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
+			  config.guess config.sub missing install-sh \
+			  autoheader automake autoconf
 
-LIBS = SaAmf SaCkpt SaClm SaEvt SaLck SaMsg SaTmr
+dist_doc_DATA		= LICENSE README.amf 
 
-all:
-	for i in $(LIBS); do \
-		cat ${srcdir}/pkgconfig/libtemplate.pc.in | sed \
-			-e 's#@PREFIX@#$(PREFIX)#g' \
-			-e 's#@LIBDIR@#$(LIBDIR)#g' \
-			-e 's#@LIB@#'$${i}'#g' \
-		> lib$${i}.pc; \
-	done;
+sysconf_DATA		= conf/openais.conf
 
-clean:
-	rm -f *.pc
+SUBDIRS	= include lib services test pkgconfig man
+# init
+
+lint:
+	for dir in lcr lib exec services tools test; do make -C $$dir lint; done
+
+doxygen:
+	mkdir -p doc/api && doxygen
+
+dist-clean-local:
+	rm -f autoconf automake autoheader $(TARFILE)
+
+clean-generic:
+	rm -rf doc/api

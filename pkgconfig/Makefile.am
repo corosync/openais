@@ -1,4 +1,4 @@
-# Copyright (c) 2004 MontaVista Software, Inc.
+# Copyright (c) 2009 Red Hat, Inc.
 # 
 # All rights reserved.
 # 
@@ -22,23 +22,47 @@
 # ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
 # LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
 # CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# SUBSTITUTE GOODS OR ENGINES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
 # INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-all: html
-# The index.html file must be hand edited when adding manual pages
+MAINTAINERCLEANFILES	= Makefile.in
 
-html:
-	mkdir html
-	groff -mandoc -Thtml openais_overview.8 > html/openais_overview.html
-	groff -mandoc -Thtml openais.conf.5 > html/openais.conf.html
-	groff -mandoc -Thtml amf.conf.5 > html/amf.conf.html
+LIBS	= saAmf saCkpt saClm saEvt saLck saMsg saTmr
 
-	cp index.html html
+pkgconf_LIBS = $(LIBS:%=lib%)
 
-clean:
-	rm -rf html
+target_LIBS = $(LIBS:%=lib%.pc)
 
+target_PACKAGE = openais.pc
+
+lib%:
+	cat $(srcdir)/libtemplate.pc.in | sed \
+		-e 's#@PREFIX@#$(exec_prefix)#g' \
+		-e 's#@LIBDIR@#$(libdir)#g' \
+		-e 's#@LIBVERSION@#$(VERSION)#g' \
+		-e 's#@LIB@#'$(@:lib%=%)'#g' \
+	> $@.pc;
+	touch $@
+
+$(target_PACKAGE):
+	cat $(srcdir)/$@.in | sed \
+		-e 's#@PREFIX@#$(exec_prefix)#g' \
+		-e 's#@LIBDIR@#$(libdir)#g' \
+		-e 's#@LIBVERSION@#$(VERSION)#g'
+	> $@
+
+all-local: $(pkgconf_LIBS) $(target_PACKAGE)
+
+install-exec-local:
+	install -d $(DESTDIR)/$(libdir)/pkgconfig
+	install -m 644 $(target_LIBS) $(target_PACKAGE) $(DESTDIR)/$(libdir)/pkgconfig
+
+uninstall-local:
+	cd $(DESTDIR)/$(libdir)/pkgconfig && rm -f $(target_LIBS) $(target_PACKAGE)
+	rmdir $(DESTDIR)/$(libdir)/pkgconfig 2> /dev/null || :
+
+clean-local:
+	rm -f *.pc $(pkgconf_LIBS)

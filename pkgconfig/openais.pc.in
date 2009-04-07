@@ -3,9 +3,7 @@ exec_prefix=${prefix}
 libdir=@LIBDIR@
 includedir=${prefix}/include
 
-Name: @LIB@
+Name: openais
 Version: @LIBVERSION@
-Description: @LIB@
+Description: openais
 Requires:
-Libs: -L${libdir} -l@LIB@
-Cflags: -I${includedir}

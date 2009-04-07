@@ -1,5 +1,7 @@
-# Copyright (c) 2002-2004 MontaVista Software, Inc.
-# Copyright (c) 2006-2008 Red Hat, Inc.
+# Copyright (c) 2009 Red Hat, Inc.
+#
+# Authors: Steven Dake (sdake@redhat.com)
+#          Fabio M. Di Nitto (fdinitto@redhat.com)
 # 
 # All rights reserved.
 # 
@@ -29,64 +31,35 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-# Include configuration
-#
-srcdir ?= $(CURDIR)/../
-subdir ?= test/
+MAINTAINERCLEANFILES	= Makefile.in
 
-include $(srcdir)Makefile.inc
+EXTRA_DIST		= index.html
 
-ifeq (${OPENAIS_COMPAT}, SOLARIS)
-	override LDFLAGS += -lnsl -lsocket -lrt
+dist_man_MANS = \
+	openais.conf.5 \
+	amf.conf.5 \
+	openais_overview.8 
+
+if BUILD_HTML_DOCS
+
+HTML_DOCS = $(dist_man_MANS:%=%.html)
+
+INDEX_HTML = index.html
+
+%.html: %
+	$(GROFF) -mandoc -Thtml $^ > $@
+
+install-data-local:
+	install -d $(DESTDIR)/${docdir}/html
+	install -m644 ${srcdir}/$(INDEX_HTML) $(HTML_DOCS) $(DESTDIR)/${docdir}/html/
+
+uninstall-local:
+	cd $(DESTDIR)/${docdir}/html && rm -f $(INDEX_HTML) $(HTML_DOCS)
+	rmdir $(DESTDIR)/${docdir}/html 2> /dev/null || :
+
+all-local: $(HTML_DOCS)
+
+clean-local:
+	rm -rf $(HTML_DOCS)
+
 endif
-
-LIBRARIES= -lSaCkpt -lSaLck -lSaMsg -lSaEvt -lSaTmr -lSaClm sa_error.o
-LIBS = $(LIBRARIES) 
-BINARIES= ckptbench testckpt testlck testlck2 testmsg testmsg2 testmsg3 testevt testtmr testclm
-
-override CFLAGS += -I../include
-override LDFLAGS += -L../lib
-
-EXTRA_CFLAGS = -I$(srcdir)include
-TEST_SRC = testckpt.c
-
-all: $(BINARIES)
-
-testckpt: testckpt.o sa_error.o
-	$(CC) $(LDFLAGS) -o testckpt testckpt.o $(LIBS)
-
-ckptbench: ckptbench.o sa_error.o
-	$(CC) $(LDFLAGS) -o ckptbench ckptbench.o $(LIBS)
-
-testlck: testlck.o sa_error.o
-	$(CC) $(LDFLAGS) -o testlck testlck.o $(LIBS)
-
-testlck2: testlck2.o sa_error.o
-	$(CC) $(LDFLAGS) -o testlck2 testlck2.o $(LIBS)
-
-testmsg: testmsg.o sa_error.o
-	$(CC) $(LDFLAGS) -o testmsg testmsg.o $(LIBS)
-
-testmsg2: testmsg2.o sa_error.o
-	$(CC) $(LDFLAGS) -o testmsg2 testmsg2.o $(LIBS)
-
-testmsg3: testmsg3.o sa_error.o
-	$(CC) $(LDFLAGS) -o testmsg3 testmsg3.o $(LIBS)
-
-testevt: testevt.o sa_error.o
-	$(CC) $(LDFLAGS) -o testevt testevt.o $(LIBS)
-
-testclm: testclm.o sa_error.o
-	$(CC) $(LDFLAGS) -o testclm testclm.o $(LIBS)
-
-testtmr: testtmr.o sa_error.o
-	$(CC) $(LDFLAGS) -o testtmr testtmr.o $(LIBS)
-
-clean:
-	rm -f *.o $(BINARIES)
-
-%.o: %.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
-
-depend:
-	makedepend -Y -- $(CFLAGS) $(CPPFLAGS) $(TEST_SRC) > /dev/null 2>&1
