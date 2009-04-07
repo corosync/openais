@@ -393,7 +393,7 @@ saCkptDispatch (
 			} else {
 				error = SA_AIS_ERR_LIBRARY;
 			}
-			goto error_exit;
+			goto error_put;
 		}
 		
 		/*
@@ -481,6 +481,7 @@ saCkptDispatch (
 		}
 	} while (cont);
 
+error_put:
 	saHandleInstancePut(&ckptHandleDatabase, ckptHandle);
 error_exit:
 	return (error);
