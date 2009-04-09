@@ -209,127 +209,127 @@ static int msg_lib_init_fn (void *conn);
 static int msg_lib_exit_fn (void *conn);
 
 static void message_handler_req_exec_msg_queueopen (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queueopenasync (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queueclose (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuestatusget (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queueretentiontimeset (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queueunlink (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuegroupcreate (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuegroupinsert (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuegroupremove (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuegroupdelete (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuegrouptrack (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuegrouptrackstop (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuegroupnotificationfree (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messagesend (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messagesendasync (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messageget (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messagedatafree (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messagecancel (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messagesendreceive (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messagereply (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_messagereplyasync (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuecapacitythresholdset (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queuecapacitythresholdget (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_metadatasizeget (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_limitget (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_queue_timeout (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_sync_queue (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_sync_queue_message (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_sync_queue_refcount (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_sync_group (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_sync_group_member (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_lib_msg_queueopen (
@@ -461,10 +461,10 @@ static int msg_find_member_nodeid (unsigned int nodeid);
 
 static void msg_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id);
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id);
 
 struct msg_pd {
 	struct list_head queue_list;
@@ -1077,24 +1077,27 @@ void msg_sync_refcount_calculate (
 
 static void msg_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id) 
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id) 
 {
 	unsigned int i, j;
 
 	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_confchg_fn\n");
 
+#ifdef TODO
 	if (configuration_type == TOTEM_CONFIGURATION_TRANSITIONAL) {
 		for (i = 0; i < left_list_entries; i++) {
 			for (j = 0; j < member_list_entries; j++) {
 				if (left_list[i] == member_list[j]) {
 					member_list[j] = 0;
+/* The above line should not assign to member_list since it is internal to totem. */
 				}
 			}
 		}
 	}
+#endif
 
 	lowest_nodeid = 0xffffffff;
 
@@ -1113,7 +1116,7 @@ static void msg_confchg_fn (
 	}
 }
 
-static int msg_name_match (SaNameT *name_a, SaNameT *name_b)
+static int msg_name_match (const SaNameT *name_a, const SaNameT *name_b)
 {
 	if (name_a->length == name_b->length) {
 		return ((strncmp ((char *)name_a->value, (char *)name_b->value, (int)name_b->length)) == 0);
@@ -1389,7 +1392,7 @@ static struct message_entry *msg_get_message (
 
 static struct queue_entry *msg_find_group_member (
 	struct list_head *queue_list_head,
-	SaNameT *queue_name)
+	const SaNameT *queue_name)
 {
 	struct list_head *list;
 	struct queue_entry *queue;
@@ -1434,7 +1437,7 @@ static struct queue_cleanup *msg_find_queue_cleanup (
 
 static struct queue_entry *msg_find_queue_id (
 	struct list_head *queue_list_head,
-	SaNameT *queue_name,
+	const SaNameT *queue_name,
 	SaUint32T queue_id)
 {
 	struct list_head *list;
@@ -1457,7 +1460,7 @@ static struct queue_entry *msg_find_queue_id (
 
 static struct queue_entry *msg_find_queue (
 	struct list_head *queue_list_head,
-	SaNameT *queue_name)
+	const SaNameT *queue_name)
 {
 	struct list_head *list;
 	struct queue_entry *queue;
@@ -1479,7 +1482,7 @@ static struct queue_entry *msg_find_queue (
 
 static struct group_entry *msg_find_group (
 	struct list_head *group_list_head,
-	SaNameT *group_name)
+	const SaNameT *group_name)
 {
 	struct list_head *list;
 	struct group_entry *group;
@@ -2238,11 +2241,11 @@ static int msg_lib_exit_fn (void *conn)
 }
 
 static void message_handler_req_exec_msg_queueopen (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queueopen *req_exec_msg_queueopen =
-		(struct req_exec_msg_queueopen *)message;
+	const struct req_exec_msg_queueopen *req_exec_msg_queueopen =
+		message;
 	struct res_lib_msg_queueopen res_lib_msg_queueopen;
 	SaAisErrorT error = SA_AIS_OK;
 	SaSizeT queue_size = 0;
@@ -2384,11 +2387,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queueopenasync (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queueopenasync *req_exec_msg_queueopenasync =
-		(struct req_exec_msg_queueopenasync *)message;
+	const struct req_exec_msg_queueopenasync *req_exec_msg_queueopenasync =
+		message;
 	struct res_lib_msg_queueopenasync res_lib_msg_queueopenasync;
 	struct res_lib_msg_queueopen_callback res_lib_msg_queueopen_callback;
 	SaAisErrorT error = SA_AIS_OK;
@@ -2547,11 +2550,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queueclose (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queueclose *req_exec_msg_queueclose =
-		(struct req_exec_msg_queueclose *)message;
+	const struct req_exec_msg_queueclose *req_exec_msg_queueclose =
+		message;
 	struct res_lib_msg_queueclose res_lib_msg_queueclose;
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
@@ -2614,11 +2617,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuestatusget (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuestatusget *req_exec_msg_queuestatusget =
-		(struct req_exec_msg_queuestatusget *)message;
+	const struct req_exec_msg_queuestatusget *req_exec_msg_queuestatusget =
+		message;
 	struct res_lib_msg_queuestatusget res_lib_msg_queuestatusget;
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
@@ -2677,11 +2680,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queueretentiontimeset (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queueretentiontimeset *req_exec_msg_queueretentiontimeset =
-		(struct req_exec_msg_queueretentiontimeset *)message;
+	const struct req_exec_msg_queueretentiontimeset *req_exec_msg_queueretentiontimeset =
+		message;
 	struct res_lib_msg_queueretentiontimeset res_lib_msg_queueretentiontimeset;
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
@@ -2732,11 +2735,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queueunlink (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queueunlink *req_exec_msg_queueunlink =
-		(struct req_exec_msg_queueunlink *)message;
+	const struct req_exec_msg_queueunlink *req_exec_msg_queueunlink =
+		message;
 	struct res_lib_msg_queueunlink res_lib_msg_queueunlink;
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
@@ -2779,11 +2782,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuegroupcreate (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuegroupcreate *req_exec_msg_queuegroupcreate =
-		(struct req_exec_msg_queuegroupcreate *)message;
+	const struct req_exec_msg_queuegroupcreate *req_exec_msg_queuegroupcreate =
+		message;
 	struct res_lib_msg_queuegroupcreate res_lib_msg_queuegroupcreate;
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
@@ -2844,11 +2847,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuegroupinsert (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuegroupinsert *req_exec_msg_queuegroupinsert =
-		(struct req_exec_msg_queuegroupinsert *)message;
+	const struct req_exec_msg_queuegroupinsert *req_exec_msg_queuegroupinsert =
+		message;
 	struct res_lib_msg_queuegroupinsert res_lib_msg_queuegroupinsert;
 	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
 	/* SaMsgQueueGroupNotificationT *notification = NULL; */
@@ -2934,11 +2937,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuegroupremove (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuegroupremove *req_exec_msg_queuegroupremove =
-		(struct req_exec_msg_queuegroupremove *)message;
+	const struct req_exec_msg_queuegroupremove *req_exec_msg_queuegroupremove =
+		message;
 	struct res_lib_msg_queuegroupremove res_lib_msg_queuegroupremove;
 	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
 	/* SaMsgQueueGroupNotificationT *notification = NULL; */
@@ -3014,11 +3017,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuegroupdelete (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuegroupdelete *req_exec_msg_queuegroupdelete =
-		(struct req_exec_msg_queuegroupdelete *)message;
+	const struct req_exec_msg_queuegroupdelete *req_exec_msg_queuegroupdelete =
+		message;
 	struct res_lib_msg_queuegroupdelete res_lib_msg_queuegroupdelete;
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
@@ -3055,11 +3058,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuegrouptrack (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuegrouptrack *req_exec_msg_queuegrouptrack =
-		(struct req_exec_msg_queuegrouptrack *)message;
+	const struct req_exec_msg_queuegrouptrack *req_exec_msg_queuegrouptrack =
+		message;
 	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
 	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
 	/* SaMsgQueueGroupNotificationT *notification = NULL; */
@@ -3109,11 +3112,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuegrouptrackstop (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuegrouptrackstop *req_exec_msg_queuegrouptrackstop =
-		(struct req_exec_msg_queuegrouptrackstop *)message;
+	const struct req_exec_msg_queuegrouptrackstop *req_exec_msg_queuegrouptrackstop =
+		message;
 	struct res_lib_msg_queuegrouptrackstop res_lib_msg_queuegrouptrackstop;
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
@@ -3150,11 +3153,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuegroupnotificationfree (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuegroupnotificationfree *req_exec_msg_queuegroupnotificationfree =
-		(struct req_exec_msg_queuegroupnotificationfree *)message;
+	const struct req_exec_msg_queuegroupnotificationfree *req_exec_msg_queuegroupnotificationfree =
+		message;
 	struct res_lib_msg_queuegroupnotificationfree res_lib_msg_queuegroupnotificationfree;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3177,11 +3180,11 @@ static void message_handler_req_exec_msg_queuegroupnotificationfree (
 }
 
 static void message_handler_req_exec_msg_messagesend (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messagesend *req_exec_msg_messagesend =
-		(struct req_exec_msg_messagesend *)message;
+	const struct req_exec_msg_messagesend *req_exec_msg_messagesend =
+		message;
 	struct res_lib_msg_messagesend res_lib_msg_messagesend;
 	struct res_lib_msg_messagereceived_callback res_lib_msg_messagereceived_callback;
 	struct queue_cleanup *cleanup = NULL;
@@ -3334,11 +3337,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_messagesendasync (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messagesendasync *req_exec_msg_messagesendasync =
-		(struct req_exec_msg_messagesendasync *)message;
+	const struct req_exec_msg_messagesendasync *req_exec_msg_messagesendasync =
+		message;
 	struct res_lib_msg_messagesendasync res_lib_msg_messagesendasync;
 	struct res_lib_msg_messagereceived_callback res_lib_msg_messagereceived_callback;
 	struct res_lib_msg_messagedelivered_callback res_lib_msg_messagedelivered_callback;
@@ -3505,11 +3508,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_messageget (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messageget *req_exec_msg_messageget =
-		(struct req_exec_msg_messageget *)message;
+	const struct req_exec_msg_messageget *req_exec_msg_messageget =
+		message;
 	struct res_lib_msg_messageget res_lib_msg_messageget;
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
@@ -3594,11 +3597,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_messagedatafree (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messagedatafree *req_exec_msg_messagedatafree =
-		(struct req_exec_msg_messagedatafree *)message;
+	const struct req_exec_msg_messagedatafree *req_exec_msg_messagedatafree =
+		message;
 	struct res_lib_msg_messagedatafree res_lib_msg_messagedatafree;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3621,11 +3624,11 @@ static void message_handler_req_exec_msg_messagedatafree (
 }
 
 static void message_handler_req_exec_msg_messagecancel (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messagecancel *req_exec_msg_messagecancel =
-		(struct req_exec_msg_messagecancel *)message;
+	const struct req_exec_msg_messagecancel *req_exec_msg_messagecancel =
+		message;
 	struct res_lib_msg_messagecancel res_lib_msg_messagecancel;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3653,11 +3656,11 @@ static void message_handler_req_exec_msg_messagecancel (
 }
 
 static void message_handler_req_exec_msg_messagesendreceive (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messagesendreceive *req_exec_msg_messagesendreceive =
-		(struct req_exec_msg_messagesendreceive *)message;
+	const struct req_exec_msg_messagesendreceive *req_exec_msg_messagesendreceive =
+		message;
 	struct res_lib_msg_messagesendreceive res_lib_msg_messagesendreceive;
 	SaAisErrorT error = SA_AIS_OK;
 	SaUint8T priority;
@@ -3788,11 +3791,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_messagereply (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messagereply *req_exec_msg_messagereply =
-		(struct req_exec_msg_messagereply *)message;
+	const struct req_exec_msg_messagereply *req_exec_msg_messagereply =
+		message;
 	struct res_lib_msg_messagereply res_lib_msg_messagereply;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3828,11 +3831,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_messagereplyasync (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
 	struct req_exec_msg_messagereplyasync *req_exec_msg_messagereplyasync =
-		(struct req_exec_msg_messagereplyasync *)message;
+		message;
 	struct res_lib_msg_messagereplyasync res_lib_msg_messagereplyasync;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3868,11 +3871,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_msg_queuecapacitythresholdset (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuecapacitythresholdset *req_exec_msg_queuecapacitythresholdset =
-		(struct req_exec_msg_queuecapacitythresholdset *)message;
+	const struct req_exec_msg_queuecapacitythresholdset *req_exec_msg_queuecapacitythresholdset =
+		message;
 	struct res_lib_msg_queuecapacitythresholdset res_lib_msg_queuecapacitythresholdset;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3900,11 +3903,11 @@ static void message_handler_req_exec_msg_queuecapacitythresholdset (
 }
 
 static void message_handler_req_exec_msg_queuecapacitythresholdget (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queuecapacitythresholdget *req_exec_msg_queuecapacitythresholdget =
-		(struct req_exec_msg_queuecapacitythresholdget *)message;
+	const struct req_exec_msg_queuecapacitythresholdget *req_exec_msg_queuecapacitythresholdget =
+		message;
 	struct res_lib_msg_queuecapacitythresholdget res_lib_msg_queuecapacitythresholdget;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3932,11 +3935,11 @@ static void message_handler_req_exec_msg_queuecapacitythresholdget (
 }
 
 static void message_handler_req_exec_msg_metadatasizeget (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_metadatasizeget *req_exec_msg_metadatasizeget =
-		(struct req_exec_msg_metadatasizeget *)message;
+	const struct req_exec_msg_metadatasizeget *req_exec_msg_metadatasizeget =
+		message;
 	struct res_lib_msg_metadatasizeget res_lib_msg_metadatasizeget;
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -3959,11 +3962,11 @@ static void message_handler_req_exec_msg_metadatasizeget (
 }
 
 static void message_handler_req_exec_msg_limitget (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_limitget *req_exec_msg_limitget =
-		(struct req_exec_msg_limitget *)message;
+	const struct req_exec_msg_limitget *req_exec_msg_limitget =
+		message;
 	struct res_lib_msg_limitget res_lib_msg_limitget;
 	SaAisErrorT error = SA_AIS_OK;
 	SaUint64T value = 0;
@@ -4020,11 +4023,11 @@ static void message_handler_req_exec_msg_limitget (
 }
 
 static void message_handler_req_exec_msg_queue_timeout (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_queue_timeout *req_exec_msg_queue_timeout =
-		(struct req_exec_msg_queue_timeout *)message;
+	const struct req_exec_msg_queue_timeout *req_exec_msg_queue_timeout =
+		message;
 	struct queue_entry *queue = NULL;
 
 	queue = msg_find_queue (&queue_list_head,
@@ -4042,11 +4045,11 @@ static void message_handler_req_exec_msg_queue_timeout (
 }
 
 static void message_handler_req_exec_msg_sync_queue (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_sync_queue *req_exec_msg_sync_queue =
-		(struct req_exec_msg_sync_queue *)message;
+	const struct req_exec_msg_sync_queue *req_exec_msg_sync_queue =
+		message;
 	struct queue_entry *queue = NULL;
 
 	int i;
@@ -4108,11 +4111,11 @@ static void message_handler_req_exec_msg_sync_queue (
 }
 
 static void message_handler_req_exec_msg_sync_queue_message (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_sync_queue_message *req_exec_msg_sync_queue_message =
-		(struct req_exec_msg_sync_queue_message *)message;
+	const struct req_exec_msg_sync_queue_message *req_exec_msg_sync_queue_message =
+		message;
 	struct queue_entry *queue = NULL;
 	struct message_entry *msg = NULL;
 
@@ -4163,11 +4166,11 @@ static void message_handler_req_exec_msg_sync_queue_message (
 }
 
 static void message_handler_req_exec_msg_sync_queue_refcount (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
 	struct req_exec_msg_sync_queue_refcount *req_exec_msg_sync_queue_refcount =
-		(struct req_exec_msg_sync_queue_refcount *)message;
+		message;
 	struct queue_entry *queue = NULL;
 
 	unsigned int i;
@@ -4229,11 +4232,11 @@ static void message_handler_req_exec_msg_sync_queue_refcount (
 }
 
 static void message_handler_req_exec_msg_sync_group (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_sync_group *req_exec_msg_sync_group =
-		(struct req_exec_msg_sync_group *)message;
+	const struct req_exec_msg_sync_group *req_exec_msg_sync_group =
+		message;
 	struct group_entry *group = NULL;
 
 	/* DEBUG */
@@ -4278,11 +4281,11 @@ static void message_handler_req_exec_msg_sync_group (
 }
 
 static void message_handler_req_exec_msg_sync_group_member (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_sync_group_member *req_exec_msg_sync_group_member =
-		(struct req_exec_msg_sync_group_member *)message;
+	const struct req_exec_msg_sync_group_member *req_exec_msg_sync_group_member =
+		message;
 	struct group_entry *group = NULL;
 	struct queue_entry *queue = NULL;
 
