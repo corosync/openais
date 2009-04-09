@@ -143,11 +143,11 @@ static unsigned int my_member_list_entries = 0;
 static unsigned int my_lowest_nodeid = 0;
 
 static void message_handler_req_exec_lck_resourceopen (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_resourceclose (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_resourcelock (
@@ -155,27 +155,27 @@ static void message_handler_req_exec_lck_resourcelock (
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_resourceunlock (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_resourcelockorphan (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_lockpurge (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_sync_resource (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_sync_resource_lock (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_sync_resource_refcount (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_lib_lck_resourceopen (
@@ -249,10 +249,10 @@ static struct memb_ring_id my_saved_ring_id;
 
 static void lck_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id);
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id);
 
 struct lck_pd {
 	struct list_head resource_list;
@@ -1005,10 +1005,10 @@ static void lck_sync_abort (void)
 
 static void lck_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id)
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	unsigned int i, j;
 
@@ -1048,7 +1048,7 @@ static void lck_confchg_fn (
 
 static struct resource *lck_resource_find (
 	struct list_head *head,
-	mar_name_t *name)
+	const mar_name_t *name)
 {
 	struct list_head *resource_list;
 	struct resource *resource;
@@ -1068,7 +1068,7 @@ static struct resource *lck_resource_find (
 
 static struct resource_lock *lck_resource_lock_find (
 	struct resource *resource,
-	mar_message_source_t *source,
+	const mar_message_source_t *source,
 	SaLckLockIdT lock_id)
 {
 	struct list_head *list;
@@ -1089,7 +1089,7 @@ static struct resource_lock *lck_resource_lock_find (
 	return (0);
 }
 
-struct resource_cleanup *lck_resource_cleanup_find (
+static struct resource_cleanup *lck_resource_cleanup_find (
 	void *conn,
 	SaLckResourceHandleT resource_handle)
 {
@@ -1110,7 +1110,7 @@ struct resource_cleanup *lck_resource_cleanup_find (
 	return (0);
 }
 
-int lck_resource_close (mar_name_t *resource_name)
+static int lck_resource_close (const mar_name_t *resource_name)
 {
 	struct req_exec_lck_resourceclose req_exec_lck_resourceclose;
 	struct iovec iovec;
@@ -1130,7 +1130,7 @@ int lck_resource_close (mar_name_t *resource_name)
 	return (-1);
 }
 
-void resource_lock_orphan (struct resource_lock *resource_lock)
+static void resource_lock_orphan (struct resource_lock *resource_lock)
 {
 	struct req_exec_lck_resourcelockorphan req_exec_lck_resourcelockorphan;
 	struct iovec iovec;
@@ -1156,7 +1156,7 @@ void resource_lock_orphan (struct resource_lock *resource_lock)
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
-void lck_resource_cleanup_lock_remove (
+static void lck_resource_cleanup_lock_remove (
 	struct resource_cleanup *resource_cleanup)
 {
 	struct list_head *list;
@@ -1188,7 +1188,7 @@ void lck_resource_cleanup_lock_remove (
 
 }
 
-void lck_resource_cleanup_remove (
+static void lck_resource_cleanup_remove (
 	void *conn,
 	SaLckResourceHandleT resource_handle)
 {
@@ -1301,11 +1301,11 @@ static int lck_lib_init_fn (void *conn)
 }
 
 static void message_handler_req_exec_lck_resourceopen (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_resourceopen *req_exec_lck_resourceopen =
-		(struct req_exec_lck_resourceopen *)message;
+	const struct req_exec_lck_resourceopen *req_exec_lck_resourceopen =
+		message;
 	struct res_lib_lck_resourceopen res_lib_lck_resourceopen;
 	struct res_lib_lck_resourceopenasync res_lib_lck_resourceopenasync;
 	struct resource *resource;
@@ -1417,11 +1417,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_lck_resourceclose (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_resourceclose *req_exec_lck_resourceclose =
-		(struct req_exec_lck_resourceclose *)message;
+	const struct req_exec_lck_resourceclose *req_exec_lck_resourceclose =
+		message;
 	struct res_lib_lck_resourceclose res_lib_lck_resourceclose;
 	struct resource *resource = 0;
 	SaAisErrorT error = SA_AIS_OK;
@@ -1461,7 +1461,7 @@ error_exit:
 	}
 }
 
-void waiter_notification_send (struct resource_lock *resource_lock)
+static void waiter_notification_send (struct resource_lock *resource_lock)
 {
 	struct res_lib_lck_lockwaitercallback res_lib_lck_lockwaitercallback;
 
@@ -1488,7 +1488,7 @@ void waiter_notification_send (struct resource_lock *resource_lock)
 		sizeof (struct res_lib_lck_lockwaitercallback));
 }
 
-void waiter_notification_list_send (struct list_head *list_notify_head)
+static void waiter_notification_list_send (struct list_head *list_notify_head)
 {
 	struct list_head *list;
 	struct resource_lock *resource_lock;
@@ -1502,8 +1502,8 @@ void waiter_notification_list_send (struct list_head *list_notify_head)
 	}
 }
 
-void resource_lock_async_deliver (
-	mar_message_source_t *source,
+static void resource_lock_async_deliver (
+	const mar_message_source_t *source,
 	struct resource_lock *resource_lock,
 	SaAisErrorT error)
 {
@@ -1527,8 +1527,8 @@ void resource_lock_async_deliver (
 	}
 }
 
-void lock_response_deliver (
-	mar_message_source_t *source,
+static void lock_response_deliver (
+	const mar_message_source_t *source,
 	struct resource_lock *resource_lock,
 	SaAisErrorT error)
 {
@@ -1555,7 +1555,7 @@ void lock_response_deliver (
 /*
  * Queue a lock if resource flags allow it
  */
-void lock_queue (
+static void lock_queue (
 	struct resource *resource,
 	struct resource_lock *resource_lock)
 {
@@ -1594,7 +1594,7 @@ else
 		grant all pr pending locks to pr granted list
 */
 #define SA_LCK_LOCK_NO_STATUS 0
-void lock_algorithm (
+static void lock_algorithm (
 	struct resource *resource,
 	struct resource_lock *resource_lock)
 {
@@ -1640,7 +1640,7 @@ void lock_algorithm (
  *		if pr pending list has locks
  *			assign all pr pending locks to pr granted lock list
  */
-void unlock_algorithm (
+static void unlock_algorithm (
 	struct resource *resource,
 	struct resource_lock *resource_lock)
 {
@@ -1723,7 +1723,7 @@ static void message_handler_req_exec_lck_resourcelock (
 	unsigned int nodeid)
 {
 	struct req_exec_lck_resourcelock *req_exec_lck_resourcelock =
-		(struct req_exec_lck_resourcelock *)message;
+		message;
 	struct resource *resource = 0;
 	struct resource_lock *resource_lock = 0;
 	struct resource_cleanup *resource_cleanup = 0;
@@ -1835,11 +1835,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_lck_resourceunlock (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_resourceunlock *req_exec_lck_resourceunlock =
-		(struct req_exec_lck_resourceunlock *)message;
+	const struct req_exec_lck_resourceunlock *req_exec_lck_resourceunlock =
+		message;
 	struct res_lib_lck_resourceunlock res_lib_lck_resourceunlock;
 	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
 	struct resource *resource = NULL;
@@ -1898,11 +1898,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_lck_resourcelockorphan (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_resourcelockorphan *req_exec_lck_resourcelockorphan =
-		(struct req_exec_lck_resourcelockorphan *)message;
+	const struct req_exec_lck_resourcelockorphan *req_exec_lck_resourcelockorphan =
+		message;
 	struct resource *resource = 0;
 	struct resource_lock *resource_lock = 0;
 
@@ -1928,11 +1928,11 @@ static void message_handler_req_exec_lck_resourcelockorphan (
 }
 
 static void message_handler_req_exec_lck_lockpurge (
-	void *msg,
+	const void *msg,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_lockpurge *req_exec_lck_lockpurge =
-		(struct req_exec_lck_lockpurge *)msg;
+	const struct req_exec_lck_lockpurge *req_exec_lck_lockpurge =
+		msg;
 	struct res_lib_lck_lockpurge res_lib_lck_lockpurge;
 	struct resource *resource = 0;
 	SaAisErrorT error = SA_AIS_OK;
@@ -1962,11 +1962,11 @@ error_exit:
 }
 
 static void message_handler_req_exec_lck_sync_resource (
-	void *msg,
+	const void *msg,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_sync_resource *req_exec_lck_sync_resource =
-		(struct req_exec_lck_sync_resource *)msg;
+	const struct req_exec_lck_sync_resource *req_exec_lck_sync_resource =
+		msg;
 	struct resource *resource;
 
 	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync resource %s\n",
@@ -2006,11 +2006,11 @@ static void message_handler_req_exec_lck_sync_resource (
 }
 
 static void message_handler_req_exec_lck_sync_resource_lock (
-	void *msg,
+	const void *msg,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_sync_resource_lock *req_exec_lck_sync_resource_lock =
-		(struct req_exec_lck_sync_resource_lock *)msg;
+	const struct req_exec_lck_sync_resource_lock *req_exec_lck_sync_resource_lock =
+		msg;
 	struct resource_lock *resource_lock;
 	struct resource *resource;
 
@@ -2080,11 +2080,11 @@ static void message_handler_req_exec_lck_sync_resource_lock (
 }
 
 static void message_handler_req_exec_lck_sync_resource_refcount (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_sync_resource_refcount *req_exec_lck_sync_resource_refcount
-		= (struct req_exec_lck_sync_resource_refcount *)message;
+	const struct req_exec_lck_sync_resource_refcount *req_exec_lck_sync_resource_refcount
+		= message;
 	struct resource *resource;
 	unsigned int i, j;
 
