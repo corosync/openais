@@ -196,6 +196,14 @@ struct ckpt_identifier {
 	mar_ckpt_section_id_t ckpt_section_id;
 };
 
+static int ckpt_checkpoint_close (
+	mar_name_t *checkpoint_name,
+	mar_uint32_t ckpt_id);
+
+static int callback_expiry (enum totem_callback_token_type type, const void *data);
+
+static void checkpoint_section_release (struct checkpoint_section *section);
+
 static int ckpt_exec_init_fn (struct corosync_api_v1 *);
 
 static int ckpt_lib_exit_fn (void *conn);
@@ -273,59 +281,59 @@ static void message_handler_req_lib_ckpt_sectioniterationnext (
 	void *msg);
 
 static void message_handler_req_exec_ckpt_checkpointopen (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sync_checkpoint (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sync_checkpoint_section (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sync_checkpoint_refcount (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_checkpointclose (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_checkpointunlink (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_checkpointretentiondurationset (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_checkpointretentiondurationexpire (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sectioncreate (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sectiondelete (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sectionwrite (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sectionoverwrite (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_ckpt_sectionread (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void exec_ckpt_checkpointopen_endian_convert (void *msg);
@@ -362,11 +370,9 @@ static void sync_refcount_decrement (
 static void sync_refcount_calculate (
 	struct checkpoint *checkpoint);
 
-void checkpoint_release (struct checkpoint *checkpoint);
-void timer_function_retention (void *data);
-unsigned int abstime_to_msec (mar_time_t time);
-void timer_function_section_expire (void *data);
-void clean_checkpoint_list(struct list_head* head);
+static void timer_function_retention (void *data);
+
+static void timer_function_section_expire (void *data);
 
 DECLARE_LIST_INIT(checkpoint_list_head);
 
@@ -413,10 +419,10 @@ static struct memb_ring_id my_saved_ring_id;
 
 static void ckpt_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id);
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id);
 
 /*
  * Executive Handler Definition
@@ -783,10 +789,10 @@ static int first_configuration = 1;
  */
 static void ckpt_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id)
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	unsigned int i, j;
 	unsigned int lowest_nodeid;
@@ -833,7 +839,7 @@ static void ckpt_confchg_fn (
 
 static struct checkpoint *checkpoint_find (
 	struct list_head *ckpt_list_head,
-	mar_name_t *name,
+	const mar_name_t *name,
 	mar_uint32_t ckpt_id)
 {
 	struct list_head *list;
@@ -856,7 +862,7 @@ static struct checkpoint *checkpoint_find (
 
 static struct checkpoint *checkpoint_find_linked (
 	struct list_head *ckpt_list_head,
-	mar_name_t *name)
+	const mar_name_t *name)
 {
 	struct list_head *list;
 	struct checkpoint *checkpoint;
@@ -877,7 +883,7 @@ static struct checkpoint *checkpoint_find_linked (
 
 static struct checkpoint *checkpoint_find_specific (
 	struct list_head *ckpt_list_head,
-	mar_name_t *name,
+	const mar_name_t *name,
 	mar_uint32_t ckpt_id)
 {
 	struct list_head *list;
@@ -980,7 +986,7 @@ static struct checkpoint_section *checkpoint_section_find (
 	return 0;
 }
 
-void checkpoint_section_release (struct checkpoint_section *section)
+static void checkpoint_section_release (struct checkpoint_section *section)
 {
 	log_printf (LOG_LEVEL_DEBUG, "checkpoint_section_release expiration timer = 0x%p\n", section->expiration_timer);
 	list_del (&section->list);
@@ -996,7 +1002,7 @@ void checkpoint_section_release (struct checkpoint_section *section)
 }
 
 
-void checkpoint_release (struct checkpoint *checkpoint)
+static void checkpoint_release (struct checkpoint *checkpoint)
 {
 	struct list_head *list;
 	struct checkpoint_section *section;
@@ -1024,7 +1030,7 @@ void checkpoint_release (struct checkpoint *checkpoint)
 	free (checkpoint);
 }
 
-int ckpt_checkpoint_close (
+static int ckpt_checkpoint_close (
 	mar_name_t *checkpoint_name,
 	mar_uint32_t ckpt_id)
 {
@@ -1233,10 +1239,10 @@ static void exec_ckpt_sync_section_endian_convert (void *msg)
  * Executive message handlers
  */
 static void message_handler_req_exec_ckpt_checkpointopen (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_checkpointopen *req_exec_ckpt_checkpointopen = (struct req_exec_ckpt_checkpointopen *)message;
+	const struct req_exec_ckpt_checkpointopen *req_exec_ckpt_checkpointopen = message;
 	struct res_lib_ckpt_checkpointopen res_lib_ckpt_checkpointopen;
 	struct res_lib_ckpt_checkpointopenasync res_lib_ckpt_checkpointopenasync;
 
@@ -1336,15 +1342,22 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 			checkpoint_section->expiration_timer = 0;
 		}
 	} else {
-        /*
-         * We have to ignore the retention_duration attribute
-         */
-        req_exec_ckpt_checkpointopen->checkpoint_creation_attributes.retention_duration =
-            checkpoint->checkpoint_creation_attributes.retention_duration;
+		mar_ckpt_checkpoint_creation_attributes_t my_creation_attributes;
+		/*
+		 * We have to ignore the retention_duration attribute
+		 * so we make a copy, set the retention duration to the
+		 * checkpoint's retention duration, then compare it
+		 */
+		memcpy (&my_creation_attributes,
+			&checkpoint->checkpoint_creation_attributes,
+			sizeof (mar_ckpt_checkpoint_creation_attributes_t));
+
+		my_creation_attributes.retention_duration = 
+			checkpoint->checkpoint_creation_attributes.retention_duration;
         
 		if (req_exec_ckpt_checkpointopen->checkpoint_creation_attributes_set &&
 			memcmp (&checkpoint->checkpoint_creation_attributes,
-				&req_exec_ckpt_checkpointopen->checkpoint_creation_attributes,
+				&my_creation_attributes,
 				sizeof (mar_ckpt_checkpoint_creation_attributes_t)) != 0) {
 
 			error = SA_AIS_ERR_EXIST;
@@ -1436,22 +1449,7 @@ error_exit:
 	}
 }
 
-unsigned int abstime_to_msec (mar_time_t time)
-{
-	struct timeval tv;
-	unsigned long long curr_time;
-	unsigned long long msec_time;
-
-	gettimeofday (&tv, NULL);
-	curr_time = ((((unsigned long long)tv.tv_sec) * ((unsigned long)1000)) +
-		(((unsigned long long)tv.tv_usec) / ((unsigned long long)1000)));
-	msec_time = (((unsigned long long)time) / 1000000) -
-		(unsigned long long)curr_time;
-
-	return ((unsigned int)(msec_time));
-}
-
-void timer_function_section_expire (void *data)
+static void timer_function_section_expire (void *data)
 {
 	struct checkpoint *checkpoint = 0;
 	struct checkpoint_section *checkpoint_section = 0;
@@ -1501,7 +1499,7 @@ free_mem :
 
 }
 
-int callback_expiry (enum totem_callback_token_type type, void *data)
+static int callback_expiry (enum totem_callback_token_type type, const void *data)
 {
 	struct checkpoint *checkpoint = (struct checkpoint *)data;
 	struct req_exec_ckpt_checkpointunlink req_exec_ckpt_checkpointunlink;
@@ -1578,10 +1576,10 @@ void timer_function_retention (void *data)
 }
 
 static void message_handler_req_exec_ckpt_checkpointclose (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_checkpointclose *req_exec_ckpt_checkpointclose = (struct req_exec_ckpt_checkpointclose *)message;
+	const struct req_exec_ckpt_checkpointclose *req_exec_ckpt_checkpointclose = message;
 	struct res_lib_ckpt_checkpointclose res_lib_ckpt_checkpointclose;
 	struct checkpoint *checkpoint = 0;
 	SaAisErrorT error = SA_AIS_OK;
@@ -1645,10 +1643,10 @@ error_exit:
 }
 
 static void message_handler_req_exec_ckpt_checkpointunlink (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_checkpointunlink *req_exec_ckpt_checkpointunlink = (struct req_exec_ckpt_checkpointunlink *)message;
+	const struct req_exec_ckpt_checkpointunlink *req_exec_ckpt_checkpointunlink = message;
 
 	struct res_lib_ckpt_checkpointunlink res_lib_ckpt_checkpointunlink;
 	struct checkpoint *checkpoint = 0;
@@ -1693,10 +1691,10 @@ error_exit:
 }
 
 static void message_handler_req_exec_ckpt_checkpointretentiondurationset (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_checkpointretentiondurationset *req_exec_ckpt_checkpointretentiondurationset = (struct req_exec_ckpt_checkpointretentiondurationset *)message;
+	const struct req_exec_ckpt_checkpointretentiondurationset *req_exec_ckpt_checkpointretentiondurationset = message;
 	struct res_lib_ckpt_checkpointretentiondurationset res_lib_ckpt_checkpointretentiondurationset;
 	struct checkpoint *checkpoint;
 	SaAisErrorT error = SA_AIS_ERR_BAD_OPERATION;
@@ -1741,10 +1739,10 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationset (
 }
 
 static void message_handler_req_exec_ckpt_checkpointretentiondurationexpire (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_checkpointretentiondurationexpire *req_exec_ckpt_checkpointretentiondurationexpire = (struct req_exec_ckpt_checkpointretentiondurationexpire *)message;
+	const struct req_exec_ckpt_checkpointretentiondurationexpire *req_exec_ckpt_checkpointretentiondurationexpire = message;
 	struct req_exec_ckpt_checkpointunlink req_exec_ckpt_checkpointunlink;
 	struct checkpoint *checkpoint;
 	struct iovec iovec;
@@ -1781,10 +1779,10 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationexpire (
 
 
 static void message_handler_req_exec_ckpt_sectioncreate (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sectioncreate *req_exec_ckpt_sectioncreate = (struct req_exec_ckpt_sectioncreate *)message;
+	const struct req_exec_ckpt_sectioncreate *req_exec_ckpt_sectioncreate = message;
 	struct res_lib_ckpt_sectioncreate res_lib_ckpt_sectioncreate;
 	struct checkpoint *checkpoint;
 	struct checkpoint_section *checkpoint_section;
@@ -1948,10 +1946,10 @@ error_exit:
 }
 
 static void message_handler_req_exec_ckpt_sectiondelete (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sectiondelete *req_exec_ckpt_sectiondelete = (struct req_exec_ckpt_sectiondelete *)message;
+	const struct req_exec_ckpt_sectiondelete *req_exec_ckpt_sectiondelete = message;
 	struct res_lib_ckpt_sectiondelete res_lib_ckpt_sectiondelete;
 	struct checkpoint *checkpoint;
 	struct checkpoint_section *checkpoint_section;
@@ -2014,10 +2012,10 @@ error_exit:
 }
 
 static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sectionexpirationtimeset *req_exec_ckpt_sectionexpirationtimeset = (struct req_exec_ckpt_sectionexpirationtimeset *)message;
+	const struct req_exec_ckpt_sectionexpirationtimeset *req_exec_ckpt_sectionexpirationtimeset = message;
 	struct res_lib_ckpt_sectionexpirationtimeset res_lib_ckpt_sectionexpirationtimeset;
 	struct checkpoint *checkpoint;
 	struct checkpoint_section *checkpoint_section;
@@ -2107,10 +2105,10 @@ error_exit:
 }
 
 static void message_handler_req_exec_ckpt_sectionwrite (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sectionwrite *req_exec_ckpt_sectionwrite = (struct req_exec_ckpt_sectionwrite *)message;
+	const struct req_exec_ckpt_sectionwrite *req_exec_ckpt_sectionwrite = message;
 	struct res_lib_ckpt_sectionwrite res_lib_ckpt_sectionwrite;
 	struct checkpoint *checkpoint;
 	struct checkpoint_section *checkpoint_section = 0;
@@ -2217,10 +2215,10 @@ error_exit:
 }
 
 static void message_handler_req_exec_ckpt_sectionoverwrite (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sectionoverwrite *req_exec_ckpt_sectionoverwrite = (struct req_exec_ckpt_sectionoverwrite *)message;
+	const struct req_exec_ckpt_sectionoverwrite *req_exec_ckpt_sectionoverwrite = message;
 	struct res_lib_ckpt_sectionoverwrite res_lib_ckpt_sectionoverwrite;
 	struct checkpoint *checkpoint;
 	struct checkpoint_section *checkpoint_section;
@@ -2314,10 +2312,10 @@ error_exit:
 }
 
 static void message_handler_req_exec_ckpt_sectionread (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sectionread *req_exec_ckpt_sectionread = (struct req_exec_ckpt_sectionread *)message;
+	const struct req_exec_ckpt_sectionread *req_exec_ckpt_sectionread = message;
 	struct res_lib_ckpt_sectionread res_lib_ckpt_sectionread;
 	struct checkpoint *checkpoint;
 	struct checkpoint_section *checkpoint_section = 0;
@@ -3412,8 +3410,9 @@ log_printf (LOG_LEVEL_NOTICE, "decrementing node id %d %d\n", nodeid, checkpoint
 void sync_refcount_calculate (
 	struct checkpoint *checkpoint)
 {
-	checkpoint->reference_count = 0;
 	unsigned int i;
+
+	checkpoint->reference_count = 0;
 
 	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
 		if (checkpoint->refcount_set[i].nodeid == 0) {
@@ -3785,11 +3784,11 @@ static void ckpt_sync_abort (void)
 }
 
 static void message_handler_req_exec_ckpt_sync_checkpoint (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sync_checkpoint *req_exec_ckpt_sync_checkpoint =
-		(struct req_exec_ckpt_sync_checkpoint *)message;
+	const struct req_exec_ckpt_sync_checkpoint *req_exec_ckpt_sync_checkpoint =
+		message;
 	struct checkpoint *checkpoint = 0;
 
 	ENTER();
@@ -3871,11 +3870,11 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 }
 
 static void message_handler_req_exec_ckpt_sync_checkpoint_section (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sync_checkpoint_section *req_exec_ckpt_sync_checkpoint_section =
-		(struct req_exec_ckpt_sync_checkpoint_section *)message;
+	const struct req_exec_ckpt_sync_checkpoint_section *req_exec_ckpt_sync_checkpoint_section =
+		message;
 	struct checkpoint *checkpoint;
 	struct checkpoint_section *checkpoint_section;
 	char *section_contents;
@@ -4003,11 +4002,10 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 }
 
 static void message_handler_req_exec_ckpt_sync_checkpoint_refcount (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_ckpt_sync_checkpoint_refcount *req_exec_ckpt_sync_checkpoint_refcount
-		= (struct req_exec_ckpt_sync_checkpoint_refcount *)message;
+	const struct req_exec_ckpt_sync_checkpoint_refcount *req_exec_ckpt_sync_checkpoint_refcount = message;
 	struct checkpoint *checkpoint;
 	unsigned int i, j;
 
