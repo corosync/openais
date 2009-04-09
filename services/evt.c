@@ -110,10 +110,10 @@ static void lib_evt_event_data_get(void *conn, void *message);
 
 static void evt_conf_change(
 		enum totem_configuration_type configuration_type,
-		unsigned int *member_list, int member_list_entries,
-		unsigned int *left_list, int left_list_entries,
-		unsigned int *joined_list, int joined_list_entries,
-		struct memb_ring_id *ring_id);
+		const unsigned int *member_list, size_t member_list_entries,
+		const unsigned int *left_list, size_t left_list_entries,
+		const unsigned int *joined_list, size_t joined_list_entries,
+		const struct memb_ring_id *ring_id);
 
 static int evt_lib_init(void *conn);
 static int evt_lib_exit(void *conn);
@@ -197,7 +197,7 @@ static struct corosync_lib_handler evt_lib_engine[] = {
 
 static void evt_remote_evt(void *msg, unsigned int nodeid);
 static void evt_remote_recovery_evt(void *msg, unsigned int nodeid);
-static void evt_remote_chan_op(void *msg, unsigned int nodeid);
+static void evt_remote_chan_op(const void *msg, unsigned int nodeid);
 
 static struct corosync_exec_handler evt_exec_engine[] = {
 	{
@@ -517,8 +517,8 @@ static DECLARE_LIST_INIT(clear_pending);
  * Next unlink ID
  */
 static uint64_t	base_unlink_id = 0;
-inline uint64_t
-next_chan_unlink_id()
+static inline uint64_t
+next_chan_unlink_id(void)
 {
 	uint64_t uid = my_node_id;
 	uid = (uid << 32ULL) | base_unlink_id;
@@ -723,9 +723,9 @@ static SaAisErrorT evtfilt_to_aisfilt(struct req_evt_event_subscribe *req,
 	mar_evt_event_filter_array_t *filta =
 			(mar_evt_event_filter_array_t *)req->ics_filter_data;
 	mar_evt_event_filter_array_t *filters;
-	mar_evt_event_filter_t *filt = (void *)filta + sizeof(mar_evt_event_filter_array_t);
-	SaUint8T *str = (void *)filta + sizeof(mar_evt_event_filter_array_t) +
-			(sizeof(mar_evt_event_filter_t) * filta->filters_number);
+	mar_evt_event_filter_t *filt = (mar_evt_event_filter_t *)((char *)filta + sizeof(mar_evt_event_filter_array_t));
+	SaUint8T *str = (SaUint8T *)((char *)filta + sizeof(mar_evt_event_filter_array_t) +
+			(sizeof(mar_evt_event_filter_t) * filta->filters_number));
 	int i;
 	int j;
 
@@ -769,7 +769,7 @@ static SaAisErrorT evtfilt_to_aisfilt(struct req_evt_event_subscribe *req,
 	return SA_AIS_OK;
 }
 
-SaTimeT clust_time_now(void)
+static SaTimeT clust_time_now(void)
 {
 	struct timeval tv;
 	SaTimeT time_now;
@@ -800,7 +800,7 @@ static void free_filters(mar_evt_event_filter_array_t *fp)
  * Look up a channel in the global channel list
  */
 static struct event_svr_channel_instance *
-find_channel(mar_name_t *chan_name, uint64_t unlink_id)
+find_channel(const mar_name_t *chan_name, uint64_t unlink_id)
 {
 	struct list_head *l, *head;
 	struct event_svr_channel_instance *eci;
@@ -831,7 +831,7 @@ find_channel(mar_name_t *chan_name, uint64_t unlink_id)
  * Find the last unlinked version of a channel.
  */
 static struct event_svr_channel_instance *
-find_last_unlinked_channel(mar_name_t *chan_name)
+find_last_unlinked_channel(const mar_name_t *chan_name)
 {
 	struct list_head *l;
 	struct event_svr_channel_instance *eci;
@@ -853,7 +853,7 @@ find_last_unlinked_channel(mar_name_t *chan_name)
 /*
  * Create and initialize a channel instance structure
  */
-static struct event_svr_channel_instance *create_channel(mar_name_t *cn)
+static struct event_svr_channel_instance *create_channel(const mar_name_t *cn)
 {
 	struct event_svr_channel_instance *eci;
 	eci = (struct event_svr_channel_instance *) malloc(sizeof(*eci));
@@ -953,7 +953,7 @@ static void dump_chan_opens(struct event_svr_channel_instance *eci)
 /*
  * Scan the list of channels and dump the open count info.
  */
-static void dump_all_chans()
+static void dump_all_chans(void)
 {
 	struct list_head *l;
 	struct event_svr_channel_instance *eci;
@@ -969,7 +969,7 @@ static void dump_all_chans()
 /*
  * Scan the list of channels and zero out the open counts
  */
-static void zero_chan_open_counts()
+static void zero_chan_open_counts(void)
 {
 	struct list_head *l;
 	struct event_svr_channel_instance *eci;
@@ -1333,7 +1333,7 @@ static SaAisErrorT evt_close_channel(mar_name_t *cn, uint64_t unlink_id, void *c
  */
 #define NODE_HASH_SIZE 256
 static struct member_node_data *nl[NODE_HASH_SIZE] = {0};
-inline int
+static inline int
 hash_sock_addr(unsigned int nodeid)
 {
 	return nodeid & (NODE_HASH_SIZE - 1);
@@ -1415,7 +1415,7 @@ an_out:
  * way there is a recovery node chosen for each original partition in case
  * of a merge.
  */
-static struct member_node_data* oldest_node()
+static struct member_node_data* oldest_node(void)
 {
 	struct member_node_data *mn = 0;
 	struct member_node_data *oldest = 0;
@@ -1451,7 +1451,7 @@ static struct member_node_data* oldest_node()
  * a new node.
  */
 static int check_last_event(
-	struct lib_event_data *evtpkt,
+	const struct lib_event_data *evtpkt,
 	unsigned int nodeid)
 {
 	struct member_node_data *nd;
@@ -1491,7 +1491,7 @@ static int check_last_event(
  * upper 32 bits of the event ID to make sure that we can generate a cluster
  * wide unique event ID for a given event.
  */
-SaAisErrorT set_event_id(mar_uint32_t node_id)
+static SaAisErrorT set_event_id(mar_uint32_t node_id)
 {
 	SaAisErrorT err = SA_AIS_OK;
 	if (base_id_top) {
@@ -1882,7 +1882,7 @@ static void __notify_event(void	*conn)
 	}
 
 }
-inline void notify_event(void *conn)
+static inline void notify_event(void *conn)
 {
 	struct libevt_pd *esip;
 
@@ -2077,8 +2077,8 @@ convert_event(void *msg)
  * - fill in some channel info
  */
 static struct event_data *
-make_local_event(struct lib_event_data *p,
-			struct event_svr_channel_instance *eci)
+make_local_event(const struct lib_event_data *p,
+	struct event_svr_channel_instance *eci)
 {
 	struct event_data *ed;
 	mar_evt_event_pattern_t *eps;
@@ -2523,7 +2523,7 @@ evt_unlink_err:
  * - See if there are any events with retetion times that need to be delivered
  *      because of the new subscription.
  */
-static char *filter_types[] = {
+static const char *filter_types[] = {
 	"INVALID FILTER TYPE",
 	"SA_EVT_PREFIX_FILTER",
 	"SA_EVT_SUFFIX_FILTER",
@@ -2929,10 +2929,10 @@ static void remove_chan_open_info(mar_uint32_t node_id)
  */
 static void evt_conf_change(
 		enum totem_configuration_type configuration_type,
-		unsigned int *member_list, int member_list_entries,
-		unsigned int *left_list, int left_list_entries,
-		unsigned int *joined_list, int joined_list_entries,
-		struct memb_ring_id *ring_id)
+		const unsigned int *member_list, size_t member_list_entries,
+		const unsigned int *left_list, size_t left_list_entries,
+		const unsigned int *joined_list, size_t joined_list_entries,
+		const struct memb_ring_id *ring_id)
 {
 	log_printf(RECOVERY_DEBUG, "Evt conf change %d\n",
 			configuration_type);
@@ -3332,8 +3332,8 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 /*
  * Calculate the remaining retention time of a received event during recovery
  */
-inline mar_time_t calc_retention_time(mar_time_t retention,
-								mar_time_t received, mar_time_t now)
+static inline mar_time_t calc_retention_time(mar_time_t retention,
+	mar_time_t received, mar_time_t now)
 {
 	if ((received < now) && ((now - received) < retention)) {
 		return retention - (now - received);
@@ -3687,9 +3687,9 @@ convert_chan_packet(void *msg)
  * Used to communicate channel opens/closes, clear retention time,
  * config change updates...
  */
-static void evt_remote_chan_op(void *msg, unsigned int nodeid)
+static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 {
-	struct req_evt_chan_command *cpkt = msg;
+	const struct req_evt_chan_command *cpkt = msg;
 	unsigned int local_node = {SA_CLM_LOCAL_NODE_ID};
 	SaClmClusterNodeT *cn, *my_node;
 	struct member_node_data *mn;
