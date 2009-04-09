@@ -188,7 +188,7 @@ AC_ARG_WITH([socket-dir],
 
 case "$host_os" in
 	*linux*)
-		AC_DEFINE_UNQUOTED([COROSYNC_LINUX], [1],
+		AC_DEFINE_UNQUOTED([OPENAIS_LINUX], [1],
 				   [Compiling for Linux platform])
 		OS_CFLAGS=""
 		OS_CPPFLAGS=""
@@ -197,7 +197,7 @@ case "$host_os" in
 		DARWIN_OPTS=""
 	;;
 	darwin*)
-		AC_DEFINE_UNQUOTED([COROSYNC_DARWIN], [1],
+		AC_DEFINE_UNQUOTED([OPENAIS_DARWIN], [1],
 				   [Compiling for Darwin platform])
 		OS_CFLAGS=""
 		OS_CPPFLAGS=""
@@ -208,7 +208,7 @@ case "$host_os" in
 			     -compatibility_version ${SONAME}"
 	;;
 	*bsd*)
-		AC_DEFINE_UNQUOTED([COROSYNC_BSD], [1],
+		AC_DEFINE_UNQUOTED([OPENAIS_BSD], [1],
 				   [Compiling for BSD platform])
 		OS_CFLAGS=""
 		OS_CPPFLAGS="-I/usr/local/include"
@@ -217,7 +217,7 @@ case "$host_os" in
 		DARWIN_OPTS=""
 	;;
 	*solaris*)
-		AC_DEFINE_UNQUOTED([COROSYNC_SOLARIS], [1],
+		AC_DEFINE_UNQUOTED([OPENAIS_SOLARIS], [1],
 				   [Compiling for Solaris platform])
 		AC_DEFINE_UNQUOTED([TS_CLASS], [1],
 				   [Prevent being scheduled RR])
