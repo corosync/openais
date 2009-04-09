@@ -275,10 +275,8 @@ saMsgDispatch (
 			} else {
 				error = SA_AIS_ERR_LIBRARY;
 			}
-			goto error_exit;
+			goto error_put;
 		}
-
-		/* memset (&dispatch_data, 0, sizeof (struct message_overlay)); */
 
 		memcpy (&callbacks, &msgInstance->callbacks,
 			sizeof (msgInstance->callbacks));
