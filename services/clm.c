@@ -33,6 +33,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -122,10 +124,10 @@ static SaClmClusterNodeT *clm_services_api_nodeid_saf_get (unsigned int node_id)
  */
 static void clm_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id);
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id);
 
 static void clm_sync_init (void);
 
@@ -144,7 +146,7 @@ static int clm_lib_init_fn (void *conn);
 static int clm_lib_exit_fn (void *conn);
 
 static void message_handler_req_exec_clm_nodejoin (
-	void *message,
+	const void *message,
 	unsigned int nodeid);
 
 static void exec_clm_nodejoin_endian_convert (void *msg);
@@ -455,7 +457,7 @@ static void library_notification_send (
 	}
 }
 
-static void notification_join (mar_clm_cluster_node_t *cluster_node)
+static void notification_join (const mar_clm_cluster_node_t *cluster_node)
 {
 	mar_clm_cluster_notification_t notification;
 
@@ -538,10 +540,10 @@ static int clm_nodejoin_send (void)
 
 static void clm_confchg_fn (
 	enum totem_configuration_type configuration_type,
-	unsigned int *member_list, int member_list_entries,
-	unsigned int *left_list, int left_list_entries,
-	unsigned int *joined_list, int joined_list_entries,
-	struct memb_ring_id *ring_id)
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	int i;
 	unsigned int node_ids[PROCESSOR_COUNT_MAX];
@@ -625,10 +627,10 @@ static void exec_clm_nodejoin_endian_convert (void *msg)
 }
 
 static void message_handler_req_exec_clm_nodejoin (
-	void *message,
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_clm_nodejoin *req_exec_clm_nodejoin = (struct req_exec_clm_nodejoin *)message;
+	const struct req_exec_clm_nodejoin *req_exec_clm_nodejoin = message;
 	int found = 0;
 	int i;
 
@@ -659,8 +661,9 @@ static void message_handler_req_exec_clm_nodejoin (
 
 static int clm_lib_init_fn (void *conn)
 {
-	log_printf (LOG_LEVEL_DEBUG, "Got request to initalize cluster membership service.\n");
 	struct clm_pd *clm_pd = (struct clm_pd *)api->ipc_private_data_get (conn);
+
+	log_printf (LOG_LEVEL_DEBUG, "Got request to initalize cluster membership service.\n");
 
 	list_init (&clm_pd->list);
 	clm_pd->conn = conn;
