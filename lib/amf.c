@@ -202,37 +202,38 @@ saAmfDispatch (
 	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
 		(void *)&amfInstance);
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	/*
-	 * Timeout instantly for SA_DISPATCH_ALL
+	 * Timeout instantly for SA_DISPATCH_ALL, otherwise don't timeout
+	 * for SA_DISPATCH_BLOCKING or SA_DISPATCH_ONE
 	 */
 	if (dispatchFlags == SA_DISPATCH_ALL) {
 		timeout = 0;
 	}
 
 	do {
+		pthread_mutex_lock (&amfInstance->dispatch_mutex);
+
 		dispatch_avail = coroipcc_dispatch_recv (amfInstance->ipc_ctx,
 			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
 
-		pthread_mutex_lock (&amfInstance->dispatch_mutex);
-
-		/*
-		 * Handle has been finalized in another thread
-		 */
-		if (amfInstance->finalize == 1) {
-			error = SA_AIS_OK;
-			goto error_unlock;
-		}
+		pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 			break; /* exit do while cont is 1 loop */
 		} else
 		if (dispatch_avail == 0) {
-			pthread_mutex_unlock (&amfInstance->dispatch_mutex);
-			continue; /* next poll */
+			continue;
+		}
+		if (dispatch_avail == -1) {
+			if (amfInstance->finalize == 1) {
+				error = SA_AIS_OK;
+			} else {
+				error = SA_AIS_ERR_LIBRARY;
+			}
+			goto error_put;
 		}
 
 		/*
@@ -242,7 +243,6 @@ saAmfDispatch (
 		 */
 
 		memcpy (&callbacks, &amfInstance->callbacks, sizeof (SaAmfCallbacksT));
-		pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 
 		/*
 		 * Dispatch incoming response
@@ -355,11 +355,9 @@ saAmfDispatch (
 		}
 	} while (cont);
 
-error_unlock:
-	pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 error_put:
 	saHandleInstancePut (&amfHandleDatabase, amfHandle);
-
+error_exit:
 	return (error);
 }
 
