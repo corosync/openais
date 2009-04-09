@@ -51,10 +51,10 @@
 
 static int read_config_file_into_objdb(
 	struct objdb_iface_ver0 *objdb,
-	char **error_string);
+	const char **error_string);
 static char error_string_response[512];
 
-char *strstr_rs (const char *haystack, const char *needle)
+static char *strstr_rs (const char *haystack, const char *needle)
 {
 	char *end_address;
 	char *new_needle;
@@ -82,7 +82,9 @@ char *strstr_rs (const char *haystack, const char *needle)
 	return (end_address);
 }
 
-static int aisparser_readconfig (struct objdb_iface_ver0 *objdb, char **error_string)
+static int aisparser_readconfig (
+	struct objdb_iface_ver0 *objdb,
+	const char **error_string)
 {
 	if (read_config_file_into_objdb(objdb, error_string)) {
 		return -1;
@@ -108,7 +110,7 @@ static char *remove_whitespace(char *string)
 static int parse_section(FILE *fp,
 			 struct objdb_iface_ver0 *objdb,
 			 hdb_handle_t parent_handle,
-			 char **error_string)
+			 const char **error_string)
 {
 	char line[512];
 	int i;
@@ -177,10 +179,10 @@ static int parse_section(FILE *fp,
 /* Read config file and load into objdb */
 static int read_config_file_into_objdb(
 	struct objdb_iface_ver0 *objdb,
-	char **error_string)
+	const char **error_string)
 {
 	FILE *fp;
-	char *filename = "/etc/ais/openais.conf";
+	const char *filename = "/etc/ais/openais.conf";
 	char *error_reason = error_string_response;
 	int res;
 
