@@ -52,8 +52,8 @@
 static char error_reason[512];
 
 struct service_engine {
-	char *name;
-	char *ver;
+	const char *name;
+	const char *ver;
 };
 
 static struct service_engine service_engines[] = {
