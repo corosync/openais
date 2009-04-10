@@ -101,6 +101,8 @@ enum msg_exec_message_req_types {
 };
 
 enum msg_sync_state {
+	MSG_SYNC_STATE_NOT_STARTED,
+	MSG_SYNC_STATE_STARTED,
 	MSG_SYNC_STATE_QUEUE,
 	MSG_SYNC_STATE_GROUP,
 };
@@ -432,7 +434,7 @@ static void message_handler_req_lib_msg_limitget (
 	void *conn,
 	void *msg);
 
-static enum msg_sync_state msg_sync_state;
+static enum msg_sync_state msg_sync_state = MSG_SYNC_STATE_NOT_STARTED;
 static enum msg_sync_iteration_state msg_sync_iteration_state;
 
 static struct list_head *msg_sync_iteration_queue;
@@ -452,8 +454,8 @@ static void msg_sync_refcount_decrement (
 static void msg_sync_refcount_calculate (
 	struct queue_entry *queue);
 
-static unsigned int member_list[PROCESSOR_COUNT_MAX];
-static unsigned int member_list_entries = 0;
+static unsigned int msg_member_list[PROCESSOR_COUNT_MAX];
+static unsigned int msg_member_list_entries = 0;
 static unsigned int lowest_nodeid = 0;
 static struct memb_ring_id saved_ring_id;
 
@@ -1016,8 +1018,8 @@ static int msg_find_member_nodeid (
 {
 	unsigned int i;
 
-	for (i = 0; i < member_list_entries; i++) {
-		if (nodeid == member_list[i]) {
+	for (i = 0; i < msg_member_list_entries; i++) {
+		if (nodeid == msg_member_list[i]) {
 			return (1);
 		}
 	}
@@ -1086,34 +1088,34 @@ static void msg_confchg_fn (
 
 	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: msg_confchg_fn\n");
 
-#ifdef TODO
-	if (configuration_type == TOTEM_CONFIGURATION_TRANSITIONAL) {
-		for (i = 0; i < left_list_entries; i++) {
-			for (j = 0; j < member_list_entries; j++) {
-				if (left_list[i] == member_list[j]) {
-					member_list[j] = 0;
-/* The above line should not assign to member_list since it is internal to totem. */
+	memcpy (&saved_ring_id, ring_id,
+		sizeof (struct memb_ring_id));
+
+	if (configuration_type != TOTEM_CONFIGURATION_REGULAR) {
+		return;
+	}
+	if (msg_sync_state != MSG_SYNC_STATE_NOT_STARTED) {
+		return;
+	}
+
+	msg_sync_state = MSG_SYNC_STATE_STARTED;
+
+	for (i = 0; i < msg_member_list_entries; i++) {
+		for (j = 0; j < member_list_entries; j++) {
+			if (msg_member_list[i] == member_list[j]) {
+				if (lowest_nodeid > member_list[j]) {
+					lowest_nodeid = member_list[j];
 				}
 			}
 		}
 	}
-#endif
 
-	lowest_nodeid = 0xffffffff;
+	memcpy (msg_member_list, member_list,
+		sizeof (unsigned int) * member_list_entries);
 
-	if (configuration_type == TOTEM_CONFIGURATION_REGULAR) {
-		memcpy (member_list, member_list,
-			sizeof (unsigned int) * member_list_entries);
-		member_list_entries = member_list_entries;
-		memcpy (&saved_ring_id, ring_id,
-			sizeof (struct memb_ring_id));
-		for (i = 0; i < member_list_entries; i++) {
-			if ((member_list[i] != 0) &&
-			    (member_list[i] < lowest_nodeid)) {
-				lowest_nodeid = member_list[i];
-			}
-		}
-	}
+	msg_member_list_entries = member_list_entries;
+
+	return;
 }
 
 static int msg_name_match (const SaNameT *name_a, const SaNameT *name_b)
@@ -2155,6 +2157,8 @@ static void msg_sync_activate (void)
 	/* DEBUG */
 	/* msg_print_queue_list (&queue_list_head);
 	   msg_print_group_list (&group_list_head); */
+
+	msg_sync_state = MSG_SYNC_STATE_NOT_STARTED;
 
 	return;
 }
