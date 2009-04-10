@@ -226,31 +226,32 @@ saTmrDispatch (
 	}
 
 	do {
+		pthread_mutex_lock (&tmrInstance->dispatch_mutex);
+
 		dispatch_avail = coroipcc_dispatch_recv (tmrInstance->ipc_ctx,
 			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
 
-		pthread_mutex_lock (&tmrInstance->dispatch_mutex);
-
-		if (tmrInstance->finalize == 1) {
-			error = SA_AIS_OK;
-			goto error_unlock;
-		}
+		pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
 			break;
 		}
 		else if (dispatch_avail == 0) {
-			pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
 			continue;
+		}
+		if (dispatch_avail == -1) {
+			if (tmrInstance->finalize == 1) {
+				error = SA_AIS_OK;
+			} else {
+				error = SA_AIS_ERR_LIBRARY;
+			}
+			goto error_put;
 		}
 
 		memset (&dispatch_data, 0, sizeof (struct message_overlay));
 
 		memcpy (&callbacks, &tmrInstance->callbacks,
 			sizeof (tmrInstance->callbacks));
-
-		pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
 
 		/* DEBUG */
 		printf ("[DEBUG]: saTmrDispatch { id = %d }\n",
@@ -288,8 +289,7 @@ saTmrDispatch (
 		}
 	} while (cont);
 
-error_unlock:
-	pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
+error_put:
 	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
 error_exit:
 	return (error);

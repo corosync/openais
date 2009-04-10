@@ -597,48 +597,53 @@ saEvtDispatch(
 	struct event_instance *evti;
 	SaEvtEventHandleT event_handle;
 	SaEvtCallbacksT callbacks;
-	int ignore_dispatch = 0;
 	int cont = 1; /* always continue do loop except when set to 0 */
 	struct lib_event_data *evt = 0;
 
-	if (dispatchFlags < SA_DISPATCH_ONE || 
-			dispatchFlags > SA_DISPATCH_BLOCKING) {
+	if (dispatchFlags != SA_DISPATCH_ONE &&
+	    dispatchFlags != SA_DISPATCH_ALL &&
+	    dispatchFlags != SA_DISPATCH_BLOCKING) {
+
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
 	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
 		(void *)&evti);
 	if (error != SA_AIS_OK) {
-		return error;
+		goto dispatch_exit;
 	}
 
 	/*
-	 * Timeout instantly for SA_DISPATCH_ALL
+	 * Timeout instantly for SA_DISPATCH_ALL, otherwise don't timeout
+	 * for SA_DISPATCH_BLOCKING or SA_DISPATCH_ONE
 	 */
-	if (dispatchFlags == SA_DISPATCH_ALL || dispatchFlags == SA_DISPATCH_ONE) {
+	if (dispatchFlags == SA_DISPATCH_ALL) {
 		timeout = 0;
 	}
 
 	do {
+		pthread_mutex_lock (&evti->ei_dispatch_mutex);
+
 		dispatch_avail = coroipcc_dispatch_recv (evti->ipc_ctx,
 			(void *)&evti->ei_dispatch_data, sizeof (evti->ei_dispatch_data), timeout);
 
-		/*
-		 * Handle has been finalized in another thread
-		 */
-		if (evti->ei_finalize == 1) {
-			error = SA_AIS_OK;
-			goto dispatch_unlock;
-		}
+		pthread_mutex_unlock (&evti->ei_dispatch_mutex);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			pthread_mutex_unlock (&evti->ei_dispatch_mutex);
 			break; /* exit do while cont is 1 loop */
 		} else
 		if (dispatch_avail == 0) {
-			pthread_mutex_unlock (&evti->ei_dispatch_mutex);
-			continue; /* next poll */
+			continue;
 		}
+		if (dispatch_avail == -1) {
+			if (evti->ei_finalize == 1) {
+				error = SA_AIS_OK;
+			} else {
+				error = SA_AIS_ERR_LIBRARY;
+			}
+			goto dispatch_put;
+		}
+		
 
 		/*
 		 * Make copy of callbacks, message data, unlock instance, 
@@ -732,26 +737,16 @@ saEvtDispatch(
 		default:
 			printf ("Dispatch: Bad message type 0x%x\n", evti->ei_dispatch_data.header.id);
 			error = SA_AIS_ERR_LIBRARY;	
-			goto dispatch_unlock;
 		}
-
-		pthread_mutex_unlock(&evti->ei_dispatch_mutex);
 
 		/*
 		 * Determine if more messages should be processed
 		 */
 		switch (dispatchFlags) {
 		case SA_DISPATCH_ONE:
-			if (ignore_dispatch) {
-				ignore_dispatch = 0;
-			} else {
-				cont = 0;
-			}
+			cont = 0;
 			break;
 		case SA_DISPATCH_ALL:
-			if (ignore_dispatch) {
-				ignore_dispatch = 0;
-			}
 			break;
 		case SA_DISPATCH_BLOCKING:
 			break;
@@ -760,10 +755,9 @@ saEvtDispatch(
 
 	goto dispatch_put;
 
-dispatch_unlock:
- 	pthread_mutex_unlock(&evti->ei_dispatch_mutex);
 dispatch_put:
 	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
+dispatch_exit:
 	return error;
 }
 

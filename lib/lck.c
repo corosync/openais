@@ -363,15 +363,12 @@ saLckDispatch (
 	}
 
 	do {
+		pthread_mutex_lock(&lckInstance->dispatch_mutex);
+
 		dispatch_avail = coroipcc_dispatch_recv (lckInstance->ipc_ctx,
 			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
 
-		pthread_mutex_lock(&lckInstance->dispatch_mutex);
-
-		if (lckInstance->finalize == 1) {
-			error = SA_AIS_OK;
-			goto error_unlock;
-		}
+		pthread_mutex_unlock(&lckInstance->dispatch_mutex);
 
 		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
 			pthread_mutex_unlock(&lckInstance->dispatch_mutex);
@@ -381,7 +378,15 @@ saLckDispatch (
 			pthread_mutex_unlock(&lckInstance->dispatch_mutex);
 			continue;
 		}
-		
+		if (dispatch_avail == -1) {
+			if (lckInstance->finalize == 1) {
+				error = SA_AIS_OK;
+			} else {
+				error = SA_AIS_ERR_LIBRARY;
+			}
+			goto error_put;
+		}
+
 		/*
 		* Make copy of callbacks, message data, unlock instance,
 		* and call callback. A risk of this dispatch method is that
@@ -389,7 +394,7 @@ saLckDispatch (
 		* LckFinalize has been called in another thread.
 		*/
 		memcpy(&callbacks,&lckInstance->callbacks, sizeof(lckInstance->callbacks));
-		pthread_mutex_unlock(&lckInstance->dispatch_mutex);
+
 		/*
 		 * Dispatch incoming response
 		 */
@@ -527,7 +532,7 @@ saLckDispatch (
 		 */
 		switch (dispatchFlags) {
 		case SA_DISPATCH_ONE:
-				cont = 0;
+			cont = 0;
 			break;
 		case SA_DISPATCH_ALL:
 			break;
@@ -535,8 +540,8 @@ saLckDispatch (
 			break;
 		}
 	} while (cont);
-error_unlock:
-	pthread_mutex_unlock(&lckInstance->dispatch_mutex);
+
+error_put:
 	saHandleInstancePut(&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
