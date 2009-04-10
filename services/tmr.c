@@ -76,12 +76,7 @@ struct timer_instance {
 	struct list_head cleanup_list;
 };
 
-static struct hdb_handle_database timer_hdb = {
-	.handle_count	= 0,
-	.handles	= 0,
-	.iterator	= 0,
-	.mutex		= PTHREAD_MUTEX_INITIALIZER
-};
+DECLARE_HDB_DATABASE (timer_hdb);
 
 static struct corosync_api_v1 *api;
 
