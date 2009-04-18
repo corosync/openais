@@ -200,7 +200,7 @@ static int ckpt_checkpoint_close (
 	mar_name_t *checkpoint_name,
 	mar_uint32_t ckpt_id);
 
-static int callback_expiry (enum totem_callback_token_type type, const void *data);
+static int callback_expiry (const void *data);
 
 static void checkpoint_section_release (struct checkpoint_section *section);
 
@@ -402,11 +402,7 @@ static unsigned int my_should_sync = 0;
 
 static unsigned int my_token_callback_active = 0;
 
-/* TODO SCHEDWRK
 static hdb_handle_t callback_expiry_handle;
-*/
-
-static void * my_token_callback_handle;
 
 static struct corosync_api_v1 *api;
 struct checkpoint_cleanup {
@@ -1499,7 +1495,7 @@ free_mem :
 
 }
 
-static int callback_expiry (enum totem_callback_token_type type, const void *data)
+static int callback_expiry (const void *data)
 {
 	struct checkpoint *checkpoint = (struct checkpoint *)data;
 	struct req_exec_ckpt_checkpointunlink req_exec_ckpt_checkpointunlink;
@@ -1557,19 +1553,10 @@ void timer_function_retention (void *data)
 	list_add (&checkpoint->expiry_list, &my_checkpoint_expiry_list_head);
 
 	if (my_token_callback_active == 0) {
-		api->totem_callback_token_create (
-			&my_token_callback_handle,
-			TOTEM_CALLBACK_TOKEN_SENT,
-			1,
-			callback_expiry,
-			NULL);
-
-/* TODO use schedwrk instead of totempg callback token
-		schedwrk_create (
+		api->schedwrk_create (
 			&callback_expiry_handle,
 			callback_expiry,
 			NULL);
-*/
 
 		my_token_callback_active = 1;
 	}
