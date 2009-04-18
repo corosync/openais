@@ -301,15 +301,17 @@ out:
 
 static void repair_node (amf_node_t *node)
 {
-	ENTER();
 	char hostname[256];
+	int res;
+
+	ENTER();
 	gethostname (hostname, 256);
 	if (!strcmp (hostname, (const char*)node->saAmfNodeClmNode.value)) {
         /* TODO if(saAmfAutoRepair == SA_TRUE) */
 #ifdef DEBUG
 			exit (0);
 #else
-			system ("reboot");
+			res = system ("reboot");
 #endif	
 	}
 }
@@ -667,7 +669,7 @@ void amf_node_sg_failed_over (struct amf_node *node, struct amf_sg *sg_in)
  * @param cluster
  * @param name - RDN of node
  */
-struct amf_node *amf_node_new (struct amf_cluster *cluster, char *name) {
+struct amf_node *amf_node_new (struct amf_cluster *cluster, const char *name) {
 	struct amf_node *node = amf_calloc (1, sizeof (struct amf_node));
 
 	setSaNameT (&node->name, name);
@@ -721,7 +723,9 @@ void *amf_node_serialize (struct amf_node *node, int *len)
 
 struct amf_node *amf_node_deserialize (struct amf_cluster *cluster, char *buf) {
 	char *tmp = buf;
-	struct amf_node *node = amf_node_new (cluster, "");
+	struct amf_node *node;
+
+	node  = amf_node_new (cluster, "");
 
 	tmp = amf_deserialize_SaNameT (tmp, &node->name);
 	tmp = amf_deserialize_SaNameT (tmp, &node->saAmfNodeClmNode);

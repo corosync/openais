@@ -711,7 +711,7 @@ extern void amf_call_function_asynchronous (async_func_t async_func, void *param
 /* amfnode.c */
 
 /* General methods */
-extern struct amf_node *amf_node_new (struct amf_cluster *cluster, char *name);
+extern struct amf_node *amf_node_new (struct amf_cluster *cluster, const char *name);
 extern void *amf_node_serialize (struct amf_node *node, int *len);
 extern struct amf_node *amf_node_deserialize (
 	struct amf_cluster *cluster, char *buf);
