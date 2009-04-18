@@ -151,13 +151,13 @@ static void message_handler_req_exec_clm_nodejoin (
 
 static void exec_clm_nodejoin_endian_convert (void *msg);
 
-static void message_handler_req_lib_clm_clustertrack (void *conn, void *message);
+static void message_handler_req_lib_clm_clustertrack (void *conn, const void *message);
 
-static void message_handler_req_lib_clm_trackstop (void *conn, void *message);
+static void message_handler_req_lib_clm_trackstop (void *conn, const void *message);
 
-static void message_handler_req_lib_clm_nodeget (void *conn, void *message);
+static void message_handler_req_lib_clm_nodeget (void *conn, const void *message);
 
-static void message_handler_req_lib_clm_nodegetasync (void *conn, void *message);
+static void message_handler_req_lib_clm_nodegetasync (void *conn, const void *message);
 
 struct clm_pd {
 	unsigned char track_flags;
@@ -671,7 +671,9 @@ static int clm_lib_init_fn (void *conn)
 	return (0);
 }
 
-static void message_handler_req_lib_clm_clustertrack (void *conn, void *msg)
+static void message_handler_req_lib_clm_clustertrack (
+	void *conn,
+	const void *msg)
 {
 	struct req_lib_clm_clustertrack *req_lib_clm_clustertrack = (struct req_lib_clm_clustertrack *)msg;
 	struct res_lib_clm_clustertrack res_lib_clm_clustertrack;
@@ -725,7 +727,9 @@ static void message_handler_req_lib_clm_clustertrack (void *conn, void *msg)
 }
 
 
-static void message_handler_req_lib_clm_trackstop (void *conn, void *msg)
+static void message_handler_req_lib_clm_trackstop (
+	void *conn,
+	const void *msg)
 {
 	struct res_lib_clm_trackstop res_lib_clm_trackstop;
 	struct clm_pd *clm_pd = (struct clm_pd *)api->ipc_private_data_get (conn);
@@ -747,7 +751,9 @@ static void message_handler_req_lib_clm_trackstop (void *conn, void *msg)
 		sizeof (struct res_lib_clm_trackstop));
 }
 
-static void message_handler_req_lib_clm_nodeget (void *conn, void *msg)
+static void message_handler_req_lib_clm_nodeget (
+	void *conn,
+	const void *msg)
 {
 	struct req_lib_clm_nodeget *req_lib_clm_nodeget = (struct req_lib_clm_nodeget *)msg;
 	struct res_clm_nodeget res_clm_nodeget;
@@ -782,7 +788,9 @@ static void message_handler_req_lib_clm_nodeget (void *conn, void *msg)
 	api->ipc_response_send (conn, &res_clm_nodeget, sizeof (struct res_clm_nodeget));
 }
 
-static void message_handler_req_lib_clm_nodegetasync (void *conn, void *msg)
+static void message_handler_req_lib_clm_nodegetasync (
+	void *conn,
+	const void *msg)
 {
 	struct req_lib_clm_nodegetasync *req_lib_clm_nodegetasync = (struct req_lib_clm_nodegetasync *)msg;
 	struct res_clm_nodegetasync res_clm_nodegetasync;
