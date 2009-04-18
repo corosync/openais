@@ -55,11 +55,6 @@
 
 #include "util.h"
 
-struct message_overlay {
-	mar_res_header_t header __attribute__((aligned(8)));
-	char data[256000];
-};
-
 /*
  * Data structure for instance data
  */
@@ -335,7 +330,7 @@ saLckDispatch (
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
 	int cont = 1; /* always continue do loop except when set to 0 */
-	struct message_overlay dispatch_data;
+	mar_res_header_t *dispatch_data;
 	struct res_lib_lck_lockwaitercallback *res_lib_lck_lockwaitercallback;
 	struct res_lib_lck_resourceopenasync *res_lib_lck_resourceopenasync = NULL;
 	struct res_lib_lck_resourcelockasync *res_lib_lck_resourcelockasync = NULL;
@@ -365,8 +360,10 @@ saLckDispatch (
 	do {
 		pthread_mutex_lock(&lckInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (lckInstance->ipc_ctx,
-			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
+		dispatch_avail = coroipcc_dispatch_get (
+			lckInstance->ipc_ctx,
+			(void **)&dispatch_data,
+			timeout);
 
 		pthread_mutex_unlock(&lckInstance->dispatch_mutex);
 
@@ -398,12 +395,12 @@ saLckDispatch (
 		/*
 		 * Dispatch incoming response
 		 */
-		switch (dispatch_data.header.id) {
+		switch (dispatch_data->id) {
 		case MESSAGE_RES_LCK_LOCKWAITERCALLBACK:
 			if (callbacks.saLckResourceOpenCallback == NULL) {
 				continue;
 			}
-			res_lib_lck_lockwaitercallback = (struct res_lib_lck_lockwaitercallback *)&dispatch_data;
+			res_lib_lck_lockwaitercallback = (struct res_lib_lck_lockwaitercallback *)dispatch_data;
 			callbacks.saLckLockWaiterCallback (
 				res_lib_lck_lockwaitercallback->waiter_signal,
 				res_lib_lck_lockwaitercallback->lock_id,
@@ -415,7 +412,7 @@ saLckDispatch (
 			if (callbacks.saLckLockWaiterCallback == NULL) {
 				continue;
 			}
-			res_lib_lck_resourceopenasync = (struct res_lib_lck_resourceopenasync *)&dispatch_data;
+			res_lib_lck_resourceopenasync = (struct res_lib_lck_resourceopenasync *)dispatch_data;
 			/*
 			 * This instance get/listadd/put required so that close
 			 * later has the proper list of resources
@@ -454,7 +451,7 @@ saLckDispatch (
 			if (callbacks.saLckLockGrantCallback == NULL) {
 				continue;
 			}
-			res_lib_lck_resourcelockasync = (struct res_lib_lck_resourcelockasync *)&dispatch_data;
+			res_lib_lck_resourcelockasync = (struct res_lib_lck_resourcelockasync *)dispatch_data;
 			/*
 			 * This instance get/listadd/put required so that close
 			 * later has the proper list of resources
@@ -492,7 +489,7 @@ saLckDispatch (
 			if (callbacks.saLckResourceUnlockCallback == NULL) {
 				continue;
 			}
-			res_lib_lck_resourceunlockasync = (struct res_lib_lck_resourceunlockasync *)&dispatch_data;
+			res_lib_lck_resourceunlockasync = (struct res_lib_lck_resourceunlockasync *)dispatch_data;
 			callbacks.saLckResourceUnlockCallback (
 				res_lib_lck_resourceunlockasync->invocation,
 				res_lib_lck_resourceunlockasync->header.error);
@@ -515,7 +512,7 @@ saLckDispatch (
 				continue;
 			}
 
-			res_lib_lck_resourcesynchronizeasync = (struct res_lib_lck_resourcesynchronizeasync *) &dispatch_data;
+			res_lib_lck_resourcesynchronizeasync = (struct res_lib_lck_resourcesynchronizeasync *) dispatch_data;
 
 			callbacks.saLckResourceSynchronizeCallback(
 				res_lib_lck_resourcesynchronizeasync->invocation,
@@ -527,6 +524,9 @@ saLckDispatch (
 			/* TODO */
 			break;
 		}
+
+		coroipcc_dispatch_put (lckInstance->ipc_ctx);
+
 		/*
 		 * Determine if more messages should be processed
 		 */

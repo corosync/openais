@@ -58,11 +58,6 @@
 
 #include "util.h"
 
-struct message_overlay {
-	mar_res_header_t header __attribute__((aligned(8)));
-	char data[4096];
-};
-
 /*
  * Data structure for instance data
  */
@@ -347,7 +342,7 @@ saCkptDispatch (
 	int dispatch_avail;
 	struct ckptInstance *ckptInstance;
 	int cont = 1; /* always continue do loop except when set to 0 */
-	struct message_overlay dispatch_data;
+	mar_res_header_t *dispatch_data;
 	struct res_lib_ckpt_checkpointopenasync *res_lib_ckpt_checkpointopenasync;
 	struct res_lib_ckpt_checkpointsynchronizeasync *res_lib_ckpt_checkpointsynchronizeasync;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;
@@ -376,8 +371,10 @@ saCkptDispatch (
 	do {
 		pthread_mutex_lock (&ckptInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (ckptInstance->ipc_ctx,
-			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
+		dispatch_avail = coroipcc_dispatch_get (
+			ckptInstance->ipc_ctx,
+			(void **)&dispatch_data,
+			timeout);
 
 		pthread_mutex_unlock (&ckptInstance->dispatch_mutex);
 
@@ -408,12 +405,12 @@ saCkptDispatch (
 		/*
 		 * Dispatch incoming response
 		 */
-		switch (dispatch_data.header.id) {
+		switch (dispatch_data->id) {
 		case MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTOPENASYNC:
 			if (callbacks.saCkptCheckpointOpenCallback == NULL) {
 				continue;
 			}
-			res_lib_ckpt_checkpointopenasync = (struct res_lib_ckpt_checkpointopenasync *) &dispatch_data;
+			res_lib_ckpt_checkpointopenasync = (struct res_lib_ckpt_checkpointopenasync *) dispatch_data;
 
 			/*
 			 * This instance get/listadd/put required so that close
@@ -458,7 +455,7 @@ saCkptDispatch (
 				continue;
 			}
 
-			res_lib_ckpt_checkpointsynchronizeasync = (struct res_lib_ckpt_checkpointsynchronizeasync *) &dispatch_data;
+			res_lib_ckpt_checkpointsynchronizeasync = (struct res_lib_ckpt_checkpointsynchronizeasync *) dispatch_data;
 
 			callbacks.saCkptCheckpointSynchronizeCallback(
 				res_lib_ckpt_checkpointsynchronizeasync->invocation,
@@ -467,6 +464,8 @@ saCkptDispatch (
 		default:
 			break;
 		}
+		coroipcc_dispatch_put (ckptInstance->ipc_ctx);
+
 		/*
 		 * Determine if more messages should be processed
 		 */

@@ -94,11 +94,6 @@ struct saHandleDatabase event_handle_db = {
 	.handleInstanceDestructor	= eventHandleInstanceDestructor
 };
 
-struct res_overlay {
-	mar_res_header_t header __attribute__((aligned(8)));
-	char data[MESSAGE_SIZE_MAX];
-};
-
 struct handle_list {
 	SaUint64T			hl_handle;
 	struct list_head 	hl_entry;
@@ -134,7 +129,6 @@ struct event_instance {
 	pthread_mutex_t			ei_dispatch_mutex;
 	pthread_mutex_t			ei_response_mutex;
 	struct list_head 		ei_channel_list;
-	struct res_overlay		ei_dispatch_data;
 	unsigned int			ei_finalize:1;
 	unsigned int			ei_data_available:1;
 };
@@ -597,6 +591,7 @@ saEvtDispatch(
 	struct event_instance *evti;
 	SaEvtEventHandleT event_handle;
 	SaEvtCallbacksT callbacks;
+	mar_res_header_t *dispatch_data;
 	int cont = 1; /* always continue do loop except when set to 0 */
 	struct lib_event_data *evt = 0;
 
@@ -624,8 +619,10 @@ saEvtDispatch(
 	do {
 		pthread_mutex_lock (&evti->ei_dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (evti->ipc_ctx,
-			(void *)&evti->ei_dispatch_data, sizeof (evti->ei_dispatch_data), timeout);
+		dispatch_avail = coroipcc_dispatch_get (
+			evti->ipc_ctx,
+			(void **)dispatch_data,
+			timeout);
 
 		pthread_mutex_unlock (&evti->ei_dispatch_mutex);
 
@@ -641,7 +638,7 @@ saEvtDispatch(
 			} else {
 				error = SA_AIS_ERR_LIBRARY;
 			}
-			goto dispatch_put;
+			goto error_put;
 		}
 		
 
@@ -656,7 +653,7 @@ saEvtDispatch(
 		/*
 		 * Dispatch incoming response
 		 */
-		switch (evti->ei_dispatch_data.header.id) {
+		switch (dispatch_data->id) {
 
 		case MESSAGE_RES_EVT_AVAILABLE:
 			evti->ei_data_available = 0;
@@ -702,7 +699,7 @@ saEvtDispatch(
 		case MESSAGE_RES_EVT_CHAN_OPEN_CALLBACK:
 		{
 			struct res_evt_open_chan_async *resa = 
-				(struct res_evt_open_chan_async *)&evti->ei_dispatch_data;
+				(struct res_evt_open_chan_async *)dispatch_data;
 			struct event_channel_instance *eci;
 
 			/*
@@ -735,9 +732,11 @@ saEvtDispatch(
 			break;
 
 		default:
-			printf ("Dispatch: Bad message type 0x%x\n", evti->ei_dispatch_data.header.id);
+			coroipcc_dispatch_put (evti->ipc_ctx);
 			error = SA_AIS_ERR_LIBRARY;	
+			goto error_put;
 		}
+		coroipcc_dispatch_put (evti->ipc_ctx);
 
 		/*
 		 * Determine if more messages should be processed
@@ -753,9 +752,7 @@ saEvtDispatch(
 		}
 	} while (cont);
 
-	goto dispatch_put;
-
-dispatch_put:
+error_put:
 	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
 dispatch_exit:
 	return error;

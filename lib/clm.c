@@ -57,11 +57,6 @@
 
 #include "util.h"
 
-struct res_overlay {
-	mar_res_header_t header;
-	char data[512000];
-};
-
 struct clmInstance {
 	void *ipc_ctx;
 	SaClmCallbacksT callbacks;
@@ -272,7 +267,7 @@ saClmDispatch (
 	struct res_lib_clm_clustertrack *res_lib_clm_clustertrack;
 	struct res_clm_nodegetcallback *res_clm_nodegetcallback;
 	SaClmCallbacksT callbacks;
-	struct res_overlay dispatch_data;
+	mar_res_header_t *dispatch_data;
 	SaClmClusterNotificationBufferT notificationBuffer;
 	SaClmClusterNotificationT notification[PROCESSOR_COUNT_MAX];
 	SaClmClusterNodeT clusterNode;
@@ -303,8 +298,10 @@ saClmDispatch (
 	do {
 		pthread_mutex_lock (&clmInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (clmInstance->ipc_ctx,
-			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
+		dispatch_avail = coroipcc_dispatch_get (
+			clmInstance->ipc_ctx,
+			(void **)&dispatch_data,
+			timeout);
 
 		pthread_mutex_unlock (&clmInstance->dispatch_mutex);
 
@@ -334,13 +331,13 @@ saClmDispatch (
 		/*
 		 * Dispatch incoming message
 		 */
-		switch (dispatch_data.header.id) {
+		switch (dispatch_data->id) {
 
 		case MESSAGE_RES_CLM_TRACKCALLBACK:
 			if (callbacks.saClmClusterTrackCallback == NULL) {
 				continue;
 			}
-			res_lib_clm_clustertrack = (struct res_lib_clm_clustertrack *)&dispatch_data;
+			res_lib_clm_clustertrack = (struct res_lib_clm_clustertrack *)dispatch_data;
 			error = SA_AIS_OK;
 
 			notificationBuffer.notification = notification;
@@ -371,7 +368,7 @@ saClmDispatch (
 			if (callbacks.saClmClusterNodeGetCallback == NULL) {
 				continue;
 			}
-			res_clm_nodegetcallback = (struct res_clm_nodegetcallback *)&dispatch_data;
+			res_clm_nodegetcallback = (struct res_clm_nodegetcallback *)dispatch_data;
 			marshall_from_mar_clm_cluster_node_t (
 				&clusterNode,
 				&res_clm_nodegetcallback->cluster_node);
@@ -383,10 +380,12 @@ saClmDispatch (
 			break;
 
 		default:
+			coroipcc_dispatch_put (clmInstance->ipc_ctx);
 			error = SA_AIS_ERR_LIBRARY;
 			goto error_put;
 			break;
 		}
+		coroipcc_dispatch_put (clmInstance->ipc_ctx);
 
 		/*
 		 * Determine if more messages should be processed

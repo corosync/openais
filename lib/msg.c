@@ -57,11 +57,6 @@
 #include "../include/ipc_msg.h"
 #include "util.h"
 
-struct message_overlay {
-	mar_res_header_t header __attribute__((aligned(8)));
-	char data[4096];
-};
-
 struct msgInstance {
 	void *ipc_ctx;
 	int finalize;
@@ -227,7 +222,7 @@ saMsgDispatch (
 	SaAisErrorT error = SA_AIS_OK;
 	struct msgInstance *msgInstance;
 	/* struct queueInstance *queueInstance; */
-	struct message_overlay dispatch_data;
+	mar_res_header_t *dispatch_data;
 	int dispatch_avail;
 	int timeout = 1;
 	int cont = 1;
@@ -257,8 +252,10 @@ saMsgDispatch (
 	do {
 		pthread_mutex_lock (&msgInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (msgInstance->ipc_ctx,
-			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
+		dispatch_avail = coroipcc_dispatch_get (
+			msgInstance->ipc_ctx,
+			(void **)dispatch_data,
+			timeout);
 
 		pthread_mutex_unlock (&msgInstance->dispatch_mutex);
 
@@ -281,18 +278,13 @@ saMsgDispatch (
 		memcpy (&callbacks, &msgInstance->callbacks,
 			sizeof (msgInstance->callbacks));
 
-		/* DEBUG */
-		printf ("[DEBUG]: saMsgDispatch { id = %u }\n",
-			(unsigned int)(dispatch_data.header.id));
-
-		switch (dispatch_data.header.id)
-		{
+		switch (dispatch_data->id) {
 		case MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK:
 			if (callbacks.saMsgQueueOpenCallback == NULL) {
 				continue;
 			}
 			res_lib_msg_queueopen_callback =
-				(struct res_lib_msg_queueopen_callback *)&dispatch_data;
+				(struct res_lib_msg_queueopen_callback *)dispatch_data;
 
 			callbacks.saMsgQueueOpenCallback (
 				res_lib_msg_queueopen_callback->invocation,
@@ -306,7 +298,7 @@ saMsgDispatch (
 				continue;
 			}
 			res_lib_msg_queuegrouptrack_callback =
-				(struct res_lib_msg_queuegrouptrack_callback *)&dispatch_data;
+				(struct res_lib_msg_queuegrouptrack_callback *)dispatch_data;
 
 			callbacks.saMsgQueueGroupTrackCallback (
 				&res_lib_msg_queuegrouptrack_callback->group_name,
@@ -320,7 +312,7 @@ saMsgDispatch (
 				continue;
 			}
 			res_lib_msg_messagedelivered_callback =
-				(struct res_lib_msg_messagedelivered_callback *)&dispatch_data;
+				(struct res_lib_msg_messagedelivered_callback *)dispatch_data;
 
 			callbacks.saMsgMessageDeliveredCallback (
 				res_lib_msg_messagedelivered_callback->invocation,
@@ -333,7 +325,7 @@ saMsgDispatch (
 				continue;
 			}
 			res_lib_msg_messagereceived_callback =
-				(struct res_lib_msg_messagereceived_callback *)&dispatch_data;
+				(struct res_lib_msg_messagereceived_callback *)dispatch_data;
 
 			callbacks.saMsgMessageReceivedCallback (
 				res_lib_msg_messagereceived_callback->queue_handle);
@@ -343,6 +335,7 @@ saMsgDispatch (
 		default:
 			break;
 		}
+		coroipcc_dispatch_put (msgInstance->ipc_ctx);
 
 		switch (dispatchFlags)
 		{

@@ -57,11 +57,6 @@
 #include "../include/ipc_tmr.h"
 #include "util.h"
 
-struct message_overlay {
-	mar_res_header_t header __attribute__((aligned(8)));
-	char data[4096];
-};
-
 struct tmrInstance {
 	void *ipc_ctx;
 	SaTmrCallbacksT callbacks;
@@ -200,7 +195,7 @@ saTmrDispatch (
 	SaTmrCallbacksT callbacks;
 	SaAisErrorT error = SA_AIS_OK;
 	struct tmrInstance *tmrInstance;
-	struct message_overlay dispatch_data;
+	mar_res_header_t *dispatch_data;
 	int dispatch_avail;
 	int timeout = 1;
 	int cont = 1;
@@ -228,8 +223,10 @@ saTmrDispatch (
 	do {
 		pthread_mutex_lock (&tmrInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (tmrInstance->ipc_ctx,
-			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
+		dispatch_avail = coroipcc_dispatch_get (
+			tmrInstance->ipc_ctx,
+			(void **)&dispatch_data,
+			timeout);
 
 		pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
 
@@ -248,24 +245,17 @@ saTmrDispatch (
 			goto error_put;
 		}
 
-		memset (&dispatch_data, 0, sizeof (struct message_overlay));
-
 		memcpy (&callbacks, &tmrInstance->callbacks,
 			sizeof (tmrInstance->callbacks));
 
-		/* DEBUG */
-		printf ("[DEBUG]: saTmrDispatch { id = %d }\n",
-			dispatch_data.header.id);
-
-		switch (dispatch_data.header.id)
-		{
+		switch (dispatch_data->id) {
 		case MESSAGE_RES_TMR_TIMEREXPIREDCALLBACK:
 			if (callbacks.saTmrTimerExpiredCallback == NULL) {
 				continue;
 			}
 
 			res_lib_tmr_timerexpiredcallback =
-				(struct res_lib_tmr_timerexpiredcallback *) &dispatch_data;
+				(struct res_lib_tmr_timerexpiredcallback *) dispatch_data;
 
 			callbacks.saTmrTimerExpiredCallback (
 				res_lib_tmr_timerexpiredcallback->timer_id,
@@ -276,6 +266,7 @@ saTmrDispatch (
 		default:
 			break;
 		}
+		coroipcc_dispatch_put (tmrInstance->ipc_ctx);
 
 		switch (dispatchFlags)
 		{

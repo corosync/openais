@@ -52,12 +52,6 @@
 #include <corosync/coroipcc.h>
 #include "util.h"
 
-
-struct res_overlay {
-	mar_res_header_t header __attribute__((aligned(8)));
-	char data[4096];
-};
-
 /*
  * Data structure for instance data
  */
@@ -190,7 +184,7 @@ saAmfDispatch (
 	struct res_lib_amf_csiremovecallback *res_lib_amf_csiremovecallback;
 	struct res_lib_amf_componentterminatecallback *res_lib_amf_componentterminatecallback;
 	SaAmfCallbacksT callbacks;
-	struct res_overlay dispatch_data;
+	mar_res_header_t *dispatch_data;
 
 	if (dispatchFlags != SA_DISPATCH_ONE &&
 		dispatchFlags != SA_DISPATCH_ALL &&
@@ -216,8 +210,10 @@ saAmfDispatch (
 	do {
 		pthread_mutex_lock (&amfInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_recv (amfInstance->ipc_ctx,
-			(void *)&dispatch_data, sizeof (dispatch_data), timeout);
+		dispatch_avail = coroipcc_dispatch_get (
+			amfInstance->ipc_ctx,
+			(void **)&dispatch_data,
+			timeout);
 
 		pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 
@@ -248,10 +244,10 @@ saAmfDispatch (
 		 * Dispatch incoming response
 		 */
 
-		switch (dispatch_data.header.id) {
+		switch (dispatch_data->id) {
 
 		case MESSAGE_RES_AMF_HEALTHCHECKCALLBACK:
-			res_lib_amf_healthcheckcallback = (struct res_lib_amf_healthcheckcallback *)&dispatch_data;
+			res_lib_amf_healthcheckcallback = (struct res_lib_amf_healthcheckcallback *)dispatch_data;
 
 			callbacks.saAmfHealthcheckCallback (
 				res_lib_amf_healthcheckcallback->invocation,
@@ -266,7 +262,7 @@ saAmfDispatch (
 			char *attr_buf;
 			int i;
 
-			res_lib_amf_csisetcallback = (struct res_lib_amf_csisetcallback *)&dispatch_data;
+			res_lib_amf_csisetcallback = (struct res_lib_amf_csisetcallback *)dispatch_data;
 
 
 			csi_descriptor.csiFlags = res_lib_amf_csisetcallback->csiFlags;
@@ -306,7 +302,7 @@ saAmfDispatch (
 			break;
 		    }
 		case MESSAGE_RES_AMF_CSIREMOVECALLBACK:
-			res_lib_amf_csiremovecallback = (struct res_lib_amf_csiremovecallback *)&dispatch_data;
+			res_lib_amf_csiremovecallback = (struct res_lib_amf_csiremovecallback *)dispatch_data;
 			callbacks.saAmfCSIRemoveCallback (
 				res_lib_amf_csiremovecallback->invocation,
 				&res_lib_amf_csiremovecallback->compName,
@@ -315,7 +311,7 @@ saAmfDispatch (
 			break;
 
 		case MESSAGE_RES_AMF_COMPONENTTERMINATECALLBACK:
-			res_lib_amf_componentterminatecallback = (struct res_lib_amf_componentterminatecallback *)&dispatch_data;
+			res_lib_amf_componentterminatecallback = (struct res_lib_amf_componentterminatecallback *)dispatch_data;
 			callbacks.saAmfComponentTerminateCallback (
 				res_lib_amf_componentterminatecallback->invocation,
 				&res_lib_amf_componentterminatecallback->compName);
@@ -323,7 +319,7 @@ saAmfDispatch (
 
 #ifdef COMPILE_OUT
 		case MESSAGE_RES_AMF_PROTECTIONGROUPTRACKCALLBACK:
-			res_lib_amf_protectiongrouptrackcallback = (struct res_lib_amf_protectiongrouptrackcallback *)&dispatch_data;
+			res_lib_amf_protectiongrouptrackcallback = (struct res_lib_amf_protectiongrouptrackcallback *)dispatch_data;
 			memcpy (res_lib_amf_protectiongrouptrackcallback->notificationBufferAddress,
 				res_lib_amf_protectiongrouptrackcallback->notificationBuffer,
 				res_lib_amf_protectiongrouptrackcallback->numberOfItems * sizeof (SaAmfProtectionGroupNotificationT));
@@ -336,10 +332,12 @@ saAmfDispatch (
 #endif
 			break;
 		default:
+			coroipcc_dispatch_put (amfInstance->ipc_ctx);
 			error = SA_AIS_ERR_LIBRARY;	
 			goto error_put;
 			break;
 		}
+		coroipcc_dispatch_put (amfInstance->ipc_ctx);
 
 		/*
 		 * Determine if more messages should be processed
