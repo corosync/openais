@@ -68,7 +68,7 @@ static struct service_engine service_engines[] = {
 
 static int openais_service_enable (
 	struct objdb_iface_ver0 *objdb,
-	char **error_string)
+	const char **error_string)
 {
 	unsigned int i;
 	hdb_handle_t object_handle;
