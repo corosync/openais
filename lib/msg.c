@@ -254,7 +254,7 @@ saMsgDispatch (
 
 		dispatch_avail = coroipcc_dispatch_get (
 			msgInstance->ipc_ctx,
-			(void **)dispatch_data,
+			(void **)&dispatch_data,
 			timeout);
 
 		pthread_mutex_unlock (&msgInstance->dispatch_mutex);
@@ -349,7 +349,6 @@ saMsgDispatch (
 		}
 	} while (cont);
 
-error_unlock:
 	pthread_mutex_unlock (&msgInstance->dispatch_mutex);
 error_put:
 	saHandleInstancePut (&msgHandleDatabase, msgHandle);
@@ -1135,8 +1134,6 @@ saMsgQueueGroupTrack (
 	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
 	struct iovec iov;
 
-	void * buffer;
-
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
@@ -1597,7 +1594,6 @@ saMsgMessageGet (
 
 error_unlock:
 	pthread_mutex_unlock (&queueInstance->response_mutex);
-error_put:
 	saHandleInstancePut (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
