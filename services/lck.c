@@ -180,35 +180,35 @@ static void message_handler_req_exec_lck_sync_resource_refcount (
 
 static void message_handler_req_lib_lck_resourceopen (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_lck_resourceopenasync (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_lck_resourceclose (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_lck_resourcelock (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_lck_resourcelockasync (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_lck_resourceunlock (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_lck_resourceunlockasync (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_lck_lockpurge (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void exec_lck_resourceopen_endian_convert (void *msg);
 static void exec_lck_resourceclose_endian_convert (void *msg);
@@ -216,8 +216,10 @@ static void exec_lck_resourcelock_endian_convert (void *msg);
 static void exec_lck_resourceunlock_endian_convert (void *msg);
 static void exec_lck_resourcelockorphan_endian_convert (void *msg);
 static void exec_lck_lockpurge_endian_convert (void *msg);
+#ifdef TODO
 static void exec_lck_resource_endian_convert (void *msg);
 static void exec_lck_resource_lock_endian_convert (void *msg);
+#endif
 static void exec_lck_sync_resource_endian_convert (void *msg);
 static void exec_lck_sync_resource_lock_endian_convert (void *msg);
 static void exec_lck_sync_resource_refcount_endian_convert (void *msg);
@@ -600,6 +602,7 @@ static void exec_lck_sync_resource_refcount_endian_convert (void *msg)
 	return;
 }
 
+#ifdef PRINTING_ENABLED
 static void print_resource_lock_list (struct resource *resource)
 {
 	struct list_head *list;
@@ -701,6 +704,7 @@ static void print_resource_list (struct list_head *head)
 		print_resource_lock_list (resource);
 	}
 }
+#endif
 
 void resource_release (struct resource *resource)
 {
@@ -1195,10 +1199,6 @@ static void lck_resource_cleanup_remove (
 	struct list_head *list;
 	struct resource_cleanup *resource_cleanup;
 	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
-
-	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: resource_cleanup_remove { %s }\n",
-		    get_mar_name_t (&resource_cleanup->name));
 
 	for (list = lck_pd->resource_cleanup_list.next;
 	     list != &lck_pd->resource_cleanup_list;
@@ -2131,7 +2131,7 @@ static void message_handler_req_exec_lck_sync_resource_refcount (
 
 static void message_handler_req_lib_lck_resourceopen (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_resourceopen *req_lib_lck_resourceopen
 		= (struct req_lib_lck_resourceopen *)msg;
@@ -2166,7 +2166,7 @@ static void message_handler_req_lib_lck_resourceopen (
 
 static void message_handler_req_lib_lck_resourceopenasync (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_resourceopen *req_lib_lck_resourceopen
 		= (struct req_lib_lck_resourceopen *)msg;
@@ -2202,7 +2202,7 @@ static void message_handler_req_lib_lck_resourceopenasync (
 
 static void message_handler_req_lib_lck_resourceclose (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_resourceclose *req_lib_lck_resourceclose
 		= (struct req_lib_lck_resourceclose *)msg;
@@ -2247,7 +2247,7 @@ static void message_handler_req_lib_lck_resourceclose (
 
 static void message_handler_req_lib_lck_resourcelock (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_resourcelock *req_lib_lck_resourcelock
 		= (struct req_lib_lck_resourcelock *)msg;
@@ -2281,7 +2281,7 @@ static void message_handler_req_lib_lck_resourcelock (
 
 static void message_handler_req_lib_lck_resourcelockasync (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_resourcelock *req_lib_lck_resourcelock
 		= (struct req_lib_lck_resourcelock *)msg;
@@ -2315,7 +2315,7 @@ static void message_handler_req_lib_lck_resourcelockasync (
 
 static void message_handler_req_lib_lck_resourceunlock (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_resourceunlock *req_lib_lck_resourceunlock
 		= (struct req_lib_lck_resourceunlock *)msg;
@@ -2348,7 +2348,7 @@ static void message_handler_req_lib_lck_resourceunlock (
 
 static void message_handler_req_lib_lck_resourceunlockasync (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_resourceunlock *req_lib_lck_resourceunlock
 		= (struct req_lib_lck_resourceunlock *)msg;
@@ -2381,7 +2381,7 @@ static void message_handler_req_lib_lck_resourceunlockasync (
 
 static void message_handler_req_lib_lck_lockpurge (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_lck_lockpurge *req_lib_lck_lockpurge
 		= (struct req_lib_lck_lockpurge *)msg;
