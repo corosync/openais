@@ -862,7 +862,7 @@ extern void amf_sg_si_activated (
 /* General methods */
 extern struct amf_su *amf_su_find (
 	struct amf_cluster *cluster, SaNameT *name);
-extern struct amf_su *amf_su_new (struct amf_sg *sg, char *name);
+extern struct amf_su *amf_su_new (struct amf_sg *sg, const char *name);
 extern void amf_su_delete (struct amf_su *su);
 extern char *amf_su_dn_make (struct amf_su *su, SaNameT *name);
 extern void *amf_su_serialize (struct amf_su *su, int *len);

@@ -712,15 +712,6 @@ static SaAmfPresenceStateT 	get_worst_comps_presence_state_in_su (amf_su_t *su)
 }
 
 /**
- * 
- * @param su
- */
-void su_history_state_set(struct amf_su *su, SaAmfPresenceStateT state)
-{
-	su->restart_control_state = su->escalation_level_history_state;
-	su->saAmfSUPresenceState =  state;
-}
-/**
  * A component notifies its parent su that its presence state has changed.
  * @param su
  * @param comp - component which has changed its presence state
@@ -729,8 +720,12 @@ void su_history_state_set(struct amf_su *su, SaAmfPresenceStateT state)
 static void su_comp_presence_state_changed (struct amf_su *su, 
 	struct amf_comp *comp, int state)
 {
+	amf_node_t *node;
+
 	ENTER ();
-	amf_node_t *node = amf_node_find (&comp->su->saAmfSUHostedByNode);
+
+	node = amf_node_find (&comp->su->saAmfSUHostedByNode);
+
 	switch (state) {
 		case SA_AMF_PRESENCE_INSTANTIATED:
 			switch (su->restart_control_state) {
@@ -1075,9 +1070,12 @@ static void su_rc_enter_idle_escalation_level_1 (amf_comp_t *component,
 static void su_rc_enter_idle_escalation_level_2 (amf_comp_t *component,
 	SaAmfRecommendedRecoveryT recommended_recovery)
 {
+	amf_node_t *node;
+
 	ENTER();
+
+	node = amf_node_find (&component->su->saAmfSUHostedByNode);
 	component->su->restart_control_state = SU_RC_IDLE_ESCALATION_LEVEL_2;
-	amf_node_t *node = amf_node_find (&component->su->saAmfSUHostedByNode);
 	amf_node_comp_restart_req (node, component); 
 }
 static int get_instantiation_max_level (amf_su_t *su)
@@ -1366,7 +1364,7 @@ static void si_ha_state_assumed_cbfn (
  * 
  * @return struct amf_su*
  */
-struct amf_su *amf_su_new (struct amf_sg *sg, char *name)
+struct amf_su *amf_su_new (struct amf_sg *sg, const char *name)
 {
 	struct amf_su *tail = sg->su_head;
 	struct amf_su *su = amf_calloc (1, sizeof (struct amf_su));
@@ -1487,7 +1485,7 @@ struct amf_su *amf_su_find (struct amf_cluster *cluster, SaNameT *name)
 	char *app_name;
 	char *sg_name;
 	char *su_name;
-	char *ptrptr;
+	char *ptrptr = NULL;
 	char *buf;
 
 	assert (cluster != NULL && name != NULL);
@@ -1595,9 +1593,10 @@ amf_si_assignment_t *amf_su_assign_si (struct amf_su *su, struct amf_si *si,
 		for (comp = su->comp_head; comp != NULL; comp = comp->next) {
 			int no_of_cs_types = 0;
 			for (i = 0; comp->saAmfCompCsTypes[i]; i++) {
+				int no_of_assignments = 0;
+
 				cs_type = comp->saAmfCompCsTypes[i];
 				no_of_cs_types++;
-				int no_of_assignments = 0;
 
 				for (csi = si->csi_head; csi != NULL; csi = csi->next) {
 					if (!memcmp(csi->saAmfCSTypeName.value, cs_type->value,
