@@ -64,24 +64,16 @@
 
 #define SECONDS_TO_EXPIRE 5
 
-int ckptinv;
-SaInvocationT open_invocation = 16;
-void printSaNameT (SaNameT *name)
-{
-	int i;
+static int ckptinv;
+static SaInvocationT open_invocation = 16;
 
-	for (i = 0; i < name->length; i++) {
-		printf ("%c", name->value[i]);
-	}
-}
+static SaVersionT version = { 'B', 1, 1 };
 
-SaVersionT version = { 'B', 1, 1 };
+static SaNameT defaultCheckpointName = { 8, "defaults" };
 
-SaNameT defaultCheckpointName = { 8, "defaults" };
+static SaNameT sectionsCheckpointName = { 8, "sections" };
 
-SaNameT sectionsCheckpointName = { 8, "sections" };
-
-SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
+static SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
 	.creationFlags = SA_CKPT_WR_ALL_REPLICAS,
 	.checkpointSize = 100000,
 	.retentionDuration = 5000000000LL,
@@ -90,33 +82,33 @@ SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
 	.maxSectionIdSize = 20
 };
 
-SaCkptSectionIdT sectionId1 = {
+static SaCkptSectionIdT sectionId1 = {
 	13,
 	(SaUint8T *) "section ID #1"
 };
 
-SaCkptSectionIdT sectionId2 = {
+static SaCkptSectionIdT sectionId2 = {
 	13,
 	(SaUint8T *) "section ID #2"
 };
 
-SaCkptSectionCreationAttributesT sectionCreationAttributes1 = {
+static SaCkptSectionCreationAttributesT sectionCreationAttributes1 = {
 	&sectionId1,
 	SA_TIME_END
 };
 
-SaCkptSectionCreationAttributesT sectionCreationAttributes2 = {
+static SaCkptSectionCreationAttributesT sectionCreationAttributes2 = {
 	&sectionId2,
 	SA_TIME_END
 };
 
-char readBuffer1[1025];
+static char readBuffer1[1025];
 
-char readBuffer2[1025];
+static char readBuffer2[1025];
 
-char default_read_buffer[1025];
+static char default_read_buffer[1025];
 
-SaCkptIOVectorElementT ReadVectorElements[] = {
+static SaCkptIOVectorElementT ReadVectorElements[] = {
 	{
 		{
 			13,
@@ -139,7 +131,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 	}
 };
 
-SaCkptIOVectorElementT default_read_vector[] = {
+static SaCkptIOVectorElementT default_read_vector[] = {
 	{
 		SA_CKPT_DEFAULT_SECTION_ID,
         default_read_buffer, /*"written data #1, this should extend past end of old section data", */
@@ -151,10 +143,10 @@ SaCkptIOVectorElementT default_read_vector[] = {
 
 
 #define DATASIZE 127000
-char data1[DATASIZE];
-char data2[DATASIZE];
-char default_write_data[56];
-SaCkptIOVectorElementT WriteVectorElements[] = {
+static char data1[DATASIZE];
+static char data2[DATASIZE];
+static char default_write_data[56];
+static SaCkptIOVectorElementT WriteVectorElements[] = {
 	{
 		{
 			13,
@@ -187,9 +179,9 @@ SaCkptIOVectorElementT default_write_vector[] = {
 	}
 };
 
-SaCkptCheckpointHandleT checkpointHandle;
+static SaCkptCheckpointHandleT checkpointHandle;
 
-void OpenCallBack (
+static void OpenCallBack (
     SaInvocationT invocation,
     const SaCkptCheckpointHandleT chckpointHandle,
     SaAisErrorT error) {
@@ -201,7 +193,7 @@ void OpenCallBack (
 
 }
 
-SaCkptCallbacksT callbacks = {
+static SaCkptCallbacksT callbacks = {
  	&OpenCallBack,
 	0
 };
