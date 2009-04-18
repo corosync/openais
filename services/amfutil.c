@@ -275,7 +275,7 @@ struct amf_cluster *amf_config_read (char **error_string)
 	char buf[1024];
 	char *line;
 	FILE *fp;
-	char *filename;
+	const char *filename;
 	amf_object_type_t current_parse = AMF_NONE;
 	int line_number = 0;
 	char *loc;
@@ -299,7 +299,7 @@ struct amf_cluster *amf_config_read (char **error_string)
 	int                       comp_cs_type_cnt = 0;
 	int                       csi_attr_cnt = 0;
 	int                       csi_dependencies_cnt = 0;
-	char                     *error_reason = NULL;
+	const char                *error_reason = NULL;
 	char                     *value;
 	filename = getenv ("COROSYNC_AMF_CONFIG_FILE");
 	if (!filename) {
@@ -1293,7 +1293,8 @@ char *_amf_strdup (const char *in_str, const char *file, unsigned int line)
 	return out_str;
 }
 
-int sa_amf_grep_one_sub_match(const char *string, char *pattern, 
+#ifdef TODO
+static int sa_amf_grep_one_sub_match(const char *string, char *pattern, 
 	SaNameT *matches_arr)
 {
 	int             status;
@@ -1334,6 +1335,7 @@ int sa_amf_grep_one_sub_match(const char *string, char *pattern,
 	return status;
 
 }
+#endif
 
 
 int sa_amf_grep(const char *string, char *pattern, size_t nmatch,
