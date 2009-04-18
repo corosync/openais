@@ -327,7 +327,7 @@ static void acsm_cluster_enter_started (amf_cluster_t *cluster)
  *****************************************************************************/
 
 void amf_cluster_start_tmo_event (int is_sync_masterm, 
-	struct amf_cluster *cluster, SaNameT *sourceNodeName)
+	struct amf_cluster *cluster, const SaNameT *sourceNodeName)
 {
 	ENTER ();
 

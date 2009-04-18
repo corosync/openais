@@ -765,7 +765,7 @@ extern int amf_cluster_applications_started_with_no_starting_sgs (
 
 /* Event methods */
 extern void amf_cluster_start_tmo_event (int is_sync_master, 
-	struct amf_cluster *cluster, SaNameT *sourceNodeName);
+	struct amf_cluster *cluster, const SaNameT *sourceNodeName);
 extern void amf_cluster_sync_ready (struct amf_cluster *cluster, 
 	struct amf_node *node);
 /**
@@ -919,7 +919,7 @@ extern struct amf_comp *amf_comp_new (struct amf_su *su, const char *name);
 extern void amf_comp_delete (struct amf_comp *comp);
 extern char *amf_comp_dn_make (struct amf_comp *comp, SaNameT *name);
 extern struct amf_comp *amf_comp_find (
-	struct amf_cluster *cluster, SaNameT *name);
+	struct amf_cluster *cluster, const SaNameT *name);
 extern void *amf_comp_serialize (struct amf_comp *comp, int *len);
 extern struct amf_comp *amf_comp_deserialize (
 	struct amf_su *su, char *buf);
@@ -957,7 +957,7 @@ extern void amf_comp_operational_state_set (
 extern void amf_comp_readiness_state_set (
 	struct amf_comp *comp, SaAmfReadinessStateT state);
 extern struct amf_healthcheck *amf_comp_find_healthcheck (
-	struct amf_comp *comp, SaAmfHealthcheckKeyT *key);
+	struct amf_comp *comp, const SaAmfHealthcheckKeyT *key);
 extern void amf_comp_healthcheck_tmo (
 	struct amf_comp *comp, SaAmfRecommendedRecoveryT recommendedRecovery);
 extern void amf_comp_cleanup_completed (struct amf_comp *comp);
@@ -985,12 +985,12 @@ extern int amf_comp_get_saAmfCompNumCurrStandbyCsi(struct amf_comp *component);
 
 extern SaAisErrorT amf_comp_healthcheck_start (
 	struct amf_comp *comp,
-	SaAmfHealthcheckKeyT *healthcheckKey,
+	const SaAmfHealthcheckKeyT *healthcheckKey,
 	SaAmfHealthcheckInvocationT invocationType,
 	SaAmfRecommendedRecoveryT recommendedRecovery);
 extern SaAisErrorT amf_comp_healthcheck_stop (
 	struct amf_comp *comp,
-	SaAmfHealthcheckKeyT *healthcheckKey);
+	const SaAmfHealthcheckKeyT *healthcheckKey);
 extern SaAisErrorT amf_comp_pm_start (
 	struct amf_comp *comp,
 	SaUint64T pid,
@@ -1012,14 +1012,14 @@ extern int amf_comp_response_1 (
 	SaUint32T *interface, SaNameT *dn, SaAmfHealthcheckKeyT *healtcheck_key,
 	SaAmfRecommendedRecoveryT *recommendedRecovery);
 extern struct amf_comp *amf_comp_response_2 (
-	SaUint32T interface, SaNameT *dn, SaAmfHealthcheckKeyT *healthcheckKey,
+	SaUint32T interface, const SaNameT *dn, const SaAmfHealthcheckKeyT *healthcheckKey,
 	SaAisErrorT error, SaAisErrorT *retval, 
 	SaAmfRecommendedRecoveryT recommendedRecovery);
 extern SaAisErrorT amf_comp_hastate_get (
-	struct amf_comp *comp, SaNameT *csi_name, SaAmfHAStateT *ha_state);
+	struct amf_comp *comp, const SaNameT *csi_name, SaAmfHAStateT *ha_state);
 extern SaAisErrorT amf_comp_healthcheck_confirm (
 	struct amf_comp *comp,
-	SaAmfHealthcheckKeyT *healthcheckKey,
+	const SaAmfHealthcheckKeyT *healthcheckKey,
 	SaAisErrorT healthcheckResult);
 
 extern amf_healthcheck_t *amf_healthcheck_new (struct amf_comp *comp);

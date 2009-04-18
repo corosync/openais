@@ -724,7 +724,7 @@ char *amf_comp_dn_make (struct amf_comp *comp, SaNameT *name)
 }
 
 struct amf_healthcheck *amf_comp_find_healthcheck (
-	struct amf_comp *comp, SaAmfHealthcheckKeyT *key)
+	struct amf_comp *comp, const SaAmfHealthcheckKeyT *key)
 {
 	struct amf_healthcheck *healthcheck;
 	struct amf_healthcheck *ret_healthcheck = 0;
@@ -846,7 +846,7 @@ end:
 	return comp;
 }
 
-struct amf_comp *amf_comp_find (struct amf_cluster *cluster, SaNameT *name)
+struct amf_comp *amf_comp_find (struct amf_cluster *cluster, const SaNameT *name)
 {
 	struct amf_application *app;
 	struct amf_sg *sg;
@@ -1732,7 +1732,7 @@ SaAisErrorT amf_comp_pm_stop (
  */
 SaAisErrorT amf_comp_healthcheck_start (
 	struct amf_comp *comp,
-	SaAmfHealthcheckKeyT *healthcheckKey,
+	const SaAmfHealthcheckKeyT *healthcheckKey,
 	SaAmfHealthcheckInvocationT invocationType,
 	SaAmfRecommendedRecoveryT recommendedRecovery)
 {
@@ -1807,7 +1807,7 @@ error_exit:
  */
 SaAisErrorT amf_comp_healthcheck_stop (
 	struct amf_comp *comp,
-	SaAmfHealthcheckKeyT *healthcheckKey)
+	const SaAmfHealthcheckKeyT *healthcheckKey)
 {
 	struct amf_healthcheck *healthcheck;
 	SaAisErrorT error = SA_AIS_OK;
@@ -2056,8 +2056,8 @@ int amf_comp_response_1 (
  * 
  * @return component to which the response should be sent
  */
-struct amf_comp *amf_comp_response_2 (SaUint32T interface, SaNameT *dn, 
-	SaAmfHealthcheckKeyT *healthcheck_key, SaAisErrorT error, 
+struct amf_comp *amf_comp_response_2 (SaUint32T interface, const SaNameT *dn, 
+	const SaAmfHealthcheckKeyT *healthcheck_key, SaAisErrorT error, 
 	SaAisErrorT *retval, SaAmfRecommendedRecoveryT recommendedRecovery)
 {
 	struct amf_csi_assignment *csi_assignment;
@@ -2215,7 +2215,7 @@ void amf_comp_restart (struct amf_comp *comp)
  * @return SaAisErrorT
  */
 SaAisErrorT amf_comp_hastate_get (
-	struct amf_comp *comp, SaNameT *csi_name, SaAmfHAStateT *ha_state)
+	struct amf_comp *comp, const SaNameT *csi_name, SaAmfHAStateT *ha_state)
 {
 	struct amf_csi_assignment *assignment;
 
@@ -2243,7 +2243,7 @@ SaAisErrorT amf_comp_hastate_get (
  */
 SaAisErrorT amf_comp_healthcheck_confirm (
 	struct amf_comp *comp,
-	SaAmfHealthcheckKeyT *healthcheckKey,
+	const SaAmfHealthcheckKeyT *healthcheckKey,
 	SaAisErrorT healthcheckResult)
 {
 	struct amf_healthcheck *healthcheck;

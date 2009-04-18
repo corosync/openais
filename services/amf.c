@@ -186,44 +186,44 @@ static void amf_confchg_fn (
 static int amf_lib_exit_fn (void *conn);
 static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api);
 static int amf_lib_init_fn (void *conn);
-static void message_handler_req_lib_amf_componentregister (void *conn, void *msg);
-static void message_handler_req_lib_amf_componentunregister (void *conn, void *msg);
-static void message_handler_req_lib_amf_pmstart (void *conn, void *msg);
-static void message_handler_req_lib_amf_pmstop (void *conn, void *msg);
-static void message_handler_req_lib_amf_healthcheckstart (void *conn, void *msg);
-static void message_handler_req_lib_amf_healthcheckconfirm (void *conn, void *msg);
-static void message_handler_req_lib_amf_healthcheckstop (void *conn, void *msg);
-static void message_handler_req_lib_amf_hastateget (void *conn, void *message);
-static void message_handler_req_lib_amf_csiquiescingcomplete (void *conn, void *msg);
-static void message_handler_req_lib_amf_protectiongrouptrack (void *conn, void *msg);
-static void message_handler_req_lib_amf_protectiongrouptrackstop (void *conn, void *msg);
-static void message_handler_req_lib_amf_componenterrorreport (void *conn, void *msg);
-static void message_handler_req_lib_amf_componenterrorclear (void *conn, void *msg);
-static void message_handler_req_lib_amf_response (void *conn, void *msg);
+static void message_handler_req_lib_amf_componentregister (void *conn, const void *msg);
+static void message_handler_req_lib_amf_componentunregister (void *conn, const void *msg);
+static void message_handler_req_lib_amf_pmstart (void *conn, const void *msg);
+static void message_handler_req_lib_amf_pmstop (void *conn, const void *msg);
+static void message_handler_req_lib_amf_healthcheckstart (void *conn, const void *msg);
+static void message_handler_req_lib_amf_healthcheckconfirm (void *conn, const void *msg);
+static void message_handler_req_lib_amf_healthcheckstop (void *conn, const void *msg);
+static void message_handler_req_lib_amf_hastateget (void *conn, const void *message);
+static void message_handler_req_lib_amf_csiquiescingcomplete (void *conn, const void *msg);
+static void message_handler_req_lib_amf_protectiongrouptrack (void *conn, const void *msg);
+static void message_handler_req_lib_amf_protectiongrouptrackstop (void *conn, const void *msg);
+static void message_handler_req_lib_amf_componenterrorreport (void *conn, const void *msg);
+static void message_handler_req_lib_amf_componenterrorclear (void *conn, const void *msg);
+static void message_handler_req_lib_amf_response (void *conn, const void *msg);
 static void message_handler_req_exec_amf_comp_register (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_comp_error_report (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_comp_instantiate (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_clc_cleanup_completed (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_healthcheck_tmo (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_response (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_sync_start (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_sync_data (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_cluster_start_tmo (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_sync_request (
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_comp_instantiate_tmo(
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void message_handler_req_exec_amf_comp_cleanup_tmo(
-	void *message, unsigned int nodeid);
+	const void *message, unsigned int nodeid);
 static void amf_dump_fn (void);
 static void amf_sync_init (void);
 static int amf_sync_process (void);
@@ -514,7 +514,7 @@ static int clm_node_list_entries;
  * @return int
  */
 static int is_list_member (
-	unsigned int key, unsigned int *list, unsigned int entries)
+	unsigned int key, const unsigned int *list, unsigned int entries)
 {
 	int i;
 
@@ -545,7 +545,7 @@ static void clm_node_list_delete (void)
  * @param nodeid
  * @param hostname
  */
-static void clm_node_list_update (unsigned int nodeid, char *hostname)
+static void clm_node_list_update (unsigned int nodeid, const char *hostname)
 {
 	int i;
 
@@ -719,10 +719,10 @@ static int create_cluster_model (void)
 
 	amf_cluster = amf_config_read (&error_string);
 	if (amf_cluster == NULL) {
-		log_printf (LOG_LEVEL_ERROR, error_string);
+		log_printf (LOG_LEVEL_ERROR, "%s", error_string);
 		corosync_fatal_error (COROSYNC_INVALID_CONFIG);
 	}
-	log_printf (LOG_LEVEL_NOTICE, error_string);
+	log_printf (LOG_LEVEL_NOTICE, "%s", error_string);
 
 	this_amf_node = get_this_node_obj ();
 
@@ -750,7 +750,7 @@ static int create_cluster_model (void)
  * @return int - node ID of new sync master
  */
 static unsigned int calc_sync_master (
-	unsigned int *member_list, int member_list_entries)
+	const unsigned int *member_list, int member_list_entries)
 {
 	int i;
 	unsigned int master = api->totem_nodeid_get(); /* assume this node is master */
@@ -1470,10 +1470,10 @@ static void amf_dump_fn (void)
  *****************************************************************************/
 
 static void message_handler_req_exec_amf_comp_register (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
 	struct res_lib_amf_componentregister res_lib;
-	struct req_exec_amf_comp_register *req_exec = message;
+	const struct req_exec_amf_comp_register *req_exec = message;
 	struct amf_comp *comp;
 	SaAisErrorT error;
 
@@ -1497,9 +1497,9 @@ static void message_handler_req_exec_amf_comp_register (
 }
 
 static void message_handler_req_exec_amf_comp_error_report (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_comp_error_report *req_exec = message;
+	const struct req_exec_amf_comp_error_report *req_exec = message;
 	struct amf_comp *comp;
 	amf_comp_t *reporting_comp;
 
@@ -1514,9 +1514,9 @@ static void message_handler_req_exec_amf_comp_error_report (
 }
 
 static void message_handler_req_exec_amf_comp_instantiate(
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_comp_instantiate *req_exec = message;
+	const struct req_exec_amf_comp_instantiate *req_exec = message;
 	struct amf_comp *component;
 
 	component = amf_comp_find (amf_cluster, &req_exec->compName);
@@ -1530,9 +1530,9 @@ static void message_handler_req_exec_amf_comp_instantiate(
 }
 
 static void message_handler_req_exec_amf_comp_instantiate_tmo(
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_comp_instantiate_tmo *req_exec = message;
+	const struct req_exec_amf_comp_instantiate_tmo *req_exec = message;
 	struct amf_comp *component;
 
 	component = amf_comp_find (amf_cluster, &req_exec->compName);
@@ -1545,9 +1545,9 @@ static void message_handler_req_exec_amf_comp_instantiate_tmo(
 }
 
 static void message_handler_req_exec_amf_comp_cleanup_tmo(
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_comp_cleanup_tmo *req_exec = message;
+	const struct req_exec_amf_comp_cleanup_tmo *req_exec = message;
 	struct amf_comp *component;
 
 	component = amf_comp_find (amf_cluster, &req_exec->compName);
@@ -1560,9 +1560,9 @@ static void message_handler_req_exec_amf_comp_cleanup_tmo(
 }
 
 static void message_handler_req_exec_amf_clc_cleanup_completed (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_clc_cleanup_completed *req_exec = message;
+	const struct req_exec_amf_clc_cleanup_completed *req_exec = message;
 	amf_comp_t *comp;
 	if (scsm.state != NORMAL_OPERATION) {
 		return;
@@ -1585,9 +1585,9 @@ static void message_handler_req_exec_amf_clc_cleanup_completed (
 }
 
 static void message_handler_req_exec_amf_healthcheck_tmo (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_healthcheck_tmo *req_exec = message;
+	const struct req_exec_amf_healthcheck_tmo *req_exec = message;
 	struct amf_comp *comp;
 	struct amf_healthcheck *healthcheck;
 
@@ -1609,9 +1609,9 @@ static void message_handler_req_exec_amf_healthcheck_tmo (
 }
 
 static void message_handler_req_exec_amf_response (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_response *req_exec = message;
+	const struct req_exec_amf_response *req_exec = message;
 	struct amf_comp *comp;
 	struct res_lib_amf_response res_lib;
 	SaAisErrorT retval;
@@ -1636,7 +1636,7 @@ static void message_handler_req_exec_amf_response (
 }
 
 static void message_handler_req_exec_amf_sync_start (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
 	SYNCTRACE ("from: %s", api->totem_ifaces_print (nodeid));
 
@@ -1683,9 +1683,9 @@ static void message_handler_req_exec_amf_sync_start (
 }
 
 static void message_handler_req_exec_amf_sync_data (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_sync_data *req_exec = message;
+	const struct req_exec_amf_sync_data *req_exec = message;
 	char *tmp = ((char*)message) + sizeof (struct req_exec_amf_sync_data);
 
 	SYNCTRACE ("rec %d bytes, ptr %p, type %d", req_exec->header.size, message,
@@ -1793,9 +1793,10 @@ static void message_handler_req_exec_amf_sync_data (
 }
 
 static void message_handler_req_exec_amf_cluster_start_tmo (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_cluster_start_tmo *req;
+	const struct req_exec_amf_cluster_start_tmo *req;
+
 	req = (struct req_exec_amf_cluster_start_tmo *)message;
 	
 	if (scsm.state != NORMAL_OPERATION) {
@@ -1807,9 +1808,9 @@ static void message_handler_req_exec_amf_cluster_start_tmo (
 }
 
 static void message_handler_req_exec_amf_sync_request (
-	void *message, unsigned int nodeid)
+	const void *message, unsigned int nodeid)
 {
-	struct req_exec_amf_sync_request *req_exec = message;
+	const struct req_exec_amf_sync_request *req_exec = message;
 	
 	SYNCTRACE ("from: %s, name: %s, state %s", api->totem_ifaces_print (nodeid),
 		req_exec->hostname, scsm_state_names[scsm.state]);
@@ -1838,9 +1839,9 @@ static void message_handler_req_exec_amf_sync_request (
 
 static void message_handler_req_lib_amf_componentregister (
 	void *conn,
-	 void *msg)
+	const void *msg)
 {
-	struct req_lib_amf_componentregister *req_lib = msg;
+	const struct req_lib_amf_componentregister *req_lib = msg;
 	struct amf_comp *comp;
 
 	assert (scsm.state == NORMAL_OPERATION);
@@ -1876,10 +1877,10 @@ static void message_handler_req_lib_amf_componentregister (
 
 static void message_handler_req_lib_amf_componentunregister (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 #ifdef COMPILE_OUT
-	struct req_lib_amf_componentunregister *req_lib_amf_componentunregister = (struct req_lib_amf_componentunregister *)message;
+	const struct req_lib_amf_componentunregister *req_lib_amf_componentunregister = message;
 	struct req_exec_amf_componentunregister req_exec_amf_componentunregister;
 	struct iovec iovec;
 	struct amf_comp *component;
@@ -1909,9 +1910,9 @@ static void message_handler_req_lib_amf_componentunregister (
 
 static void message_handler_req_lib_amf_pmstart (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_amf_pmstart *req_lib = msg;
+	const struct req_lib_amf_pmstart *req_lib = msg;
 	struct res_lib_amf_pmstart  res_lib;
 	struct amf_comp *comp;
 	SaAisErrorT error = SA_AIS_OK;
@@ -1948,9 +1949,9 @@ static void message_handler_req_lib_amf_pmstart (
 
 static void message_handler_req_lib_amf_pmstop (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_amf_pmstop *req_lib = msg;
+	const struct req_lib_amf_pmstop *req_lib = msg;
 	struct res_lib_amf_pmstop  res_lib;
 	struct amf_comp *comp;
 	SaAisErrorT error = SA_AIS_OK;
@@ -1985,9 +1986,9 @@ static void message_handler_req_lib_amf_pmstop (
 }
 
 static void message_handler_req_lib_amf_healthcheckstart (
-	void *conn, void *msg)
+	void *conn, const void *msg)
 {
-	struct req_lib_amf_healthcheckstart *req_lib = msg;
+	const struct req_lib_amf_healthcheckstart *req_lib = msg;
 	struct res_lib_amf_healthcheckstart res_lib;
 	struct amf_comp *comp;
 	SaAisErrorT error = SA_AIS_OK;
@@ -2013,9 +2014,9 @@ static void message_handler_req_lib_amf_healthcheckstart (
 }
 
 static void message_handler_req_lib_amf_healthcheckconfirm (
-	void *conn,	void *msg)
+	void *conn, const void *msg)
 {
-	struct req_lib_amf_healthcheckconfirm *req_lib = msg;
+	const struct req_lib_amf_healthcheckconfirm *req_lib = msg;
 	struct res_lib_amf_healthcheckconfirm res_lib;
 	struct amf_comp *comp;
 	SaAisErrorT error = SA_AIS_OK;
@@ -2037,9 +2038,9 @@ static void message_handler_req_lib_amf_healthcheckconfirm (
 }
 
 static void message_handler_req_lib_amf_healthcheckstop (
-	void *conn,	void *msg)
+	void *conn, const void *msg)
 {
-	struct req_lib_amf_healthcheckstop *req_lib = msg;
+	const struct req_lib_amf_healthcheckstop *req_lib = msg;
 	struct res_lib_amf_healthcheckstop res_lib;
 	struct amf_comp *comp;
 	SaAisErrorT error = SA_AIS_OK;
@@ -2059,9 +2060,9 @@ static void message_handler_req_lib_amf_healthcheckstop (
 	api->ipc_response_send (conn, &res_lib, sizeof (res_lib));
 }
 
-static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
+static void message_handler_req_lib_amf_hastateget (void *conn, const void *msg)
 {
-	struct req_lib_amf_hastateget *req_lib = msg;
+	const struct req_lib_amf_hastateget *req_lib = msg;
 	struct res_lib_amf_hastateget res_lib;
 	struct amf_comp *comp;
 	SaAmfHAStateT ha_state;
@@ -2088,10 +2089,10 @@ static void message_handler_req_lib_amf_hastateget (void *conn, void *msg)
 
 static void message_handler_req_lib_amf_protectiongrouptrack (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 #ifdef COMPILE_OUT
-	struct req_lib_amf_protectiongrouptrack *req_lib_amf_protectiongrouptrack = (struct req_lib_amf_protectiongrouptrack *)message;
+	const struct req_lib_amf_protectiongrouptrack *req_lib_amf_protectiongrouptrack = message;
 	struct res_lib_amf_protectiongrouptrack res_lib_amf_protectiongrouptrack;
 	struct libamf_ci_trackentry *track = 0;
 	int i;
@@ -2158,16 +2159,16 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 
 static void message_handler_req_lib_amf_csiquiescingcomplete (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 }
 
 static void message_handler_req_lib_amf_protectiongrouptrackstop (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 #ifdef COMPILE_OUT
-	struct req_lib_amf_protectiongrouptrackstop *req_lib_amf_protectiongrouptrackstop = (struct req_lib_amf_protectiongrouptrackstop *)message;
+	const struct req_lib_amf_protectiongrouptrackstop *req_lib_amf_protectiongrouptrackstop = message;
 	struct res_lib_amf_protectiongrouptrackstop res_lib_amf_protectiongrouptrackstop;
 	struct libamf_ci_trackentry *track = 0;
 	int i;
@@ -2236,9 +2237,9 @@ void mcast_error_report_from_pm (
 
 static void message_handler_req_lib_amf_componenterrorreport (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_amf_componenterrorreport *req_lib = msg;
+	const struct req_lib_amf_componenterrorreport *req_lib = msg;
 	struct amf_comp *comp;
 	amf_comp_t *reporting_comp;
 	SaNameT reporting_comp_name;
@@ -2289,10 +2290,10 @@ static void message_handler_req_lib_amf_componenterrorreport (
 
 static void message_handler_req_lib_amf_componenterrorclear (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 #ifdef COMPILLE_OUT
-	struct req_lib_amf_componenterrorclear *req_lib_amf_componenterrorclear = (struct req_lib_amf_componenterrorclear *)message;
+	const struct req_lib_amf_componenterrorclear *req_lib_amf_componenterrorclear = message;
 	struct req_exec_amf_componenterrorclear req_exec_amf_componenterrorclear;
 
 	struct iovec iovec;
@@ -2338,10 +2339,10 @@ static void message_handler_req_lib_amf_componenterrorclear (
  * @param conn
  * @param msg
  */
-static void message_handler_req_lib_amf_response (void *conn, void *msg)
+static void message_handler_req_lib_amf_response (void *conn, const void *msg)
 {
 	struct res_lib_amf_response res_lib;
-	struct req_lib_amf_response *req_lib = msg;
+	const struct req_lib_amf_response *req_lib = msg;
 	int multicast;
 	SaAisErrorT retval;
 	SaUint32T interface;
@@ -2383,7 +2384,6 @@ send_response:
 	res_lib.header.size = sizeof (struct res_lib_amf_response);
 	res_lib.header.error = retval;
 	api->ipc_response_send (conn, &res_lib, sizeof (res_lib));
-end:
 	return;
 }
 
