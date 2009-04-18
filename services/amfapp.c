@@ -239,15 +239,17 @@ static void start_all_sg_for_cluster (amf_application_t *app)
 
 static void timer_function_cluster_application_started (void* app)
 {
-	ENTER();
 	amf_application_t *application = (amf_application_t*)app;
+
+	ENTER();
 	amf_cluster_application_started (application->cluster, application);
 }
 
 static void timer_function_node_application_started (void* app)
 {
-	ENTER();
 	amf_application_t *application = (amf_application_t*)app;
+
+	ENTER();
 	amf_node_application_started (application->node_to_start, application);
 }
 
