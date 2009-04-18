@@ -36,7 +36,7 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
 			  config.guess config.sub missing install-sh \
 			  autoheader automake autoconf
 
-dist_doc_DATA		= LICENSE README.amf 
+dist_doc_DATA		= LICENSE README.amf AUTHORS
 
 sysconf_DATA		= conf/openais.conf
 
