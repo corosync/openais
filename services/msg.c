@@ -336,103 +336,103 @@ static void message_handler_req_exec_msg_sync_group_member (
 
 static void message_handler_req_lib_msg_queueopen (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queueopenasync (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queueclose (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuestatusget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queueretentiontimeset (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queueunlink (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuegroupcreate (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuegroupinsert (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuegroupremove (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuegroupdelete (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuegrouptrack (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuegrouptrackstop (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuegroupnotificationfree (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messagesend (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messagesendasync (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messageget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messagedatafree (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messagecancel (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messagesendreceive (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messagereply (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_messagereplyasync (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuecapacitythresholdset (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_queuecapacitythresholdget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_metadatasizeget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_msg_limitget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static enum msg_sync_state msg_sync_state = MSG_SYNC_STATE_NOT_STARTED;
 static enum msg_sync_iteration_state msg_sync_iteration_state;
@@ -1126,6 +1126,7 @@ static int msg_name_match (const SaNameT *name_a, const SaNameT *name_b)
 	return (0);
 }
 
+#ifdef PRINT_ON
 static void msg_print_queue_cleanup_list (
 	struct list_head *cleanup_head)
 {
@@ -1255,6 +1256,7 @@ static void msg_print_group_list (
 	}
 	return;
 }
+#endif
 
 static unsigned int msg_group_track_current (
 	struct group_entry *group,
@@ -1569,7 +1571,7 @@ static void msg_release_queue_message (
 
 static void msg_release_queue_cleanup (
 	void *conn,
-	SaNameT *queue_name,
+	const SaNameT *queue_name,
 	SaUint32T queue_id)
 {
 	struct list_head *list;
@@ -3838,7 +3840,7 @@ static void message_handler_req_exec_msg_messagereplyasync (
 	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_messagereplyasync *req_exec_msg_messagereplyasync =
+	const struct req_exec_msg_messagereplyasync *req_exec_msg_messagereplyasync =
 		message;
 	struct res_lib_msg_messagereplyasync res_lib_msg_messagereplyasync;
 	SaAisErrorT error = SA_AIS_OK;
@@ -4173,7 +4175,7 @@ static void message_handler_req_exec_msg_sync_queue_refcount (
 	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_msg_sync_queue_refcount *req_exec_msg_sync_queue_refcount =
+	const struct req_exec_msg_sync_queue_refcount *req_exec_msg_sync_queue_refcount =
 		message;
 	struct queue_entry *queue = NULL;
 
@@ -4331,10 +4333,9 @@ static void message_handler_req_exec_msg_sync_group_member (
 
 static void message_handler_req_lib_msg_queueopen (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queueopen *req_lib_msg_queueopen =
-		(struct req_lib_msg_queueopen *)msg;
+	const struct req_lib_msg_queueopen *req_lib_msg_queueopen = msg;
 	struct req_exec_msg_queueopen req_exec_msg_queueopen;
 	struct iovec iovec;
 
@@ -4369,10 +4370,9 @@ static void message_handler_req_lib_msg_queueopen (
 
 static void message_handler_req_lib_msg_queueopenasync (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queueopenasync *req_lib_msg_queueopenasync =
-		(struct req_lib_msg_queueopenasync *)msg;
+	const struct req_lib_msg_queueopenasync *req_lib_msg_queueopenasync = msg;
 	struct req_exec_msg_queueopenasync req_exec_msg_queueopenasync;
 	struct iovec iovec;
 
@@ -4407,10 +4407,9 @@ static void message_handler_req_lib_msg_queueopenasync (
 
 static void message_handler_req_lib_msg_queueclose (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queueclose *req_lib_msg_queueclose =
-		(struct req_lib_msg_queueclose *)msg;
+	const struct req_lib_msg_queueclose *req_lib_msg_queueclose = msg;
 	struct req_exec_msg_queueclose req_exec_msg_queueclose;
 	struct iovec iovec;
 
@@ -4441,10 +4440,9 @@ static void message_handler_req_lib_msg_queueclose (
 
 static void message_handler_req_lib_msg_queuestatusget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuestatusget *req_lib_msg_queuestatusget =
-		(struct req_lib_msg_queuestatusget *)msg;
+	const struct req_lib_msg_queuestatusget *req_lib_msg_queuestatusget = msg;
 	struct req_exec_msg_queuestatusget req_exec_msg_queuestatusget;
 	struct iovec iovec;
 
@@ -4468,10 +4466,9 @@ static void message_handler_req_lib_msg_queuestatusget (
 
 static void message_handler_req_lib_msg_queueretentiontimeset (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queueretentiontimeset *req_lib_msg_queueretentiontimeset =
-		(struct req_lib_msg_queueretentiontimeset *)msg;
+	const struct req_lib_msg_queueretentiontimeset *req_lib_msg_queueretentiontimeset = msg;
 	struct req_exec_msg_queueretentiontimeset req_exec_msg_queueretentiontimeset;
 	struct iovec iovec;
 
@@ -4500,10 +4497,9 @@ static void message_handler_req_lib_msg_queueretentiontimeset (
 
 static void message_handler_req_lib_msg_queueunlink (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queueunlink *req_lib_msg_queueunlink =
-		(struct req_lib_msg_queueunlink *)msg;
+	const struct req_lib_msg_queueunlink *req_lib_msg_queueunlink = msg;
 	struct req_exec_msg_queueunlink req_exec_msg_queueunlink;
 	struct iovec iovec;
 
@@ -4527,10 +4523,9 @@ static void message_handler_req_lib_msg_queueunlink (
 
 static void message_handler_req_lib_msg_queuegroupcreate (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuegroupcreate *req_lib_msg_queuegroupcreate =
-		(struct req_lib_msg_queuegroupcreate *)msg;
+	const struct req_lib_msg_queuegroupcreate *req_lib_msg_queuegroupcreate = msg;
 	struct req_exec_msg_queuegroupcreate req_exec_msg_queuegroupcreate;
 	struct iovec iovec;
 
@@ -4557,10 +4552,9 @@ static void message_handler_req_lib_msg_queuegroupcreate (
 
 static void message_handler_req_lib_msg_queuegroupinsert (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuegroupinsert *req_lib_msg_queuegroupinsert =
-		(struct req_lib_msg_queuegroupinsert *)msg;
+	const struct req_lib_msg_queuegroupinsert *req_lib_msg_queuegroupinsert = msg;
 	struct req_exec_msg_queuegroupinsert req_exec_msg_queuegroupinsert;
 	struct iovec iovec;
 
@@ -4586,10 +4580,9 @@ static void message_handler_req_lib_msg_queuegroupinsert (
 
 static void message_handler_req_lib_msg_queuegroupremove (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuegroupremove *req_lib_msg_queuegroupremove =
-		(struct req_lib_msg_queuegroupremove *)msg;
+	const struct req_lib_msg_queuegroupremove *req_lib_msg_queuegroupremove = msg;
 	struct req_exec_msg_queuegroupremove req_exec_msg_queuegroupremove;
 	struct iovec iovec;
 
@@ -4615,10 +4608,9 @@ static void message_handler_req_lib_msg_queuegroupremove (
 
 static void message_handler_req_lib_msg_queuegroupdelete (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuegroupdelete *req_lib_msg_queuegroupdelete =
-		(struct req_lib_msg_queuegroupdelete *)msg;
+	const struct req_lib_msg_queuegroupdelete *req_lib_msg_queuegroupdelete = msg;
 	struct req_exec_msg_queuegroupdelete req_exec_msg_queuegroupdelete;
 	struct iovec iovec;
 
@@ -4642,10 +4634,9 @@ static void message_handler_req_lib_msg_queuegroupdelete (
 
 static void message_handler_req_lib_msg_queuegrouptrack (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuegrouptrack *req_lib_msg_queuegrouptrack =
-		(struct req_lib_msg_queuegrouptrack *)msg;
+	const struct req_lib_msg_queuegrouptrack *req_lib_msg_queuegrouptrack = msg;
 	struct req_exec_msg_queuegrouptrack req_exec_msg_queuegrouptrack;
 	struct iovec iovec;
 
@@ -4674,10 +4665,9 @@ static void message_handler_req_lib_msg_queuegrouptrack (
 
 static void message_handler_req_lib_msg_queuegrouptrackstop (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuegrouptrackstop *req_lib_msg_queuegrouptrackstop =
-		(struct req_lib_msg_queuegrouptrackstop *)msg;
+	const struct req_lib_msg_queuegrouptrackstop *req_lib_msg_queuegrouptrackstop = msg;
 	struct req_exec_msg_queuegrouptrackstop req_exec_msg_queuegrouptrackstop;
 	struct iovec iovec;
 
@@ -4701,10 +4691,8 @@ static void message_handler_req_lib_msg_queuegrouptrackstop (
 
 static void message_handler_req_lib_msg_queuegroupnotificationfree (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuegroupnotificationfree *req_lib_msg_queuegroupnotificationfree =
-		(struct req_lib_msg_queuegroupnotificationfree *)msg;
 	struct req_exec_msg_queuegroupnotificationfree req_exec_msg_queuegroupnotificationfree;
 	struct iovec iovec;
 
@@ -4725,10 +4713,9 @@ static void message_handler_req_lib_msg_queuegroupnotificationfree (
 
 static void message_handler_req_lib_msg_messagesend (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messagesend *req_lib_msg_messagesend =
-		(struct req_lib_msg_messagesend *)msg;
+	const struct req_lib_msg_messagesend *req_lib_msg_messagesend = msg;
 	struct req_exec_msg_messagesend req_exec_msg_messagesend;
 	struct iovec iovec[2];
 
@@ -4768,10 +4755,9 @@ static void message_handler_req_lib_msg_messagesend (
 
 static void message_handler_req_lib_msg_messagesendasync (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messagesendasync *req_lib_msg_messagesendasync =
-		(struct req_lib_msg_messagesendasync *)msg;
+	const struct req_lib_msg_messagesendasync *req_lib_msg_messagesendasync = msg;
 	struct req_exec_msg_messagesendasync req_exec_msg_messagesendasync;
 	struct iovec iovec[2];
 
@@ -4811,10 +4797,9 @@ static void message_handler_req_lib_msg_messagesendasync (
 
 static void message_handler_req_lib_msg_messageget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messageget *req_lib_msg_messageget =
-		(struct req_lib_msg_messageget *)msg;
+	const struct req_lib_msg_messageget *req_lib_msg_messageget = msg;
 	struct req_exec_msg_messageget req_exec_msg_messageget;
 	struct iovec iovec;
 
@@ -4843,10 +4828,8 @@ static void message_handler_req_lib_msg_messageget (
 
 static void message_handler_req_lib_msg_messagedatafree (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messagedatafree *req_lib_msg_messagedatafree =
-		(struct req_lib_msg_messagedatafree *)msg;
 	struct req_exec_msg_messagedatafree req_exec_msg_messagedatafree;
 	struct iovec iovec;
 
@@ -4867,10 +4850,9 @@ static void message_handler_req_lib_msg_messagedatafree (
 
 static void message_handler_req_lib_msg_messagecancel (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messagecancel *req_lib_msg_messagecancel =
-		(struct req_lib_msg_messagecancel *)msg;
+	const struct req_lib_msg_messagecancel *req_lib_msg_messagecancel = msg;
 	struct req_exec_msg_messagecancel req_exec_msg_messagecancel;
 	struct iovec iovec;
 
@@ -4897,10 +4879,9 @@ static void message_handler_req_lib_msg_messagecancel (
 
 static void message_handler_req_lib_msg_messagesendreceive (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messagesendreceive *req_lib_msg_messagesendreceive =
-		(struct req_lib_msg_messagesendreceive *)msg;
+	const struct req_lib_msg_messagesendreceive *req_lib_msg_messagesendreceive = msg;
 	struct req_exec_msg_messagesendreceive req_exec_msg_messagesendreceive;
 	struct iovec iovec[2];
 
@@ -4943,10 +4924,9 @@ static void message_handler_req_lib_msg_messagesendreceive (
 
 static void message_handler_req_lib_msg_messagereply (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messagereply *req_lib_msg_messagereply =
-		(struct req_lib_msg_messagereply *)msg;
+	const struct req_lib_msg_messagereply *req_lib_msg_messagereply = msg;
 	struct req_exec_msg_messagereply req_exec_msg_messagereply;
 	struct iovec iovec;
 
@@ -4975,10 +4955,9 @@ static void message_handler_req_lib_msg_messagereply (
 
 static void message_handler_req_lib_msg_messagereplyasync (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_messagereplyasync *req_lib_msg_messagereplyasync =
-		(struct req_lib_msg_messagereplyasync *)msg;
+	const struct req_lib_msg_messagereplyasync *req_lib_msg_messagereplyasync = msg;
 	struct req_exec_msg_messagereplyasync req_exec_msg_messagereplyasync;
 	struct iovec iovec;
 
@@ -5007,10 +4986,9 @@ static void message_handler_req_lib_msg_messagereplyasync (
 
 static void message_handler_req_lib_msg_queuecapacitythresholdset (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuecapacitythresholdset *req_lib_msg_queuecapacitythresholdset =
-		(struct req_lib_msg_queuecapacitythresholdset *)msg;
+	const struct req_lib_msg_queuecapacitythresholdset *req_lib_msg_queuecapacitythresholdset = msg;
 	struct req_exec_msg_queuecapacitythresholdget req_exec_msg_queuecapacitythresholdset;
 	struct iovec iovec;
 
@@ -5037,10 +5015,9 @@ static void message_handler_req_lib_msg_queuecapacitythresholdset (
 
 static void message_handler_req_lib_msg_queuecapacitythresholdget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_queuecapacitythresholdget *req_lib_msg_queuecapacitythresholdget =
-		(struct req_lib_msg_queuecapacitythresholdget *)msg;
+	const struct req_lib_msg_queuecapacitythresholdget *req_lib_msg_queuecapacitythresholdget = msg;
 	struct req_exec_msg_queuecapacitythresholdget req_exec_msg_queuecapacitythresholdget;
 	struct iovec iovec;
 
@@ -5067,10 +5044,8 @@ static void message_handler_req_lib_msg_queuecapacitythresholdget (
 
 static void message_handler_req_lib_msg_metadatasizeget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_metadatasizeget *req_lib_msg_metadatasizeget =
-		(struct req_lib_msg_metadatasizeget *)msg;
 	struct req_exec_msg_metadatasizeget req_exec_msg_metadatasizeget;
 	struct iovec iovec;
 
@@ -5091,10 +5066,9 @@ static void message_handler_req_lib_msg_metadatasizeget (
 
 static void message_handler_req_lib_msg_limitget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_msg_limitget *req_lib_msg_limitget =
-		(struct req_lib_msg_limitget *)msg;
+	const struct req_lib_msg_limitget *req_lib_msg_limitget = msg;
 	struct req_exec_msg_limitget req_exec_msg_limitget;
 	struct iovec iovec;
 
