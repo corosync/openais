@@ -750,7 +750,7 @@ struct amf_csi *amf_csi_deserialize (struct amf_si *si, char *buf)
 	return csi;
 }
 
-struct amf_csi *amf_csi_find (struct amf_si *si, char *name)
+struct amf_csi *amf_csi_find (struct amf_si *si, const char *name)
 {
 	struct amf_csi *csi;
 
@@ -864,7 +864,7 @@ char *amf_csi_assignment_dn_make (
 }
 
 struct amf_csi_assignment *amf_csi_assignment_find (
-	struct amf_cluster *cluster, SaNameT *name)
+	struct amf_cluster *cluster, const SaNameT *name)
 {
 	struct amf_application *app;
 	struct amf_si *si;

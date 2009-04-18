@@ -1176,7 +1176,7 @@ extern void amf_csi_delete_assignments (struct amf_csi *csi, struct amf_su *su);
 
 /* General methods */
 extern struct amf_csi *amf_csi_new (struct amf_si *si);
-extern struct amf_csi *amf_csi_find (struct amf_si *si, char *name);
+extern struct amf_csi *amf_csi_find (struct amf_si *si, const char *name);
 extern void amf_csi_delete (struct amf_csi *csi);
 extern void *amf_csi_serialize (struct amf_csi *csi, int *len);
 extern struct amf_csi *amf_csi_deserialize (
@@ -1189,7 +1189,7 @@ extern char *amf_csi_dn_make (struct amf_csi *csi, SaNameT *name);
 extern char *amf_csi_assignment_dn_make (
 	struct amf_csi_assignment *csi_assignment, SaNameT *name);
 extern struct amf_csi_assignment *amf_csi_assignment_find (
-	struct amf_cluster *cluster, SaNameT *name);
+	struct amf_cluster *cluster, const SaNameT *name);
 extern struct amf_csi_attribute *amf_csi_attribute_new (struct amf_csi *csi);
 extern void *amf_csi_attribute_serialize (
 	struct amf_csi_attribute *csi_attribute, int *len);

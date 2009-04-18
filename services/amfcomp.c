@@ -1031,7 +1031,7 @@ void amf_comp_foreach_csi_assignment (
 }
 
 static struct amf_csi_assignment *csi_assignment_find_in (
-	struct amf_comp *component, SaNameT *csi_name) 
+	struct amf_comp *component, const SaNameT *csi_name) 
 {
 	struct amf_csi_assignment *csi_assignment;
 	SaNameT dn;
