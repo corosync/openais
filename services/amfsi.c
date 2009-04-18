@@ -507,8 +507,9 @@ SaAmfAssignmentStateT amf_si_get_saAmfSIAssignmentState (struct amf_si *si)
 void amf_csi_delete_assignments (struct amf_csi *csi, struct amf_su *su)
 {
 	struct amf_csi_assignment *csi_assignment;
-	ENTER ();
 	struct amf_csi_assignment **prev = &csi->assigned_csis;
+
+	ENTER ();
 
 	for (csi_assignment = csi->assigned_csis; csi_assignment != NULL;
 		csi_assignment = csi_assignment->next) {
@@ -532,7 +533,7 @@ void amf_csi_delete_assignments (struct amf_csi *csi, struct amf_su *su)
  * 
  * @return struct amf_si*
  */
-struct amf_si *amf_si_new (struct amf_application *app, char *name)
+struct amf_si *amf_si_new (struct amf_application *app, const char *name)
 {
 	struct amf_si *tail = app->si_head;
 	struct amf_si *si = amf_calloc (1, sizeof (struct amf_si));
@@ -612,7 +613,9 @@ void *amf_si_serialize (struct amf_si *si, int *len)
 struct amf_si *amf_si_deserialize (struct amf_application *app, char *buf) 
 {
 	char *tmp = buf;
-	struct amf_si *si = amf_si_new (app, "");
+	struct amf_si *si;
+
+	si = amf_si_new (app, "");
 
 	tmp = amf_deserialize_SaNameT (tmp, &si->name);
 	tmp = amf_deserialize_SaNameT (tmp, &si->saAmfSIProtectedbySG);
@@ -768,7 +771,7 @@ struct amf_csi *amf_csi_find (struct amf_si *si, char *name)
  * CSI Assignment class implementation                         *              
  ****************************************************************************/
 
-struct amf_csi_assignment *amf_csi_assignment_new (struct amf_csi *csi)
+static struct amf_csi_assignment *amf_csi_assignment_new (struct amf_csi *csi)
 {
 	struct amf_csi_assignment *csi_assignment =
 		amf_calloc (1, sizeof (struct amf_csi_assignment));
@@ -799,7 +802,7 @@ void *amf_csi_assignment_serialize (
 	return buf;
 }
 
-struct amf_si_assignment *si_assignment_find (
+static struct amf_si_assignment *si_assignment_find (
 	struct amf_csi_assignment *csi_assignment)
 {
 	struct amf_comp *component;

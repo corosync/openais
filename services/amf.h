@@ -1043,7 +1043,7 @@ extern void mcast_error_report_from_pm (
 
 /* General methods */
 extern struct amf_si *amf_si_find (struct amf_application *app, char *name);
-extern struct amf_si *amf_si_new (struct amf_application *app, char *name);
+extern struct amf_si *amf_si_new (struct amf_application *app, const char *name);
 extern void amf_si_delete (struct amf_si *si);
 extern int amf_si_calc_and_set_csi_dependency_level (struct amf_si *si);
 extern void *amf_si_serialize (struct amf_si *si, int *len);
