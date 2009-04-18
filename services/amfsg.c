@@ -2120,9 +2120,11 @@ static void amf_sg_su_state_changed_to_instantiation_failed (amf_sg_t *sg,
 int amf_sg_start (struct amf_sg *sg, struct amf_node *node)
 {
 
-	sg->recovery_scope.event_type = SG_START_EV;
-	ENTER ();
 	int instantiated_sus = 0;
+
+	sg->recovery_scope.event_type = SG_START_EV;
+
+	ENTER ();
 
 	switch (sg->avail_state) {
 		case SG_AC_InstantiatingServiceUnits:
@@ -2219,8 +2221,9 @@ int amf_sg_assign_si_req (struct amf_sg *sg, int dependency_level)
  */
 void amf_sg_failover_node_req (struct amf_sg *sg, struct amf_node *node) 
 {
-	ENTER();
 	sg_event_t sg_event;
+
+	ENTER();
 
 	switch (sg->avail_state) {
 		case SG_AC_Idle:
@@ -2293,8 +2296,9 @@ void amf_sg_failover_node_req (struct amf_sg *sg, struct amf_node *node)
 void amf_sg_failover_su_req (struct amf_sg *sg, struct amf_su *su, 
 	struct amf_node *node)
 {
-	ENTER ();
 	sg_event_t sg_event;
+
+	ENTER ();
 
 	switch (sg->avail_state) {
 		case SG_AC_Idle:
@@ -2710,7 +2714,7 @@ static void standby_su_activated_cbfn (
  * @return struct amf_sg*
  */
 
-struct amf_sg *amf_sg_new (struct amf_application *app, char *name) 
+struct amf_sg *amf_sg_new (struct amf_application *app, const char *name) 
 {
 	struct amf_sg *sg = amf_calloc (1, sizeof (struct amf_sg));
 
@@ -2805,7 +2809,9 @@ void *amf_sg_serialize (struct amf_sg *sg, int *len)
 struct amf_sg *amf_sg_deserialize (struct amf_application *app, char *buf)
 {
 	char *tmp = buf;
-	struct amf_sg *sg = amf_sg_new (app, "");
+	struct amf_sg *sg;
+
+	sg = amf_sg_new (app, "");
 
 	tmp = amf_deserialize_SaNameT (tmp, &sg->name);
 	tmp = amf_deserialize_SaUint32T (tmp, &sg->saAmfSGRedundancyModel);

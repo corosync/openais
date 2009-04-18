@@ -815,7 +815,7 @@ extern void amf_application_sg_assigned (
 
 /* General methods */
 extern struct amf_sg *amf_sg_find (struct amf_application *app, char *name);
-extern struct amf_sg *amf_sg_new (struct amf_application *app, char *name);
+extern struct amf_sg *amf_sg_new (struct amf_application *app, const char *name);
 extern void amf_sg_delete (struct amf_sg *sg);
 extern void *amf_sg_serialize (struct amf_sg *sg, int *len);
 extern struct amf_sg *amf_sg_deserialize (
@@ -1195,17 +1195,14 @@ extern void *amf_csi_attribute_serialize (
 	struct amf_csi_attribute *csi_attribute, int *len);
 extern struct amf_csi_attribute *amf_csi_attribute_deserialize (
 	struct amf_csi *csi, char *buf);
-/* extern int sa_amf_grep(const char *string, char *pattern, size_t nmatch, */
-/*	char** sub_match_array);                                             */
-
-extern int sa_amf_grep(const char *string, char *pattern, size_t nmatch,
+extern int sa_amf_grep(const char *string, const char *pattern, size_t nmatch,
 	SaNameT *sub_match_array);
 
 /*===========================================================================*/
 extern struct amf_node *this_amf_node;
 extern struct amf_cluster *amf_cluster;
 
-static inline int name_match(SaNameT *name1, SaNameT *name2)
+static inline int name_match(const SaNameT *name1, const SaNameT *name2)
 {
 	if (name1->length == name2->length) {
 		return ((strncmp ((char *)name1->value, (char *)name2->value, name1->length)) == 0);

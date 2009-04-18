@@ -1338,7 +1338,7 @@ static int sa_amf_grep_one_sub_match(const char *string, char *pattern,
 #endif
 
 
-int sa_amf_grep(const char *string, char *pattern, size_t nmatch,
+int sa_amf_grep(const char *string, const char *pattern, size_t nmatch,
 	SaNameT *matches_arr)
 {
 	int             status;
