@@ -73,39 +73,42 @@
 #define MODE_UNKNOWN -1
 
 
-SaClmHandleT handle;
+static SaClmHandleT handle;
 
-int mode = MODE_UNKNOWN;
+static int mode = MODE_UNKNOWN;
 
 
-void interruptAction();
+static void interruptAction(int);
 
-void usage();
+static void usage(void);
 
-void clusterTrack(const SaClmClusterNotificationBufferT *, SaUint32T, SaAisErrorT);
+static void clusterTrack(const SaClmClusterNotificationBufferT *, SaUint32T, SaAisErrorT);
 
-int apiCall(char *, SaAisErrorT);
+static int apiCall(const char *, SaAisErrorT);
 
-char *decodeStatus(int);
+static const char *decodeStatus(int);
 
-void printBoolean(SaBoolT);
+static void printBoolean(SaBoolT);
 
-void printName(SaNameT *);
+static void printName(SaNameT *);
 
-void printAddress(SaClmNodeAddressT *);
+static void printAddress(SaClmNodeAddressT *);
 
-void printCluster(const SaClmClusterNotificationBufferT *);
+static void printCluster(const SaClmClusterNotificationBufferT *);
 
-void printDate(SaTimeT);
+static void printDate(SaTimeT);
 
-char *decodeClusterChange(int);
-
+static const char *decodeClusterChange(int);
 
 int main(int argc, char *argv[])
 {
 	struct sigaction act;
-	act.sa_handler = interruptAction;
 	int status;
+	SaClmCallbacksT callbacks;
+	int trackingMode;
+	SaVersionT version;
+
+	act.sa_handler = interruptAction;
 	if ((status = sigaction(SIGINT, &act, NULL)) != 0)
 	{
 		printf("sigaction returned: %d\n", status);
@@ -132,7 +135,7 @@ int main(int argc, char *argv[])
 		usage();
 		return 1;
 	}
-	int trackingMode =
+	trackingMode =
 		mode == MODE_QUERY                                     ? SA_TRACK_CURRENT :
 		mode == MODE_CALLBACK && strcmp(argv[2], "full") == 0  ? SA_TRACK_CHANGES :
 		mode == MODE_CALLBACK && strcmp(argv[2], "delta") == 0 ? SA_TRACK_CHANGES_ONLY :
@@ -143,11 +146,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	SaClmCallbacksT callbacks;
 	callbacks.saClmClusterNodeGetCallback = NULL;
 	callbacks.saClmClusterTrackCallback = (SaClmClusterTrackCallbackT)clusterTrack;
 	
-	SaVersionT version;
 	version.releaseCode = 'B';
 	version.majorVersion = 1;
 	version.minorVersion = 0;
@@ -184,7 +185,7 @@ int main(int argc, char *argv[])
 }
 
 
-void interruptAction()
+static void interruptAction(int action)
 {
 	fprintf(stderr, "SIGINT signal caught\n");
 	if (mode == MODE_CALLBACK)
@@ -196,7 +197,7 @@ void interruptAction()
 }
 
 
-void usage()
+static void usage()
 {
 		fprintf(stderr, "%s: usage is:\n", PGM_NAME);
 		fprintf(stderr, "  membership query           Query for membership once\n");
@@ -205,7 +206,7 @@ void usage()
 }
 
 
-void clusterTrack(
+static void clusterTrack(
 	const SaClmClusterNotificationBufferT *buffer,
 	SaUint32T numberOfMembers,
 	SaAisErrorT error)
@@ -216,9 +217,9 @@ void clusterTrack(
 }
 
 
-int apiCall(char *call, SaAisErrorT code)
+static int apiCall(const char *call, SaAisErrorT code)
 {
-	char *s = decodeStatus(code);
+	const char *s = decodeStatus(code);
 	printf("called: %s, status: %s", call, s);
 	if (strcmp(s, "unknown error code") == 0)
 	{
@@ -232,7 +233,7 @@ int apiCall(char *call, SaAisErrorT code)
 }
 
 
-char *decodeStatus(int code)
+static const char *decodeStatus(int code)
 {
  	return  
   	  code == SA_AIS_OK                      ? "successful"                                                  :
@@ -266,13 +267,13 @@ char *decodeStatus(int code)
 }
 
 
-void printBoolean(SaBoolT b)
+static void printBoolean(SaBoolT b)
 {
 	printf("%s\n", b ? "true" : "false");
 }
 
 
-void printName(SaNameT *name)
+static void printName(SaNameT *name)
 {
 	int i;
 	for (i=0; i<name->length; i++) printf("%c", name->value[i]);
@@ -280,7 +281,7 @@ void printName(SaNameT *name)
 }
 
 
-void printAddress(SaClmNodeAddressT *nodeAddress)
+static void printAddress(SaClmNodeAddressT *nodeAddress)
 {
 	if (nodeAddress->family == SA_CLM_AF_INET6)
 	{
@@ -308,11 +309,13 @@ void printAddress(SaClmNodeAddressT *nodeAddress)
 }
 
 
-void printCluster(const SaClmClusterNotificationBufferT *buffer)
+static void printCluster(const SaClmClusterNotificationBufferT *buffer)
 {
+	int j; 
+
 	printf("  view number: %llu\n", (unsigned long long)buffer->viewNumber);
 	printf("  number of items: %u\n\n",  buffer->numberOfItems);
-	int j; for (j=0; j<buffer->numberOfItems; j++)
+	for (j=0; j<buffer->numberOfItems; j++)
 	{
 		printf("    node index within sequence: %d\n", j);
 		printf("    cluster node: %u\n", buffer->notification[j].clusterNode.nodeId);
@@ -327,7 +330,7 @@ void printCluster(const SaClmClusterNotificationBufferT *buffer)
 }
 
 
-void printDate(SaTimeT nanoseconds)
+static void printDate(SaTimeT nanoseconds)
 {
 	time_t tt = nanoseconds/SA_TIME_ONE_SECOND;
 	struct tm *decodedTime = localtime(&tt);
@@ -342,7 +345,7 @@ void printDate(SaTimeT nanoseconds)
 }
 
 
-char *decodeClusterChange(int code)
+static const char *decodeClusterChange(int code)
 {
  	return  
   	  code == SA_CLM_NODE_NO_CHANGE     ? "node has not changed"           :
