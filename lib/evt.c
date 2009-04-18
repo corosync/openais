@@ -621,7 +621,7 @@ saEvtDispatch(
 
 		dispatch_avail = coroipcc_dispatch_get (
 			evti->ipc_ctx,
-			(void **)dispatch_data,
+			(void **)&dispatch_data,
 			timeout);
 
 		pthread_mutex_unlock (&evti->ei_dispatch_mutex);
@@ -1706,7 +1706,7 @@ static uint32_t aispatt_to_evt_patt(
 		memcpy(str, patterns->patterns[i].pattern, 
 			 	patterns->patterns[i].patternSize);
 		pats->pattern_size = patterns->patterns[i].patternSize;
-		pats->pattern = (SaUint8T *)((void *)str - data);
+		pats->pattern = (SaUint8T *)((char *)str - (char *)data);
 		str += patterns->patterns[i].patternSize;
 		pats++;
 	}
@@ -1739,7 +1739,7 @@ static uint32_t aisfilt_to_evt_filt(
 {
 	int i;
 	mar_evt_event_filter_array_t *filtd = data;
-	mar_evt_event_filter_t *filts = data + sizeof(mar_evt_event_filter_array_t);
+	mar_evt_event_filter_t *filts = (mar_evt_event_filter_t *)(((char *)data) + sizeof(mar_evt_event_filter_array_t));
 	SaUint8T *str = (SaUint8T *)filts +
 			(filters->filtersNumber * sizeof(*filts));
 
@@ -1747,7 +1747,7 @@ static uint32_t aisfilt_to_evt_filt(
 	 * Pointers are replaced with offsets into the data array.  These
 	 * will be later converted back into pointers by the evt server.
 	 */
-	filtd->filters = (mar_evt_event_filter_t *)((void *)filts - data);
+	filtd->filters = (mar_evt_event_filter_t *)(((char *)filts) - ((char *)data));
 	filtd->filters_number = filters->filtersNumber;
 
 	for (i = 0; i < filters->filtersNumber; i++) {
@@ -1757,7 +1757,7 @@ static uint32_t aisfilt_to_evt_filt(
 		memcpy(str,
 			 filters->filters[i].filter.pattern, 
 			 filters->filters[i].filter.patternSize);
-		filts->filter.pattern = (SaUint8T *)((void *)str - data);
+		filts->filter.pattern = (SaUint8T *)(((char *)str) - ((char *)data));
 		str += filters->filters[i].filter.patternSize;
 		filts++;
 	}
@@ -1857,7 +1857,7 @@ saEvtEventPublish(
 	}
 
 	patterns = (struct event_pattern *)req->led_body;
-	data_start = (void *)req->led_body + pattern_size;
+	data_start = (void *)(((char *)req->led_body) + pattern_size);
 
 	/*
 	 * copy everything to the request structure
