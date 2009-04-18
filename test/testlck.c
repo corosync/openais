@@ -50,7 +50,7 @@
 SaNameT resource_name_async;
 SaLckResourceHandleT resource_handle_async;
 
-void testLckResourceOpenCallback (
+static void testLckResourceOpenCallback (
 	SaInvocationT invocation,
 	SaLckResourceHandleT lockResourceHandle,
 	SaAisErrorT error)
@@ -60,7 +60,7 @@ void testLckResourceOpenCallback (
 	resource_handle_async = lockResourceHandle;
 }
 
-void testLckLockGrantCallback (
+static void testLckLockGrantCallback (
 	SaInvocationT invocation,
 	SaLckLockStatusT lockStatus,
 	SaAisErrorT error)
@@ -69,10 +69,10 @@ void testLckLockGrantCallback (
 		(unsigned long long)invocation, lockStatus, error);
 }
 
-SaLckLockIdT pr_lock_id;
-SaLckLockIdT pr_lock_async_id;
+static SaLckLockIdT pr_lock_id;
+static SaLckLockIdT pr_lock_async_id;
 
-void testLckLockWaiterCallback (
+static void testLckLockWaiterCallback (
         SaLckWaiterSignalT waiterSignal,
         SaLckLockIdT lockId,
         SaLckLockModeT modeHeld,
@@ -90,7 +90,7 @@ void testLckLockWaiterCallback (
 	printf ("saLckResourceUnlockAsync result %d (should be 1)\n", result);
 }
 
-void testLckResourceUnlockCallback (
+static void testLckResourceUnlockCallback (
         SaInvocationT invocation,
         SaAisErrorT error)
 {
@@ -98,16 +98,16 @@ void testLckResourceUnlockCallback (
 		(unsigned long long)invocation, error);
 }
 
-SaLckCallbacksT callbacks = {
+static SaLckCallbacksT callbacks = {
 	.saLckResourceOpenCallback	= testLckResourceOpenCallback,
 	.saLckLockGrantCallback		= testLckLockGrantCallback,
 	.saLckLockWaiterCallback	= testLckLockWaiterCallback,
 	.saLckResourceUnlockCallback	= testLckResourceUnlockCallback
 };
 
-SaVersionT version = { 'B', 1, 1 };
+static SaVersionT version = { 'B', 1, 1 };
 
-void setSaNameT (SaNameT *name, char *str) {
+static void setSaNameT (SaNameT *name, const char *str) {
 	strncpy ((char *)name->value, str, SA_MAX_NAME_LENGTH);
 	if (strlen ((char *)name->value) > SA_MAX_NAME_LENGTH) {
 		name->length = SA_MAX_NAME_LENGTH;
@@ -116,20 +116,20 @@ void setSaNameT (SaNameT *name, char *str) {
 	}
 }
 
-void sigintr_handler (int signum) {
-	exit (0);
-}
-
 struct th_data {
 	SaLckHandleT handle;
 };
 
-void *th_dispatch (void *arg)
+static void *th_dispatch (void *arg)
 {
 	struct th_data *th_data = (struct th_data *)arg;
 
 	saLckDispatch (th_data->handle, SA_DISPATCH_BLOCKING);
 	return (0);
+}
+
+static void sigintr_handler (int signum) {
+	exit (0);
 }
 
 int main (void) {
