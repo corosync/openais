@@ -915,7 +915,7 @@ extern int amf_su_instantiate (struct amf_su *su);
 /* amfcomp.c */
 
 /* General methods */
-extern struct amf_comp *amf_comp_new (struct amf_su *su, char *name);
+extern struct amf_comp *amf_comp_new (struct amf_su *su, const char *name);
 extern void amf_comp_delete (struct amf_comp *comp);
 extern char *amf_comp_dn_make (struct amf_comp *comp, SaNameT *name);
 extern struct amf_comp *amf_comp_find (
@@ -1218,7 +1218,7 @@ static inline char *getSaNameT (SaNameT *name)
 	return ((char *)name->value);
 }
 
-static inline void setSaNameT (SaNameT *name, char *str) {
+static inline void setSaNameT (SaNameT *name, const char *str) {
 	strncpy ((char *)name->value, str, SA_MAX_NAME_LENGTH);
 	if (strlen ((char *)name->value) > SA_MAX_NAME_LENGTH) {
 		name->length = SA_MAX_NAME_LENGTH;

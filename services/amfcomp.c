@@ -332,7 +332,6 @@ static void *clc_command_run (void *context)
 {
 	struct clc_command_run_data *clc_command_run_data =
 		(struct clc_command_run_data *)context;
-	clc_command_run_data->exit_code = 0;
 
 	pid_t pid;
 	int res;
@@ -348,6 +347,8 @@ static void *clc_command_run (void *context)
 	int envp_size;
 
 	ENTER();
+
+	clc_command_run_data->exit_code = 0;
 
 	pid = fork();
 
@@ -430,10 +431,12 @@ static void *clc_command_run (void *context)
 	argv = amf_malloc (sizeof (char*) * argv_size);
 	argv[0] = cmd;
 	{
+		char *ptrptr = NULL;
+		char *arg;
+
 		/* make a proper argv array */
 		i = 1;
-		char *ptrptr;
-		char *arg = strtok_r(comp_argv, " ", &ptrptr);
+		arg = strtok_r(comp_argv, " ", &ptrptr);
 		while (arg) {
 			argv_size++;
 			argv = realloc (argv, sizeof (char*) * argv_size);
@@ -533,7 +536,7 @@ static void start_component_cleanup_timer (struct amf_comp *component)
 	}
 }
 
-void stop_component_cleanup_timer (struct amf_comp *component)
+static void stop_component_cleanup_timer (struct amf_comp *component)
 {
 	ENTER();
 
@@ -754,7 +757,7 @@ struct amf_healthcheck *amf_comp_find_healthcheck (
  * 
  * @return struct amf_comp*
  */
-struct amf_comp *amf_comp_new(struct amf_su *su, char *name)
+struct amf_comp *amf_comp_new(struct amf_su *su, const char *name)
 {
 	struct amf_comp *tail = su->comp_head;
 	struct amf_comp *comp = amf_calloc (1, sizeof (struct amf_comp));
@@ -853,7 +856,7 @@ struct amf_comp *amf_comp_find (struct amf_cluster *cluster, SaNameT *name)
 	char *sg_name;
 	char *su_name;
 	char *comp_name;
-	char *ptrptr;
+	char *ptrptr = NULL;
 	char *buf;
 
 	assert (cluster != NULL && name != NULL);
@@ -904,7 +907,8 @@ end:
 	return comp;
 }
 
-void amf_comp_healthcheck_deactivate (struct amf_comp *comp)
+#ifdef TODO
+static void amf_comp_healthcheck_deactivate (struct amf_comp *comp)
 {
 	struct amf_healthcheck *healthcheck;
 
@@ -922,6 +926,7 @@ void amf_comp_healthcheck_deactivate (struct amf_comp *comp)
 		}
 	}
 }
+#endif
 
 static void comp_ha_state_set ( struct amf_comp *comp,
 	struct amf_csi_assignment *csi_assignment,
@@ -1333,11 +1338,12 @@ static void clear_ha_state (
 static void comp_recover_action (amf_comp_t *comp, 
 	SaAmfRecommendedRecoveryT recommendedRecovery)
 {
+	amf_node_t *node;
 
 
 	ENTER ();
 
-	amf_node_t *node = amf_node_find (&comp->su->saAmfSUHostedByNode);
+	node = amf_node_find (&comp->su->saAmfSUHostedByNode);
 	switch (recommendedRecovery) {
 		case SA_AMF_NO_RECOMMENDATION: {
 			/*
@@ -1527,7 +1533,7 @@ static void timer_function_pm_fn (void *data)
  * @param ppid the process id to find children of
  * @param depth the descendents tree depth to monitor
  */
-void amf_comp_find_and_add_child_pids(
+static void amf_comp_find_and_add_child_pids(
 	struct amf_comp *comp,
 	SaAmfPmErrorsT pmErrors,
 	SaAmfRecommendedRecoveryT recommendedRecovery,
@@ -1838,6 +1844,8 @@ SaAisErrorT amf_comp_healthcheck_stop (
  */
 void amf_comp_instantiate (struct amf_comp *comp)
 {
+	SaNameT compName;
+
 	ENTER ();
 
 	switch (comp->saAmfCompPresenceState) {
@@ -1847,7 +1855,6 @@ void amf_comp_instantiate (struct amf_comp *comp)
 			if (amf_su_is_local (comp->su)) {
 				TRACE1("Send instantiate event for comp '%s' from host %s", 
 					comp->name.value, comp->su->saAmfSUHostedByNode.value);
-				SaNameT compName;
 				amf_comp_dn_make (comp, &compName);
 				amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_COMPONENT_INSTANTIATE,
 					&compName, sizeof (SaNameT));
@@ -2055,6 +2062,7 @@ struct amf_comp *amf_comp_response_2 (SaUint32T interface, SaNameT *dn,
 {
 	struct amf_csi_assignment *csi_assignment;
 	struct amf_comp *comp = NULL;
+	amf_healthcheck_t *healthcheck;
 
 	assert (retval != NULL);
 
@@ -2102,7 +2110,7 @@ struct amf_comp *amf_comp_response_2 (SaUint32T interface, SaNameT *dn,
 			comp = amf_comp_find (amf_cluster, dn);
 			
 			assert (comp);
-			amf_healthcheck_t *healthcheck = amf_comp_find_healthcheck (
+			healthcheck = amf_comp_find_healthcheck (
 				comp, healthcheck_key);
 			assert (comp);
 			healthcheck->recommendedRecovery = recommendedRecovery; 
@@ -2548,7 +2556,9 @@ struct amf_comp *amf_comp_deserialize (struct amf_su *su, char *buf)
 	char *tmp = buf;
 	int i;
 	SaUint32T cnt;
-	struct amf_comp *component = amf_comp_new (su, "");
+	struct amf_comp *component;
+
+	component = amf_comp_new (su, "");
 
 	tmp = amf_deserialize_SaNameT (tmp, &component->name);
 	tmp = amf_deserialize_SaUint32T (tmp, &cnt);
