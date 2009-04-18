@@ -39,13 +39,15 @@ src			= amfapp.c amfcluster.c amfnode.c amfsi.c amfutil.c \
 
 SERVICE_LCRSO		= clm ckpt evt lck msg tmr
 
+REGULAR_LCRSO		= openaisserviceenable openaisparser
+
 AMF_OBJECTS		= $(src:%.c=%.o)
 
-SOURCES			= $(SERVICE_LCRSO:%=%.c) $(src)
+SOURCES			= $(SERVICE_LCRSO:%=%.c) $(src) openaisserviceenable.c openaisparser.c
 
 EXTRA_DIST		= $(SOURCES)
 
-LCRSO			= $(SERVICE_LCRSO:%=service_%.lcrso) service_amf.lcrso
+LCRSO			= $(SERVICE_LCRSO:%=service_%.lcrso) $(REGULAR_LCRSO:%=%.lcrso) service_amf.lcrso
 
 LCRSO_OBJS		= $(SOURCES:%.c=%.o)
 
@@ -56,11 +58,16 @@ service_amf.lcrso: $(AMF_OBJECTS)
 	$(CC) $(CFLAGS) -bundle -bundle_loader /usr/sbin/corosync $^ -o $@
 service_%.lcrso: %.o
 	$(CC) $(CFLAGS) -bundle -bundle_loader /usr/sbin/corosync $^ -o $@
+%.lcrso: %.o
+	$(CC) $(CFLAGS) -bundle -bundle_loader /usr/sbin/corosync $^ -o $@
 else
 service_amf.lcrso: $(AMF_OBJECTS)
 	$(CC) $(CFLAGS) -shared -Wl,-soname=$@ $^ -o $@
 
 service_%.lcrso: %.o
+	$(CC) $(CFLAGS) -shared -Wl,-soname=$@ $^ -o $@
+
+%.lcrso: %.o
 	$(CC) $(CFLAGS) -shared -Wl,-soname=$@ $^ -o $@
 endif
 
