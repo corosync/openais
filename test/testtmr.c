@@ -48,11 +48,11 @@
 #include "saAis.h"
 #include "saTmr.h"
 
-#define TMR_10_SECONDS (SaTimeT)(10000000000)
-#define TMR_20_SECONDS (SaTimeT)(20000000000)
-#define TMR_30_SECONDS (SaTimeT)(30000000000)
+#define TMR_10_SECONDS (SaTimeT)(10000000000ULL)
+#define TMR_20_SECONDS (SaTimeT)(20000000000ULL)
+#define TMR_30_SECONDS (SaTimeT)(30000000000ULL)
 
-void TimerExpiredCallback (
+static void TimerExpiredCallback (
 	SaTmrTimerIdT timerId,
 	const void *timerData,
 	SaUint64T expirationCount)
@@ -72,7 +72,7 @@ SaTmrCallbacksT callbacks = {
 
 SaVersionT version = { 'A', 1, 1 };
 
-void *tmr_dispatch (void *data)
+static void *tmr_dispatch (void *data)
 {
 	SaTmrHandleT *handle = (SaTmrHandleT *)data;
 
