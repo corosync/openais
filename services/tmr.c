@@ -86,35 +86,35 @@ static int tmr_lib_exit_fn (void *conn);
 
 static void message_handler_req_lib_tmr_timerstart (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_tmr_timerreschedule (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_tmr_timercancel (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_tmr_periodictimerskip (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_tmr_timerremainingtimeget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_tmr_timerattributesget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_tmr_timeget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static void message_handler_req_lib_tmr_clocktickget (
 	void *conn,
-	void *msg);
+	const void *msg);
 
 static struct corosync_api_v1 *api;
 
@@ -340,7 +340,7 @@ static void tmr_timer_expired (void *data)
 
 static void message_handler_req_lib_tmr_timerstart (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_tmr_timerstart *req_lib_tmr_timerstart =
 		(struct req_lib_tmr_timerstart *)msg;
@@ -348,7 +348,7 @@ static void message_handler_req_lib_tmr_timerstart (
 	struct timer_instance *timer_instance = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
-	hdb_handle_t timer_id;
+	hdb_handle_t timer_id = 0;
 	struct tmr_pd *tmr_pd = (struct tmr_pd *) api->ipc_private_data_get (conn);
 
 	/* DEBUG */
@@ -422,7 +422,7 @@ error_exit:
 
 static void message_handler_req_lib_tmr_timerreschedule (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_tmr_timerreschedule *req_lib_tmr_timerreschedule =
 		(struct req_lib_tmr_timerreschedule *)msg;
@@ -486,7 +486,7 @@ error_exit:
 
 static void message_handler_req_lib_tmr_timercancel (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_tmr_timercancel *req_lib_tmr_timercancel =
 		(struct req_lib_tmr_timercancel *)msg;
@@ -530,7 +530,7 @@ error_exit:
 
 static void message_handler_req_lib_tmr_periodictimerskip (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_tmr_periodictimerskip *req_lib_tmr_periodictimerskip =
 		(struct req_lib_tmr_periodictimerskip *)msg;
@@ -574,7 +574,7 @@ error_exit:
 
 static void message_handler_req_lib_tmr_timerremainingtimeget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_tmr_timerremainingtimeget *req_lib_tmr_timerremainingtimeget =
 		(struct req_lib_tmr_timerremainingtimeget *)msg;
@@ -615,7 +615,7 @@ error_exit:
 
 static void message_handler_req_lib_tmr_timerattributesget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
 	struct req_lib_tmr_timerattributesget *req_lib_tmr_timerattributesget =
 		(struct req_lib_tmr_timerattributesget *)msg;
@@ -656,10 +656,8 @@ error_exit:
 
 static void message_handler_req_lib_tmr_timeget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_tmr_timeget *req_lib_tmr_timeget =
-		(struct req_lib_tmr_timeget *)msg;
 	struct res_lib_tmr_timeget res_lib_tmr_timeget;
 	SaAisErrorT error = SA_AIS_OK;
 	SaTimeT current_time;
@@ -685,10 +683,8 @@ static void message_handler_req_lib_tmr_timeget (
 
 static void message_handler_req_lib_tmr_clocktickget (
 	void *conn,
-	void *msg)
+	const void *msg)
 {
-	struct req_lib_tmr_clocktickget *req_lib_tmr_clocktickget =
-		(struct req_lib_tmr_clocktickget *)msg;
 	struct res_lib_tmr_clocktickget res_lib_tmr_clocktickget;
 	SaAisErrorT error = SA_AIS_OK;
 	SaTimeT clock_tick;
@@ -700,8 +696,6 @@ static void message_handler_req_lib_tmr_clocktickget (
 
 	memcpy (&res_lib_tmr_clocktickget.clock_tick,
 		&clock_tick, sizeof (SaTimeT));
-
-error_exit:
 
 	res_lib_tmr_clocktickget.header.size =
 		sizeof (struct res_lib_tmr_clocktickget);
