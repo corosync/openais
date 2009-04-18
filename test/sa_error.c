@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include "saAis.h"
+#include "sa_error.h"
 
 const char *sa_error_list[] = {
 	"OUT_OF_RANGE",
@@ -55,7 +56,7 @@ char *get_test_output (SaAisErrorT result, SaAisErrorT expected) {
 static char test_result[256];
 
         if (result == expected) {
-                return ("PASSED");
+                return ((char *)"PASSED");
         } else {
                 sprintf (test_result,
                         "FAILED expected %s got %s",
