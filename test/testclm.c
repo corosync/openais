@@ -47,7 +47,7 @@
 #include "saAis.h"
 #include "saClm.h"
 
-void printSaClmNodeAddressT (SaClmNodeAddressT *nodeAddress) {
+static void printSaClmNodeAddressT (const SaClmNodeAddressT *nodeAddress) {
 	int i;
 
 	printf ("family=%d - address=", nodeAddress->family);
@@ -56,7 +56,7 @@ void printSaClmNodeAddressT (SaClmNodeAddressT *nodeAddress) {
 	}
 }
 
-void printSaNameT (SaNameT *name)
+static void printSaNameT (SaNameT *name)
 {
 	int i;
 
@@ -65,7 +65,7 @@ void printSaNameT (SaNameT *name)
 	}
 }
 
-void printSaClmClusterNodeT (char *description, SaClmClusterNodeT *clusterNode) {
+static void printSaClmClusterNodeT (const char *description, SaClmClusterNodeT *clusterNode) {
 	printf ("Node Information for %s\n", description);
 
 	printf ("\tnode id is %x\n", (int)clusterNode->nodeId);
@@ -83,7 +83,7 @@ void printSaClmClusterNodeT (char *description, SaClmClusterNodeT *clusterNode) 
 	printf ("\tTimestamp is %llx nanoseconds\n", (unsigned long long)clusterNode->bootTimestamp);
 }
 
-void NodeGetCallback (
+static void NodeGetCallback (
 	SaInvocationT invocation,
 	const SaClmClusterNodeT *clusterNode,
 	SaAisErrorT error) 
@@ -99,7 +99,7 @@ void NodeGetCallback (
 	}
 }
 
-void TrackCallback (
+static void TrackCallback (
 	const SaClmClusterNotificationBufferT *notificationBuffer,
 	SaUint32T numberOfMembers,
 	SaAisErrorT error)
@@ -129,14 +129,14 @@ printf ("Track callback\n");
 	printf ("Done calling trackCallback\n");
 }
 
-SaClmCallbacksT callbacks = {
+static SaClmCallbacksT callbacks = {
 	.saClmClusterNodeGetCallback	= NodeGetCallback,
 	.saClmClusterTrackCallback		= TrackCallback
 };
 
-SaVersionT version = { 'B', 1, 1 };
+static SaVersionT version = { 'B', 1, 1 };
 
-void sigintr_handler (int signum) {
+static void sigintr_handler (int signum) {
 	exit (0);
 }
 
