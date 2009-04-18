@@ -98,15 +98,15 @@ enum evt_message_req_types {
 	MESSAGE_REQ_EXEC_EVT_RECOVERY_EVENTDATA = 2
 };
 
-static void lib_evt_open_channel(void *conn, void *message);
-static void lib_evt_open_channel_async(void *conn, void *message);
-static void lib_evt_close_channel(void *conn, void *message);
-static void lib_evt_unlink_channel(void *conn, void *message);
-static void lib_evt_event_subscribe(void *conn, void *message);
-static void lib_evt_event_unsubscribe(void *conn, void *message);
+static void lib_evt_open_channel(void *conn, const void *message);
+static void lib_evt_open_channel_async(void *conn, const void *message);
+static void lib_evt_close_channel(void *conn, const void *message);
+static void lib_evt_unlink_channel(void *conn, const void *message);
+static void lib_evt_event_subscribe(void *conn, const void *message);
+static void lib_evt_event_unsubscribe(void *conn, const void *message);
 static void lib_evt_event_publish(void *conn, void *message);
-static void lib_evt_event_clear_retentiontime(void *conn, void *message);
-static void lib_evt_event_data_get(void *conn, void *message);
+static void lib_evt_event_clear_retentiontime(void *conn, const void *message);
+static void lib_evt_event_data_get(void *conn, const void *message);
 
 static void evt_conf_change(
 		enum totem_configuration_type configuration_type,
@@ -716,7 +716,7 @@ DECLARE_LIST_INIT(mnd);
  * Take the filters we received from the application via the library and
  * make them into a real mar_evt_event_filter_array_t
  */
-static SaAisErrorT evtfilt_to_aisfilt(struct req_evt_event_subscribe *req,
+static SaAisErrorT evtfilt_to_aisfilt(const struct req_evt_event_subscribe *req,
 		mar_evt_event_filter_array_t **evtfilters)
 {
 
@@ -1240,7 +1240,7 @@ static int remove_open_count(
 /*
  * Send a request to open a channel to the rest of the cluster.
  */
-static SaAisErrorT evt_open_channel(mar_name_t *cn, SaUint8T flgs)
+static SaAisErrorT evt_open_channel(const mar_name_t *cn, SaUint8T flgs)
 {
 	struct req_evt_chan_command cpkt;
 	struct event_svr_channel_instance *eci;
@@ -2224,15 +2224,13 @@ printf ("hdb cre %p\n", &libevt_pd->esi_hdb);
 /*
  * Handler for saEvtChannelOpen
  */
-static void lib_evt_open_channel(void *conn, void *message)
+static void lib_evt_open_channel(void *conn, const void *message)
 {
 	SaAisErrorT error;
-	struct req_evt_channel_open *req;
+	const struct req_evt_channel_open *req = message;
 	struct res_evt_channel_open res;
 	struct open_chan_pending *ocp;
 	int ret;
-
-	req = message;
 
 	log_printf(CHAN_OPEN_DEBUG,
 		"saEvtChannelOpen (Open channel request)\n");
@@ -2293,15 +2291,12 @@ open_return:
 /*
  * Handler for saEvtChannelOpen
  */
-static void lib_evt_open_channel_async(void *conn, void *message)
+static void lib_evt_open_channel_async(void *conn, const void *message)
 {
 	SaAisErrorT error;
-	struct req_evt_channel_open *req;
+	const struct req_evt_channel_open *req = message;
 	struct res_evt_channel_open res;
 	struct open_chan_pending *ocp;
-
-	req = message;
-
 
 	log_printf(CHAN_OPEN_DEBUG,
 		"saEvtChannelOpenAsync (Async Open channel request)\n");
@@ -2403,9 +2398,9 @@ printf ("list del %p\n",eco);
 /*
  * Handler for saEvtChannelClose
  */
-static void lib_evt_close_channel(void *conn, void *message)
+static void lib_evt_close_channel(void *conn, const void *message)
 {
-	struct req_evt_channel_close *req;
+	const struct req_evt_channel_close *req = message;
 	struct res_evt_channel_close res;
 	struct event_svr_channel_open	*eco;
 	unsigned int ret;
@@ -2413,8 +2408,6 @@ static void lib_evt_close_channel(void *conn, void *message)
 	struct libevt_pd *esip;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
-
-	req = message;
 
 	log_printf(LOG_LEVEL_DEBUG,
 			"saEvtChannelClose (Close channel request)\n");
@@ -2445,16 +2438,15 @@ chan_close_done:
 /*
  * Handler for saEvtChannelUnlink
  */
-static void lib_evt_unlink_channel(void *conn, void *message)
+static void lib_evt_unlink_channel(void *conn, const void *message)
 {
-	struct req_evt_channel_unlink *req;
+	const struct req_evt_channel_unlink *req = message;
 	struct res_evt_channel_unlink res;
 	struct iovec chn_iovec;
 	struct unlink_chan_pending *ucp = 0;
 	struct req_evt_chan_command cpkt;
 	SaAisErrorT error = SA_AIS_ERR_LIBRARY;
 
-	req = message;
 
 	log_printf(CHAN_UNLINK_DEBUG,
 			"saEvtChannelUnlink (Unlink channel request)\n");
@@ -2534,9 +2526,9 @@ static const char *filter_types[] = {
 /*
  * saEvtEventSubscribe Handler
  */
-static void lib_evt_event_subscribe(void *conn, void *message)
+static void lib_evt_event_subscribe(void *conn, const void *message)
 {
-	struct req_evt_event_subscribe *req;
+	const struct req_evt_event_subscribe *req = message;
 	struct res_evt_event_subscribe res;
 	mar_evt_event_filter_array_t *filters;
 	SaAisErrorT error;
@@ -2551,8 +2543,6 @@ static void lib_evt_event_subscribe(void *conn, void *message)
 	struct libevt_pd *esip;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
-
-	req = message;
 
 	log_printf(LOG_LEVEL_DEBUG,
 		"saEvtEventSubscribe (Subscribe request)\n");
@@ -2653,9 +2643,9 @@ subr_done:
 /*
  * saEvtEventUnsubscribe Handler
  */
-static void lib_evt_event_unsubscribe(void *conn, void *message)
+static void lib_evt_event_unsubscribe(void *conn, const void *message)
 {
-	struct req_evt_event_unsubscribe *req;
+	const struct req_evt_event_unsubscribe *req = message;
 	struct res_evt_event_unsubscribe res;
 	struct event_svr_channel_open	*eco;
 	struct event_svr_channel_instance *eci;
@@ -2666,8 +2656,6 @@ static void lib_evt_event_unsubscribe(void *conn, void *message)
 	struct libevt_pd *esip;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
-
-	req = message;
 
 	log_printf(LOG_LEVEL_DEBUG,
 		"saEvtEventUnsubscribe (Unsubscribe request)\n");
@@ -2722,7 +2710,7 @@ unsubr_done:
  */
 static void lib_evt_event_publish(void *conn, void *message)
 {
-	struct lib_event_data *req;
+	struct lib_event_data *req = message;
 	struct res_evt_event_publish res;
 	struct event_svr_channel_open	*eco;
 	struct event_svr_channel_instance *eci;
@@ -2736,8 +2724,6 @@ static void lib_evt_event_publish(void *conn, void *message)
 	struct libevt_pd *esip;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
-
-	req = message;
 
 	log_printf(LOG_LEVEL_DEBUG,
 			"saEvtEventPublish (Publish event request)\n");
@@ -2791,17 +2777,15 @@ pub_done:
 /*
  * saEvtEventRetentionTimeClear handler
  */
-static void lib_evt_event_clear_retentiontime(void *conn, void *message)
+static void lib_evt_event_clear_retentiontime(void *conn, const void *message)
 {
-	struct req_evt_event_clear_retentiontime *req;
+	const struct req_evt_event_clear_retentiontime *req = message;
 	struct res_evt_event_clear_retentiontime res;
 	struct req_evt_chan_command cpkt;
 	struct retention_time_clear_pending *rtc = 0;
 	struct iovec rtn_iovec;
 	SaAisErrorT error;
 	int ret;
-
-	req = message;
 
 	log_printf(RETENTION_TIME_DEBUG,
 		"saEvtEventRetentionTimeClear (Clear event retentiontime request)\n");
@@ -2855,7 +2839,7 @@ evt_ret_clr_err:
 /*
  * Send requested event data to the application
  */
-static void lib_evt_event_data_get(void *conn, void *message)
+static void lib_evt_event_data_get(void *conn, const void *message)
 {
 	struct chan_event_list *cel;
 	struct event_data *edp;
