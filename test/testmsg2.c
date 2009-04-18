@@ -46,7 +46,7 @@
 #include "saAis.h"
 #include "saMsg.h"
 
-void QueueOpenCallback (
+static void QueueOpenCallback (
 	SaInvocationT invocation,
 	SaMsgQueueHandleT queueHandle,
 	SaAisErrorT error)
@@ -61,7 +61,7 @@ void QueueOpenCallback (
 		(unsigned int)(error));
 }
 
-void QueueGroupTrackCallback (
+static void QueueGroupTrackCallback (
 	const SaNameT *queueGroupName,
 	const SaMsgQueueGroupNotificationBufferT *notificationBuffer,
 	SaUint32T numberOfMembers,
@@ -87,7 +87,7 @@ void QueueGroupTrackCallback (
 	}
 }
 
-void MessageDeliveredCallback (
+static void MessageDeliveredCallback (
 	SaInvocationT invocation,
 	SaAisErrorT error)
 {
@@ -99,7 +99,7 @@ void MessageDeliveredCallback (
 		(unsigned int)(error));
 }
 
-void MessageReceivedCallback (
+static void MessageReceivedCallback (
 	SaMsgQueueHandleT queueHandle)
 {
 	/* DEBUG */
@@ -108,27 +108,27 @@ void MessageReceivedCallback (
 		(unsigned long long)(queueHandle));
 }
 
-SaMsgCallbacksT callbacks = {
+static SaMsgCallbacksT callbacks = {
 	.saMsgQueueOpenCallback		= QueueOpenCallback,
 	.saMsgQueueGroupTrackCallback	= QueueGroupTrackCallback,
 	.saMsgMessageDeliveredCallback	= MessageDeliveredCallback,
 	.saMsgMessageReceivedCallback	= MessageReceivedCallback
 };
 
-SaVersionT version = { 'B', 1, 1 };
+static SaVersionT version = { 'B', 1, 1 };
 
-SaMsgQueueCreationAttributesT creation_attributes = {
+static SaMsgQueueCreationAttributesT creation_attributes = {
 	SA_MSG_QUEUE_PERSISTENT,
 	{ 128000, 128000, 128000 },
 	SA_TIME_END
 };
 
-void setSaNameT (SaNameT *name, char *str) {
+static void setSaNameT (SaNameT *name, const char *str) {
 	name->length = strlen (str);
 	strcpy ((char *)name->value, str);
 }
 
-void setSaMsgMessageT (SaMsgMessageT *message, char *data) {
+static void setSaMsgMessageT (SaMsgMessageT *message, const char *data) {
 	message->type = 1;
 	message->version = 2;
 	message->size = strlen (data) + 1;
