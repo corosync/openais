@@ -47,7 +47,7 @@
 #include "saAis.h"
 #include "saLck.h"
 
-void testLckResourceOpenCallback (
+static void testLckResourceOpenCallback (
 	SaInvocationT invocation,
 	SaLckResourceHandleT lockResourceHandle,
 	SaAisErrorT error)
@@ -55,7 +55,7 @@ void testLckResourceOpenCallback (
 	printf ("testLckResourceOpenCallback\n");
 }
 
-void testLckLockGrantCallback (
+static void testLckLockGrantCallback (
 	SaInvocationT invocation,
 	SaLckLockStatusT lockStatus,
 	SaAisErrorT error)
@@ -63,7 +63,7 @@ void testLckLockGrantCallback (
 	printf ("testLckLockGrantCallback\n");
 }
 
-void testLckLockWaiterCallback (
+static void testLckLockWaiterCallback (
 	SaLckWaiterSignalT waiterSignal,
         SaLckLockIdT lockId,
         SaLckLockModeT modeHeld,
@@ -72,33 +72,29 @@ void testLckLockWaiterCallback (
 	printf ("testLckLockWaiterCallback\n");
 }
 
-void testLckResourceUnlockCallback (
+static void testLckResourceUnlockCallback (
 	SaInvocationT invocation,
         SaAisErrorT error)
 {
 	printf ("testLckResourceUnlockCallback\n");
 }
 
-SaLckCallbacksT callbacks = {
+static SaLckCallbacksT callbacks = {
 	.saLckResourceOpenCallback	= testLckResourceOpenCallback,
 	.saLckLockGrantCallback		= testLckLockGrantCallback,
 	.saLckLockWaiterCallback	= testLckLockWaiterCallback,
 	.saLckResourceUnlockCallback	= testLckResourceUnlockCallback
 };
 
-SaVersionT version = { 'B', 1, 1 };
+static SaVersionT version = { 'B', 1, 1 };
 
-void setSaNameT (SaNameT *name, char *str) {
+static void setSaNameT (SaNameT *name, const char *str) {
 	strncpy ((char *)name->value, str, SA_MAX_NAME_LENGTH);
 	if (strlen ((char *)name->value) > SA_MAX_NAME_LENGTH) {
 		name->length = SA_MAX_NAME_LENGTH;
 	} else {
 		name->length = strlen (str);
 	}
-}
-
-void sigintr_handler (int signum) {
-	exit (0);
 }
 
 int main (void)
