@@ -71,7 +71,7 @@ int result_buf_len = sizeof(result_buf);
 #define TRY_WAIT 2
 
 
-void testresult (SaAisErrorT result, SaAisErrorT expected, int test_no)
+static void testresult (SaAisErrorT result, SaAisErrorT expected, int test_no)
 {
 	if (result == expected) {
 		printf ("Test %d passed\n", test_no);
@@ -82,18 +82,18 @@ void testresult (SaAisErrorT result, SaAisErrorT expected, int test_no)
 	}
 }
 
-SaVersionT version1 = { 'B', 0x01, 0x01 };
-SaVersionT version2 = { 'A', 0x01, 0x01 };
-SaVersionT version3 = { 'B', 0x02, 0x01 };
-SaVersionT version4 = { 'B', 0x01, 0xff };
-SaVersionT version5 = { 'C', 0xff, 0xff };
+static SaVersionT version1 = { 'B', 0x01, 0x01 };
+static SaVersionT version2 = { 'A', 0x01, 0x01 };
+static SaVersionT version3 = { 'B', 0x02, 0x01 };
+static SaVersionT version4 = { 'B', 0x01, 0xff };
+static SaVersionT version5 = { 'C', 0xff, 0xff };
 
 struct version_test {
 	SaVersionT	*version;
 	SaAisErrorT	result;
 };
 
-struct version_test versions[] = {
+static struct version_test versions[] = {
 	{ &version1, SA_AIS_OK },
 	{ &version2, SA_AIS_ERR_VERSION },
 	{ &version3, SA_AIS_ERR_VERSION },
@@ -102,39 +102,39 @@ struct version_test versions[] = {
 	{ 0, SA_AIS_ERR_INVALID_PARAM}
 };
 
-int version_size = sizeof(versions) / sizeof(struct version_test);
+static int version_size = sizeof(versions) / sizeof(struct version_test);
 
-void open_callback(SaInvocationT invocation,
+static void open_callback(SaInvocationT invocation,
 		SaEvtChannelHandleT channelHandle,
 		SaAisErrorT error);
-void event_callback(SaEvtSubscriptionIdT subscriptionId,
+static void event_callback(SaEvtSubscriptionIdT subscriptionId,
 		const SaEvtEventHandleT eventHandle,
 		const SaSizeT eventDataSize);
 
-SaEvtCallbacksT callbacks = {
+static SaEvtCallbacksT callbacks = {
 	open_callback,
 	event_callback
 };
 
-char channel[256] = "TESTEVT_CHANNEL";
-char unlink_channel[256] = "TESTEVT_UNLINK_CHANNEL";
-SaEvtSubscriptionIdT subscription_id = 0xabcdef;
-SaInvocationT	     open_invocation = 0xaa55cc33;
-unsigned long long test_ret_time = 30000000000ULL; /* 30 seconds */
+static char channel[256] = "TESTEVT_CHANNEL";
+static char unlink_channel[256] = "TESTEVT_UNLINK_CHANNEL";
+static SaEvtSubscriptionIdT subscription_id = 0xabcdef;
+static SaInvocationT	     open_invocation = 0xaa55cc33;
+static unsigned long long test_ret_time = 30000000000ULL; /* 30 seconds */
 
 
 /*
  * event data
  */
 
-long *exp_data;
+static long *exp_data;
 #define DATA_SIZE 2048 /* default data size */
 #define LCOUNT DATA_SIZE/sizeof(long)
 	
 /*
  * Test saEvtInitialize and version checking.
  */
-void test_initialize (void) {
+static void test_initialize (void) {
 	SaAisErrorT result;
 	SaEvtHandleT handle;
 	int i;
@@ -175,14 +175,14 @@ void test_initialize (void) {
 #define patt4_size sizeof(_patt4)
 
 
-SaEvtEventFilterT filters[] = {
+static SaEvtEventFilterT filters[] = {
 	{SA_EVT_PREFIX_FILTER, {patt1_size, patt1_size, patt1}},
 	{SA_EVT_SUFFIX_FILTER, {patt2_size, patt2_size, patt2}},
 	{SA_EVT_EXACT_FILTER, {patt3_size, patt3_size, patt3}},
 	{SA_EVT_PASS_ALL_FILTER, {patt4_size, patt4_size, patt4}}
 };
 
-SaEvtEventFilterArrayT subscribe_filters = {
+static SaEvtEventFilterArrayT subscribe_filters = {
 	sizeof(filters)/sizeof(SaEvtEventFilterT),
 	filters 
 };
@@ -190,7 +190,7 @@ SaEvtEventFilterArrayT subscribe_filters = {
 /*
  * Process the open callback
  */
-void open_callback(SaInvocationT invocation,
+static void open_callback(SaInvocationT invocation,
 		SaEvtChannelHandleT channel_handle,
 		SaAisErrorT error)
 {
@@ -231,8 +231,8 @@ void open_callback(SaInvocationT invocation,
  * 9. Open a channel async.
  * 
  */
-void
-test_channel()
+static void
+test_channel(void)
 {
 	SaEvtHandleT handle;
 	SaEvtChannelHandleT channel_handle;
@@ -711,24 +711,24 @@ SaEvtEventPatternT patterns[] = {
 	{patt3_size, patt3_size, patt3},
 	{patt4_size, patt4_size, patt4}
 };
-SaNameT test_pub_name = {13, "Test Pub Name"};
+static SaNameT test_pub_name = {13, "Test Pub Name"};
 #define TEST_PRIORITY 2
 
-SaEvtEventPatternArrayT evt_pat_set_array = {
+static SaEvtEventPatternArrayT evt_pat_set_array = {
 	sizeof(patterns)/sizeof(SaEvtEventPatternT),
 	sizeof(patterns)/sizeof(SaEvtEventPatternT),
 	patterns
 };
 
-char event_data[1000];
+static char event_data[1000];
 #define EVENT_DATA_SIZE 1000
 
-SaEvtEventIdT event_id = 0;
-SaUint8T priority;
-SaTimeT retention_time = 0ULL;
-SaNameT publisher_name = {0, {0}};
-SaSizeT event_data_size = 0;
-int expected_pat_count;
+static SaEvtEventIdT event_id = 0;
+static SaUint8T priority;
+static SaTimeT retention_time = 0ULL;
+static SaNameT publisher_name = {0, {0}};
+static SaSizeT event_data_size = 0;
+static int expected_pat_count;
 
 /*
  * Test event operations.
@@ -747,7 +747,7 @@ int expected_pat_count;
  * 12. Publish with set patterns and event user data.
  * 
  */
-void 
+static void 
 event_callback(SaEvtSubscriptionIdT my_subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT my_event_data_size)
@@ -887,8 +887,8 @@ evt_free:
 	}
 }
 
-void
-test_event()
+static void
+test_event(void)
 {
 	SaEvtHandleT handle;
 	SaEvtChannelHandleT channel_handle;
@@ -1362,7 +1362,7 @@ static int call_count = 0;
  * Checks event ID with subscription ID to make sure that we
  * received an event on the correct subscription.
  */
-void 
+static void 
 multi_test_callback1(SaEvtSubscriptionIdT my_subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT my_event_data_size)
@@ -1435,8 +1435,8 @@ evt_free:
  * 2. Test multiple openings of a single channel and receving events.
  * 3. Test opening of multiple channels and receiving events
  */
-void
-test_multi_channel1()
+static void
+test_multi_channel1(void)
 {
 
 	SaEvtEventFilterT filt1[1] = {
@@ -1708,7 +1708,7 @@ evt_fin:
  * each subscription.
  *
  */
-void 
+static void 
 multi_test_callback2(SaEvtSubscriptionIdT my_subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT my_event_data_size)
@@ -1779,8 +1779,8 @@ evt_free:
 	}
 }
 
-void
-test_multi_channel2()
+static void
+test_multi_channel2(void)
 {
 
 	SaEvtEventFilterT filt1[1] = {
@@ -2008,7 +2008,7 @@ evt_fin:
  * subscription.
  *
  */
-void 
+static void 
 multi_test_callback3(SaEvtSubscriptionIdT my_subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT my_event_data_size)
@@ -2079,8 +2079,8 @@ evt_free:
 	}
 }
 
-void
-test_multi_channel3()
+static void
+test_multi_channel3(void)
 {
 
 	SaEvtEventFilterT filt1[1] = {
@@ -2367,10 +2367,10 @@ evt_fin:
  *
  */
 #define EXPIRE_TIME 10 /* Seconds */
-SaEvtEventIdT retained_id;
-int got_event;
+static SaEvtEventIdT retained_id;
+static int got_event;
 
-void 
+static void 
 event_callback_retained(SaEvtSubscriptionIdT my_subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT my_event_data_size)
@@ -2395,8 +2395,8 @@ event_callback_retained(SaEvtSubscriptionIdT my_subscription_id,
 	got_event = 1;
 }
 
-void
-test_retention()
+static void
+test_retention(void)
 {
 	SaEvtHandleT handle;
 	SaEvtChannelHandleT channel_handle;
@@ -2756,7 +2756,7 @@ evt_fin:
 
 }
 
-void 
+static void 
 unlink_chan_callback(SaEvtSubscriptionIdT my_subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT my_event_data_size)
@@ -2828,8 +2828,8 @@ SaEvtCallbacksT unlink_callbacks = {
 	open_callback,
 	unlink_chan_callback
 };
-void
-test_unlink_channel()
+static void
+test_unlink_channel(void)
 {
 	SaEvtHandleT handle;
 	SaEvtChannelHandleT channel_handle1;
@@ -3217,6 +3217,7 @@ unlink_exit:
 	printf("Done\n");
 
 }
+
 int main (void)
 {
 	test_initialize ();
