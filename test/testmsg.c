@@ -46,9 +46,9 @@
 #include "saAis.h"
 #include "saMsg.h"
 
-SaMsgQueueHandleT async_handle;
+static SaMsgQueueHandleT async_handle;
 
-void QueueOpenCallback (
+static void QueueOpenCallback (
 	SaInvocationT invocation,
 	SaMsgQueueHandleT queueHandle,
 	SaAisErrorT error)
@@ -61,7 +61,7 @@ void QueueOpenCallback (
 	async_handle = queueHandle;
 }
 
-void QueueGroupTrackCallback (
+static void QueueGroupTrackCallback (
 	const SaNameT *queueGroupName,
 	const SaMsgQueueGroupNotificationBufferT *notificationBuffer,
 	SaUint32T numberOfMembers,
@@ -71,7 +71,7 @@ void QueueGroupTrackCallback (
 	printf ("[DEBUG]: testmsg (QueueGroupTrackCallback)\n");
 }
 
-void MessageDeliveredCallback (
+static void MessageDeliveredCallback (
 	SaInvocationT invocation,
 	SaAisErrorT error)
 {
@@ -81,34 +81,34 @@ void MessageDeliveredCallback (
 		(unsigned long long) invocation);
 }
 
-void MessageReceivedCallback (
+static void MessageReceivedCallback (
 	SaMsgQueueHandleT queueHandle)
 {
 	/* DEBUG */
 	printf ("[DEBUG]: testmsg (MessageReceivedCallback)\n");
 }
 
-SaMsgCallbacksT callbacks = {
+static SaMsgCallbacksT callbacks = {
 	.saMsgQueueOpenCallback		= QueueOpenCallback,
 	.saMsgQueueGroupTrackCallback	= QueueGroupTrackCallback,
 	.saMsgMessageDeliveredCallback	= MessageDeliveredCallback,
 	.saMsgMessageReceivedCallback	= MessageReceivedCallback
 };
 
-SaVersionT version = { 'B', 1, 1 };
+static SaVersionT version = { 'B', 1, 1 };
 
-SaMsgQueueCreationAttributesT creation_attributes = {
+static SaMsgQueueCreationAttributesT creation_attributes = {
 	SA_MSG_QUEUE_PERSISTENT,
 	{ 128000, 128000, 128000 },
 	SA_TIME_END
 };
 
-void setSaNameT (SaNameT *name, char *str) {
+static void setSaNameT (SaNameT *name, const char *str) {
 	name->length = strlen (str);
 	strcpy ((char *)name->value, str);
 }
 
-void setSaMsgMessageT (SaMsgMessageT *message, char *data) {
+static void setSaMsgMessageT (SaMsgMessageT *message, const char *data) {
 	message->type = 1;
 	message->version = 2;
 	message->size = strlen (data) + 1;
@@ -117,7 +117,7 @@ void setSaMsgMessageT (SaMsgMessageT *message, char *data) {
 	message->priority = 0;
 }
 
-void sigintr_handler (int signum) {
+static void sigintr_handler (int signum) {
 	exit (0);
 }
 
