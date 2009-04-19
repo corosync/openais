@@ -2212,6 +2212,46 @@ int amf_sg_assign_si_req (struct amf_sg *sg, int dependency_level)
 }
 
 /**
+ * Checks if a SG ACSM is waiting for a active SI assignment on a given node
+ * before it will transition to the next state. This is used to determine if we
+ * can safely defer processing a node leave/failover until the ACSM transitions
+ * back to idle (if the current ACSM action involves the node specified, then
+ * it may NEVER complete).
+ *
+ * @return SA_TRUE if activating an SI assignment on node specified, SA_FALSE if not
+ */
+static int is_acsm_assigning_node_active (struct amf_sg *sg, struct amf_node *node)
+{
+	struct amf_si *si;
+	struct amf_si_assignment *si_assignment;
+	int activating_node_su = SA_FALSE;
+
+	for (si = sg->application->si_head; si != NULL; si = si->next) {
+		if (name_match (&si->saAmfSIProtectedbySG, &sg->name)) {
+
+			for (si_assignment = si->assigned_sis;
+				si_assignment != NULL;
+				si_assignment = si_assignment->next) {
+
+				/* Check if an SU on the node is in the process of activating */
+				if (name_match(&node->name,
+					&si_assignment->su->saAmfSUHostedByNode) &&
+					si_assignment->requested_ha_state !=
+					si_assignment->saAmfSISUHAState &&
+					si_assignment->requested_ha_state ==
+					SA_AMF_HA_ACTIVE) {
+					activating_node_su = SA_TRUE;
+					break;
+				}
+			}
+		}
+	}
+	ENTER("'%s, %s' %u",node->name.value, sg->name.value, activating_node_su);
+
+	return activating_node_su;
+}
+
+/**
  * This function is called because an error has been detected and the analysis
  * (done elsewhere) indicated that this error shall be recovered by a Node
  * failover. This function initiates the recovery action 'Node failover'.
@@ -2226,6 +2266,20 @@ void amf_sg_failover_node_req (struct amf_sg *sg, struct amf_node *node)
 	ENTER();
 
 	switch (sg->avail_state) {
+		case SG_AC_ActivatingStandby:
+			/* check if failover can be safely deferred */
+			if (!is_acsm_assigning_node_active (sg, node)) {
+				sg_set_event (SG_FAILOVER_NODE_EV, sg, 0, 0, node, &sg_event); 
+				sg_defer_event (SG_FAILOVER_NODE_EV, &sg_event);
+				break;
+			} else {
+				log_printf (LOG_LEVEL_NOTICE,
+							"Cannot defer node '%s' failover (%s ACSM state %u)",
+							node->name.value, sg->name.value, sg->avail_state);
+
+				/* fall-through and process now */
+			}
+
 		case SG_AC_Idle:
 			set_scope_for_failover_node(sg, node);
 			if (has_any_su_in_scope_active_workload (sg)) {
@@ -2263,7 +2317,6 @@ void amf_sg_failover_node_req (struct amf_sg *sg, struct amf_node *node)
 			break;
 		case SG_AC_DeactivatingDependantWorkload:
 		case SG_AC_TerminatingSuspected:
-		case SG_AC_ActivatingStandby:
 		case SG_AC_AssigningStandbyToSpare:
 		case SG_AC_ReparingComponent:
 		case SG_AC_ReparingSu:
@@ -2852,4 +2905,3 @@ struct amf_sg *amf_sg_find (struct amf_application *app, char *name)
 
 	return sg;
 }
-
