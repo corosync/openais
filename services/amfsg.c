@@ -2246,7 +2246,7 @@ static int is_acsm_assigning_node_active (struct amf_sg *sg, struct amf_node *no
 			}
 		}
 	}
-	ENTER("'%s, %s' %u",node->name.value, sg->name.value, activating_node_su);
+	log_printf (LOG_LEVEL_DEBUG, "'%s, %s' %u", node->name.value, sg->name.value, activating_node_su);
 
 	return activating_node_su;
 }
