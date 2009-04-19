@@ -1272,6 +1272,9 @@ SaAisErrorT amf_comp_register (struct amf_comp *comp)
 		case SA_AMF_PRESENCE_RESTARTING:
 			comp_presence_state_set (comp, SA_AMF_PRESENCE_INSTANTIATED);
 			break;
+		case SA_AMF_PRESENCE_UNINSTANTIATED:
+			/* wait until amf thinks it's instantitating */
+			return SA_AIS_ERR_TRY_AGAIN;
 		case SA_AMF_PRESENCE_INSTANTIATING:
 			amf_comp_operational_state_set (comp, SA_AMF_OPERATIONAL_ENABLED);
 			comp_presence_state_set (comp, SA_AMF_PRESENCE_INSTANTIATED);
@@ -1284,9 +1287,7 @@ SaAisErrorT amf_comp_register (struct amf_comp *comp)
 				comp->saAmfCompPresenceState);
 			assert (0);
 			break;
-		
 	}
-	
 	return SA_AIS_OK;
 }
 

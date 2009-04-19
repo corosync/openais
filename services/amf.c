@@ -1844,7 +1844,16 @@ static void message_handler_req_lib_amf_componentregister (
 	const struct req_lib_amf_componentregister *req_lib = msg;
 	struct amf_comp *comp;
 
-	assert (scsm.state == NORMAL_OPERATION);
+	if ((scsm.state != NORMAL_OPERATION) ||
+		(amf_cluster == NULL)) {
+		struct res_lib_amf_componentregister res_lib;
+		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
+		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
+		res_lib.header.error = SA_AIS_ERR_TRY_AGAIN;
+		openais_conn_send_response (
+			conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
+		return;
+	}
 
 	comp = amf_comp_find (amf_cluster, &req_lib->compName);
 	if (comp) {
@@ -2244,7 +2253,16 @@ static void message_handler_req_lib_amf_componenterrorreport (
 	amf_comp_t *reporting_comp;
 	SaNameT reporting_comp_name;
 
-	assert (scsm.state == NORMAL_OPERATION);
+	if ((scsm.state != NORMAL_OPERATION) ||
+		(amf_cluster == NULL)) {
+		struct res_lib_amf_componentregister res_lib;
+		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
+		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
+		res_lib.header.error = SA_AIS_ERR_TRY_AGAIN;
+		openais_conn_send_response (
+			conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
+		return;
+	}
 
 	comp = amf_comp_find (amf_cluster, &req_lib->erroneousComponent);
 	reporting_comp = amf_comp_find_from_conn_info (conn);
