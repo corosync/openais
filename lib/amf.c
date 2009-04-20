@@ -33,6 +33,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -70,12 +72,7 @@ static void amfHandleInstanceDestructor (void *);
 /*
  * All instances in one database
  */
-static struct saHandleDatabase amfHandleDatabase = {
-	.handleCount				= 0,
-	.handles					= 0,
-	.mutex						= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= amfHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(amfHandleDatabase,amfHandleInstanceDestructor);
 
 /*
  * Versions supported

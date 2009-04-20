@@ -32,6 +32,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -68,12 +70,7 @@ struct tmrInstance {
 
 void tmrHandleInstanceDestructor (void *instance);
 
-static struct saHandleDatabase tmrHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= tmrHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(tmrHandleDatabase,tmrHandleInstanceDestructor);
 
 static SaVersionT tmrVersionsSupported[] = {
 	{ 'A', 1, 1 }

@@ -32,6 +32,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <config.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -101,32 +102,11 @@ void ckptSectionIterationHandleInstanceDestructor (void *instance);
 /*
  * All CKPT instances in this database
  */
-static struct saHandleDatabase ckptHandleDatabase = {
-	.handleCount				= 0,
-	.handles					= 0,
-	.mutex						= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= ckptHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(ckptHandleDatabase,ckptHandleInstanceDestructor);
 
-/*
- *  All Checkpoint instances in this database
- */
-static struct saHandleDatabase checkpointHandleDatabase = {
-	.handleCount				= 0,
-	.handles					= 0,
-	.mutex						= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= checkpointHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(checkpointHandleDatabase,checkpointHandleInstanceDestructor);
 
-/*
- * All section iterators in this database
- */
-static struct saHandleDatabase ckptSectionIterationHandleDatabase = {
-	.handleCount				= 0,
-	.handles					= 0,
-	.mutex						= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= ckptSectionIterationHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(ckptSectionIterationHandleDatabase, ckptSectionIterationHandleInstanceDestructor);
 
 /*
  * Versions supported

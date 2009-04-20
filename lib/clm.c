@@ -33,6 +33,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -67,12 +69,7 @@ struct clmInstance {
 
 static void clmHandleInstanceDestructor (void *);
 
-static struct saHandleDatabase clmHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= clmHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(clmHandleDatabase,clmHandleInstanceDestructor);
 
 /*
  * Versions supported

@@ -31,6 +31,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
+
 #include <sys/types.h>
 #include <errno.h>
 #include <stdio.h>
@@ -67,32 +69,11 @@ static struct saVersionDatabase evt_version_database = {
 /*
  * Event instance data
  */
-struct saHandleDatabase evt_instance_handle_db = {
-	.handleCount	= 0,
-	.handles 		= 0,
-	.mutex			= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= evtHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(evt_instance_handle_db,evtHandleInstanceDestructor);
 
-/*
- * Channel instance data
- */
-struct saHandleDatabase channel_handle_db = {
-	.handleCount	= 0,
-	.handles 		= 0,
-	.mutex			= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= chanHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(channel_handle_db,chanHandleInstanceDestructor);
 
-/*
- * Event instance data
- */
-struct saHandleDatabase event_handle_db = {
-	.handleCount	= 0,
-	.handles 		= 0,
-	.mutex			= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= eventHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(event_handle_db,eventHandleInstanceDestructor);
 
 struct handle_list {
 	SaUint64T			hl_handle;
@@ -543,8 +524,6 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 		edi->edi_patterns.patterns[i].allocatedSize = pat->pattern_size;
 		edi->edi_patterns.patterns[i].pattern = malloc(pat->pattern_size);
 		if (!edi->edi_patterns.patterns[i].pattern) {
-            DPRINT (("make_event: couldn't alloc %llu bytes\n",
-				(unsigned long long)pat->pattern_size));
 			saHandleDestroy(&event_handle_db, *event_handle);
 			error =  SA_AIS_ERR_LIBRARY;
 			goto make_evt_done_put2;

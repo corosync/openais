@@ -32,6 +32,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -94,32 +96,11 @@ void lckResourceHandleLockIdInstanceDestructor (void *instance);
 /*
  * All LCK instances in this database
  */
-static struct saHandleDatabase lckHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= lckHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(lckHandleDatabase,lckHandleInstanceDestructor);
 
-/*
- *  All Resource instances in this database
- */
-static struct saHandleDatabase lckResourceHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= lckResourceHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(lckResourceHandleDatabase,lckResourceHandleInstanceDestructor);
 
-/*
- *  All Resource Lock Identifier instances in this database
- */
-static struct saHandleDatabase lckLockIdHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= lckResourceHandleLockIdInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(lckLockIdHandleDatabase,lckResourceHandleLockIdInstanceDestructor);
 
 /*
  * Versions supported
@@ -447,7 +428,6 @@ saLckDispatch (
 			}
 			break;
 		case MESSAGE_RES_LCK_RESOURCELOCKASYNC:
-			DPRINT (("grant\n"));
 			if (callbacks.saLckLockGrantCallback == NULL) {
 				continue;
 			}

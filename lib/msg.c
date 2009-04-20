@@ -32,6 +32,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -81,19 +83,9 @@ struct queueInstance {
 void msgHandleInstanceDestructor (void *instance);
 void queueHandleInstanceDestructor (void *instance);
 
-static struct saHandleDatabase msgHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= msgHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(msgHandleDatabase,msgHandleInstanceDestructor);
 
-static struct saHandleDatabase queueHandleDatabase = {
-	.handleCount			= 0,
-	.handles			= 0,
-	.mutex				= PTHREAD_MUTEX_INITIALIZER,
-	.handleInstanceDestructor	= queueHandleInstanceDestructor
-};
+DECLARE_SAHDB_DATABASE(queueHandleDatabase,queueHandleInstanceDestructor);
 
 static SaVersionT msgVersionsSupported[] = {
 	{ 'B', 1, 1 }
