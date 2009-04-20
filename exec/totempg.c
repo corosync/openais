@@ -158,20 +158,19 @@ static void (*totempg_log_printf) (char *file, int line, int level, char *format
 
 struct totem_config *totempg_totem_config;
 
+enum throw_away_mode {
+	THROW_AWAY_INACTIVE,
+	THROW_AWAY_ACTIVE
+};
+
 struct assembly {
 	unsigned int nodeid;
 	unsigned char data[MESSAGE_SIZE_MAX];
 	int index;
 	unsigned char last_frag_num;
+	enum throw_away_mode throw_away_mode;
 	struct list_head list;
 };
-
-enum throw_away_mode_t {
-	THROW_AWAY_INACTIVE,
-	THROW_AWAY_ACTIVE
-};
-
-static enum throw_away_mode_t throw_away_mode = THROW_AWAY_INACTIVE;
 
 DECLARE_LIST_INIT(assembly_list_inuse);
 
@@ -265,6 +264,10 @@ static struct assembly *assembly_ref (unsigned int nodeid)
 		list_del (&assembly->list);
 		list_add (&assembly->list, &assembly_list_inuse);
 		assembly->nodeid = nodeid;
+		assembly->index = 0;
+		assembly->last_frag_num = 0;
+		assembly->throw_away_mode = THROW_AWAY_INACTIVE;
+
 		return (assembly);
 	}
 
@@ -278,6 +281,9 @@ static struct assembly *assembly_ref (unsigned int nodeid)
 	 */
 	assert (assembly);
 	assembly->nodeid = nodeid;
+	assembly->index = 0;
+	assembly->last_frag_num = 0;
+	assembly->throw_away_mode = THROW_AWAY_INACTIVE;
 	list_init (&assembly->list);
 	list_add (&assembly->list, &assembly_list_inuse);
 
@@ -569,10 +575,10 @@ static void totempg_deliver_fn (
 	 */
 	start = 0;
 
-	if (throw_away_mode == THROW_AWAY_ACTIVE) {
+	if (assembly->throw_away_mode == THROW_AWAY_ACTIVE) {
 		 /* Throw away the first msg block */
 		if (mcast->fragmented == 0 || mcast->fragmented == 1) {
-			throw_away_mode = THROW_AWAY_INACTIVE;
+			assembly->throw_away_mode = THROW_AWAY_INACTIVE;
 
 			assembly->index += msg_lens[0];
 			iov_delv.iov_base = &assembly->data[assembly->index];
@@ -580,7 +586,7 @@ static void totempg_deliver_fn (
 			start = 1;
 		}
 	} else 
-	if (throw_away_mode == THROW_AWAY_INACTIVE) {
+	if (assembly->throw_away_mode == THROW_AWAY_INACTIVE) {
 		if (continuation == assembly->last_frag_num) {
 			assembly->last_frag_num = mcast->fragmented;
 			for  (i = start; i < msg_count; i++) {
@@ -593,7 +599,7 @@ static void totempg_deliver_fn (
 				}
 			}
 		} else {
-			throw_away_mode = THROW_AWAY_ACTIVE;
+			assembly->throw_away_mode = THROW_AWAY_ACTIVE;
 		}
 	}
 
