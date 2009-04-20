@@ -60,7 +60,7 @@
 #include "../include/ipc_ckpt.h"
 #include "../include/mar_ckpt.h"
 
-LOGSYS_DECLARE_SUBSYS ("CKPT", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("CKPT");
 
 #define GLOBALID_CHECKPOINT_NAME "global_checkpoint_name_do_not_use_in_an_application"
 
@@ -933,10 +933,10 @@ static struct checkpoint_section *checkpoint_section_find (
 	struct checkpoint_section *checkpoint_section;
 
 	if (id_len != 0) {
-		log_printf (LOG_LEVEL_DEBUG, "Finding checkpoint section id %s %d\n", (char*)id, id_len);
+		log_printf (LOGSYS_LEVEL_DEBUG, "Finding checkpoint section id %s %d\n", (char*)id, id_len);
 	}
 	else {
-		log_printf (LOG_LEVEL_DEBUG, "Finding default checkpoint section\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "Finding default checkpoint section\n");
 	}
 
 	for (checkpoint_section_list = checkpoint->sections_list_head.next;
@@ -946,13 +946,13 @@ static struct checkpoint_section *checkpoint_section_find (
 		checkpoint_section = list_entry (checkpoint_section_list,
 			struct checkpoint_section, list);
 		if (checkpoint_section->section_descriptor.section_id.id_len) {
-			log_printf (LOG_LEVEL_DEBUG, "Checking section id %d %*s\n",
+			log_printf (LOGSYS_LEVEL_DEBUG, "Checking section id %d %*s\n",
 				checkpoint_section->section_descriptor.section_id.id_len,
 				checkpoint_section->section_descriptor.section_id.id_len,
 				checkpoint_section->section_descriptor.section_id.id);
 		}
 		else {
-			log_printf (LOG_LEVEL_DEBUG, "Checking default section id\n");
+			log_printf (LOGSYS_LEVEL_DEBUG, "Checking default section id\n");
 		}
 
 		/*
@@ -963,7 +963,7 @@ static struct checkpoint_section *checkpoint_section_find (
 		if ((id_len ||
 				checkpoint_section->section_descriptor.section_id.id ||
 				checkpoint_section->section_descriptor.section_id.id_len) == 0) {
-			 log_printf (LOG_LEVEL_DEBUG, "Returning default section\n");
+			 log_printf (LOGSYS_LEVEL_DEBUG, "Returning default section\n");
 			 return (checkpoint_section);
 		}
 
@@ -973,7 +973,7 @@ static struct checkpoint_section *checkpoint_section_find (
 			(memcmp (checkpoint_section->section_descriptor.section_id.id,
 			id, id_len) == 0)) {
 
-			log_printf (LOG_LEVEL_DEBUG, "Returning section %s(0x%p)\n", checkpoint_section->section_descriptor.section_id.id,
+			log_printf (LOGSYS_LEVEL_DEBUG, "Returning section %s(0x%p)\n", checkpoint_section->section_descriptor.section_id.id,
 				checkpoint_section);
 
 			return (checkpoint_section);
@@ -984,7 +984,7 @@ static struct checkpoint_section *checkpoint_section_find (
 
 static void checkpoint_section_release (struct checkpoint_section *section)
 {
-	log_printf (LOG_LEVEL_DEBUG, "checkpoint_section_release expiration timer = 0x%p\n", section->expiration_timer);
+	log_printf (LOGSYS_LEVEL_DEBUG, "checkpoint_section_release expiration timer = 0x%p\n", section->expiration_timer);
 	list_del (&section->list);
 
 	api->timer_delete (section->expiration_timer);
@@ -1248,7 +1248,7 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 	struct ckpt_pd *ckpt_pd;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_DEBUG, "Executive request to open checkpoint %p\n", req_exec_ckpt_checkpointopen);
+	log_printf (LOGSYS_LEVEL_DEBUG, "Executive request to open checkpoint %p\n", req_exec_ckpt_checkpointopen);
 
 	if (req_exec_ckpt_checkpointopen->fail_with_error != SA_AIS_OK) {
 		error = req_exec_ckpt_checkpointopen->fail_with_error;
@@ -1366,7 +1366,7 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 	/*
 	 * Setup connection information and mark checkpoint as referenced
 	 */
-	log_printf (LOG_LEVEL_DEBUG, "CHECKPOINT opened is %p\n", checkpoint);
+	log_printf (LOGSYS_LEVEL_DEBUG, "CHECKPOINT opened is %p\n", checkpoint);
 
 	sync_refcount_increment (checkpoint, nodeid);
 	sync_refcount_calculate (checkpoint);
@@ -1452,14 +1452,14 @@ static void timer_function_section_expire (void *data)
 	struct ckpt_identifier *ckpt_id = 0;
 
 	ckpt_id = (struct ckpt_identifier *)data;
-	log_printf (LOG_LEVEL_DEBUG, "timer_function_section_expire data = 0x%p\n",data);
+	log_printf (LOGSYS_LEVEL_DEBUG, "timer_function_section_expire data = 0x%p\n",data);
 	if (ckpt_id->ckpt_section_id.id_len && ckpt_id->ckpt_section_id.id) {
-		log_printf (LOG_LEVEL_DEBUG, "Attempting to expire section %s in ckpt %s\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "Attempting to expire section %s in ckpt %s\n",
 			ckpt_id->ckpt_section_id.id,
 			ckpt_id->ckpt_name.value);
 	}
 	else {
-		log_printf (LOG_LEVEL_ERROR, "timer_function_section_expire data incorect\n");
+		log_printf (LOGSYS_LEVEL_ERROR, "timer_function_section_expire data incorect\n");
 		goto free_mem;
 	}
 
@@ -1468,7 +1468,7 @@ static void timer_function_section_expire (void *data)
 		&ckpt_id->ckpt_name,
 		ckpt_id->ckpt_id);
         if (checkpoint == NULL) {
-		log_printf (LOG_LEVEL_ERROR, "timer_function_section_expire could not find ckpt %s\n",
+		log_printf (LOGSYS_LEVEL_ERROR, "timer_function_section_expire could not find ckpt %s\n",
                         ckpt_id->ckpt_name.value);
 		goto free_mem;
         }
@@ -1477,13 +1477,13 @@ static void timer_function_section_expire (void *data)
 		(char *)ckpt_id->ckpt_section_id.id,
 		(int)ckpt_id->ckpt_section_id.id_len);
         if (checkpoint_section == 0) {
-		log_printf (LOG_LEVEL_ERROR, "timer_function_section_expire could not find section %s in ckpt %s\n",
+		log_printf (LOGSYS_LEVEL_ERROR, "timer_function_section_expire could not find section %s in ckpt %s\n",
                         ckpt_id->ckpt_section_id.id,
                         ckpt_id->ckpt_name.value);
 		goto free_mem;
         }
 
-	log_printf (LOG_LEVEL_DEBUG, "Expiring section %s in ckpt %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "Expiring section %s in ckpt %s\n",
                         ckpt_id->ckpt_section_id.id,
                         ckpt_id->ckpt_name.value);
 
@@ -1508,7 +1508,7 @@ static int callback_expiry (const void *data)
 		checkpoint = list_entry (list,
 			struct checkpoint, expiry_list);
 
-		log_printf (LOG_LEVEL_DEBUG,
+		log_printf (LOGSYS_LEVEL_DEBUG,
 			"refcnt checkpoint %s %d\n",
 			get_mar_name_t (&checkpoint->name), checkpoint->reference_count);
 		if (checkpoint->reference_count == 0) {
@@ -1532,7 +1532,7 @@ static int callback_expiry (const void *data)
 			if (res == -1) {
 				return (-1);
 			}
-			log_printf (LOG_LEVEL_DEBUG,
+			log_printf (LOGSYS_LEVEL_DEBUG,
 				"Expiring checkpoint %s\n",
 				get_mar_name_t (&checkpoint->name));
 		}
@@ -1572,7 +1572,7 @@ static void message_handler_req_exec_ckpt_checkpointclose (
 	SaAisErrorT error = SA_AIS_OK;
 	int release_checkpoint = 0;
 
-	log_printf (LOG_LEVEL_DEBUG, "Got EXEC request to close checkpoint %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "Got EXEC request to close checkpoint %s\n",
 		get_mar_name_t (&req_exec_ckpt_checkpointclose->checkpoint_name));
 
 	checkpoint = checkpoint_find (
@@ -1587,7 +1587,7 @@ static void message_handler_req_exec_ckpt_checkpointclose (
 	sync_refcount_decrement (checkpoint, nodeid);
 	sync_refcount_calculate (checkpoint);
 
-	log_printf (LOG_LEVEL_DEBUG, "Close checkpoint->reference_count %d\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "Close checkpoint->reference_count %d\n",
 		checkpoint->reference_count);
 	assert (checkpoint->reference_count >= 0);
 
@@ -1595,7 +1595,7 @@ static void message_handler_req_exec_ckpt_checkpointclose (
 	 * If checkpoint has been unlinked and this is the last reference, delete it
 	 */
 	if (checkpoint->unlinked && checkpoint->reference_count == 0) {
-		log_printf (LOG_LEVEL_DEBUG, "Unlinking checkpoint.\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "Unlinking checkpoint.\n");
 		release_checkpoint = 1;
 	} else
 	if (checkpoint->reference_count == 0) {
@@ -1639,7 +1639,7 @@ static void message_handler_req_exec_ckpt_checkpointunlink (
 	struct checkpoint *checkpoint = 0;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_DEBUG, "Got EXEC request to unlink checkpoint %p\n", req_exec_ckpt_checkpointunlink);
+	log_printf (LOGSYS_LEVEL_DEBUG, "Got EXEC request to unlink checkpoint %p\n", req_exec_ckpt_checkpointunlink);
 	checkpoint = checkpoint_find_linked (
 		&checkpoint_list_head,
 		&req_exec_ckpt_checkpointunlink->checkpoint_name);
@@ -1691,7 +1691,7 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationset (
 		&req_exec_ckpt_checkpointretentiondurationset->checkpoint_name,
 		req_exec_ckpt_checkpointretentiondurationset->ckpt_id);
 	if (checkpoint) {
-		log_printf (LOG_LEVEL_DEBUG, "Setting retention duration for checkpoint %s\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "Setting retention duration for checkpoint %s\n",
 			get_mar_name_t (&req_exec_ckpt_checkpointretentiondurationset->checkpoint_name));
 		if (checkpoint->unlinked == 0) {
 			checkpoint->checkpoint_creation_attributes.retention_duration =
@@ -1738,10 +1738,10 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationexpire (
 		&checkpoint_list_head,
 		&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name,
 		req_exec_ckpt_checkpointretentiondurationexpire->ckpt_id);
-		log_printf (LOG_LEVEL_NOTICE, "Expiring checkpoint %s\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "Expiring checkpoint %s\n",
 			get_mar_name_t (&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name));
 	if (checkpoint && (checkpoint->reference_count == 0)) {
-		log_printf (LOG_LEVEL_NOTICE, "Expiring checkpoint %s\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "Expiring checkpoint %s\n",
 			get_mar_name_t (&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name));
 
 		req_exec_ckpt_checkpointunlink.header.size =
@@ -1778,7 +1778,7 @@ static void message_handler_req_exec_ckpt_sectioncreate (
 	struct ckpt_identifier *ckpt_id = 0;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_DEBUG, "Executive request to create a checkpoint section.\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "Executive request to create a checkpoint section.\n");
 	checkpoint = checkpoint_find (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectioncreate->checkpoint_name,
@@ -1895,7 +1895,7 @@ static void message_handler_req_exec_ckpt_sectioncreate (
 		memcpy(&ckpt_id->ckpt_section_id,
 			&checkpoint_section->section_descriptor.section_id,
 			sizeof(mar_ckpt_section_id_t));
-		log_printf (LOG_LEVEL_DEBUG, "req_exec_ckpt_sectioncreate Enqueuing Timer to Expire section %s in ckpt %s\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "req_exec_ckpt_sectioncreate Enqueuing Timer to Expire section %s in ckpt %s\n",
 			ckpt_id->ckpt_section_id.id,
 			ckpt_id->ckpt_name.value);
 		api->timer_add_absolute (
@@ -1903,12 +1903,12 @@ static void message_handler_req_exec_ckpt_sectioncreate (
 			ckpt_id,
 			timer_function_section_expire,
 			&checkpoint_section->expiration_timer);
-		log_printf (LOG_LEVEL_DEBUG,
+		log_printf (LOGSYS_LEVEL_DEBUG,
 			"req_exec_ckpt_sectionicreate expiration timer = 0x%p\n",
 			checkpoint_section->expiration_timer);
 	}
 
-	log_printf (LOG_LEVEL_DEBUG,
+	log_printf (LOGSYS_LEVEL_DEBUG,
 		"message_handler_req_exec_ckpt_sectioncreate created section with id = %s, id_len = %d\n",
 		checkpoint_section->section_descriptor.section_id.id,
 		checkpoint_section->section_descriptor.section_id.id_len);
@@ -1952,7 +1952,7 @@ static void message_handler_req_exec_ckpt_sectiondelete (
 	}
 
 	if (checkpoint->active_replica_set == 0) {
-		log_printf (LOG_LEVEL_DEBUG, "sectiondelete: no active replica, returning error.\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "sectiondelete: no active replica, returning error.\n");
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -2009,7 +2009,7 @@ static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
 	struct ckpt_identifier *ckpt_id = 0;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_DEBUG, "Executive request to set section expiration time\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "Executive request to set section expiration time\n");
 	checkpoint = checkpoint_find (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectionexpirationtimeset->checkpoint_name,
@@ -2020,7 +2020,7 @@ static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
 	}
 
 	if (checkpoint->active_replica_set == 0) {
-		log_printf (LOG_LEVEL_DEBUG, "expirationset: no active replica, returning error.\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "expirationset: no active replica, returning error.\n");
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -2063,7 +2063,7 @@ static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
 		memcpy(&ckpt_id->ckpt_section_id,
 			&checkpoint_section->section_descriptor.section_id,
 			sizeof(mar_ckpt_section_id_t));
-		log_printf (LOG_LEVEL_DEBUG, "req_exec_ckpt_sectionexpirationtimeset Enqueuing Timer to Expire section %s in ckpt %s, ref = 0x%p\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "req_exec_ckpt_sectionexpirationtimeset Enqueuing Timer to Expire section %s in ckpt %s, ref = 0x%p\n",
 			ckpt_id->ckpt_section_id.id,
 			ckpt_id->ckpt_name.value,
 			ckpt_id);
@@ -2072,7 +2072,7 @@ static void message_handler_req_exec_ckpt_sectionexpirationtimeset (
 			ckpt_id,
 			timer_function_section_expire,
 			&checkpoint_section->expiration_timer);
-		log_printf (LOG_LEVEL_DEBUG, "req_exec_ckpt_sectionexpirationtimeset expiration timer = 0x%p\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "req_exec_ckpt_sectionexpirationtimeset expiration timer = 0x%p\n",
 			checkpoint_section->expiration_timer);
 	}
 
@@ -2103,19 +2103,19 @@ static void message_handler_req_exec_ckpt_sectionwrite (
 	void *section_data;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_DEBUG, "Executive request to section write.\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "Executive request to section write.\n");
 	checkpoint = checkpoint_find (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectionwrite->checkpoint_name,
 		req_exec_ckpt_sectionwrite->ckpt_id);
 	if (checkpoint == NULL) {
-		log_printf (LOG_LEVEL_ERROR, "checkpoint_find returned 0 Calling error_exit.\n");
+		log_printf (LOGSYS_LEVEL_ERROR, "checkpoint_find returned 0 Calling error_exit.\n");
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
 	if (checkpoint->active_replica_set == 0) {
-		log_printf (LOG_LEVEL_DEBUG, "checkpointwrite: no active replica, returning error.\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "checkpointwrite: no active replica, returning error.\n");
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -2125,7 +2125,7 @@ static void message_handler_req_exec_ckpt_sectionwrite (
 		goto error_exit;
 	}
 
-	log_printf (LOG_LEVEL_DEBUG, "writing checkpoint section is %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "writing checkpoint section is %s\n",
 		((char *)req_exec_ckpt_sectionwrite) +
 			sizeof (struct req_exec_ckpt_sectionwrite));
 
@@ -2138,10 +2138,10 @@ static void message_handler_req_exec_ckpt_sectionwrite (
 		req_exec_ckpt_sectionwrite->id_len);
 	if (checkpoint_section == 0) {
 		if (req_exec_ckpt_sectionwrite->id_len == 0) {
-			log_printf (LOG_LEVEL_DEBUG, "CANT FIND DEFAULT SECTION.\n");
+			log_printf (LOGSYS_LEVEL_DEBUG, "CANT FIND DEFAULT SECTION.\n");
 		}
 		else {
-			log_printf (LOG_LEVEL_DEBUG, "CANT FIND SECTION '%s'\n",
+			log_printf (LOGSYS_LEVEL_DEBUG, "CANT FIND SECTION '%s'\n",
 				((char *)req_exec_ckpt_sectionwrite) +
 				sizeof (struct req_exec_ckpt_sectionwrite));
 		}
@@ -2157,7 +2157,7 @@ static void message_handler_req_exec_ckpt_sectionwrite (
 	if (size_required > checkpoint_section->section_descriptor.section_size) {
 		section_data = realloc (checkpoint_section->section_data, size_required);
 		if (section_data == 0) {
-			log_printf (LOG_LEVEL_ERROR, "section_data realloc returned 0 Calling error_exit.\n");
+			log_printf (LOGSYS_LEVEL_ERROR, "section_data realloc returned 0 Calling error_exit.\n");
 			error = SA_AIS_ERR_NO_MEMORY;
 			goto error_exit;
 		}
@@ -2212,7 +2212,7 @@ static void message_handler_req_exec_ckpt_sectionoverwrite (
 	void *section_data;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_DEBUG, "Executive request to section overwrite.\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "Executive request to section overwrite.\n");
 	checkpoint = checkpoint_find (
 		&checkpoint_list_head,
 		&req_exec_ckpt_sectionoverwrite->checkpoint_name,
@@ -2223,7 +2223,7 @@ static void message_handler_req_exec_ckpt_sectionoverwrite (
 	}
 
 	if (checkpoint->active_replica_set == 0) {
-		log_printf (LOG_LEVEL_DEBUG, "sectionoverwrite: no active replica, returning error.\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "sectionoverwrite: no active replica, returning error.\n");
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -2313,7 +2313,7 @@ static void message_handler_req_exec_ckpt_sectionread (
 
 	res_lib_ckpt_sectionread.data_read = 0;
 
-	log_printf (LOG_LEVEL_DEBUG, "Executive request for section read.\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "Executive request for section read.\n");
 
 	checkpoint = checkpoint_find (
 		&checkpoint_list_head,
@@ -2424,7 +2424,7 @@ static int ckpt_lib_exit_fn (void *conn)
 	struct ckpt_pd *ckpt_pd = (struct ckpt_pd *)api->ipc_private_data_get (conn);
 	int res;
 
-	log_printf (LOG_LEVEL_DEBUG, "checkpoint exit conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "checkpoint exit conn %p\n", conn);
 
 	/*
 	 * close all checkpoints opened on this connection
@@ -2467,7 +2467,7 @@ static void message_handler_req_lib_ckpt_checkpointopen (
 	struct req_exec_ckpt_checkpointopen req_exec_ckpt_checkpointopen;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_DEBUG, "Library request to open checkpoint.\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "Library request to open checkpoint.\n");
 	req_exec_ckpt_checkpointopen.header.size =
 		sizeof (struct req_exec_ckpt_checkpointopen);
 	req_exec_ckpt_checkpointopen.header.id =
@@ -2566,7 +2566,7 @@ static void message_handler_req_lib_ckpt_checkpointretentiondurationset (
 	struct req_exec_ckpt_checkpointretentiondurationset req_exec_ckpt_checkpointretentiondurationset;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_DEBUG, "DURATION SET FROM API conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "DURATION SET FROM API conn %p\n", conn);
 	req_exec_ckpt_checkpointretentiondurationset.header.id =
 		SERVICE_ID_MAKE (CKPT_SERVICE,
 			MESSAGE_REQ_EXEC_CKPT_CHECKPOINTRETENTIONDURATIONSET);
@@ -2671,7 +2671,7 @@ static void message_handler_req_lib_ckpt_checkpointstatusget (
 		res_lib_ckpt_checkpointstatusget.checkpoint_descriptor.memory_used = memory_used;
 	}
 	else {
-		log_printf (LOG_LEVEL_ERROR, "#### Could Not Find the Checkpoint's status so Returning Error. ####\n");
+		log_printf (LOGSYS_LEVEL_ERROR, "#### Could Not Find the Checkpoint's status so Returning Error. ####\n");
 
 		res_lib_ckpt_checkpointstatusget.header.size = sizeof (struct res_lib_ckpt_checkpointstatusget);
 		res_lib_ckpt_checkpointstatusget.header.id = MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTSTATUSGET;
@@ -2691,7 +2691,7 @@ static void message_handler_req_lib_ckpt_sectioncreate (
 	struct req_exec_ckpt_sectioncreate req_exec_ckpt_sectioncreate;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_DEBUG, "Section create from conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "Section create from conn %p\n", conn);
 
 	req_exec_ckpt_sectioncreate.header.id =
 		SERVICE_ID_MAKE (CKPT_SERVICE,
@@ -2722,13 +2722,13 @@ static void message_handler_req_lib_ckpt_sectioncreate (
 	req_exec_ckpt_sectioncreate.header.size += iovecs[1].iov_len;
 
 	if (iovecs[1].iov_len) {
-		log_printf (LOG_LEVEL_DEBUG, "message_handler_req_lib_ckpt_sectioncreate Section = %p, id_len = %d\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "message_handler_req_lib_ckpt_sectioncreate Section = %p, id_len = %d\n",
 			iovecs[1].iov_base,
 			(int)iovecs[1].iov_len);
 	}
 
 	if (iovecs[1].iov_len > 0) {
-		log_printf (LOG_LEVEL_DEBUG, "IOV_BASE is %p\n", iovecs[1].iov_base);
+		log_printf (LOGSYS_LEVEL_DEBUG, "IOV_BASE is %p\n", iovecs[1].iov_base);
 		assert (api->totem_mcast (iovecs, 2, TOTEM_AGREED) == 0);
 	} else {
 		assert (api->totem_mcast (iovecs, 1, TOTEM_AGREED) == 0);
@@ -2743,7 +2743,7 @@ static void message_handler_req_lib_ckpt_sectiondelete (
 	struct req_exec_ckpt_sectiondelete req_exec_ckpt_sectiondelete;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_DEBUG, "section delete from conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "section delete from conn %p\n", conn);
 
 	req_exec_ckpt_sectiondelete.header.id =
 		SERVICE_ID_MAKE (CKPT_SERVICE,
@@ -2786,7 +2786,7 @@ static void message_handler_req_lib_ckpt_sectionexpirationtimeset (
 	struct req_exec_ckpt_sectionexpirationtimeset req_exec_ckpt_sectionexpirationtimeset;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_DEBUG, "section expiration time set from conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "section expiration time set from conn %p\n", conn);
 	req_exec_ckpt_sectionexpirationtimeset.header.id =
 		SERVICE_ID_MAKE (CKPT_SERVICE,
 			MESSAGE_REQ_EXEC_CKPT_SECTIONEXPIRATIONTIMESET);
@@ -2831,16 +2831,16 @@ static void message_handler_req_lib_ckpt_sectionwrite (
 	struct req_exec_ckpt_sectionwrite req_exec_ckpt_sectionwrite;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_DEBUG, "Received data from lib with len = %d and ref = 0x%lx\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "Received data from lib with len = %d and ref = 0x%lx\n",
 		(int)req_lib_ckpt_sectionwrite->data_size,
 		(long)req_lib_ckpt_sectionwrite->data_offset);
 
-	log_printf (LOG_LEVEL_DEBUG, "Checkpoint section being written to is %s, id_len = %d\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "Checkpoint section being written to is %s, id_len = %d\n",
 		((char *)req_lib_ckpt_sectionwrite) +
 			sizeof (struct req_lib_ckpt_sectionwrite),
 		req_lib_ckpt_sectionwrite->id_len);
 
-	log_printf (LOG_LEVEL_DEBUG, "Section write from conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "Section write from conn %p\n", conn);
 
 	/*
 	 * checkpoint opened is writeable mode so send message to cluster
@@ -2892,7 +2892,7 @@ static void message_handler_req_lib_ckpt_sectionoverwrite (
 	struct req_exec_ckpt_sectionoverwrite req_exec_ckpt_sectionoverwrite;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_DEBUG, "Section overwrite from conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "Section overwrite from conn %p\n", conn);
 
 	req_exec_ckpt_sectionoverwrite.header.id =
 		SERVICE_ID_MAKE (CKPT_SERVICE,
@@ -2937,7 +2937,7 @@ static void message_handler_req_lib_ckpt_sectionread (
 	struct req_exec_ckpt_sectionread req_exec_ckpt_sectionread;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_DEBUG, "Section read from conn %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "Section read from conn %p\n", conn);
 
 	/*
 	 * checkpoint opened is writeable mode so send message to cluster
@@ -3063,7 +3063,7 @@ static void message_handler_req_lib_ckpt_sectioniterationinitialize (
 
 	struct ckpt_pd *ckpt_pd = (struct ckpt_pd *)api->ipc_private_data_get (conn);
 
-	log_printf (LOG_LEVEL_DEBUG, "section iteration initialize\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "section iteration initialize\n");
 
 	checkpoint = checkpoint_find (
 		&checkpoint_list_head,
@@ -3075,7 +3075,7 @@ static void message_handler_req_lib_ckpt_sectioniterationinitialize (
 	}
 
 	if (checkpoint->active_replica_set == 0) {
-		log_printf (LOG_LEVEL_DEBUG, "iterationinitialize: no active replica, returning error.\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "iterationinitialize: no active replica, returning error.\n");
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
@@ -3235,7 +3235,7 @@ static void message_handler_req_lib_ckpt_sectioniterationnext (
 
 	struct ckpt_pd *ckpt_pd = (struct ckpt_pd *)api->ipc_private_data_get (conn);
 
-	log_printf (LOG_LEVEL_DEBUG, "section iteration next\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "section iteration next\n");
 	res = hdb_handle_get (&ckpt_pd->iteration_hdb,
 		req_lib_ckpt_sectioniterationnext->iteration_handle,
 		&iteration_instance_p);
@@ -3365,7 +3365,7 @@ static void sync_refcount_decrement (
 		}
 		if (checkpoint->refcount_set[i].nodeid == nodeid) {
 			checkpoint->refcount_set[i].refcount -= 1;
-log_printf (LOG_LEVEL_NOTICE, "decrementing node id %d %d\n", nodeid, checkpoint->refcount_set[i].refcount);
+log_printf (LOGSYS_LEVEL_NOTICE, "decrementing node id %d %d\n", nodeid, checkpoint->refcount_set[i].refcount);
 			break;
 		}
 	}
@@ -4068,9 +4068,9 @@ static void ckpt_dump_fn (void)
 	struct list_head *checkpoint_section_list;
 	struct checkpoint_section *section;
 
-	log_printf (LOG_LEVEL_NOTICE,
+	log_printf (LOGSYS_LEVEL_NOTICE,
 		"========== Checkpoint Information ===========");
-	log_printf (LOG_LEVEL_NOTICE, "global_ckpt_id: %u", global_ckpt_id);
+	log_printf (LOGSYS_LEVEL_NOTICE, "global_ckpt_id: %u", global_ckpt_id);
 
 	for (checkpoint_list = checkpoint_list_head.next;
 		checkpoint_list != &checkpoint_list_head;
@@ -4082,12 +4082,12 @@ static void ckpt_dump_fn (void)
 			return;
 		}
 
-		log_printf (LOG_LEVEL_NOTICE, "Checkpoint %s (%d):",
+		log_printf (LOGSYS_LEVEL_NOTICE, "Checkpoint %s (%d):",
 			checkpoint->name.value, checkpoint->name.length);
-		log_printf (LOG_LEVEL_NOTICE, "   id:       %u", checkpoint->ckpt_id);
-		log_printf (LOG_LEVEL_NOTICE, "   sec cnt:  %u", checkpoint->section_count);
-		log_printf (LOG_LEVEL_NOTICE, "   ref cnt:  %u", checkpoint->reference_count);
-		log_printf (LOG_LEVEL_NOTICE, "   unlinked: %u", checkpoint->unlinked);
+		log_printf (LOGSYS_LEVEL_NOTICE, "   id:       %u", checkpoint->ckpt_id);
+		log_printf (LOGSYS_LEVEL_NOTICE, "   sec cnt:  %u", checkpoint->section_count);
+		log_printf (LOGSYS_LEVEL_NOTICE, "   ref cnt:  %u", checkpoint->reference_count);
+		log_printf (LOGSYS_LEVEL_NOTICE, "   unlinked: %u", checkpoint->unlinked);
 
 		for (checkpoint_section_list = checkpoint->sections_list_head.next;
 			checkpoint_section_list != &checkpoint->sections_list_head;
@@ -4096,14 +4096,14 @@ static void ckpt_dump_fn (void)
 			section = list_entry (checkpoint_section_list,
 				struct checkpoint_section, list);
 
-			log_printf (LOG_LEVEL_NOTICE, "   Section %s (%d)",
+			log_printf (LOGSYS_LEVEL_NOTICE, "   Section %s (%d)",
 				section->section_descriptor.section_id.id,
 				section->section_descriptor.section_id.id_len);
-			log_printf (LOG_LEVEL_NOTICE, "      size:     %llu",
+			log_printf (LOGSYS_LEVEL_NOTICE, "      size:     %llu",
 				section->section_descriptor.section_size);
-			log_printf (LOG_LEVEL_NOTICE, "      state:    %u",
+			log_printf (LOGSYS_LEVEL_NOTICE, "      state:    %u",
 				section->section_descriptor.section_state);
-			log_printf (LOG_LEVEL_NOTICE, "      exp time: %llu",
+			log_printf (LOGSYS_LEVEL_NOTICE, "      exp time: %llu",
 				section->section_descriptor.expiration_time);
 		}
 	}

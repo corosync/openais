@@ -66,7 +66,7 @@
 #include "ipc_amf.h"
 #include "amf.h"
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 #ifndef COROSYNC_CLUSTER_STARTUP_TIMEOUT
 #define COROSYNC_CLUSTER_STARTUP_TIMEOUT 5000
@@ -916,16 +916,16 @@ parse_error:
 static void print_csi_assignment (struct amf_comp *comp,
 	struct amf_csi_assignment *csi_assignment)
 {
-	log_printf (LOG_INFO, "            safCSI=%s\n", csi_assignment->csi->name.value);
-	log_printf (LOG_INFO, "              HA state: %s\n",
+	log_printf (LOGSYS_LEVEL_INFO, "            safCSI=%s\n", csi_assignment->csi->name.value);
+	log_printf (LOGSYS_LEVEL_INFO, "              HA state: %s\n",
 		ha_state_text[csi_assignment->saAmfCSICompHAState]);
 }
 
 static void print_si_assignment (struct amf_su *su,
 	struct amf_si_assignment *si_assignment)
 {
-	log_printf (LOG_INFO, "          safSi=%s\n", si_assignment->si->name.value);
-	log_printf (LOG_INFO, "            HA state: %s\n",
+	log_printf (LOGSYS_LEVEL_INFO, "          safSi=%s\n", si_assignment->si->name.value);
+	log_printf (LOGSYS_LEVEL_INFO, "            HA state: %s\n",
 		ha_state_text[si_assignment->saAmfSISUHAState]);
 }
 
@@ -939,100 +939,100 @@ void amf_runtime_attributes_print (struct amf_cluster *cluster)
 	struct amf_si *si;
 	struct amf_csi *csi;
 
-	log_printf (LOG_INFO, "AMF runtime attributes:");
-	log_printf (LOG_INFO, "===================================================");
-	log_printf (LOG_INFO, "safCluster=%s", getSaNameT(&cluster->name));
-	log_printf (LOG_INFO, "  admin state: %s\n",
+	log_printf (LOGSYS_LEVEL_INFO, "AMF runtime attributes:");
+	log_printf (LOGSYS_LEVEL_INFO, "===================================================");
+	log_printf (LOGSYS_LEVEL_INFO, "safCluster=%s", getSaNameT(&cluster->name));
+	log_printf (LOGSYS_LEVEL_INFO, "  admin state: %s\n",
 		admin_state_text[cluster->saAmfClusterAdminState]);
-	log_printf (LOG_INFO, "  state:       %u\n", cluster->acsm_state);
+	log_printf (LOGSYS_LEVEL_INFO, "  state:       %u\n", cluster->acsm_state);
 	for (node = cluster->node_head; node != NULL; node = node->next) {
-		log_printf (LOG_INFO, "  safNode=%s\n", getSaNameT (&node->name));
-		log_printf (LOG_INFO, "    CLM Node:    %s\n", getSaNameT (&node->saAmfNodeClmNode));
-		log_printf (LOG_INFO, "    node ID:     %u\n", node->nodeid);
-		log_printf (LOG_INFO, "    admin state: %s\n",
+		log_printf (LOGSYS_LEVEL_INFO, "  safNode=%s\n", getSaNameT (&node->name));
+		log_printf (LOGSYS_LEVEL_INFO, "    CLM Node:    %s\n", getSaNameT (&node->saAmfNodeClmNode));
+		log_printf (LOGSYS_LEVEL_INFO, "    node ID:     %u\n", node->nodeid);
+		log_printf (LOGSYS_LEVEL_INFO, "    admin state: %s\n",
 			admin_state_text[node->saAmfNodeAdminState]);
-		log_printf (LOG_INFO, "    oper state:  %s\n",
+		log_printf (LOGSYS_LEVEL_INFO, "    oper state:  %s\n",
 			oper_state_text[node->saAmfNodeOperState]);
-		log_printf (LOG_INFO, "    acsm state:  %u\n", node->acsm_state);
+		log_printf (LOGSYS_LEVEL_INFO, "    acsm state:  %u\n", node->acsm_state);
 	}
 	for (app = cluster->application_head; app != NULL; app = app->next) {
-		log_printf (LOG_INFO, "  safApp=%s\n", getSaNameT(&app->name));
-		log_printf (LOG_INFO, "    admin state: %s\n",
+		log_printf (LOGSYS_LEVEL_INFO, "  safApp=%s\n", getSaNameT(&app->name));
+		log_printf (LOGSYS_LEVEL_INFO, "    admin state: %s\n",
 			admin_state_text[app->saAmfApplicationAdminState]);
-		log_printf (LOG_INFO, "    num_sg:      %d\n", app->saAmfApplicationCurrNumSG);
+		log_printf (LOGSYS_LEVEL_INFO, "    num_sg:      %d\n", app->saAmfApplicationCurrNumSG);
 		for (sg = app->sg_head; sg != NULL; sg = sg->next) {
-			log_printf (LOG_INFO, "    safSg=%s\n", getSaNameT(&sg->name));
-			log_printf (LOG_INFO, "      avail_state:        %u\n",
+			log_printf (LOGSYS_LEVEL_INFO, "    safSg=%s\n", getSaNameT(&sg->name));
+			log_printf (LOGSYS_LEVEL_INFO, "      avail_state:        %u\n",
 				sg->avail_state);
-			log_printf (LOG_INFO, "      admin state:        %s\n",
+			log_printf (LOGSYS_LEVEL_INFO, "      admin state:        %s\n",
 				admin_state_text[sg->saAmfSGAdminState]);
-			log_printf (LOG_INFO, "      assigned SUs        %d\n",
+			log_printf (LOGSYS_LEVEL_INFO, "      assigned SUs        %d\n",
 				sg->saAmfSGNumCurrAssignedSUs);
-			log_printf (LOG_INFO, "      non inst. spare SUs %d\n",
+			log_printf (LOGSYS_LEVEL_INFO, "      non inst. spare SUs %d\n",
 				sg->saAmfSGNumCurrNonInstantiatedSpareSUs);
-			log_printf (LOG_INFO, "      inst. spare SUs     %d\n",
+			log_printf (LOGSYS_LEVEL_INFO, "      inst. spare SUs     %d\n",
 				sg->saAmfSGNumCurrInstantiatedSpareSUs);
 			for (su = sg->su_head; su != NULL; su = su->next) {
-				log_printf (LOG_INFO, "      safSU=%s\n", getSaNameT(&su->name));
-				log_printf (LOG_INFO, "        oper state:      %s\n",
+				log_printf (LOGSYS_LEVEL_INFO, "      safSU=%s\n", getSaNameT(&su->name));
+				log_printf (LOGSYS_LEVEL_INFO, "        oper state:      %s\n",
 					oper_state_text[su->saAmfSUOperState]);
-				log_printf (LOG_INFO, "        admin state:     %s\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        admin state:     %s\n",
 					admin_state_text[su->saAmfSUAdminState]);
-				log_printf (LOG_INFO, "        readiness state: %s\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        readiness state: %s\n",
 					readiness_state_text[amf_su_get_saAmfSUReadinessState (su)]);
-				log_printf (LOG_INFO, "        presence state:  %s\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        presence state:  %s\n",
 					presence_state_text[su->saAmfSUPresenceState]);
-				log_printf (LOG_INFO, "        hosted by node   %s\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        hosted by node   %s\n",
 					su->saAmfSUHostedByNode.value);
-				log_printf (LOG_INFO, "        num active SIs   %d\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        num active SIs   %d\n",
 					amf_su_get_saAmfSUNumCurrActiveSIs (su));
-				log_printf (LOG_INFO, "        num standby SIs  %d\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        num standby SIs  %d\n",
 					amf_su_get_saAmfSUNumCurrStandbySIs (su));
-				log_printf (LOG_INFO, "        restart count    %d\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        restart count    %d\n",
 					su->saAmfSURestartCount);
-				log_printf (LOG_INFO, "        restart control state %d\n",
+				log_printf (LOGSYS_LEVEL_INFO, "        restart control state %d\n",
 					su->restart_control_state);
-				log_printf (LOG_INFO, "        SU failover cnt  %d\n", su->su_failover_cnt);
-				log_printf (LOG_INFO, "        assigned SIs:");
+				log_printf (LOGSYS_LEVEL_INFO, "        SU failover cnt  %d\n", su->su_failover_cnt);
+				log_printf (LOGSYS_LEVEL_INFO, "        assigned SIs:");
 				amf_su_foreach_si_assignment (su, print_si_assignment);
 
 				for (comp = su->comp_head; comp != NULL; comp = comp->next) {
-					log_printf (LOG_INFO, "        safComp=%s\n", getSaNameT(&comp->name));
-					log_printf (LOG_INFO, "          oper state:      %s\n",
+					log_printf (LOGSYS_LEVEL_INFO, "        safComp=%s\n", getSaNameT(&comp->name));
+					log_printf (LOGSYS_LEVEL_INFO, "          oper state:      %s\n",
 						oper_state_text[comp->saAmfCompOperState]);
-					log_printf (LOG_INFO, "          readiness state: %s\n",
+					log_printf (LOGSYS_LEVEL_INFO, "          readiness state: %s\n",
 						readiness_state_text[amf_comp_get_saAmfCompReadinessState (comp)]);
-					log_printf (LOG_INFO, "          presence state:  %s\n",
+					log_printf (LOGSYS_LEVEL_INFO, "          presence state:  %s\n",
 						presence_state_text[comp->saAmfCompPresenceState]);
-					log_printf (LOG_INFO, "          num active CSIs  %d\n",
+					log_printf (LOGSYS_LEVEL_INFO, "          num active CSIs  %d\n",
 						amf_comp_get_saAmfCompNumCurrActiveCsi (comp));
-					log_printf (LOG_INFO, "          num standby CSIs %d\n",
+					log_printf (LOGSYS_LEVEL_INFO, "          num standby CSIs %d\n",
 						amf_comp_get_saAmfCompNumCurrStandbyCsi (comp));
-					log_printf (LOG_INFO, "          restart count    %d\n",
+					log_printf (LOGSYS_LEVEL_INFO, "          restart count    %d\n",
 						comp->saAmfCompRestartCount);
-					log_printf (LOG_INFO, "          assigned CSIs:");
+					log_printf (LOGSYS_LEVEL_INFO, "          assigned CSIs:");
 					amf_comp_foreach_csi_assignment (
 						comp, print_csi_assignment);
 				}
 			}
 		}
 		for (si = app->si_head; si != NULL; si = si->next) {
-			log_printf (LOG_INFO, "    safSi=%s\n", getSaNameT(&si->name));
-			log_printf (LOG_INFO, "      admin state:         %s\n",
+			log_printf (LOGSYS_LEVEL_INFO, "    safSi=%s\n", getSaNameT(&si->name));
+			log_printf (LOGSYS_LEVEL_INFO, "      admin state:         %s\n",
 				admin_state_text[si->saAmfSIAdminState]);
-			log_printf (LOG_INFO, "      assignm. state:      %s\n",
+			log_printf (LOGSYS_LEVEL_INFO, "      assignm. state:      %s\n",
 				assignment_state_text[
 				amf_si_get_saAmfSIAssignmentState (si)]);
-			log_printf (LOG_INFO, "      active assignments:  %d\n",
+			log_printf (LOGSYS_LEVEL_INFO, "      active assignments:  %d\n",
 				amf_si_get_saAmfSINumCurrActiveAssignments (si));
-			log_printf (LOG_INFO, "      standby assignments: %d\n",
+			log_printf (LOGSYS_LEVEL_INFO, "      standby assignments: %d\n",
 				amf_si_get_saAmfSINumCurrStandbyAssignments (si));
 			for (csi = si->csi_head; csi != NULL; csi = csi->next) {
-				log_printf (LOG_INFO, "      safCsi=%s\n", getSaNameT(&csi->name));
+				log_printf (LOGSYS_LEVEL_INFO, "      safCsi=%s\n", getSaNameT(&csi->name));
 			}
 		}
 	}
-	log_printf (LOG_INFO, "===================================================");
+	log_printf (LOGSYS_LEVEL_INFO, "===================================================");
 }
 
 /* to be removed... */
@@ -1250,7 +1250,7 @@ void *_amf_malloc (size_t size, const char *file, unsigned int line)
 	void *tmp = malloc (size);
 
 	if (tmp == NULL) {
-		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
+		log_printf (LOGSYS_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
 		api->error_memory_failure ();
 	}
 
@@ -1262,7 +1262,7 @@ void *_amf_calloc (size_t nmemb, size_t size, const char *file, unsigned int lin
 	void *tmp = calloc (nmemb, size);
 
 	if (tmp == NULL) {
-		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
+		log_printf (LOGSYS_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
 		api->error_memory_failure ();
 	}
 
@@ -1274,7 +1274,7 @@ void *_amf_realloc (void* ptr, size_t size, const char *file, unsigned int line)
 	void *tmp = realloc (ptr, size);
 
 	if (tmp == NULL) {
-		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
+		log_printf (LOGSYS_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
 		api->error_memory_failure ();
 	}
 
@@ -1286,7 +1286,7 @@ char *_amf_strdup (const char *in_str, const char *file, unsigned int line)
 	char *out_str = strdup (in_str);
 
 	if (out_str == NULL) {
-		log_printf (LOG_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
+		log_printf (LOGSYS_LEVEL_ERROR, "AMF out-of-memory at %s:%u", file, line);
 		api->error_memory_failure ();
 	}
 

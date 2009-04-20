@@ -153,7 +153,7 @@
 #include "ipc_amf.h"
 #include "amf.h"
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 #ifdef AMFTEST
 #define static
@@ -631,7 +631,7 @@ static struct amf_node *get_this_node_obj (void)
 	char hostname[HOST_NAME_MAX + 1];
 
 	if (gethostname (hostname, sizeof(hostname)) == -1) {
-		log_printf (LOG_LEVEL_ERROR, "gethostname failed: %d", errno);
+		log_printf (LOGSYS_LEVEL_ERROR, "gethostname failed: %d", errno);
 		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 
@@ -719,15 +719,15 @@ static int create_cluster_model (void)
 
 	amf_cluster = amf_config_read (&error_string);
 	if (amf_cluster == NULL) {
-		log_printf (LOG_LEVEL_ERROR, "%s", error_string);
+		log_printf (LOGSYS_LEVEL_ERROR, "%s", error_string);
 		corosync_fatal_error (COROSYNC_INVALID_CONFIG);
 	}
-	log_printf (LOG_LEVEL_NOTICE, "%s", error_string);
+	log_printf (LOGSYS_LEVEL_NOTICE, "%s", error_string);
 
 	this_amf_node = get_this_node_obj ();
 
 	if (this_amf_node == NULL) {
-		log_printf (LOG_LEVEL_INFO,
+		log_printf (LOGSYS_LEVEL_INFO,
 			"Info: This node is not configured as an AMF node, disabling.");
 		return -1;
 	}
@@ -1112,7 +1112,7 @@ static void cluster_joined_nodes_start (void)
 	struct amf_node *node;
 
 	ENTER ();
-	log_printf(LOG_NOTICE, "AMF synchronisation ready, starting cluster");
+	log_printf(LOGSYS_LEVEL_NOTICE, "AMF synchronisation ready, starting cluster");
 
 	for (i = 0; i < clm_node_list_entries; i++) {
 		node = amf_node_find_by_nodeid (clm_node_list[i].nodeid);
@@ -1120,7 +1120,7 @@ static void cluster_joined_nodes_start (void)
 		if (node != NULL) {
 			amf_cluster_sync_ready (amf_cluster, node);
 		} else {
-			log_printf (LOG_LEVEL_INFO,
+			log_printf (LOGSYS_LEVEL_INFO,
 				"Info: Node %u is not configured as an AMF node",
 				clm_node_list[i].nodeid);
 		}
@@ -1275,7 +1275,7 @@ static void amf_sync_activate (void)
 				this_amf_node->nodeid = api->totem_nodeid_get();
 				cluster_joined_nodes_start ();
 			} else {
-				log_printf (LOG_LEVEL_INFO,
+				log_printf (LOGSYS_LEVEL_INFO,
 					"Info: This node is not configured as an AMF node, disabling.");
 				sync_state_set (UNCONFIGURED);
 			}
@@ -1305,7 +1305,7 @@ static void amf_sync_activate (void)
 static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
 	if (gethostname (hostname, sizeof (hostname)) == -1) {
-		log_printf (LOG_LEVEL_ERROR, "gethostname failed: %d", errno);
+		log_printf (LOGSYS_LEVEL_ERROR, "gethostname failed: %d", errno);
 		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 
@@ -1422,7 +1422,7 @@ static void amf_confchg_fn (
 			break;
 		}
 		default:
-			log_printf (LOG_LEVEL_ERROR, "unknown state: %u\n", scsm.state);
+			log_printf (LOGSYS_LEVEL_ERROR, "unknown state: %u\n", scsm.state);
 			assert (0);
 			break;
 	}
@@ -1521,7 +1521,7 @@ static void message_handler_req_exec_amf_comp_instantiate(
 
 	component = amf_comp_find (amf_cluster, &req_exec->compName);
 	if (component == NULL) {
-		log_printf (LOG_ERR, "Error: '%s' not found", req_exec->compName.value);
+		log_printf (LOGSYS_LEVEL_ERROR, "Error: '%s' not found", req_exec->compName.value);
 		return;
 
 	}
@@ -1537,7 +1537,7 @@ static void message_handler_req_exec_amf_comp_instantiate_tmo(
 
 	component = amf_comp_find (amf_cluster, &req_exec->compName);
 	if (component == NULL) {
-		log_printf (LOG_ERR, "Error: '%s' not found", req_exec->compName.value);
+		log_printf (LOGSYS_LEVEL_ERROR, "Error: '%s' not found", req_exec->compName.value);
 		return;
 
 	}
@@ -1552,7 +1552,7 @@ static void message_handler_req_exec_amf_comp_cleanup_tmo(
 
 	component = amf_comp_find (amf_cluster, &req_exec->compName);
 	if (component == NULL) {
-		log_printf (LOG_ERR, "Error: '%s' not found", req_exec->compName.value);
+		log_printf (LOGSYS_LEVEL_ERROR, "Error: '%s' not found", req_exec->compName.value);
 		return;
 
 	}
@@ -1572,7 +1572,7 @@ static void message_handler_req_exec_amf_clc_cleanup_completed (
 	ENTER ();
 
 	if (comp == NULL) {
-		log_printf (LOG_ERR, "Error: '%s' not found", req_exec->compName.value);
+		log_printf (LOGSYS_LEVEL_ERROR, "Error: '%s' not found", req_exec->compName.value);
 		return;
 	}
 	
@@ -1597,7 +1597,7 @@ static void message_handler_req_exec_amf_healthcheck_tmo (
 
 	comp = amf_comp_find (amf_cluster, &req_exec->compName);
 	if (comp == NULL) {
-		log_printf (LOG_ERR, "Error: '%s' not found", req_exec->compName.value);
+		log_printf (LOGSYS_LEVEL_ERROR, "Error: '%s' not found", req_exec->compName.value);
 		return;
 	}
 
@@ -1658,7 +1658,7 @@ static void message_handler_req_exec_amf_sync_start (
 					api->sync_request (amf_service_engine.name);
 				} else {
                     /* TODO: I am sync master but not AMF node */
-					log_printf (LOG_LEVEL_ERROR,
+					log_printf (LOGSYS_LEVEL_ERROR,
 								"AMF sync error: I am sync master but not AMF node");
 					corosync_fatal_error (COROSYNC_FATAL_ERR);
 				}
@@ -1693,7 +1693,7 @@ static void message_handler_req_exec_amf_sync_data (
 
 #if 0
 	if (req_exec->protocol_version != AMF_PROTOCOL_VERSION) {
-		log_printf (LOG_ERR, "Error: Protocol version not supported");
+		log_printf (LOGSYS_LEVEL_ERROR, "Error: Protocol version not supported");
 		return;
 	}
 #endif
@@ -1875,7 +1875,7 @@ static void message_handler_req_lib_amf_componentregister (
 		assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 	} else {
 		struct res_lib_amf_componentregister res_lib;
-		log_printf (LOG_ERR, "Error: Comp register: '%s' not found", req_lib->compName.value);
+		log_printf (LOGSYS_LEVEL_ERROR, "Error: Comp register: '%s' not found", req_lib->compName.value);
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = SA_AIS_ERR_INVALID_PARAM;
@@ -1894,7 +1894,7 @@ static void message_handler_req_lib_amf_componentunregister (
 	struct iovec iovec;
 	struct amf_comp *component;
 
-	log_printf (LOG_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_componentunregister()\n");
+	log_printf (LOGSYS_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_componentunregister()\n");
 
 	req_exec_amf_componentunregister.header.size = sizeof (struct req_exec_amf_componentunregister);
 	req_exec_amf_componentunregister.header.id = 
@@ -1943,7 +1943,7 @@ static void message_handler_req_lib_amf_pmstart (
 								   req_lib->pmErrors,
 								   req_lib->recommendedRecovery);
 	} else {
-		log_printf (LOG_ERR, "PmStart: Component '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "PmStart: Component '%s' not found",
 					req_lib->compName.value);
 		error = SA_AIS_ERR_NOT_EXIST;
 	}
@@ -1981,7 +1981,7 @@ static void message_handler_req_lib_amf_pmstop (
 								  req_lib->processId,
 								  req_lib->pmErrors);
 	} else {
-		log_printf (LOG_ERR, "PmStop: Component '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "PmStop: Component '%s' not found",
 					req_lib->compName.value);
 		error = SA_AIS_ERR_NOT_EXIST;
 	}
@@ -2010,7 +2010,7 @@ static void message_handler_req_lib_amf_healthcheckstart (
 			comp, &req_lib->healthcheckKey, req_lib->invocationType,
 			req_lib->recommendedRecovery);
 	} else {
-		log_printf (LOG_ERR, "Healthcheckstart: Component '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheckstart: Component '%s' not found",
 			req_lib->compName.value);
 		error = SA_AIS_ERR_NOT_EXIST;
 	}
@@ -2035,7 +2035,7 @@ static void message_handler_req_lib_amf_healthcheckconfirm (
 		error = amf_comp_healthcheck_confirm (
 			comp, &req_lib->healthcheckKey, req_lib->healthcheckResult);
 	} else {
-		log_printf (LOG_ERR, "Healthcheck confirm: Component '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheck confirm: Component '%s' not found",
 			req_lib->compName.value);
 		error = SA_AIS_ERR_NOT_EXIST;
 	}
@@ -2058,7 +2058,7 @@ static void message_handler_req_lib_amf_healthcheckstop (
 	if (comp != NULL) {
 		error = amf_comp_healthcheck_stop (comp, &req_lib->healthcheckKey);
 	} else {
-		log_printf (LOG_ERR, "Healthcheckstop: Component '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheckstop: Component '%s' not found",
 			req_lib->compName.value);
 		error = SA_AIS_ERR_NOT_EXIST;
 	}
@@ -2083,7 +2083,7 @@ static void message_handler_req_lib_amf_hastateget (void *conn, const void *msg)
 		res_lib.haState = ha_state;
 		res_lib.header.error = error;
 	} else {
-		log_printf (LOG_ERR, "HA state get: Component '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "HA state get: Component '%s' not found",
 			req_lib->compName.value);
 		error = SA_AIS_ERR_NOT_EXIST;
 	}
@@ -2107,11 +2107,11 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 	int i;
 	struct saAmfProtectionGroup *amfProtectionGroup;
 
-	log_printf (LOG_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_protectiongrouptrack()\n");
+	log_printf (LOGSYS_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_protectiongrouptrack()\n");
 
 	amfProtectionGroup = protectiongroup_find (&req_lib_amf_protectiongrouptrack->csiName);
 	if (amfProtectionGroup) {
-		log_printf (LOG_LEVEL_DEBUG, "protectiongrouptrack: Got valid track start on CSI: %s.\n", getSaNameT (&req_lib_amf_protectiongrouptrack->csiName));
+		log_printf (LOGSYS_LEVEL_DEBUG, "protectiongrouptrack: Got valid track start on CSI: %s.\n", getSaNameT (&req_lib_amf_protectiongrouptrack->csiName));
 		for (i = 0; i < conn_info->ais_ci.u.libamf_ci.trackEntries; i++) {
 			if (conn_info->ais_ci.u.libamf_ci.tracks[i].active == 0) {
 				track = &conn_info->ais_ci.u.libamf_ci.tracks[i];
@@ -2138,7 +2138,7 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 		 * If SA_TRACK_CURRENT is specified, write out all current connections
 		 */
 	} else {
-		log_printf (LOG_LEVEL_DEBUG, "invalid track start, csi not registered with system.\n");
+		log_printf (LOGSYS_LEVEL_DEBUG, "invalid track start, csi not registered with system.\n");
 	}
 
 	res_lib_amf_protectiongrouptrack.header.id = MESSAGE_RES_AMF_PROTECTIONGROUPTRACK;
@@ -2182,7 +2182,7 @@ static void message_handler_req_lib_amf_protectiongrouptrackstop (
 	struct libamf_ci_trackentry *track = 0;
 	int i;
 
-	log_printf (LOG_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_protectiongrouptrackstop()\n");
+	log_printf (LOGSYS_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_protectiongrouptrackstop()\n");
 
 	for (i = 0; i < conn_info->ais_ci.u.libamf_ci.trackEntries; i++) {
 		if (name_match (&req_lib_amf_protectiongrouptrackstop->csiName,
@@ -2193,7 +2193,7 @@ static void message_handler_req_lib_amf_protectiongrouptrackstop (
 	}
 
 	if (track) {
-		log_printf (LOG_LEVEL_DEBUG, "protectiongrouptrackstop: Trackstop on CSI: %s\n", getSaNameT (&req_lib_amf_protectiongrouptrackstop->csiName));
+		log_printf (LOGSYS_LEVEL_DEBUG, "protectiongrouptrackstop: Trackstop on CSI: %s\n", getSaNameT (&req_lib_amf_protectiongrouptrackstop->csiName));
 		memset (track, 0, sizeof (struct libamf_ci_trackentry));
 		conn_info->ais_ci.u.libamf_ci.trackActive -= 1;
 		if (conn_info->ais_ci.u.libamf_ci.trackActive == 0) {
@@ -2296,7 +2296,7 @@ static void message_handler_req_lib_amf_componenterrorreport (
 	} else {
 		struct res_lib_amf_componenterrorreport res_lib;
 
-		log_printf (LOG_ERR, "Component %s not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "Component %s not found",
 			req_lib->erroneousComponent.value);
 		res_lib.header.size = sizeof (struct res_lib_amf_componenterrorreport);
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTERRORREPORT;
@@ -2316,7 +2316,7 @@ static void message_handler_req_lib_amf_componenterrorclear (
 
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_componenterrorclear()\n");
+	log_printf (LOGSYS_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_componenterrorclear()\n");
 
 	req_exec_amf_componenterrorclear.header.size = sizeof (struct req_exec_amf_componenterrorclear);
 	req_exec_amf_componenterrorclear.header.id =

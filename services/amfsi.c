@@ -119,7 +119,7 @@
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 /**
  * Check that all CSI assignments belonging to an SI assignment
@@ -263,7 +263,7 @@ static void set_si_ha_state (struct amf_csi_assignment *csi_assignment)
 
 	/* log changes to HA state */
 	if (old_ha_state != csi_assignment->si_assignment->saAmfSISUHAState) {
-		log_printf (LOG_NOTICE, "SU HA state changed to '%s' for:\n"
+		log_printf (LOGSYS_LEVEL_NOTICE, "SU HA state changed to '%s' for:\n"
 			"\t\tSI '%s', SU '%s'",
 			amf_ha_state (csi_assignment->si_assignment->saAmfSISUHAState),
 			csi_assignment->si_assignment->si->name.value,
@@ -273,7 +273,7 @@ static void set_si_ha_state (struct amf_csi_assignment *csi_assignment)
 	/* log changes to assignment state */
 	if (old_assigment_state !=
 		amf_si_get_saAmfSIAssignmentState (csi_assignment->csi->si)) {
-		log_printf (LOG_NOTICE, "SI Assignment state changed to '%s' for:\n"
+		log_printf (LOGSYS_LEVEL_NOTICE, "SI Assignment state changed to '%s' for:\n"
 			"\t\tSI '%s', SU '%s'",
 			amf_assignment_state (
 			amf_si_get_saAmfSIAssignmentState (csi_assignment->csi->si)),

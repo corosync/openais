@@ -371,7 +371,7 @@
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 static int assign_si (struct amf_sg *sg, int dependency_level);
 static void acsm_enter_activating_standby (struct amf_sg *sg);
@@ -482,7 +482,7 @@ static void acsm_enter_idle (amf_sg_t *sg)
 				assert (sg->recovery_scope.sus[0] != NULL);
 				amf_su_dn_make (sg->recovery_scope.sus[0], &dn);
 				log_printf (
-					LOG_NOTICE,
+					LOGSYS_LEVEL_NOTICE,
 					"'%s' %s recovery action finished",
 					dn.value,
 					sg_event_type_text[sg->recovery_scope.event_type]);
@@ -492,7 +492,7 @@ static void acsm_enter_idle (amf_sg_t *sg)
 				amf_node_sg_failed_over (
 					sg->recovery_scope.node, sg);
 				log_printf (
-					LOG_NOTICE, 
+					LOGSYS_LEVEL_NOTICE, 
 					"'%s for %s' recovery action finished",
 					sg_event_type_text[sg->recovery_scope.event_type],
 					sg->name.value);
@@ -502,11 +502,11 @@ static void acsm_enter_idle (amf_sg_t *sg)
 					sg, this_amf_node);
 				break;
 			case SG_ASSIGN_SI_EV:
-				log_printf (LOG_NOTICE, "All SI assigned");
+				log_printf (LOGSYS_LEVEL_NOTICE, "All SI assigned");
 				break;
 			default:
 				log_printf (
-					LOG_NOTICE, 
+					LOGSYS_LEVEL_NOTICE, 
 					"'%s' recovery action finished",
 					sg_event_type_text[sg->recovery_scope.event_type]);
 				break;
@@ -660,7 +660,7 @@ static struct amf_si *si_get_dependent (struct amf_si *si)
 		if (is_match) {
 			tmp_si = amf_si_find (si->application, (char*)res_arr[1].value);
 		} else {
-			log_printf (LOG_LEVEL_ERROR, "distinguished name for "
+			log_printf (LOGSYS_LEVEL_ERROR, "distinguished name for "
 				"amf_si_depedency failed\n");
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
 		}
@@ -812,7 +812,7 @@ static void acsm_enter_repairing_su (struct amf_sg *sg)
 			struct amf_node *node = 
 				amf_node_find(&((*sus)->saAmfSUHostedByNode));
 			if (node == NULL) {
-				log_printf (LOG_LEVEL_ERROR, 
+				log_printf (LOGSYS_LEVEL_ERROR, 
 					"Su to recover not hosted on any node\n");
 				corosync_fatal_error (COROSYNC_FATAL_ERR);
 			}
@@ -1081,7 +1081,7 @@ static void set_scope_for_failover_su (struct amf_sg *sg, struct amf_su *su)
 
 	amf_su_dn_make (sg->recovery_scope.sus[0], &dn);
 	log_printf (
-		LOG_NOTICE, "'%s' for %s recovery action started",
+		LOGSYS_LEVEL_NOTICE, "'%s' for %s recovery action started",
 		sg_event_type_text[sg->recovery_scope.event_type],
 		dn.value);
 
@@ -1124,7 +1124,7 @@ static void set_scope_for_failover_node (struct amf_sg *sg, struct amf_node *nod
 	calloc (1, sizeof (struct amf_si *));
 
 	log_printf (
-		LOG_NOTICE, "'%s' for node %s recovery action started",
+		LOGSYS_LEVEL_NOTICE, "'%s' for node %s recovery action started",
 		sg_event_type_text[sg->recovery_scope.event_type],
 		node->name.value);
 
@@ -1744,7 +1744,7 @@ static int assign_si (struct amf_sg *sg, int dependency_level)
 			sg_si_count_get (sg),
 			sg->saAmfSGMaxActiveSIsperSUs);
 	} else {
-		log_printf (LOG_LEVEL_ERROR, "ERROR: saAmfSGNumPrefActiveSUs == 0 !!");
+		log_printf (LOGSYS_LEVEL_ERROR, "ERROR: saAmfSGNumPrefActiveSUs == 0 !!");
 		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
 
@@ -1753,7 +1753,7 @@ static int assign_si (struct amf_sg *sg, int dependency_level)
 			sg_si_count_get (sg),
 			sg->saAmfSGMaxStandbySIsperSUs);
 	} else {
-		log_printf (LOG_LEVEL_ERROR, "ERROR: saAmfSGNumPrefStandbySUs == 0 !!");
+		log_printf (LOGSYS_LEVEL_ERROR, "ERROR: saAmfSGNumPrefStandbySUs == 0 !!");
 		corosync_fatal_error (COROSYNC_FATAL_ERR);
 
 	}
@@ -2025,7 +2025,7 @@ static void amf_sg_su_state_changed_to_uninstantiated (amf_sg_t *sg,
 			}
 			break;
 		default:
-			log_printf (LOG_ERR, "sg avail_state = %d", sg->avail_state);
+			log_printf (LOGSYS_LEVEL_ERROR, "sg avail_state = %d", sg->avail_state);
 			assert (0);
 			break;
 	}
@@ -2246,7 +2246,7 @@ static int is_acsm_assigning_node_active (struct amf_sg *sg, struct amf_node *no
 			}
 		}
 	}
-	log_printf (LOG_LEVEL_DEBUG, "'%s, %s' %u", node->name.value, sg->name.value, activating_node_su);
+	log_printf (LOGSYS_LEVEL_DEBUG, "'%s, %s' %u", node->name.value, sg->name.value, activating_node_su);
 
 	return activating_node_su;
 }
@@ -2273,7 +2273,7 @@ void amf_sg_failover_node_req (struct amf_sg *sg, struct amf_node *node)
 				sg_defer_event (SG_FAILOVER_NODE_EV, &sg_event);
 				break;
 			} else {
-				log_printf (LOG_LEVEL_NOTICE,
+				log_printf (LOGSYS_LEVEL_NOTICE,
 							"Cannot defer node '%s' failover (%s ACSM state %u)",
 							node->name.value, sg->name.value, sg->avail_state);
 

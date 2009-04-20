@@ -145,7 +145,7 @@
 #include "../include/saAis.h"
 #include "../include/saAmf.h"
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 enum clc_command_run_operation_type {
 	CLC_COMMAND_RUN_OPERATION_TYPE_INSTANTIATE = 1,
@@ -569,7 +569,7 @@ static int clc_cli_instantiate (struct amf_comp *comp)
 	res = pthread_create (&thread, &thread_attr, clc_command_run,
 		(void *)clc_command_run_data);
 	if (res != 0) {
-		log_printf (LOG_LEVEL_ERROR, "pthread_create failed: %d", res);
+		log_printf (LOGSYS_LEVEL_ERROR, "pthread_create failed: %d", res);
 	}
 	start_component_instantiate_timer (comp);
 	return (res);
@@ -685,7 +685,7 @@ static int clc_cli_cleanup (struct amf_comp *comp)
 	res = pthread_create (&thread, &thread_attr, clc_command_run,
 		(void *)clc_command_run_data);
 	if (res != 0) {
-		log_printf (LOG_LEVEL_ERROR, "pthread_create failed: %d", res);
+		log_printf (LOGSYS_LEVEL_ERROR, "pthread_create failed: %d", res);
 	}
 // TODO error code from pthread_create
 	return (res);
@@ -1092,7 +1092,7 @@ static void mcast_healthcheck_tmo_event (
 	struct req_exec_amf_healthcheck_tmo req_exec;
 	struct iovec iovec;
 	if (healthcheck->active == 0) {
-		log_printf (LOG_ERR, "Healthcheck timeout: ignored key = %s, "
+		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheck timeout: ignored key = %s, "
 							 "due to wrong state = %d, comp = %s",
 			healthcheck->safHealthcheckKey.key, 
 			healthcheck->comp->saAmfCompPresenceState, 
@@ -1283,7 +1283,7 @@ SaAisErrorT amf_comp_register (struct amf_comp *comp)
             /* ignore due to instantitate timeout a while ago  */
 			break;
 		default:
-			log_printf(LOG_LEVEL_ERROR,"comp->saAmfCompPresenceState = %d",
+			log_printf(LOGSYS_LEVEL_ERROR,"comp->saAmfCompPresenceState = %d",
 				comp->saAmfCompPresenceState);
 			assert (0);
 			break;
@@ -1504,7 +1504,7 @@ static void timer_function_pm_fn (void *data)
 				/* don't report it as an error if we are busy
 				 * shutting down
 				 */
-				syslog(LOG_ALERT, "component %s:%s exited",
+				syslog(LOGSYS_LEVEL_ALERT, "component %s:%s exited",
 					   comp->su->saAmfSUHostedByNode.value, comp->name.value);
 				mcast_error_report_from_pm (comp, pm->recovery);
 				reported = SA_TRUE;
@@ -1616,7 +1616,7 @@ SaAisErrorT amf_comp_pm_start (
 	SaInt32T numProcEntriesFound;
 
 	if (is_not_instantiating_or_instantiated_or_restarting (comp)) {
-		log_printf (LOG_ERR, "PmStart: ignored due to wrong state = %d, comp = %s",
+		log_printf (LOGSYS_LEVEL_ERROR, "PmStart: ignored due to wrong state = %d, comp = %s",
 					comp->saAmfCompPresenceState, comp->name.value);
 		return SA_AIS_ERR_FAILED_OPERATION;
 	}
@@ -1741,7 +1741,7 @@ SaAisErrorT amf_comp_healthcheck_start (
 	SaAisErrorT error = SA_AIS_OK;
 	
 	if (is_not_instantiating_or_instantiated_or_restarting (comp)) {
-		log_printf (LOG_ERR, "Healthcheckstart: ignored key = %s, "
+		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheckstart: ignored key = %s, "
 							 "due to wrong state = %d, comp = %s",
 			healthcheckKey->key, comp->saAmfCompPresenceState, comp->name.value);
 		error = SA_AIS_OK;
@@ -1751,7 +1751,7 @@ SaAisErrorT amf_comp_healthcheck_start (
 
 	healthcheck = amf_comp_find_healthcheck (comp, healthcheckKey);
 	if (healthcheck == 0) {
-		log_printf (LOG_ERR, "Healthcheckstart: Healthcheck '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheckstart: Healthcheck '%s' not found",
 			healthcheckKey->key);
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
@@ -1828,7 +1828,7 @@ SaAisErrorT amf_comp_healthcheck_stop (
 	} else {
 		healthcheck = amf_comp_find_healthcheck (comp, healthcheckKey);
 		if (healthcheck == NULL) {
-			log_printf (LOG_ERR, "Healthcheckstop: Healthcheck '%s' not found",
+			log_printf (LOGSYS_LEVEL_ERROR, "Healthcheckstop: Healthcheck '%s' not found",
 				healthcheckKey->key);
 			error = SA_AIS_ERR_NOT_EXIST;
 		} else {
@@ -1967,7 +1967,7 @@ int amf_comp_response_1 (
 	res = invocation_get_and_destroy (invocation, interface, &data);
 
 	if (res == -1) {
-		log_printf (LOG_ERR, "Lib response: invocation not found\n");
+		log_printf (LOGSYS_LEVEL_ERROR, "Lib response: invocation not found\n");
 		*retval = SA_AIS_ERR_INVALID_PARAM;
 		return 0;
 	}
@@ -1992,7 +1992,7 @@ int amf_comp_response_1 (
 				}
 				if (is_not_instantiating_or_instantiated_or_restarting(
 					healthcheck->comp)) {
-					log_printf (LOG_ERR, "HealthcheckResponse: ignored for key = %s, "
+					log_printf (LOGSYS_LEVEL_ERROR, "HealthcheckResponse: ignored for key = %s, "
 										 "due to wrong state = %d comp = %s",
 						healthcheck->safHealthcheckKey.key, 
 						healthcheck->comp->saAmfCompPresenceState,
@@ -2252,14 +2252,14 @@ SaAisErrorT amf_comp_healthcheck_confirm (
 
 	healthcheck = amf_comp_find_healthcheck (comp, healthcheckKey);
 	if (is_not_instantiating_or_instantiated_or_restarting(comp)) {
-		log_printf (LOG_ERR, "HealthcheckConfirm: ignored for key = %s, "
+		log_printf (LOGSYS_LEVEL_ERROR, "HealthcheckConfirm: ignored for key = %s, "
 							 "due to wrong state = %d, comp = %s",
 			healthcheckKey->key, comp->saAmfCompPresenceState, comp->name.value);
 		error = SA_AIS_OK;
 		goto out;
 	}
 	if (healthcheck == NULL) {
-		log_printf (LOG_ERR, "Healthcheckstop: Healthcheck '%s' not found",
+		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheckstop: Healthcheck '%s' not found",
 			healthcheckKey->key);
 		error = SA_AIS_ERR_NOT_EXIST;
 	} else if (healthcheck->active) {

@@ -151,7 +151,7 @@
 #include <corosync/engine/logsys.h>
 #include "amf.h"
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 typedef struct cluster_event {
 	amf_cluster_event_type_t event_type;
@@ -179,7 +179,7 @@ static void cluster_recall_deferred_events (amf_cluster_t *cluster)
 	if (amf_fifo_get (&cluster->deferred_events, &cluster_event)) {
 		switch (cluster_event.event_type) {
 			case CLUSTER_SYNC_READY_EV:
-				log_printf (LOG_NOTICE, 
+				log_printf (LOGSYS_LEVEL_NOTICE, 
 					"Recall CLUSTER_SYNC_READY_EV");
 
 				amf_node_sync_ready (cluster_event.node);
@@ -269,7 +269,7 @@ static void amf_cluster_assign_workload (struct amf_cluster *cluster)
 
 static void acsm_cluster_enter_assigning_workload (struct amf_cluster *cluster)
 {
-	log_printf(LOG_NOTICE,
+	log_printf(LOGSYS_LEVEL_NOTICE,
 		"Cluster: all applications started, assigning workload.");
 	cluster->acsm_state = CLUSTER_AC_ASSIGNING_WORKLOAD;
 	amf_cluster_assign_workload (cluster);
@@ -361,7 +361,7 @@ void amf_cluster_start_tmo_event (int is_sync_masterm,
 			/* ignore cluster startup timer expiration */
 			break;
 		default:
-			log_printf(LOG_LEVEL_ERROR, "Cluster timout expired"
+			log_printf(LOGSYS_LEVEL_ERROR, "Cluster timout expired"
 				" in wrong cluster"
 				" state = %d", cluster->acsm_state);
 			assert(0);
@@ -426,7 +426,7 @@ void amf_cluster_sync_ready (struct amf_cluster *cluster, struct amf_node *node)
 			break;
 
 		default:
-			log_printf(LOG_LEVEL_ERROR, "Cluster sync ready event"
+			log_printf(LOGSYS_LEVEL_ERROR, "Cluster sync ready event"
 				" received in wrong cluster"
 				" state = %d", cluster->acsm_state);
 			assert (0);
@@ -463,7 +463,7 @@ void amf_cluster_application_started (
 			}
 			break;
 		default: {
-			log_printf (LOG_ERR,"Error invalid cluster availability state %d",
+			log_printf (LOGSYS_LEVEL_ERROR,"Error invalid cluster availability state %d",
 				cluster->acsm_state);
 			corosync_fatal_error(cluster->acsm_state);
 			break;
@@ -481,7 +481,7 @@ void amf_cluster_application_workload_assigned (
 	ENTER ();
 	switch (cluster->acsm_state) {
 		case CLUSTER_AC_ASSIGNING_WORKLOAD:
-			log_printf (LOG_NOTICE, "Cluster: application %s assigned.",
+			log_printf (LOGSYS_LEVEL_NOTICE, "Cluster: application %s assigned.",
 				app->name.value);
 			if (amf_cluster_applications_assigned (cluster)) {
 				acsm_cluster_enter_started (cluster);

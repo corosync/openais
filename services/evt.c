@@ -33,13 +33,13 @@
  */
 
 #define DUMP_CHAN_INFO
-#define RECOVERY_EVENT_DEBUG LOG_LEVEL_DEBUG
-#define RECOVERY_DEBUG LOG_LEVEL_DEBUG
-#define CHAN_DEL_DEBUG LOG_LEVEL_DEBUG
-#define CHAN_OPEN_DEBUG LOG_LEVEL_DEBUG
-#define CHAN_UNLINK_DEBUG LOG_LEVEL_DEBUG
-#define REMOTE_OP_DEBUG LOG_LEVEL_DEBUG
-#define RETENTION_TIME_DEBUG LOG_LEVEL_DEBUG
+#define RECOVERY_EVENT_DEBUG LOGSYS_LEVEL_DEBUG
+#define RECOVERY_DEBUG LOGSYS_LEVEL_DEBUG
+#define CHAN_DEL_DEBUG LOGSYS_LEVEL_DEBUG
+#define CHAN_OPEN_DEBUG LOGSYS_LEVEL_DEBUG
+#define CHAN_UNLINK_DEBUG LOGSYS_LEVEL_DEBUG
+#define REMOTE_OP_DEBUG LOGSYS_LEVEL_DEBUG
+#define RETENTION_TIME_DEBUG LOGSYS_LEVEL_DEBUG
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -62,7 +62,7 @@
 #include "../include/ipc_evt.h"
 #include "clm.h"
 
-LOGSYS_DECLARE_SUBSYS ("EVT", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("EVT");
 /*
  * event instance structure. Contains information about the
  * active connection to the API library.
@@ -893,7 +893,7 @@ static int check_open_size(struct event_svr_channel_instance *eci)
 		esc_node_opens_tmp = realloc (eci->esc_node_opens,
 							sizeof(struct open_count) * total_member_count);
 		if (esc_node_opens_tmp == NULL) {
-			log_printf(LOG_LEVEL_WARNING,
+			log_printf(LOGSYS_LEVEL_WARNING,
 					"Memory error realloc of node list\n");
 			return -1;
 		}
@@ -925,7 +925,7 @@ static struct open_count* find_open_count(
 			return &eci->esc_node_opens[i];
 		}
 	}
-	log_printf(LOG_LEVEL_DEBUG,
+	log_printf(LOGSYS_LEVEL_DEBUG,
 			"find_open_count: node id %s not found\n",
 			api->totem_ifaces_print (node_id));
 	return 0;
@@ -934,7 +934,7 @@ static struct open_count* find_open_count(
 static void dump_chan_opens(struct event_svr_channel_instance *eci)
 {
 	int i;
-	log_printf(LOG_LEVEL_NOTICE,
+	log_printf(LOGSYS_LEVEL_NOTICE,
 			"Channel %s, total %d, local %d\n",
 			eci->esc_channel_name.value,
 			eci->esc_total_opens,
@@ -943,7 +943,7 @@ static void dump_chan_opens(struct event_svr_channel_instance *eci)
 		if (eci->esc_node_opens[i].oc_node_id == 0) {
 			break;
 		}
-		log_printf(LOG_LEVEL_NOTICE, "Node %s, count %d\n",
+		log_printf(LOGSYS_LEVEL_NOTICE, "Node %s, count %d\n",
 			api->totem_ifaces_print (eci->esc_node_opens[i].oc_node_id),
 			eci->esc_node_opens[i].oc_open_count);
 	}
@@ -1063,7 +1063,7 @@ static int dec_open_count(struct event_svr_channel_instance *eci,
 		eci->esc_total_opens--;
 		oc->oc_open_count--;
 		if ((eci->esc_total_opens < 0) || (oc->oc_open_count < 0)) {
-			log_printf(LOG_LEVEL_ERROR, "Channel open decrement error\n");
+			log_printf(LOGSYS_LEVEL_ERROR, "Channel open decrement error\n");
 			dump_chan_opens(eci);
 		}
 		return 0;
@@ -1096,7 +1096,7 @@ static void delete_channel(struct event_svr_channel_instance *eci)
 			eci->esc_channel_name.value, (unsigned long long)eci->esc_unlink_id);
 
 		if (!list_empty(&eci->esc_open_chans)) {
-				log_printf(LOG_LEVEL_NOTICE,
+				log_printf(LOGSYS_LEVEL_NOTICE,
 					"Last channel close request for %s (still open)\n",
 					eci->esc_channel_name.value);
 				dump_chan_opens(eci);
@@ -1128,7 +1128,7 @@ free_event_data(struct event_data *edp)
 	if (--edp->ed_ref_count) {
 		return;
 	}
-	log_printf(LOG_LEVEL_DEBUG, "Freeing event ID: 0x%llx\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "Freeing event ID: 0x%llx\n",
 			(unsigned long long)edp->ed_event.led_event_id);
 	if (edp->ed_delivered) {
 		free(edp->ed_delivered);
@@ -1362,7 +1362,7 @@ evt_find_node(unsigned int nodeid)
 	nlp = lookup_node(nodeid);
 
 	if (!nlp) {
-		log_printf(LOG_LEVEL_DEBUG, "find_node: Got NULL nlp?\n");
+		log_printf(LOGSYS_LEVEL_DEBUG, "find_node: Got NULL nlp?\n");
 		return 0;
 	}
 
@@ -1381,7 +1381,7 @@ evt_add_node(
 	nlp = lookup_node(nodeid);
 
 	if (!nlp) {
-		log_printf(LOG_LEVEL_DEBUG, "add_node: Got NULL nlp?\n");
+		log_printf(LOGSYS_LEVEL_DEBUG, "add_node: Got NULL nlp?\n");
 		goto an_out;
 	}
 
@@ -1424,7 +1424,7 @@ static struct member_node_data* oldest_node(void)
 	for (i = 0; i < trans_member_count; i++) {
 		mn = evt_find_node(trans_member_list[i]);
 		if (!mn || (mn->mn_started == 0)) {
-			log_printf(LOG_LEVEL_ERROR,
+			log_printf(LOGSYS_LEVEL_ERROR,
 				"Transitional config Node %s not active\n",
 				api->totem_ifaces_print (trans_member_list[i]));
 			continue;
@@ -1459,13 +1459,13 @@ static int check_last_event(
 
 	nd = evt_find_node(nodeid);
 	if (!nd) {
-		log_printf(LOG_LEVEL_DEBUG,
+		log_printf(LOGSYS_LEVEL_DEBUG,
 				"Node ID %s not found for event %llx\n",
 				api->totem_ifaces_print (evtpkt->led_publisher_node_id),
 				(unsigned long long)evtpkt->led_event_id);
 		cn = clmapi->nodeid_saf_get(nodeid);
 		if (!cn) {
-			log_printf(LOG_LEVEL_DEBUG,
+			log_printf(LOGSYS_LEVEL_DEBUG,
 					"Cluster Node 0x%s not found for event %llx\n",
 				api->totem_ifaces_print (evtpkt->led_publisher_node_id),
 				(unsigned long long)evtpkt->led_event_id);
@@ -1652,7 +1652,7 @@ evt_delivered(struct event_data *evt, struct event_svr_channel_open *eco)
 		return;
 	}
 
-	log_printf(LOG_LEVEL_DEBUG, "delivered ID %llx to eco %p\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "delivered ID %llx to eco %p\n",
 			(unsigned long long)evt->ed_event.led_event_id, eco);
 	if (evt->ed_delivered_count == evt->ed_delivered_next) {
 		struct event_svr_channel_open **ed_delivered_tmp;
@@ -1660,7 +1660,7 @@ evt_delivered(struct event_data *evt, struct event_svr_channel_open *eco)
 		ed_delivered_tmp = realloc (evt->ed_delivered,
 			DELIVER_SIZE * sizeof(struct event_svr_channel_open *));
 		if (ed_delivered_tmp == NULL) {
-			log_printf(LOG_LEVEL_WARNING, "Memory error realloc\n");
+			log_printf(LOGSYS_LEVEL_WARNING, "Memory error realloc\n");
 			return;
 		}
 		evt->ed_delivered = ed_delivered_tmp;
@@ -1686,10 +1686,10 @@ evt_already_delivered(struct event_data *evt,
 		return 0;
 	}
 
-	log_printf(LOG_LEVEL_DEBUG, "Deliver count: %d deliver_next %d\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "Deliver count: %d deliver_next %d\n",
 		evt->ed_delivered_count, evt->ed_delivered_next);
 	for (i = 0; i < evt->ed_delivered_next; i++) {
-		log_printf(LOG_LEVEL_DEBUG, "Checking ID %llx delivered %p eco %p\n",
+		log_printf(LOGSYS_LEVEL_DEBUG, "Checking ID %llx delivered %p eco %p\n",
 			(unsigned long long)evt->ed_event.led_event_id,
 			evt->ed_delivered[i], eco);
 		if (evt->ed_delivered[i] == eco) {
@@ -1873,7 +1873,7 @@ static void __notify_event(void	*conn)
 	struct libevt_pd *esip;
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
-	log_printf(LOG_LEVEL_DEBUG, "DELIVER: notify\n");
+	log_printf(LOGSYS_LEVEL_DEBUG, "DELIVER: notify\n");
 	if (esip->esi_nevents != 0) {
 		res.evd_head.size = sizeof(res);
 		res.evd_head.id = MESSAGE_RES_EVT_AVAILABLE;
@@ -1932,14 +1932,14 @@ deliver_event(struct event_data *evt,
 	if (esip->esi_queue_blocked) {
 		if (esip->esi_nevents < evt_delivery_queue_resume) {
 			esip->esi_queue_blocked = 0;
-			log_printf(LOG_LEVEL_DEBUG, "unblock\n");
+			log_printf(LOGSYS_LEVEL_DEBUG, "unblock\n");
 		}
 	}
 
 	assert (esip->esi_nevents >= 0);
 	if (!esip->esi_queue_blocked &&
 							(esip->esi_nevents >= evt_delivery_queue_size)) {
-		log_printf(LOG_LEVEL_DEBUG, "block\n");
+		log_printf(LOGSYS_LEVEL_DEBUG, "block\n");
 		esip->esi_queue_blocked = 1;
 		do_deliver_warning = 1;
 	}
@@ -1954,7 +1954,7 @@ deliver_event(struct event_data *evt,
 				 */
 				cel = list_entry(esip->esi_events[i].prev,
 					struct chan_event_list, cel_entry);
-				log_printf(LOG_LEVEL_DEBUG, "Drop 0x%0llx\n",
+				log_printf(LOGSYS_LEVEL_DEBUG, "Drop 0x%0llx\n",
 					(unsigned long long)cel->cel_event->ed_event.led_event_id);
 				list_del(&cel->cel_entry);
 				free_event_data(cel->cel_event);
@@ -1974,7 +1974,7 @@ deliver_event(struct event_data *evt,
 	if (do_deliver_event) {
 		ep = malloc(sizeof(*ep));
 		if (!ep) {
-			log_printf(LOG_LEVEL_WARNING,
+			log_printf(LOGSYS_LEVEL_WARNING,
 						"3Memory allocation error, can't deliver event\n");
 			return;
 		}
@@ -1996,11 +1996,11 @@ deliver_event(struct event_data *evt,
 		struct event_data *ed;
 		ed = malloc(dropped_event_size);
 		if (!ed) {
-			log_printf(LOG_LEVEL_WARNING,
+			log_printf(LOGSYS_LEVEL_WARNING,
 						"4Memory allocation error, can't deliver event\n");
 			return;
 		}
-		log_printf(LOG_LEVEL_DEBUG, "Warn 0x%0llx\n",
+		log_printf(LOGSYS_LEVEL_DEBUG, "Warn 0x%0llx\n",
 			(unsigned long long)evt->ed_event.led_event_id);
 		memcpy(ed, dropped_event, dropped_event_size);
 		ed->ed_event.led_publish_time = clust_time_now();
@@ -2009,7 +2009,7 @@ deliver_event(struct event_data *evt,
 
 		ep = malloc(sizeof(*ep));
 		if (!ep) {
-			log_printf(LOG_LEVEL_WARNING,
+			log_printf(LOGSYS_LEVEL_WARNING,
 						"5Memory allocation error, can't deliver event\n");
 			return;
 		}
@@ -2089,7 +2089,7 @@ make_local_event(const struct lib_event_data *p,
 	ed_size = sizeof(*ed) + p->led_user_data_offset + p->led_user_data_size;
 	ed = malloc(ed_size);
 	if (!ed) {
-		log_printf(LOG_LEVEL_WARNING,
+		log_printf(LOGSYS_LEVEL_WARNING,
 			"Failed to allocate %u bytes for event, offset %u, data size %u\n",
 				ed_size, p->led_user_data_offset, p->led_user_data_size);
 		return 0;
@@ -2134,7 +2134,7 @@ static void retain_event(struct event_data *evt)
 		&evt->ed_timer_handle);
 
 	if (ret != 0) {
-		log_printf(LOG_LEVEL_ERROR,
+		log_printf(LOGSYS_LEVEL_ERROR,
 				"retention of event id 0x%llx failed\n",
 				(unsigned long long)evt->ed_event.led_event_id);
 	} else {
@@ -2193,7 +2193,7 @@ static int evt_lib_init(void *conn)
 
 	libevt_pd = (struct libevt_pd *)api->ipc_private_data_get(conn);
 
-	log_printf(LOG_LEVEL_DEBUG, "saEvtInitialize request.\n");
+	log_printf(LOGSYS_LEVEL_DEBUG, "saEvtInitialize request.\n");
 
 	/*
 	 * Initailze event instance data
@@ -2274,7 +2274,7 @@ static void lib_evt_open_channel(void *conn, const void *message)
 		chan_open_timeout,
 		&ocp->ocp_timer_handle);
 	if (ret != 0) {
-		log_printf(LOG_LEVEL_WARNING,
+		log_printf(LOGSYS_LEVEL_WARNING,
 				"Error setting timeout for open channel %s\n",
 				req->ico_channel_name.value);
 	}
@@ -2354,7 +2354,7 @@ common_chan_close(struct event_svr_channel_open	*eco, struct libevt_pd *esip, vo
 	struct event_svr_channel_subscr *ecs;
 	struct list_head *l, *nxt;
 
-	log_printf(LOG_LEVEL_DEBUG, "Close channel %s flags 0x%02x\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "Close channel %s flags 0x%02x\n",
 			eco->eco_channel->esc_channel_name.value,
 			eco->eco_flags);
 
@@ -2375,7 +2375,7 @@ printf ("list del %p\n",eco);
 	for (l = eco->eco_subscr.next; l != &eco->eco_subscr; l = nxt) {
 		nxt = l->next;
 		ecs = list_entry(l, struct event_svr_channel_subscr, ecs_entry);
-		log_printf(LOG_LEVEL_DEBUG, "Unsubscribe ID: %x\n",
+		log_printf(LOGSYS_LEVEL_DEBUG, "Unsubscribe ID: %x\n",
 				ecs->ecs_sub_id);
 		list_del(&ecs->ecs_entry);
 		free(ecs);
@@ -2409,9 +2409,9 @@ static void lib_evt_close_channel(void *conn, const void *message)
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
 
-	log_printf(LOG_LEVEL_DEBUG,
+	log_printf(LOGSYS_LEVEL_DEBUG,
 			"saEvtChannelClose (Close channel request)\n");
-	log_printf(LOG_LEVEL_DEBUG, "handle 0x%x\n", req->icc_channel_handle);
+	log_printf(LOGSYS_LEVEL_DEBUG, "handle 0x%x\n", req->icc_channel_handle);
 
 	/*
 	 * look up the channel handle
@@ -2466,7 +2466,7 @@ static void lib_evt_unlink_channel(void *conn, const void *message)
 	 */
 	ucp = malloc(sizeof(*ucp));
 	if (!ucp) {
-		log_printf(LOG_LEVEL_ERROR,
+		log_printf(LOGSYS_LEVEL_ERROR,
 				"saEvtChannelUnlink: Memory allocation failure\n");
 		error = SA_AIS_ERR_TRY_AGAIN;
 		goto evt_unlink_err;
@@ -2544,9 +2544,9 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
 
-	log_printf(LOG_LEVEL_DEBUG,
+	log_printf(LOGSYS_LEVEL_DEBUG,
 		"saEvtEventSubscribe (Subscribe request)\n");
-	log_printf(LOG_LEVEL_DEBUG, "subscription Id: 0x%llx\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "subscription Id: 0x%llx\n",
 		(unsigned long long)req->ics_sub_id);
 
 	/*
@@ -2573,10 +2573,10 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 	error = evtfilt_to_aisfilt(req, &filters);
 
 	if (error == SA_AIS_OK) {
-		log_printf(LOG_LEVEL_DEBUG, "Subscribe filters count %d\n",
+		log_printf(LOGSYS_LEVEL_DEBUG, "Subscribe filters count %d\n",
 				(int)filters->filters_number);
 		for (i = 0; i < filters->filters_number; i++) {
-			log_printf(LOG_LEVEL_DEBUG, "type %s(%d) sz %d, <%s>\n",
+			log_printf(LOGSYS_LEVEL_DEBUG, "type %s(%d) sz %d, <%s>\n",
 					filter_types[filters->filters[i].filter_type],
 					filters->filters[i].filter_type,
 					(int)filters->filters[i].filter.pattern_size,
@@ -2612,7 +2612,7 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 	 */
 	for (l = retained_list.next; l != &retained_list; l = l->next) {
 		evt = list_entry(l, struct event_data, ed_retained);
-		log_printf(LOG_LEVEL_DEBUG,
+		log_printf(LOGSYS_LEVEL_DEBUG,
 			"Checking event ID %llx chanp %p -- sub chanp %p\n",
 			(unsigned long long)evt->ed_event.led_event_id,
 			evt->ed_my_chan, eci);
@@ -2621,7 +2621,7 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 				continue;
 			}
 			if (event_match(evt, ecs) == SA_AIS_OK) {
-				log_printf(LOG_LEVEL_DEBUG,
+				log_printf(LOGSYS_LEVEL_DEBUG,
 					"deliver event ID: 0x%llx\n",
 						(unsigned long long)evt->ed_event.led_event_id);
 				deliver_event(evt, eco, ecs);
@@ -2657,9 +2657,9 @@ static void lib_evt_event_unsubscribe(void *conn, const void *message)
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
 
-	log_printf(LOG_LEVEL_DEBUG,
+	log_printf(LOGSYS_LEVEL_DEBUG,
 		"saEvtEventUnsubscribe (Unsubscribe request)\n");
-	log_printf(LOG_LEVEL_DEBUG, "subscription Id: 0x%llx\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "subscription Id: 0x%llx\n",
 		(unsigned long long)req->icu_sub_id);
 
 	/*
@@ -2687,7 +2687,7 @@ static void lib_evt_event_unsubscribe(void *conn, const void *message)
 
 	list_del(&ecs->ecs_entry);
 
-	log_printf(LOG_LEVEL_DEBUG,
+	log_printf(LOGSYS_LEVEL_DEBUG,
 			"unsubscribe from channel %s subscription ID 0x%x "
 			"with %d filters\n",
 			eci->esc_channel_name.value,
@@ -2725,7 +2725,7 @@ static void lib_evt_event_publish(void *conn, void *message)
 
 	esip = (struct libevt_pd *)api->ipc_private_data_get(conn);
 
-	log_printf(LOG_LEVEL_DEBUG,
+	log_printf(LOGSYS_LEVEL_DEBUG,
 			"saEvtEventPublish (Publish event request)\n");
 
 
@@ -2796,7 +2796,7 @@ static void lib_evt_event_clear_retentiontime(void *conn, const void *message)
 
 	rtc = malloc(sizeof(*rtc));
 	if (!rtc) {
-		log_printf(LOG_LEVEL_ERROR,
+		log_printf(LOGSYS_LEVEL_ERROR,
 			"saEvtEventRetentionTimeClear: Memory allocation failure\n");
 		error = SA_AIS_ERR_TRY_AGAIN;
 		goto evt_ret_clr_err;
@@ -2862,7 +2862,7 @@ static void lib_evt_event_data_get(void *conn, const void *message)
 			if (esip->esi_queue_blocked &&
 					(esip->esi_nevents < evt_delivery_queue_resume)) {
 				esip->esi_queue_blocked = 0;
-				log_printf(LOG_LEVEL_DEBUG, "unblock\n");
+				log_printf(LOGSYS_LEVEL_DEBUG, "unblock\n");
 			}
 			edp = cel->cel_event;
 			edp->ed_event.led_lib_channel_handle = cel->cel_chan_handle;
@@ -2950,7 +2950,7 @@ static void evt_conf_change(
 				/*
 				 * ERROR: No recovery.
 				 */
-				log_printf(LOG_LEVEL_ERROR,
+				log_printf(LOGSYS_LEVEL_ERROR,
 						"Config change left list allocation error\n");
 				assert(0);
 			}
@@ -2970,7 +2970,7 @@ static void evt_conf_change(
 				/*
 				 * ERROR: No recovery.
 				 */
-				log_printf(LOG_LEVEL_ERROR,
+				log_printf(LOGSYS_LEVEL_ERROR,
 				  "Config change transitional member list allocation error\n");
 				assert(0);
 			}
@@ -2995,7 +2995,7 @@ static void evt_conf_change(
 				/*
 				 * ERROR: No recovery.
 				 */
-				log_printf(LOG_LEVEL_ERROR,
+				log_printf(LOGSYS_LEVEL_ERROR,
 						"Config change joined list allocation error\n");
 				assert(0);
 			}
@@ -3016,7 +3016,7 @@ static void evt_conf_change(
 				/*
 				 * ERROR: No recovery.
 				 */
-				log_printf(LOG_LEVEL_ERROR,
+				log_printf(LOGSYS_LEVEL_ERROR,
 						"Config change member list allocation error\n");
 				assert(0);
 			}
@@ -3041,8 +3041,8 @@ static int evt_lib_exit(void *conn)
 		api->ipc_private_data_get(conn);
 
 printf ("lib_exit (%p)\n", conn);
-	log_printf(LOG_LEVEL_DEBUG, "saEvtFinalize (Event exit request)\n");
-	log_printf(LOG_LEVEL_DEBUG, "saEvtFinalize %d evts on list\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "saEvtFinalize (Event exit request)\n");
+	log_printf(LOGSYS_LEVEL_DEBUG, "saEvtFinalize %d evts on list\n",
 			esip->esi_nevents);
 
 	/*
@@ -3109,7 +3109,7 @@ static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 	api = corosync_api;
 
 	clmapi = openais_clm_services_api_reference (api, &clm_services_api_handle);
-	log_printf(LOG_LEVEL_DEBUG, "Evt exec init request\n");
+	log_printf(LOGSYS_LEVEL_DEBUG, "Evt exec init request\n");
 
 	api->object_find_create (
 		OBJECT_PARENT_HANDLE,
@@ -3128,7 +3128,7 @@ static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 					     (void *)&value,
 					     NULL) && value) {
 			evt_delivery_queue_size = atoi(value);
-			log_printf(LOG_LEVEL_NOTICE,
+			log_printf(LOGSYS_LEVEL_NOTICE,
 				   "event delivery_queue_size set to %u\n",
 				   evt_delivery_queue_size);
 		}
@@ -3139,7 +3139,7 @@ static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 					     (void *)&value,
 					     NULL) && value) {
 			evt_delivery_queue_resume = atoi(value);
-			log_printf(LOG_LEVEL_NOTICE,
+			log_printf(LOGSYS_LEVEL_NOTICE,
 				   "event delivery_queue_resume set to %u\n",
 				   evt_delivery_queue_size);
 		}
@@ -3152,7 +3152,7 @@ static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 	dropped_event_size = sizeof(*dropped_event) + sizeof(dropped_pattern);
 	dropped_event = malloc(dropped_event_size);
 	if (dropped_event == 0) {
-		log_printf(LOG_LEVEL_ERROR,
+		log_printf(LOGSYS_LEVEL_ERROR,
 				"Memory Allocation Failure, event service not started\n");
 		errno = ENOMEM;
 		return -1;
@@ -3238,7 +3238,7 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 	struct event_data *evt;
 	SaClmClusterNodeT *cn;
 
-	log_printf(LOG_LEVEL_DEBUG, "Remote event data received from nodeid %s\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "Remote event data received from nodeid %s\n",
 			api->totem_ifaces_print (nodeid));
 
 	/*
@@ -3250,12 +3250,12 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 			/*
 			 * Not sure how this can happen...
 			 */
-			log_printf(LOG_LEVEL_DEBUG, "No cluster node data for nodeid %s\n",
+			log_printf(LOGSYS_LEVEL_DEBUG, "No cluster node data for nodeid %s\n",
 				api->totem_ifaces_print (nodeid));
 			errno = ENXIO;
 			return;
 	}
-	log_printf(LOG_LEVEL_DEBUG, "Cluster node ID %s name %s\n",
+	log_printf(LOGSYS_LEVEL_DEBUG, "Cluster node ID %s name %s\n",
 					api->totem_ifaces_print (cn->nodeId), cn->nodeName.value);
 
 	evtpkt->led_publisher_node_id = nodeid;
@@ -3289,7 +3289,7 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 	 * don't know about.
 	 */
 	if (!eci) {
-		log_printf(LOG_LEVEL_DEBUG, "Channel %s doesn't exist\n",
+		log_printf(LOGSYS_LEVEL_DEBUG, "Channel %s doesn't exist\n",
 				evtpkt->led_chan_name.value);
 		return;
 	}
@@ -3300,7 +3300,7 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 
 	evt = make_local_event(evtpkt, eci);
 	if (!evt) {
-		log_printf(LOG_LEVEL_WARNING,
+		log_printf(LOGSYS_LEVEL_WARNING,
 						"1Memory allocation error, can't deliver event\n");
 		return;
 	}
@@ -3395,11 +3395,11 @@ static void evt_remote_recovery_evt(void *msg, unsigned int nodeid)
 				/*
 				 * Not sure how this can happen
 				 */
-				log_printf(LOG_LEVEL_NOTICE, "No node for nodeid %s\n",
+				log_printf(LOGSYS_LEVEL_NOTICE, "No node for nodeid %s\n",
 						api->totem_ifaces_print (evtpkt->led_nodeid));
 				return;
 		}
-		log_printf(LOG_LEVEL_DEBUG, "Cluster node ID %s name %s\n",
+		log_printf(LOGSYS_LEVEL_DEBUG, "Cluster node ID %s name %s\n",
 						api->totem_ifaces_print (md->mn_node_info.nodeId),
 						md->mn_node_info.nodeName.value);
 
@@ -3421,7 +3421,7 @@ static void evt_remote_recovery_evt(void *msg, unsigned int nodeid)
 
 		evt = make_local_event(evtpkt, eci);
 		if (!evt) {
-			log_printf(LOG_LEVEL_WARNING,
+			log_printf(LOGSYS_LEVEL_WARNING,
 				"2Memory allocation error, can't deliver event\n");
 			errno = ENOMEM;
 			return;
@@ -3687,7 +3687,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 	if (mn == NULL) {
 		cn = clmapi->nodeid_saf_get(nodeid);
 		if (cn == NULL) {
-			log_printf(LOG_LEVEL_WARNING,
+			log_printf(LOGSYS_LEVEL_WARNING,
 				"Evt remote channel op: Node data for nodeid %d is NULL\n",
 				nodeid);
 			return;
@@ -3721,7 +3721,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 			eci = create_channel(&cpkt->u.chc_chan.ocr_name);
 		}
 		if (!eci) {
-			log_printf(LOG_LEVEL_WARNING, "Could not create channel %s\n",
+			log_printf(LOGSYS_LEVEL_WARNING, "Could not create channel %s\n",
 				   get_mar_name_t(&cpkt->u.chc_chan.ocr_name));
 			break;
 		}
@@ -3758,11 +3758,11 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 	 * free up channel associated data when all instances are closed.
 	 */
 	case EVT_CLOSE_CHAN_OP:
-		log_printf(LOG_LEVEL_DEBUG, "Closing channel %s for node 0x%x\n",
+		log_printf(LOGSYS_LEVEL_DEBUG, "Closing channel %s for node 0x%x\n",
 						cpkt->u.chcu.chcu_name.value, mn->mn_node_info.nodeId);
 		eci = find_channel(&cpkt->u.chcu.chcu_name, cpkt->u.chcu.chcu_unlink_id);
 		if (!eci) {
-			log_printf(LOG_LEVEL_NOTICE,
+			log_printf(LOGSYS_LEVEL_NOTICE,
 					"Channel close request for %s not found\n",
 				cpkt->u.chcu.chcu_name.value);
 			break;
@@ -3772,7 +3772,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 		 * if last instance, we can free up assocated data.
 		 */
 		dec_open_count(eci, mn->mn_node_info.nodeId);
-		log_printf(LOG_LEVEL_DEBUG,
+		log_printf(LOGSYS_LEVEL_DEBUG,
 				"Close channel %s t %d, l %d, r %d\n",
 				eci->esc_channel_name.value,
 				eci->esc_total_opens, eci->esc_local_opens,
@@ -3802,7 +3802,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 		eci = find_channel(&cpkt->u.chcu.chcu_name,
 				EVT_CHAN_ACTIVE);
 		if (!eci) {
-			log_printf(LOG_LEVEL_NOTICE,
+			log_printf(LOGSYS_LEVEL_NOTICE,
 					"Channel unlink request for %s not found\n",
 				cpkt->u.chcu.chcu_name.value);
 		}  else {
@@ -3875,7 +3875,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 	 * start using an event ID that is unique.
 	 */
 	case EVT_SET_ID_OP: {
-		int log_level = LOG_LEVEL_DEBUG;
+		int log_level = LOGSYS_LEVEL_DEBUG;
 		if (cpkt->u.chc_set_id.chc_nodeid == my_node->nodeId) {
 			log_level = RECOVERY_DEBUG;
 		}
@@ -3905,7 +3905,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 	 */
 	case EVT_OPEN_COUNT:
 		if (recovery_phase == evt_recovery_complete) {
-			log_printf(LOG_LEVEL_ERROR,
+			log_printf(LOGSYS_LEVEL_ERROR,
 				"Evt open count msg from nodeid %s, but not in membership change\n",
 				api->totem_ifaces_print (nodeid));
 		}
@@ -3930,13 +3930,13 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 			eci = create_channel(&cpkt->u.chc_set_opens.chc_chan_name);
 		}
 		if (!eci) {
-			log_printf(LOG_LEVEL_WARNING, "Could not create channel %s\n",
+			log_printf(LOGSYS_LEVEL_WARNING, "Could not create channel %s\n",
 				   get_mar_name_t(&cpkt->u.chc_set_opens.chc_chan_name));
 			break;
 		}
 		if (set_open_count(eci, mn->mn_node_info.nodeId,
 			cpkt->u.chc_set_opens.chc_open_count)) {
-			log_printf(LOG_LEVEL_ERROR,
+			log_printf(LOGSYS_LEVEL_ERROR,
 				"Error setting Open channel count %s for node %s\n",
 				cpkt->u.chc_set_opens.chc_chan_name.value,
 				api->totem_ifaces_print (mn->mn_node_info.nodeId));
@@ -3949,7 +3949,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 	 */
 	case EVT_OPEN_COUNT_DONE: {
 		if (recovery_phase == evt_recovery_complete) {
-			log_printf(LOG_LEVEL_ERROR,
+			log_printf(LOGSYS_LEVEL_ERROR,
 				"Evt config msg from nodeid %s, but not in membership change\n",
 				api->totem_ifaces_print (nodeid));
 		}
@@ -4005,7 +4005,7 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
 	}
 
 	default:
-		log_printf(LOG_LEVEL_NOTICE, "Invalid channel operation %d\n",
+		log_printf(LOGSYS_LEVEL_NOTICE, "Invalid channel operation %d\n",
 						cpkt->chc_op);
 		break;
 	}
@@ -4042,7 +4042,7 @@ static void evt_sync_init(void)
 	while (left_list_entries--) {
 		md = evt_find_node(*left_list);
 		if (md == 0) {
-			log_printf(LOG_LEVEL_WARNING,
+			log_printf(LOGSYS_LEVEL_WARNING,
 					"Can't find cluster node at %s\n",
 							api->totem_ifaces_print (*left_list));
 		/*
@@ -4169,7 +4169,7 @@ static int evt_sync_process(void)
 					/*
 					 * Error: shouldn't happen
 					 */
-					log_printf(LOG_LEVEL_ERROR,
+					log_printf(LOGSYS_LEVEL_ERROR,
 							"recovery error node: %s not found\n",
 							api->totem_ifaces_print (*add_list));
 					assert(0);
@@ -4273,7 +4273,7 @@ static int evt_sync_process(void)
 		 */
 		for (;next_retained != &retained_list;
 								next_retained = next_retained->next) {
-			log_printf(LOG_LEVEL_DEBUG, "Sending next retained event\n");
+			log_printf(LOGSYS_LEVEL_DEBUG, "Sending next retained event\n");
 			evt = list_entry(next_retained, struct event_data, ed_retained);
 			evt->ed_event.led_head.id =
 				SERVICE_ID_MAKE(EVT_SERVICE, MESSAGE_REQ_EXEC_EVT_RECOVERY_EVENTDATA);
@@ -4331,7 +4331,7 @@ static int evt_sync_process(void)
 	}
 
 	default:
-		log_printf(LOG_LEVEL_WARNING, "Bad recovery phase state: %u\n",
+		log_printf(LOGSYS_LEVEL_WARNING, "Bad recovery phase state: %u\n",
 				recovery_phase);
 		recovery_phase = evt_recovery_complete;
 		return 0;

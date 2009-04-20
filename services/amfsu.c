@@ -379,7 +379,7 @@
 #include "amf.h"
 #include <corosync/engine/logsys.h>
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 static int terminate_all_components_in_level (struct amf_su *su, 
 	SaUint32T current_instantiation_level);
@@ -465,7 +465,7 @@ static int has_su_restarted_max_times (amf_su_t *su)
 static void su_readiness_state_set (struct amf_su *su,
 	SaAmfReadinessStateT readiness_state)
 {
-	log_printf (LOG_NOTICE, "Setting SU '%s' readiness state: %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "Setting SU '%s' readiness state: %s\n",
 		su->name.value, amf_readiness_state (readiness_state));
 }
 
@@ -497,7 +497,7 @@ static void su_presence_state_set (struct amf_su *su,
 
 
 	su->saAmfSUPresenceState = presence_state;
-	log_printf (LOG_NOTICE, "Setting SU '%s' presence state: %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "Setting SU '%s' presence state: %s\n",
 		su->name.value, amf_presence_state (presence_state));
 
 
@@ -532,7 +532,7 @@ void amf_su_operational_state_set (struct amf_su *su,
 	struct amf_comp* comp;
 
 	su->saAmfSUOperState = oper_state;
-	log_printf (LOG_NOTICE, "Setting SU '%s' operational state: %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "Setting SU '%s' operational state: %s\n",
 		su->name.value, amf_op_state (oper_state));
 
 	if (oper_state == SA_AMF_OPERATIONAL_ENABLED) {
@@ -586,7 +586,7 @@ static void comp_restart (struct amf_comp *comp)
 
 	ENTER ();
 	amf_comp_dn_make (comp, &dn);
-	log_printf (LOG_NOTICE, "Error detected for '%s', recovery "
+	log_printf (LOGSYS_LEVEL_NOTICE, "Error detected for '%s', recovery "
 		"action: Component restart", dn.value);
 
 	comp->su->restart_control_state = SU_RC_RESTART_COMP_DEACTIVATING;
@@ -937,7 +937,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 					}
 					break;
 				default:
-					log_printf (LOG_LEVEL_NOTICE,"%s %d",su->name.value, 
+					log_printf (LOGSYS_LEVEL_NOTICE,"%s %d",su->name.value, 
 						su->restart_control_state);
 					TRACE1 ("state %d", su->restart_control_state);
 					assert (0);
@@ -1233,7 +1233,7 @@ void amf_su_comp_error_suspected (
 						SA_AMF_OPERATIONAL_DISABLED);
 					
 					amf_comp_dn_make (comp, &dn);
-					log_printf (LOG_NOTICE, "Error detected for '%s', recovery "
+					log_printf (LOGSYS_LEVEL_NOTICE, "Error detected for '%s', recovery "
 						"action:\n\t\tSU failover", dn.value);
 					amf_sg_failover_su_req (comp->su->sg, comp->su, this_amf_node);
 					return;
@@ -1267,7 +1267,7 @@ void amf_su_restart (struct amf_su *su)
 	ENTER ();
 
 	amf_su_dn_make (su, &dn);
-	log_printf (LOG_NOTICE, "Error detected for '%s', recovery "
+	log_printf (LOGSYS_LEVEL_NOTICE, "Error detected for '%s', recovery "
 		"action: SU restart", dn.value);
 
 	su->restart_control_state = SU_RC_RESTART_SU_DEACTIVATING;
@@ -1337,10 +1337,10 @@ static void si_ha_state_assumed_cbfn (
 	if (all_confirmed) {
 		switch (si_assignment->su->restart_control_state) {
 			case SU_RC_RESTART_COMP_SETTING:
-				log_printf (LOG_NOTICE, "Component restart recovery finished");
+				log_printf (LOGSYS_LEVEL_NOTICE, "Component restart recovery finished");
 				break;
 			case SU_RC_RESTART_SU_SETTING:
-				log_printf (LOG_NOTICE, "SU restart recovery finished");
+				log_printf (LOGSYS_LEVEL_NOTICE, "SU restart recovery finished");
 				break;
 			default:
 				assert (0);
@@ -1607,12 +1607,12 @@ amf_si_assignment_t *amf_su_assign_si (struct amf_su *su, struct amf_si *si,
 				}
 				if (no_of_assignments == 0) {
 					log_printf (
-						LOG_WARNING, "\t   No CSIs of type %s configured?!!\n",
+						LOGSYS_LEVEL_WARNING, "\t   No CSIs of type %s configured?!!\n",
 						getSaNameT (cs_type));
 				}
 			}
 			if (no_of_cs_types == 0) {
-				log_printf (LOG_LEVEL_ERROR,
+				log_printf (LOGSYS_LEVEL_ERROR,
 					"\t   No CS types configured for comp %s ?!!\n",
 					getSaNameT (&comp->name));
 			}

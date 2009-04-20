@@ -129,7 +129,7 @@
 #include "amf.h"
 #include <corosync/engine/logsys.h>
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 typedef struct application_event {
 	amf_application_event_type_t event_type;  
@@ -163,7 +163,7 @@ static void application_recall_deferred_events (amf_application_t *app)
 	if (amf_fifo_get (&app->deferred_events, &application_event)) {
 		switch (application_event.event_type) {
 			case APPLICATION_ASSIGN_WORKLOAD_EV: {
-				log_printf (LOG_NOTICE,
+				log_printf (LOGSYS_LEVEL_NOTICE,
 					"Recall APPLICATION_ASSIGN_WORKLOAD_EV");
 				amf_application_assign_workload (
 					application_event.app,
@@ -172,7 +172,7 @@ static void application_recall_deferred_events (amf_application_t *app)
 			}
 			case APPLICATION_START_EV: {
 
-				log_printf (LOG_NOTICE, 
+				log_printf (LOGSYS_LEVEL_NOTICE, 
 					"Recall APPLICATION_START_EV");
 				amf_application_start (application_event.app,
 						application_event.node);
@@ -343,7 +343,7 @@ void amf_application_start (
 			}
 			break;
 		case APP_AC_ASSIGNING_WORKLOAD:
-			log_printf (LOG_LEVEL_ERROR, "Request to start application"
+			log_printf (LOGSYS_LEVEL_ERROR, "Request to start application"
 				" =%s in state  APP_AC_ASSIGNING_WORKLOAD(should be deferred)",
 				app->name.value);
 			application_defer_event (APPLICATION_START_EV, app , node);
@@ -388,7 +388,7 @@ void amf_application_assign_workload (struct amf_application *app,
 				 */
 				assert (0);
 			} else {
-				log_printf (LOG_LEVEL_ERROR, "Request to assign workload to"
+				log_printf (LOGSYS_LEVEL_ERROR, "Request to assign workload to"
 					" application =%s in state APP_AC_ASSIGNING_WORKLOAD "
 					"(should be deferred)", app->name.value);
 
@@ -429,7 +429,7 @@ void amf_application_sg_started (struct amf_application *app, struct amf_sg *sg,
 			}
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, "amf_application_sg_started()"
+			log_printf (LOGSYS_LEVEL_ERROR, "amf_application_sg_started()"
 				" called in state = %d", app->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
@@ -447,7 +447,7 @@ void amf_application_sg_assigned (
 			application_enter_workload_assigned (app);
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, 
+			log_printf (LOGSYS_LEVEL_ERROR, 
 				"amf_application_sg_assigned()"
 				" called in state = %d", app->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);

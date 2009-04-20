@@ -61,7 +61,7 @@
 #include "../include/saLck.h"
 #include "../include/ipc_lck.h"
 
-LOGSYS_DECLARE_SUBSYS ("LCK", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("LCK");
 
 enum lck_message_req_types {
 	MESSAGE_REQ_EXEC_LCK_RESOURCEOPEN = 0,
@@ -608,7 +608,7 @@ static void print_resource_lock_list (struct resource *resource)
 	struct list_head *list;
 	struct resource_lock *resource_lock;
 
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: resource_lock_list ...\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_lock_list ...\n");
 
 	for (list = resource->resource_lock_list_head.next;
 	     list != &resource->resource_lock_list_head;
@@ -616,7 +616,7 @@ static void print_resource_lock_list (struct resource *resource)
 	{
 		resource_lock = list_entry (list, struct resource_lock, resource_list);
 
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
 			    (unsigned int)(resource_lock->lock_id),
 			    (unsigned int)(resource_lock->lock_mode),
 			    (unsigned int)(resource_lock->lock_status),
@@ -629,7 +629,7 @@ static void print_pr_pending_list (struct resource *resource)
 	struct list_head *list;
 	struct resource_lock *resource_lock;
 
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: pr_pending_list ...\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: pr_pending_list ...\n");
 
 	for (list = resource->pr_pending_list_head.next;
 	     list != &resource->pr_pending_list_head;
@@ -637,7 +637,7 @@ static void print_pr_pending_list (struct resource *resource)
 	{
 		resource_lock = list_entry (list, struct resource_lock, list);
 
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
 			    (unsigned int)(resource_lock->lock_id),
 			    (unsigned int)(resource_lock->lock_mode),
 			    (unsigned int)(resource_lock->lock_status),
@@ -650,7 +650,7 @@ static void print_pr_granted_list (struct resource *resource)
 	struct list_head *list;
 	struct resource_lock *resource_lock;
 
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: pr_granted_list ...\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: pr_granted_list ...\n");
 
 	for (list = resource->pr_granted_list_head.next;
 	     list != &resource->pr_granted_list_head;
@@ -658,7 +658,7 @@ static void print_pr_granted_list (struct resource *resource)
 	{
 		resource_lock = list_entry (list, struct resource_lock, list);
 
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
 			    (unsigned int)(resource_lock->lock_id),
 			    (unsigned int)(resource_lock->lock_mode),
 			    (unsigned int)(resource_lock->lock_status),
@@ -671,7 +671,7 @@ static void print_ex_pending_list (struct resource *resource)
 	struct list_head *list;
 	struct resource_lock *resource_lock;
 
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: ex_pending_list ...\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: ex_pending_list ...\n");
 
 	for (list = resource->ex_pending_list_head.next;
 	     list != &resource->ex_pending_list_head;
@@ -679,7 +679,7 @@ static void print_ex_pending_list (struct resource *resource)
 	{
 		resource_lock = list_entry (list, struct resource_lock, list);
 
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
 			    (unsigned int)(resource_lock->lock_id),
 			    (unsigned int)(resource_lock->lock_mode),
 			    (unsigned int)(resource_lock->lock_status),
@@ -698,7 +698,7 @@ static void print_resource_list (struct list_head *head)
 	{
 		resource = list_entry (list, struct resource, list);
 
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: print_resource_list { name=%s addr=%p }\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: print_resource_list { name=%s addr=%p }\n",
 			    get_mar_name_t (&resource->name), (void *)(resource));
 
 		print_resource_lock_list (resource);
@@ -712,7 +712,7 @@ void resource_release (struct resource *resource)
 	struct list_head *list;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: resource_release { name=%s addr=%p }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_release { name=%s addr=%p }\n",
 		    get_mar_name_t (&resource->name), (void *)(resource));
 
 	for (list = resource->resource_lock_list_head.next;
@@ -731,7 +731,7 @@ void resource_release (struct resource *resource)
 void resource_lock_release (struct resource_lock *resource_lock)
 {
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: resource_lock_release { id=%u addr=%p }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_lock_release { id=%u addr=%p }\n",
 		    (unsigned int)(resource_lock->lock_id), (void *)(resource_lock));
 
 	list_del (&resource_lock->list);
@@ -1168,7 +1168,7 @@ static void lck_resource_cleanup_lock_remove (
 	struct resource_lock *resource_lock;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: resource_cleanup_lock_remove { %s }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_cleanup_lock_remove { %s }\n",
 		    get_mar_name_t (&resource_cleanup->name));
 
 	resource = lck_resource_find (&resource_list_head,
@@ -1183,7 +1183,7 @@ static void lck_resource_cleanup_lock_remove (
 		resource_lock = list_entry (list, struct resource_lock, resource_list);
 
 		/* DEBUG */
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t lock_id=%u addr=%p\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t lock_id=%u addr=%p\n",
 			    (unsigned int)(resource_lock->lock_id),
 			    (void *)(resource_lock));
 
@@ -1230,7 +1230,7 @@ static int lck_lib_exit_fn (void *conn)
 	struct list_head *cleanup_list;
 	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
 
-	log_printf (LOG_LEVEL_DEBUG, "lck_exit_fn conn_info %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "lck_exit_fn conn_info %p\n", conn);
 
 	cleanup_list = lck_pd->resource_cleanup_list.next;
 
@@ -1246,7 +1246,7 @@ static int lck_lib_exit_fn (void *conn)
 		assert (resource_cleanup->name.length != 0);
 
 		/* DEBUG */
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: resource_cleanup { %s }\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_cleanup { %s }\n",
 			    get_mar_name_t (&resource_cleanup->name));
 
 		lck_resource_cleanup_lock_remove (resource_cleanup);
@@ -1268,7 +1268,7 @@ static int lck_lib_exit_fn (void *conn)
 	struct list_head *cleanup_list;
 	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
 
-	log_printf (LOG_LEVEL_DEBUG, "lck_exit_fn conn_info %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "lck_exit_fn conn_info %p\n", conn);
 
 	for (cleanup_list = lck_pd->resource_cleanup_list.next;
 	     cleanup_list != &lck_pd->resource_cleanup_list;
@@ -1277,7 +1277,7 @@ static int lck_lib_exit_fn (void *conn)
 		resource_cleanup = list_entry (cleanup_list, struct resource_cleanup, list);
 
 		/* DEBUG */
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: resource_cleanup { %s }\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_cleanup { %s }\n",
 			    get_mar_name_t (&resource_cleanup->name));
 
 		lck_resource_cleanup_lock_remove (resource_cleanup);
@@ -1292,7 +1292,7 @@ static int lck_lib_init_fn (void *conn)
 {
 	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
 
-	log_printf (LOG_LEVEL_DEBUG, "lck_init_fn conn_info %p\n", conn);
+	log_printf (LOGSYS_LEVEL_DEBUG, "lck_init_fn conn_info %p\n", conn);
 
 	list_init (&lck_pd->resource_list);
 	list_init (&lck_pd->resource_cleanup_list);
@@ -1313,7 +1313,7 @@ static void message_handler_req_exec_lck_resourceopen (
 	SaAisErrorT error = SA_AIS_OK;
 	struct lck_pd *lck_pd;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saLckResourceOpen %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceOpen %s\n",
 		get_mar_name_t (&req_exec_lck_resourceopen->resource_name));
 	
 	if (req_exec_lck_resourceopen->fail_with_error != SA_AIS_OK) {
@@ -1354,7 +1354,7 @@ static void message_handler_req_exec_lck_resourceopen (
 			sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
 	}
 
-	log_printf (LOG_LEVEL_DEBUG, "RESOURCE opened is %p\n", resource);
+	log_printf (LOGSYS_LEVEL_DEBUG, "RESOURCE opened is %p\n", resource);
 
 	sync_refcount_increment (resource, nodeid);
 	sync_refcount_calculate (resource);
@@ -1426,7 +1426,7 @@ static void message_handler_req_exec_lck_resourceclose (
 	struct resource *resource = 0;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saLckResourceClose %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceClose %s\n",
 		get_mar_name_t (&req_exec_lck_resourceclose->lockResourceName));
 
 	resource = lck_resource_find (&resource_list_head,
@@ -1728,7 +1728,7 @@ static void message_handler_req_exec_lck_resourcelock (
 	struct resource_lock *resource_lock = 0;
 	struct resource_cleanup *resource_cleanup = 0;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saLckResourceLock %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceLock %s\n",
 		get_mar_name_t (&req_exec_lck_resourcelock->req_lib_lck_resourcelock.lockResourceName));
 
 	resource = lck_resource_find (&resource_list_head,
@@ -1773,7 +1773,7 @@ static void message_handler_req_exec_lck_resourcelock (
 		req_exec_lck_resourcelock->req_lib_lck_resourcelock.invocation;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t lock_id=%u addr=%p\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t lock_id=%u addr=%p\n",
 		    (unsigned int)(resource_lock->lock_id),
 		    (void *)(resource_lock));
 
@@ -1846,7 +1846,7 @@ static void message_handler_req_exec_lck_resourceunlock (
 	struct resource_lock *resource_lock = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: saLckResourceUnlock %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceUnlock %s\n",
 		get_mar_name_t (&req_exec_lck_resourceunlock->resource_name));
 
 	resource = lck_resource_find (&resource_list_head,
@@ -1906,7 +1906,7 @@ static void message_handler_req_exec_lck_resourcelockorphan (
 	struct resource *resource = 0;
 	struct resource_lock *resource_lock = 0;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: orphan locks for resource %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: orphan locks for resource %s\n",
 		get_mar_name_t (&req_exec_lck_resourcelockorphan->resource_name));
 
 	resource = lck_resource_find (&resource_list_head,
@@ -1937,7 +1937,7 @@ static void message_handler_req_exec_lck_lockpurge (
 	struct resource *resource = 0;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOG_LEVEL_DEBUG, "EXEC request: saLckLockPurge %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckLockPurge %s\n",
 		get_mar_name_t (&req_exec_lck_lockpurge->req_lib_lck_lockpurge.lockResourceName));
 
 	resource = lck_resource_find (&resource_list_head,
@@ -1969,7 +1969,7 @@ static void message_handler_req_exec_lck_sync_resource (
 		msg;
 	struct resource *resource;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync resource %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync resource %s\n",
 		    get_mar_name_t (&req_exec_lck_sync_resource->resource_name));
 
 	/*
@@ -2014,7 +2014,7 @@ static void message_handler_req_exec_lck_sync_resource_lock (
 	struct resource_lock *resource_lock;
 	struct resource *resource;
 
-	log_printf (LOG_LEVEL_NOTICE, "EXEC request: sync resource lock %u\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync resource lock %u\n",
 		    (unsigned int)(req_exec_lck_sync_resource_lock->lock_id));
 
 	/*
@@ -2054,7 +2054,7 @@ static void message_handler_req_exec_lck_sync_resource_lock (
 	resource_lock->resource = resource;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: lock_id=%u lock_mode=%u lock_status=%u\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: lock_id=%u lock_mode=%u lock_status=%u\n",
 		    (unsigned int)(resource_lock->lock_id),
 		    (unsigned int)(resource_lock->lock_mode),
 		    (unsigned int)(resource_lock->lock_status));
@@ -2125,7 +2125,7 @@ static void message_handler_req_exec_lck_sync_resource_refcount (
 	sync_refcount_calculate (resource);
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_DEBUG, "[DEBUG]: sync refcount for resource %s is %u\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: sync refcount for resource %s is %u\n",
 		    get_mar_name_t (&resource->name), (unsigned int)(resource->refcount));
 }
 
@@ -2138,7 +2138,7 @@ static void message_handler_req_lib_lck_resourceopen (
 	struct req_exec_lck_resourceopen req_exec_lck_resourceopen;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceOpen %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceOpen %s\n",
 		get_mar_name_t (&req_lib_lck_resourceopen->lockResourceName));
 
 	req_exec_lck_resourceopen.header.size =
@@ -2173,7 +2173,7 @@ static void message_handler_req_lib_lck_resourceopenasync (
 	struct req_exec_lck_resourceopen req_exec_lck_resourceopen;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceOpenAsync %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceOpenAsync %s\n",
 		get_mar_name_t (&req_lib_lck_resourceopen->lockResourceName));
 
 	req_exec_lck_resourceopen.header.size =
@@ -2211,7 +2211,7 @@ static void message_handler_req_lib_lck_resourceclose (
 	struct resource *resource;
 	struct res_lib_lck_resourceclose res_lib_lck_resourceclose;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceClose %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceClose %s\n",
 		get_mar_name_t (&req_lib_lck_resourceclose->lockResourceName));
 
 	resource = lck_resource_find (&resource_list_head,
@@ -2254,7 +2254,7 @@ static void message_handler_req_lib_lck_resourcelock (
 	struct req_exec_lck_resourcelock req_exec_lck_resourcelock;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceLock %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceLock %s\n",
 		get_mar_name_t (&req_lib_lck_resourcelock->lockResourceName));
 
 	req_exec_lck_resourcelock.header.size =
@@ -2288,7 +2288,7 @@ static void message_handler_req_lib_lck_resourcelockasync (
 	struct req_exec_lck_resourcelock req_exec_lck_resourcelock;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceLockAsync %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceLockAsync %s\n",
 		get_mar_name_t (&req_lib_lck_resourcelock->lockResourceName));
 
 	req_exec_lck_resourcelock.header.size =
@@ -2322,7 +2322,7 @@ static void message_handler_req_lib_lck_resourceunlock (
 	struct req_exec_lck_resourceunlock req_exec_lck_resourceunlock;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceUnlock %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceUnlock %s\n",
 		get_mar_name_t (&req_lib_lck_resourceunlock->lockResourceName));
 
 	req_exec_lck_resourceunlock.header.size =
@@ -2355,7 +2355,7 @@ static void message_handler_req_lib_lck_resourceunlockasync (
 	struct req_exec_lck_resourceunlock req_exec_lck_resourceunlock;
 	struct iovec iovec;
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceUnlockAsync %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceUnlockAsync %s\n",
 		get_mar_name_t (&req_lib_lck_resourceunlock->lockResourceName));
 
 	req_exec_lck_resourceunlock.header.size =
@@ -2388,7 +2388,7 @@ static void message_handler_req_lib_lck_lockpurge (
 	struct req_exec_lck_lockpurge req_exec_lck_lockpurge;
 	struct iovec iovecs[2];
 
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saLckResourceLockPurge %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceLockPurge %s\n",
 		get_mar_name_t (&req_lib_lck_lockpurge->lockResourceName));
 
 	req_exec_lck_lockpurge.header.size =

@@ -62,7 +62,7 @@
 #include "../include/saTmr.h"
 #include "../include/ipc_tmr.h"
 
-LOGSYS_DECLARE_SUBSYS ("TMR", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("TMR");
 
 struct timer_instance {
 	SaTmrTimerIdT timer_id;
@@ -260,7 +260,7 @@ static int tmr_lib_exit_fn (void *conn)
 		timer_instance = list_entry (cleanup_list, struct timer_instance, cleanup_list);
 
 		/* DEBUG */
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: cleanup timer { id=0x%04x }\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: cleanup timer { id=0x%04x }\n",
 			    (unsigned int)(timer_instance->timer_id));
 
 		api->timer_delete (timer_instance->timer_handle);
@@ -284,7 +284,7 @@ static void tmr_timer_expired (void *data)
 	timer_instance->expiration_count += 1;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: tmr_timer_expired { id=0x%04x }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: tmr_timer_expired { id=0x%04x }\n",
 		    (unsigned int)(timer_instance->timer_id));
 
 	res_lib_tmr_timerexpiredcallback.header.size =
@@ -305,7 +305,7 @@ static void tmr_timer_expired (void *data)
 	}
 	else {
 		/* DEBUG */
-		log_printf (LOG_LEVEL_NOTICE, "[DEBUG]: skipping timer { id=0x%04x }\n",
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: skipping timer { id=0x%04x }\n",
 			    (unsigned int)(timer_instance->timer_id));
 
 		timer_instance->timer_skip -= 1;
@@ -352,7 +352,7 @@ static void message_handler_req_lib_tmr_timerstart (
 	struct tmr_pd *tmr_pd = (struct tmr_pd *) api->ipc_private_data_get (conn);
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerStart\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrTimerStart\n");
 
 	hdb_handle_create (&timer_hdb,
 		   sizeof (struct timer_instance),
@@ -370,7 +370,7 @@ static void message_handler_req_lib_tmr_timerstart (
 	timer_instance->timer_data = req_lib_tmr_timerstart->timer_data;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "[DEBUG]:\t timer_data=%p\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t timer_data=%p\n",
 		    (void *)(timer_instance->timer_data));
 
 	memcpy (&timer_instance->timer_attributes,
@@ -432,7 +432,7 @@ static void message_handler_req_lib_tmr_timerreschedule (
 	SaTimeT current_time = 0;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerReschedule { id=0x%04x }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrTimerReschedule { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timerreschedule->timer_id));
 
 	hdb_handle_get (&timer_hdb,
@@ -495,7 +495,7 @@ static void message_handler_req_lib_tmr_timercancel (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerCancel { id=0x%04x }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrTimerCancel { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timercancel->timer_id));
 
 	hdb_handle_get (&timer_hdb,
@@ -539,7 +539,7 @@ static void message_handler_req_lib_tmr_periodictimerskip (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrPeriodicTimerSkip { id=0x%04x }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrPeriodicTimerSkip { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_periodictimerskip->timer_id));
 
 	hdb_handle_get (&timer_hdb,
@@ -583,7 +583,7 @@ static void message_handler_req_lib_tmr_timerremainingtimeget (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerRemainingTimeGet { id=0x%04x }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrTimerRemainingTimeGet { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timerremainingtimeget->timer_id));
 
 	hdb_handle_get (&timer_hdb,
@@ -624,7 +624,7 @@ static void message_handler_req_lib_tmr_timerattributesget (
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimerAttributesGet { id=0x%04x }\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrTimerAttributesGet { id=0x%04x }\n",
 		    (unsigned int)(req_lib_tmr_timerattributesget->timer_id));
 
 	hdb_handle_get (&timer_hdb,
@@ -663,7 +663,7 @@ static void message_handler_req_lib_tmr_timeget (
 	SaTimeT current_time;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrTimeGet\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrTimeGet\n");
 
 	current_time = (SaTimeT)(api->timer_time_get());
 
@@ -690,7 +690,7 @@ static void message_handler_req_lib_tmr_clocktickget (
 	SaTimeT clock_tick;
 
 	/* DEBUG */
-	log_printf (LOG_LEVEL_NOTICE, "LIB request: saTmrClockTickGet\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saTmrClockTickGet\n");
 
 	clock_tick = (SaTimeT)((1.0 / CLOCKS_PER_SEC) * 1000000000ULL);
 

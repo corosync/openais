@@ -73,7 +73,7 @@
 #include "../include/mar_clm.h"
 #include "clm.h"
 
-LOGSYS_DECLARE_SUBSYS ("CLM", LOG_INFO);
+LOGSYS_DECLARE_SUBSYS ("CLM");
 
 
 enum clm_message_req_types {
@@ -553,19 +553,19 @@ static void clm_confchg_fn (
 		view_initial = ring_id->seq / 4;
 	}
 
-	log_printf (LOG_LEVEL_NOTICE, "CLM CONFIGURATION CHANGE\n");
-	log_printf (LOG_LEVEL_NOTICE, "New Configuration:\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "CLM CONFIGURATION CHANGE\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "New Configuration:\n");
 	for (i = 0; i < member_list_entries; i++) {
-		log_printf (LOG_LEVEL_NOTICE, "\t%s\n", api->totem_ifaces_print (member_list[i]));
+		log_printf (LOGSYS_LEVEL_NOTICE, "\t%s\n", api->totem_ifaces_print (member_list[i]));
 	}
-	log_printf (LOG_LEVEL_NOTICE, "Members Left:\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "Members Left:\n");
 	for (i = 0; i < left_list_entries; i++) {
-		log_printf (LOG_LEVEL_NOTICE, "\t%s\n", api->totem_ifaces_print (left_list[i]));
+		log_printf (LOGSYS_LEVEL_NOTICE, "\t%s\n", api->totem_ifaces_print (left_list[i]));
 	}
 
-	log_printf (LOG_LEVEL_NOTICE, "Members Joined:\n");
+	log_printf (LOGSYS_LEVEL_NOTICE, "Members Joined:\n");
 	for (i = 0; i < joined_list_entries; i++) {
-		log_printf (LOG_LEVEL_NOTICE, "\t%s\n", api->totem_ifaces_print (joined_list[i]));
+		log_printf (LOGSYS_LEVEL_NOTICE, "\t%s\n", api->totem_ifaces_print (joined_list[i]));
 	}
 
 	for (i = 0; i < left_list_entries; i++) {
@@ -634,7 +634,7 @@ static void message_handler_req_exec_clm_nodejoin (
 	int found = 0;
 	int i;
 
-	log_printf (LOG_LEVEL_NOTICE, "got nodejoin message %s\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "got nodejoin message %s\n",
 		req_exec_clm_nodejoin->cluster_node.node_name.value);
 	
 	/*
@@ -663,7 +663,7 @@ static int clm_lib_init_fn (void *conn)
 {
 	struct clm_pd *clm_pd = (struct clm_pd *)api->ipc_private_data_get (conn);
 
-	log_printf (LOG_LEVEL_DEBUG, "Got request to initalize cluster membership service.\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "Got request to initalize cluster membership service.\n");
 
 	list_init (&clm_pd->list);
 	clm_pd->conn = conn;
@@ -761,7 +761,7 @@ static void message_handler_req_lib_clm_nodeget (
 	int valid = 0;
 	int i;
 
-	log_printf (LOG_LEVEL_NOTICE, "nodeget: trying to find node %x\n",
+	log_printf (LOGSYS_LEVEL_NOTICE, "nodeget: trying to find node %x\n",
 		(int)req_lib_clm_nodeget->node_id);
 
 	if (req_lib_clm_nodeget->node_id == SA_CLM_LOCAL_NODE_ID) {
@@ -770,7 +770,7 @@ static void message_handler_req_lib_clm_nodeget (
 	} else 
 	for (i = 0; i < cluster_node_count; i++) {
 		if (cluster_node_entries[i].node_id == req_lib_clm_nodeget->node_id) {
-			log_printf (LOG_LEVEL_DEBUG, "found host that matches one desired in nodeget.\n");
+			log_printf (LOGSYS_LEVEL_DEBUG, "found host that matches one desired in nodeget.\n");
 			cluster_node = &cluster_node_entries[i];
 			valid = 1;
 			break;
@@ -799,7 +799,7 @@ static void message_handler_req_lib_clm_nodegetasync (
 	int error = SA_AIS_ERR_INVALID_PARAM;
 	int i;
 
-	log_printf (LOG_LEVEL_DEBUG, "nodeget: trying to find node %x\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "nodeget: trying to find node %x\n",
 		(int)req_lib_clm_nodegetasync->node_id);
 
 	if (req_lib_clm_nodegetasync->node_id == SA_CLM_LOCAL_NODE_ID) {
@@ -808,7 +808,7 @@ static void message_handler_req_lib_clm_nodegetasync (
 	} else 
 	for (i = 0; i < cluster_node_count; i++) {
 		if (cluster_node_entries[i].node_id == req_lib_clm_nodegetasync->node_id) {
-			log_printf (LOG_LEVEL_DEBUG, "found host that matches one desired in nodeget.\n");
+			log_printf (LOGSYS_LEVEL_DEBUG, "found host that matches one desired in nodeget.\n");
 			cluster_node = &cluster_node_entries[i];
 			error = SA_AIS_OK;
 			break;

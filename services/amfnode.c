@@ -195,7 +195,7 @@
 #include "amf.h"
 #include <corosync/engine/logsys.h>
 
-LOGSYS_DECLARE_SUBSYS ("AMF", LOG_INFO)
+LOGSYS_DECLARE_SUBSYS ("AMF");
 
 /******************************************************************************
  * Internal (static) utility functions
@@ -332,7 +332,7 @@ static void node_acsm_enter_idle (amf_node_t *node)
 static void node_acsm_enter_joining_assigning_workload (struct amf_node *node, 
 	struct amf_application *app)
 {
-	log_printf(LOG_NOTICE,
+	log_printf(LOGSYS_LEVEL_NOTICE,
 		"Node=%s: all applications started, assigning workload.",
 		node->name.value);
 
@@ -373,7 +373,7 @@ void amf_node_leave (struct amf_node *node)
 			node_acsm_enter_idle (node);
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, "amf_node_leave called in state = %d"
+			log_printf (LOGSYS_LEVEL_ERROR, "amf_node_leave called in state = %d"
 				" (should have been deferred)", node->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
@@ -400,7 +400,7 @@ void amf_node_failover (struct amf_node *node)
 		case NODE_ACSM_REPAIR_NEEDED:
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, "amf_node_leave()called in state = %d"
+			log_printf (LOGSYS_LEVEL_ERROR, "amf_node_leave()called in state = %d"
 				" (should have been deferred)", node->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
@@ -451,7 +451,7 @@ void amf_node_comp_restart_req (struct amf_node *node, struct amf_comp *comp)
 				amf_su_operational_state_set (su, SA_AMF_OPERATIONAL_DISABLED);
 				amf_comp_dn_make (comp, &dn);
 
-				log_printf (LOG_NOTICE, "Error detected for '%s', recovery "
+				log_printf (LOGSYS_LEVEL_NOTICE, "Error detected for '%s', recovery "
 					"action:\n\t\tSU failover", dn.value);
 
 				amf_sg_failover_su_req (su->sg, su, node);
@@ -466,7 +466,7 @@ void amf_node_comp_restart_req (struct amf_node *node, struct amf_comp *comp)
 				amf_su_operational_state_set (su, SA_AMF_OPERATIONAL_DISABLED);
 				amf_comp_dn_make (comp, &dn);
 
-				log_printf (LOG_NOTICE, "Error detected for '%s', recovery "
+				log_printf (LOGSYS_LEVEL_NOTICE, "Error detected for '%s', recovery "
 					"action:\n\t\tSU failover", dn.value);
 
 				amf_sg_failover_su_req (su->sg, su, node);
@@ -533,7 +533,7 @@ void amf_node_sync_ready (struct amf_node *node)
 
 	assert (node != NULL);
 
-	log_printf(LOG_NOTICE, "Node=%s: sync ready, starting hosted SUs.",
+	log_printf(LOGSYS_LEVEL_NOTICE, "Node=%s: sync ready, starting hosted SUs.",
 		node->name.value);
 	node->saAmfNodeOperState = SA_AMF_OPERATIONAL_ENABLED;
 
@@ -550,7 +550,7 @@ void amf_node_sync_ready (struct amf_node *node)
 		case NODE_ACSM_REPAIR_NEEDED:
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, "amf_node_sync_ready() was called in "
+			log_printf (LOGSYS_LEVEL_ERROR, "amf_node_sync_ready() was called in "
 										 "state = %d (should have been deferred)",
 				node->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
@@ -588,7 +588,7 @@ void amf_node_application_started (struct amf_node *node,
 			}
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, "amf_node_application_started()"
+			log_printf (LOGSYS_LEVEL_ERROR, "amf_node_application_started()"
 				"called in state = %d (unexpected !!)", node->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
@@ -612,13 +612,13 @@ void amf_node_application_workload_assigned (struct amf_node *node,
 		case NODE_ACSM_JOINING_ASSIGNING_WORKLOAD:
 
 			if (amf_cluster_applications_assigned (amf_cluster)) {
-				log_printf(LOG_NOTICE, "Node=%s: all workload assigned", 
+				log_printf(LOGSYS_LEVEL_NOTICE, "Node=%s: all workload assigned", 
 					node->name.value);
 				node_acsm_enter_idle (node);
 			}
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, "amf_node_application_workload_assigned()"
+			log_printf (LOGSYS_LEVEL_ERROR, "amf_node_application_workload_assigned()"
 				"called in state = %d (unexpected !!)", node->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
@@ -653,7 +653,7 @@ void amf_node_sg_failed_over (struct amf_node *node, struct amf_sg *sg_in)
 			}
 			break;
 		default:
-			log_printf (LOG_LEVEL_ERROR, "amf_node_sg_failed_over()"
+			log_printf (LOGSYS_LEVEL_ERROR, "amf_node_sg_failed_over()"
 				"called in state = %d (unexpected !!)", node->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
 			break;
