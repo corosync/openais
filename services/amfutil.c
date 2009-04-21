@@ -47,6 +47,8 @@
  * 
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -303,7 +305,7 @@ struct amf_cluster *amf_config_read (char **error_string)
 	char                     *value;
 	filename = getenv ("COROSYNC_AMF_CONFIG_FILE");
 	if (!filename) {
-		filename = "/etc/ais/amf.conf";
+		filename = SYSCONFDIR "/amf.conf";
 	}
 
 	fp = fopen (filename, "r");

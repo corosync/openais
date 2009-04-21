@@ -29,7 +29,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-EXTRA_DIST              = autogen.sh conf/openais.conf
+EXTRA_DIST              = autogen.sh conf/openais.conf conf/amf.conf
 AUTOMAKE_OPTIONS	= foreign
 
 MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
