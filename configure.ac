@@ -144,6 +144,7 @@ esac
 
 PKG_CHECK_MODULES([corosync],[corosync])
 PKG_CHECK_MODULES([coroipcc],[libcoroipcc])
+_PKG_CONFIG([lcrsodir], [variable lcrsodir], [corosync])
 
 ## local defines
 PACKAGE_FEATURES=""
@@ -177,7 +178,7 @@ AC_ARG_ENABLE([coverage],
 AC_ARG_WITH([lcrso-dir],
 	[  --with-lcrso-dir=DIR    : corosync lcrso files. ],
 	[ LCRSODIR="$withval" ],
-	[ LCRSODIR="$libexecdir/lcrso" ])
+	[ LCRSODIR="${pkg_cv_lcrsodir}" ])
 
 AC_ARG_WITH([socket-dir],
 	[  --with-socket-dir=DIR   : corosync socket dir. ],
