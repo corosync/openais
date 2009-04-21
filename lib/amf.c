@@ -293,9 +293,7 @@ saAmfDispatch (
 				res_lib_amf_csisetcallback->haState,
 				&csi_descriptor);
 
-			if (csi_attribute_array != NULL) {
-				free(csi_attribute_array);
-			}
+			free(csi_attribute_array);
 			break;
 		    }
 		case MESSAGE_RES_AMF_CSIREMOVECALLBACK:

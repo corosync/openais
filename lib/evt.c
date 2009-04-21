@@ -277,9 +277,7 @@ static void eventHandleInstanceDestructor(void *instance)
 		}
 		free(edi->edi_patterns.patterns);
 	}
-	if (edi->edi_event_data) {
-		free(edi->edi_event_data);
-	}
+	free(edi->edi_event_data);
 
 	pthread_mutex_destroy(&edi->edi_mutex);
 }
@@ -1424,9 +1422,7 @@ saEvtEventAttributesSet(
 	 */
 	if (oldpatterns) {
 		for (i = 0; i < oldnumber; i++) {
-			if (oldpatterns[i].pattern) {
-				free(oldpatterns[i].pattern);
-			}
+			free(oldpatterns[i].pattern);
 		}
 		free (oldpatterns);
 	}

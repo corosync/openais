@@ -1112,9 +1112,7 @@ static void delete_channel(struct event_svr_channel_instance *eci)
 		}
 
 		list_del(&eci->esc_entry);
-		if (eci->esc_node_opens) {
-			free(eci->esc_node_opens);
-		}
+		free(eci->esc_node_opens);
 		free(eci);
 	}
 }
@@ -1130,9 +1128,7 @@ free_event_data(struct event_data *edp)
 	}
 	log_printf(LOGSYS_LEVEL_DEBUG, "Freeing event ID: 0x%llx\n",
 			(unsigned long long)edp->ed_event.led_event_id);
-	if (edp->ed_delivered) {
-		free(edp->ed_delivered);
-	}
+	free(edp->ed_delivered);
 
 	free(edp);
 }

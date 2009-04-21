@@ -3335,9 +3335,7 @@ error_exit:
 
 	/* ? */
 	if ((error != SA_AIS_OK) && (msg != NULL)) {
-		if (msg->message.data != NULL) {
-			free (msg->message.data);
-		}
+		free (msg->message.data);
 		free (msg);
 	}
 }
@@ -3506,9 +3504,7 @@ error_exit:
 
 	/* ? */
 	if ((error != SA_AIS_OK) && (msg != NULL)) {
-		if (msg->message.data != NULL) {
-			free (msg->message.data);
-		}
+		free (msg->message.data);
 		free (msg);
 	}
 }
@@ -3597,9 +3593,7 @@ error_exit:
 		}
 	}
 
-	if (msg != NULL) {
-		free (msg);
-	}
+	free (msg);
 }
 
 static void message_handler_req_exec_msg_messagedatafree (
@@ -3789,9 +3783,7 @@ error_exit:
 
 	/* ? */
 	if ((error != SA_AIS_OK) && (msg != NULL)) {
-		if (msg->message.data != NULL) {
-			free (msg->message.data);
-		}
+		free (msg->message.data);
 		free (msg);
 	}
 }

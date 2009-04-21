@@ -988,12 +988,8 @@ static void checkpoint_section_release (struct checkpoint_section *section)
 	list_del (&section->list);
 
 	api->timer_delete (section->expiration_timer);
-	if (section->section_descriptor.section_id.id) {
-		free (section->section_descriptor.section_id.id);
-	}
-	if (section->section_data) {
-		free (section->section_data);
-	}
+	free (section->section_descriptor.section_id.id);
+	free (section->section_data);
 	free (section);
 }
 
