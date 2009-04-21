@@ -1378,8 +1378,7 @@ saMsgMessageSend (
 		goto error_exit;
 	}
 
-	if ((message->priority < SA_MSG_MESSAGE_HIGHEST_PRIORITY) ||
-	    (message->priority > SA_MSG_MESSAGE_LOWEST_PRIORITY))
+	if (message->priority > SA_MSG_MESSAGE_LOWEST_PRIORITY)
 	{
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
