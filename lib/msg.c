@@ -270,6 +270,10 @@ saMsgDispatch (
 		memcpy (&callbacks, &msgInstance->callbacks,
 			sizeof (msgInstance->callbacks));
 
+		/* DEBUG */
+		printf ("[DEBUG]: saMsgDispatch { id = %u }\n",
+			(unsigned int)(dispatch_data->id));
+
 		switch (dispatch_data->id) {
 		case MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK:
 			if (callbacks.saMsgQueueOpenCallback == NULL) {
@@ -291,6 +295,10 @@ saMsgDispatch (
 			}
 			res_lib_msg_queuegrouptrack_callback =
 				(struct res_lib_msg_queuegrouptrack_callback *)dispatch_data;
+
+			res_lib_msg_queuegrouptrack_callback->buffer.notification =
+				(SaMsgQueueGroupNotificationT *)(res_lib_msg_queuegrouptrack_callback +
+				sizeof (struct res_lib_msg_queuegrouptrack_callback));
 
 			callbacks.saMsgQueueGroupTrackCallback (
 				&res_lib_msg_queuegrouptrack_callback->group_name,
@@ -1123,8 +1131,10 @@ saMsgQueueGroupTrack (
 {
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_queuegrouptrack req_lib_msg_queuegrouptrack;
-	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
+	struct res_lib_msg_queuegrouptrack *res_lib_msg_queuegrouptrack;
 	struct iovec iov;
+
+	void * buffer;
 
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -1187,16 +1197,41 @@ saMsgQueueGroupTrack (
 
 	pthread_mutex_lock (&msgInstance->response_mutex);
 
+	/*
 	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_msg_queuegrouptrack,
 		sizeof (struct res_lib_msg_queuegrouptrack));
+	*/
 
-	if (res_lib_msg_queuegrouptrack.header.error != SA_AIS_OK) {
-		error = res_lib_msg_queuegrouptrack.header.error;
+	error = coroipcc_msg_send_reply_receive_in_buf (
+		msgInstance->ipc_ctx,
+		&iov,
+		1,
+		&buffer);
+
+	res_lib_msg_queuegrouptrack = buffer;
+
+	if (res_lib_msg_queuegrouptrack->header.error != SA_AIS_OK) {
+		error = res_lib_msg_queuegrouptrack->header.error;
 		goto error_unlock;
+	}
+
+	if ((trackFlags & SA_TRACK_CURRENT) && (notificationBuffer != NULL)) {
+		if (res_lib_msg_queuegrouptrack->buffer.numberOfItems > notificationBuffer->numberOfItems) {
+			notificationBuffer->numberOfItems =
+				res_lib_msg_queuegrouptrack->buffer.numberOfItems;
+			error = SA_AIS_ERR_NO_SPACE;
+			goto error_unlock;
+		}
+		notificationBuffer->numberOfItems =
+			res_lib_msg_queuegrouptrack->buffer.numberOfItems;
+		memcpy (notificationBuffer->notification, ((char *)(buffer) +
+			sizeof (struct res_lib_msg_queuegrouptrack)),
+			res_lib_msg_queuegrouptrack->buffer.numberOfItems *
+			sizeof (SaMsgQueueGroupNotificationT));
 	}
 
 error_unlock:

@@ -128,6 +128,13 @@ struct message_entry {
 	struct list_head list;
 };
 
+struct group_track {
+	void *conn;
+	SaNameT group_name;
+	SaUint8T track_flags;
+	struct list_head list;
+};
+
 struct queue_cleanup {
 	SaNameT queue_name;
 	SaUint32T queue_id;
@@ -168,7 +175,6 @@ struct queue_entry {
 
 struct group_entry {
 	SaNameT group_name;
-	SaUint8T track_flags;
 	SaUint32T change_count;
 	SaUint32T member_count;
 	SaMsgQueueGroupPolicyT policy;
@@ -193,6 +199,7 @@ struct group_entry {
 
 DECLARE_LIST_INIT(queue_list_head);
 DECLARE_LIST_INIT(group_list_head);
+DECLARE_LIST_INIT(track_list_head);
 
 DECLARE_LIST_INIT(sync_queue_list_head);
 DECLARE_LIST_INIT(sync_group_list_head);
@@ -860,7 +867,6 @@ struct req_exec_msg_queuegrouptrack {
 	mar_req_header_t header;
 	mar_message_source_t source;
 	SaNameT group_name;
-	SaUint8T track_flags;
 	SaUint8T buffer_flag;
 };
 
@@ -976,7 +982,6 @@ struct req_exec_msg_sync_queue {
 	SaMsgQueueOpenFlagsT open_flags;
 	SaMsgQueueGroupChangesT change_flag;
 	SaMsgQueueCreationAttributesT create_attrs;
-	/* corosync_timer_handle_t ? */
 };
 
 struct req_exec_msg_sync_queue_message {
@@ -1001,7 +1006,6 @@ struct req_exec_msg_sync_group {
 	mar_req_header_t header;
 	struct memb_ring_id ring_id;
 	SaNameT group_name;
-	SaUint8T track_flags;
 	SaMsgQueueGroupPolicyT policy;
 };
 
@@ -1415,6 +1419,28 @@ static struct queue_entry *msg_find_group_member (
 	return (0);
 }
 
+static struct group_track *msg_find_group_track (
+	void *conn,
+	SaNameT *group_name)
+{
+	struct list_head *list;
+	struct group_track *track;
+
+	for (list = track_list_head.next;
+	     list != &track_list_head;
+	     list = list->next)
+	{
+		track = list_entry (list, struct group_track, list);
+
+		if ((msg_name_match (group_name, &track->group_name)) &&
+		    (conn == track->conn))
+		{
+			return (track);
+		}
+	}
+	return (0);
+}
+
 static struct queue_cleanup *msg_find_queue_cleanup (
 	void *conn,
 	SaNameT *queue_name,
@@ -1651,20 +1677,38 @@ static void msg_release_queue (
 static void msg_release_group (
 	struct group_entry *group)
 {
-	struct list_head *list = group->queue_head.next;
+	struct list_head *queue_list;
+	struct list_head *track_list;
 	struct queue_entry *queue;
+	struct group_track *track;
 
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg_release_group ( %s )\n",
 		    (char *)(group->group_name.value));
 
+	queue_list = group->queue_head.next;
+
 	while (!list_empty (&group->queue_head)) {
-		queue = list_entry (list, struct queue_entry, group_list);
+		queue = list_entry (queue_list, struct queue_entry, group_list);
+		queue_list = group->queue_head.next;
 
 		list_del (&queue->group_list);
 		list_init (&queue->group_list);
+	}
 
-		list = group->queue_head.next;
+	track_list = track_list_head.next;
+
+	while (track_list != &track_list_head) {
+		track = list_entry (track_list, struct group_track, list);
+		track_list = track_list->next;
+
+		if (msg_name_match (&track->group_name, &group->group_name))
+		{
+			list_del (&track->list);
+			list_init (&track->list);
+
+			free (track);
+		}
 	}
 
 	list_del (&group->group_list);
@@ -1881,7 +1925,6 @@ static int msg_sync_group_transmit (
 	memcpy (&req_exec_msg_sync_group.group_name,
 		&group->group_name, sizeof (SaNameT));
 
-	req_exec_msg_sync_group.track_flags = group->track_flags;
 	req_exec_msg_sync_group.policy = group->policy;
 
 	iov.iov_base = (char *)&req_exec_msg_sync_group;
@@ -2213,7 +2256,10 @@ static int msg_lib_init_fn (void *conn)
 static int msg_lib_exit_fn (void *conn)
 {
 	struct queue_cleanup *cleanup;
+	struct group_track *track;
 	struct list_head *cleanup_list;
+	struct list_head *track_list;
+
 	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get(conn);
 
 	/* DEBUG */
@@ -2238,9 +2284,27 @@ static int msg_lib_exit_fn (void *conn)
 		msg_close_queue (&cleanup->queue_name, cleanup->queue_id);
 
 		list_del (&cleanup->list);
+		list_init (&cleanup->list);
+
 		free (cleanup);
 
 		cleanup_list = msg_pd->queue_cleanup_list.next;
+	}
+
+	for (track_list = track_list_head.next;
+	     track_list != &track_list_head;
+	     track_list = track_list->next)
+	{
+		track = list_entry (track_list, struct group_track, list);
+
+		/* DEBUG */
+		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: cleanup track conn=0x%p group=%s\n",
+			    (void *)(track->conn), (char *)(track->group_name.value));
+
+		list_del (&track->list);
+		/* list_init (&track->list); */
+
+		free (track);
 	}
 
 	return (0);
@@ -2859,11 +2923,14 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 	const struct req_exec_msg_queuegroupinsert *req_exec_msg_queuegroupinsert =
 		message;
 	struct res_lib_msg_queuegroupinsert res_lib_msg_queuegroupinsert;
-	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
-	/* SaMsgQueueGroupNotificationT *notification = NULL; */
+	struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback;
+	SaMsgQueueGroupNotificationT buffer[MAX_NUM_QUEUES_PER_GROUP];
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
 	struct queue_entry *queue = NULL;
+	struct group_track *track = NULL;
+	struct iovec iov[2];
+	unsigned int count = 0;
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupInsert\n");
 
@@ -2906,15 +2973,68 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 	}
 
 	queue->group = group;
+	queue->change_flag = SA_MSG_QUEUE_GROUP_ADDED;
+	group->member_count += 1;
 
 	list_init (&queue->group_list);
 	list_add_tail (&queue->group_list, &group->queue_head);
 
-	group->member_count += 1;
+	track = msg_find_group_track (
+		req_exec_msg_queuegroupinsert->source.conn,
+		&group->group_name);
+	if (track != NULL) {
+		memset (buffer, 0, sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+		if (track->track_flags & SA_TRACK_CHANGES) {
+			count = msg_group_track_changes (group, buffer);
 
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t member_count = %u\n",
-		    (unsigned int)(group->member_count));
+			res_lib_msg_queuegrouptrack_callback.header.size =
+				sizeof (struct res_lib_msg_queuegrouptrack_callback) +
+				(sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+			res_lib_msg_queuegrouptrack_callback.header.id =
+				MESSAGE_RES_MSG_QUEUEGROUPTRACK_CALLBACK;
+			res_lib_msg_queuegrouptrack_callback.header.error = error;
+
+			memcpy (&res_lib_msg_queuegrouptrack_callback.group_name,
+				&group->group_name, sizeof (SaNameT));
+
+			res_lib_msg_queuegrouptrack_callback.buffer.numberOfItems = count;
+			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
+			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
+
+			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
+			iov[1].iov_base = buffer;
+			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
+
+			api->ipc_dispatch_iov_send (track->conn, iov, 2);
+		}
+		if (track->track_flags & SA_TRACK_CHANGES_ONLY) {
+			count = msg_group_track_changes_only (group, buffer);
+
+			res_lib_msg_queuegrouptrack_callback.header.size =
+				sizeof (struct res_lib_msg_queuegrouptrack_callback) +
+				(sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+			res_lib_msg_queuegrouptrack_callback.header.id =
+				MESSAGE_RES_MSG_QUEUEGROUPTRACK_CALLBACK;
+			res_lib_msg_queuegrouptrack_callback.header.error = error;
+
+			memcpy (&res_lib_msg_queuegrouptrack_callback.group_name,
+				&group->group_name, sizeof (SaNameT));
+
+			res_lib_msg_queuegrouptrack_callback.buffer.numberOfItems = count;
+			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
+			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
+
+			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
+			iov[1].iov_base = buffer;
+			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
+
+			api->ipc_dispatch_iov_send (track->conn, iov, 2);
+		}
+	}
+
+	queue->change_flag = SA_MSG_QUEUE_GROUP_NO_CHANGE;
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_msg_queuegroupinsert->source))
@@ -2929,16 +3049,6 @@ error_exit:
 			req_exec_msg_queuegroupinsert->source.conn,
 			&res_lib_msg_queuegroupinsert,
 			sizeof (struct res_lib_msg_queuegroupinsert));
-
-		if (error == SA_AIS_OK) {
-			if (group->track_flags & SA_TRACK_CHANGES) {
-				/* !! */
-			}
-
-			if (group->track_flags & SA_TRACK_CHANGES_ONLY) {
-				/* !! */
-			}
-		}
 	}
 }
 
@@ -2949,11 +3059,14 @@ static void message_handler_req_exec_msg_queuegroupremove (
 	const struct req_exec_msg_queuegroupremove *req_exec_msg_queuegroupremove =
 		message;
 	struct res_lib_msg_queuegroupremove res_lib_msg_queuegroupremove;
-	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
-	/* SaMsgQueueGroupNotificationT *notification = NULL; */
+	struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback;
+	SaMsgQueueGroupNotificationT buffer[MAX_NUM_QUEUES_PER_GROUP];
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
 	struct queue_entry *queue = NULL;
+	struct group_track *track = NULL;
+	struct iovec iov[2];
+	unsigned int count = 0;
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupRemove\n");
 
@@ -2982,19 +3095,72 @@ static void message_handler_req_exec_msg_queuegroupremove (
 	}
 
 	queue->group = NULL;
+	queue->change_flag = SA_MSG_QUEUE_GROUP_REMOVED;
+	group->member_count -= 1;
+
+	track = msg_find_group_track (
+		req_exec_msg_queuegroupremove->source.conn,
+		&group->group_name);
+	if (track != NULL) {
+		memset (buffer, 0, sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+		if (track->track_flags & SA_TRACK_CHANGES) {
+			count = msg_group_track_changes (group, buffer);
+
+			res_lib_msg_queuegrouptrack_callback.header.size =
+				sizeof (struct res_lib_msg_queuegrouptrack_callback) +
+				(sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+			res_lib_msg_queuegrouptrack_callback.header.id =
+				MESSAGE_RES_MSG_QUEUEGROUPTRACK_CALLBACK;
+			res_lib_msg_queuegrouptrack_callback.header.error = error;
+
+			memcpy (&res_lib_msg_queuegrouptrack_callback.group_name,
+				&group->group_name, sizeof (SaNameT));
+
+			res_lib_msg_queuegrouptrack_callback.buffer.numberOfItems = count;
+			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
+			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
+
+			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
+			iov[1].iov_base = buffer;
+			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
+
+			api->ipc_dispatch_iov_send (track->conn, iov, 2);
+		}
+		if (track->track_flags & SA_TRACK_CHANGES_ONLY) {
+			count = msg_group_track_changes_only (group, buffer);
+
+			res_lib_msg_queuegrouptrack_callback.header.size =
+				sizeof (struct res_lib_msg_queuegrouptrack_callback) +
+				(sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+			res_lib_msg_queuegrouptrack_callback.header.id =
+				MESSAGE_RES_MSG_QUEUEGROUPTRACK_CALLBACK;
+			res_lib_msg_queuegrouptrack_callback.header.error = error;
+
+			memcpy (&res_lib_msg_queuegrouptrack_callback.group_name,
+				&group->group_name, sizeof (SaNameT));
+
+			res_lib_msg_queuegrouptrack_callback.buffer.numberOfItems = count;
+			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
+			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
+
+			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
+			iov[1].iov_base = buffer;
+			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
+
+			api->ipc_dispatch_iov_send (track->conn, iov, 2);
+		}
+	}
+
+	queue->change_flag = SA_MSG_QUEUE_GROUP_NO_CHANGE;
 
 	list_del (&queue->group_list);
 	list_init (&queue->group_list);
 
-	group->member_count -= 1;
-
 	if (group->member_count == 0) {
 		group->next_queue = NULL;
 	}
-
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t member_count = %u\n",
-		    (unsigned int)(group->member_count));
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_msg_queuegroupremove->source))
@@ -3009,16 +3175,6 @@ error_exit:
 			req_exec_msg_queuegroupremove->source.conn,
 			&res_lib_msg_queuegroupremove,
 			sizeof (struct res_lib_msg_queuegroupremove));
-
-		if (error == SA_AIS_OK) {
-			if (group->track_flags & SA_TRACK_CHANGES) {
-				/* !! */
-			}
-
-			if (group->track_flags & SA_TRACK_CHANGES_ONLY) {
-				/* !! */
-			}
-		}
 	}
 }
 
@@ -3070,35 +3226,16 @@ static void message_handler_req_exec_msg_queuegrouptrack (
 	const struct req_exec_msg_queuegrouptrack *req_exec_msg_queuegrouptrack =
 		message;
 	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
-	/* struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback; */
-	/* SaMsgQueueGroupNotificationT *notification = NULL; */
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrack\n");
-
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s\n",
-		    (char *)(req_exec_msg_queuegrouptrack->group_name.value));
 
 	group = msg_find_group (&group_list_head,
 		&req_exec_msg_queuegrouptrack->group_name);
 	if (group == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
-	}
-
-	if (req_exec_msg_queuegrouptrack->track_flags & SA_TRACK_CURRENT) {
-		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "\t SA_TRACK_CURRENT\n");
-	}
-
-	if (req_exec_msg_queuegrouptrack->track_flags & SA_TRACK_CHANGES) {
-		group->track_flags = req_exec_msg_queuegrouptrack->track_flags;
-	}
-
-	if (req_exec_msg_queuegrouptrack->track_flags & SA_TRACK_CHANGES_ONLY) {
-		group->track_flags = req_exec_msg_queuegrouptrack->track_flags;
 	}
 
 error_exit:
@@ -3129,18 +3266,12 @@ static void message_handler_req_exec_msg_queuegrouptrackstop (
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrackStop\n");
 
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s\n",
-		    (char *)(req_exec_msg_queuegrouptrackstop->group_name.value));
-
 	group = msg_find_group (&group_list_head,
 		&req_exec_msg_queuegrouptrackstop->group_name);
 	if (group == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
-
-	group->track_flags = 0;
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_msg_queuegrouptrackstop->source))
@@ -4265,7 +4396,6 @@ static void message_handler_req_exec_msg_sync_group (
 		&req_exec_msg_sync_group->group_name,
 		sizeof (SaNameT));
 
-	group->track_flags = req_exec_msg_sync_group->track_flags;
 	group->policy = req_exec_msg_sync_group->policy;
 
 	list_init (&group->queue_head);
@@ -4628,31 +4758,109 @@ static void message_handler_req_lib_msg_queuegrouptrack (
 	void *conn,
 	const void *msg)
 {
-	const struct req_lib_msg_queuegrouptrack *req_lib_msg_queuegrouptrack = msg;
-	struct req_exec_msg_queuegrouptrack req_exec_msg_queuegrouptrack;
-	struct iovec iovec;
+	struct req_lib_msg_queuegrouptrack *req_lib_msg_queuegrouptrack =
+		(struct req_lib_msg_queuegrouptrack *)msg;
+	struct res_lib_msg_queuegrouptrack res_lib_msg_queuegrouptrack;
+	struct res_lib_msg_queuegrouptrack_callback res_lib_msg_queuegrouptrack_callback;
+	SaMsgQueueGroupNotificationT buffer[MAX_NUM_QUEUES_PER_GROUP];
+	SaAisErrorT error = SA_AIS_OK;
+	struct group_entry *group = NULL;
+	struct group_track *track = NULL;
+	struct iovec iov[2];
+	unsigned int count = 0;
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrack\n");
 
-	req_exec_msg_queuegrouptrack.header.size =
-		sizeof (struct req_exec_msg_queuegrouptrack);
-	req_exec_msg_queuegrouptrack.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACK);
+	group = msg_find_group (&group_list_head,
+		&req_lib_msg_queuegrouptrack->group_name);
+	if (group == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
 
-	api->ipc_source_set (&req_exec_msg_queuegrouptrack.source, conn);
+	if ((req_lib_msg_queuegrouptrack->track_flags & SA_TRACK_CURRENT) &&
+	    (req_lib_msg_queuegrouptrack->buffer_flag == 0))
+	{
+		count = msg_group_track_current (group, buffer);
 
-	memcpy (&req_exec_msg_queuegrouptrack.group_name,
-		&req_lib_msg_queuegrouptrack->group_name, sizeof (SaNameT));
+		res_lib_msg_queuegrouptrack_callback.header.size =
+			sizeof (struct res_lib_msg_queuegrouptrack_callback) +
+			(sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+		res_lib_msg_queuegrouptrack_callback.header.id =
+			MESSAGE_RES_MSG_QUEUEGROUPTRACK_CALLBACK;
+		res_lib_msg_queuegrouptrack_callback.header.error = error;
 
-	req_exec_msg_queuegrouptrack.track_flags =
-		req_lib_msg_queuegrouptrack->track_flags;
-	req_exec_msg_queuegrouptrack.buffer_flag =
-		req_lib_msg_queuegrouptrack->buffer_flag;
+		memcpy (&res_lib_msg_queuegrouptrack_callback.group_name,
+			&group->group_name, sizeof (SaNameT));
 
-	iovec.iov_base = (char *)&req_exec_msg_queuegrouptrack;
-	iovec.iov_len = sizeof (req_exec_msg_queuegrouptrack);
+		res_lib_msg_queuegrouptrack_callback.buffer.numberOfItems = count;
+		res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
+		res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
 
-	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+		iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+		iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
+		iov[1].iov_base = buffer;
+		iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
+
+		api->ipc_dispatch_iov_send (conn, iov, 2);
+	}
+
+	if ((req_lib_msg_queuegrouptrack->track_flags & SA_TRACK_CHANGES) ||
+	    (req_lib_msg_queuegrouptrack->track_flags & SA_TRACK_CHANGES_ONLY))
+	{
+		track = msg_find_group_track (conn, &group->group_name);
+		if (track == NULL) {
+			track = malloc (sizeof (struct group_track));
+			if (track == NULL) {
+				error = SA_AIS_ERR_NO_MEMORY;
+				goto error_exit;
+			}
+			memset (track, 0, sizeof (struct group_track));
+			memcpy (&track->group_name,
+				&group->group_name, sizeof (SaNameT));
+
+			track->conn = conn;
+
+			list_init (&track->list);
+			list_add_tail (&track->list, &track_list_head);
+		}
+		track->track_flags = req_lib_msg_queuegrouptrack->track_flags;
+	}
+
+error_exit:
+	if ((req_lib_msg_queuegrouptrack->track_flags & SA_TRACK_CURRENT) &&
+	    (req_lib_msg_queuegrouptrack->buffer_flag == 1) && (error == SA_AIS_OK))
+	{
+		count = msg_group_track_current (group, buffer);
+
+		res_lib_msg_queuegrouptrack.header.size =
+			sizeof (struct res_lib_msg_queuegrouptrack) +
+			(sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP);
+		res_lib_msg_queuegrouptrack.header.id =
+			MESSAGE_RES_MSG_QUEUEGROUPTRACK;
+		res_lib_msg_queuegrouptrack.header.error = error;
+
+		res_lib_msg_queuegrouptrack.buffer.numberOfItems = count;
+		res_lib_msg_queuegrouptrack.buffer.queueGroupPolicy = group->policy;
+
+		iov[0].iov_base = &res_lib_msg_queuegrouptrack;
+		iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack);
+		iov[1].iov_base = buffer;
+		iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
+
+		api->ipc_response_iov_send (conn, iov, 2);
+	}
+	else {
+		res_lib_msg_queuegrouptrack.header.size =
+			sizeof (struct res_lib_msg_queuegrouptrack);
+		res_lib_msg_queuegrouptrack.header.id =
+			MESSAGE_RES_MSG_QUEUEGROUPTRACK;
+		res_lib_msg_queuegrouptrack.header.error = error;
+
+		api->ipc_response_send (conn,
+			&res_lib_msg_queuegrouptrack,
+			sizeof (struct res_lib_msg_queuegrouptrack));
+	}
 }
 
 static void message_handler_req_lib_msg_queuegrouptrackstop (
@@ -4660,25 +4868,41 @@ static void message_handler_req_lib_msg_queuegrouptrackstop (
 	const void *msg)
 {
 	const struct req_lib_msg_queuegrouptrackstop *req_lib_msg_queuegrouptrackstop = msg;
-	struct req_exec_msg_queuegrouptrackstop req_exec_msg_queuegrouptrackstop;
-	struct iovec iovec;
+	struct res_lib_msg_queuegrouptrackstop res_lib_msg_queuegrouptrackstop;
+	struct group_entry *group = NULL;
+	struct group_track *track = NULL;
+	SaAisErrorT error = SA_AIS_OK;
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrackstopStop\n");
 
-	req_exec_msg_queuegrouptrackstop.header.size =
-		sizeof (struct req_exec_msg_queuegrouptrackstop);
-	req_exec_msg_queuegrouptrackstop.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEGROUPTRACKSTOP);
+	group = msg_find_group (&group_list_head,
+		&req_lib_msg_queuegrouptrackstop->group_name);
+	if (group == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
 
-	api->ipc_source_set (&req_exec_msg_queuegrouptrackstop.source, conn);
+	track = msg_find_group_track (conn, &group->group_name);
+	if (track == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
 
-	memcpy (&req_exec_msg_queuegrouptrackstop.group_name,
-		&req_lib_msg_queuegrouptrackstop->group_name, sizeof (SaNameT));
+	list_del (&track->list);
+	list_init (&track->list);
 
-	iovec.iov_base = (char *)&req_exec_msg_queuegrouptrackstop;
-	iovec.iov_len = sizeof (req_exec_msg_queuegrouptrackstop);
+	free (track);
 
-	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+error_exit:
+	res_lib_msg_queuegrouptrackstop.header.size =
+		sizeof (struct res_lib_msg_queuegrouptrackstop);
+	res_lib_msg_queuegrouptrackstop.header.id =
+		MESSAGE_RES_MSG_QUEUEGROUPTRACKSTOP;
+	res_lib_msg_queuegrouptrackstop.header.error = error;
+
+	api->ipc_response_send (conn,
+		&res_lib_msg_queuegrouptrackstop,
+		sizeof (struct res_lib_msg_queuegrouptrackstop));
 }
 
 static void message_handler_req_lib_msg_queuegroupnotificationfree (
