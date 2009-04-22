@@ -38,7 +38,7 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
 
 dist_doc_DATA		= LICENSE README.amf AUTHORS
 
-sysconf_DATA		= conf/openais.conf
+sysconf_DATA		= conf/openais.conf conf/amf.conf
 
 SUBDIRS	= include lib services test pkgconfig man
 # init

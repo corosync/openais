@@ -26,4 +26,6 @@ EXTRA_DIST 		= $(noinst_HEADERS)
 
 noinst_HEADERS          = $(OPENAIS_INTERNAL_H)
 
-nobase_include_HEADERS	= $(OPENAIS_H)
+openais_includedir	= ${includedir}/openais
+
+openais_include_HEADERS	= $(OPENAIS_H)

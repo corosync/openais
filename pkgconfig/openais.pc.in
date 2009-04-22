@@ -1,9 +1,0 @@
-prefix=@PREFIX@
-exec_prefix=${prefix}
-libdir=@LIBDIR@
-includedir=${prefix}/include
-
-Name: openais
-Version: @LIBVERSION@
-Description: openais
-Requires:

@@ -45,13 +45,17 @@ AMF_OBJECTS		= $(src:%.c=%.o)
 
 SOURCES			= $(SERVICE_LCRSO:%=%.c) $(src) openaisserviceenable.c openaisparser.c
 
-EXTRA_DIST		= $(SOURCES)
+EXTRA_DIST		= $(SOURCES) aisexec
 
 LCRSO			= $(SERVICE_LCRSO:%=service_%.lcrso) $(REGULAR_LCRSO:%=%.lcrso) service_amf.lcrso
 
 LCRSO_OBJS		= $(SOURCES:%.c=%.o)
 
 noinst_HEADERS		= clm.h amf.h
+
+sbin_SCRIPTS		= aisexec
+
+sbin_PROGRAMS		= openais-instantiate
 
 if BUILD_DARWIN
 service_amf.lcrso: $(AMF_OBJECTS)

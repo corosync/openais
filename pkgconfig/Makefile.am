@@ -36,8 +36,6 @@ pkgconf_LIBS = $(LIBS:%=lib%)
 
 target_LIBS = $(LIBS:%=lib%.pc)
 
-target_PACKAGE = openais.pc
-
 lib%:
 	cat $(srcdir)/libtemplate.pc.in | sed \
 		-e 's#@PREFIX@#$(exec_prefix)#g' \
@@ -47,21 +45,14 @@ lib%:
 	> $@.pc;
 	touch $@
 
-$(target_PACKAGE):
-	cat $(srcdir)/$@.in | sed \
-		-e 's#@PREFIX@#$(exec_prefix)#g' \
-		-e 's#@LIBDIR@#$(libdir)#g' \
-		-e 's#@LIBVERSION@#$(VERSION)#g'
-	> $@
-
-all-local: $(pkgconf_LIBS) $(target_PACKAGE)
+all-local: $(pkgconf_LIBS)
 
 install-exec-local:
 	install -d $(DESTDIR)/$(libdir)/pkgconfig
-	install -m 644 $(target_LIBS) $(target_PACKAGE) $(DESTDIR)/$(libdir)/pkgconfig
+	install -m 644 $(target_LIBS) $(DESTDIR)/$(libdir)/pkgconfig
 
 uninstall-local:
-	cd $(DESTDIR)/$(libdir)/pkgconfig && rm -f $(target_LIBS) $(target_PACKAGE)
+	cd $(DESTDIR)/$(libdir)/pkgconfig && rm -f $(target_LIBS)
 	rmdir $(DESTDIR)/$(libdir)/pkgconfig 2> /dev/null || :
 
 clean-local:
