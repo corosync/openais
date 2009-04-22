@@ -16,17 +16,5 @@ OPENAIS_TMR_A.01.01 {
 		saTmrClockTickGet;
 
 	local:
-		saHandleCreate;
-		saHandleDestroy;
-		saHandleInstanceGet;
-		saHandleInstancePut;
-		saPollRetry;
-		saRecvRetry;
-		saSendMsgReceiveReply;
-		saSendMsgRetry;
-		saSendReceiveReply;
-		saSendRetry;
-		saServiceConnect;
-		saVersionVerify;
 		clustTimeNow;
 };

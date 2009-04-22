@@ -16,17 +16,5 @@ OPENAIS_LCK_B.01.01 {
 		saLckResourceLockPurge;
 
 	local:
-		saHandleCreate;
-		saHandleDestroy;
-		saHandleInstanceGet;
-		saHandleInstancePut;
-		saPollRetry;
-		saRecvRetry;
-		saSendMsgReceiveReply;
-		saSendMsgRetry;
-		saSendReceiveReply;
-		saSendRetry;
-		saServiceConnect;
-		saVersionVerify;
 		clustTimeNow;
 };

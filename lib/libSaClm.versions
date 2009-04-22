@@ -12,17 +12,5 @@ OPENAIS_CLM_B.01.01 {
 		saClmClusterNodeGetAsync;
 
 	local:
-		saHandleCreate;
-		saHandleDestroy;
-		saHandleInstanceGet;
-		saHandleInstancePut;
-		saPollRetry;
-		saRecvRetry;
-		saSendMsgReceiveReply;
-		saSendMsgRetry;
-		saSendReceiveReply;
-		saSendRetry;
-		saServiceConnect;
-		saVersionVerify;
 		clustTimeNow;
 };

@@ -26,17 +26,5 @@ OPENAIS_CKPT_B.01.01 {
 		saCkptCheckpointSynchronizeAsync;
 		
 	local:
-		saHandleCreate;
-		saHandleDestroy;
-		saHandleInstanceGet;
-		saHandleInstancePut;
-		saPollRetry;
-		saRecvRetry;
-		saSendMsgReceiveReply;
-		saSendMsgRetry;
-		saSendReceiveReply;
-		saSendRetry;
-		saServiceConnect;
-		saVersionVerify;
 		clustTimeNow;
 };

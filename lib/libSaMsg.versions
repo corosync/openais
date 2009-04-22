@@ -19,23 +19,10 @@ OPENAIS_MSG_B.01.01 {
 		saMsgQueueGroupTrackStop;
 		saMsgMessageSend;
 		saMsgMessageSendAsync;
-		saMsgMessageSendAsync;
 		saMsgMessageGet;
 		saMsgMessageCancel;
 		saMsgMessageReply;
 		saMsgMessageReplyAsync;
 	local:
-		saHandleCreate;
-		saHandleDestroy;
-		saHandleInstanceGet;
-		saHandleInstancePut;
-		saPollRetry;
-		saRecvRetry;
-		saSendMsgReceiveReply;
-		saSendMsgRetry;
-		saSendReceiveReply;
-		saSendRetry;
-		saServiceConnect;
-		saVersionVerify;
 		clustTimeNow;
 };
