@@ -37,7 +37,6 @@
 
 #include "saAis.h"
 #include "saLck.h"
-#include <corosync/ipc_gen.h>
 #include <corosync/swab.h>
 
 enum req_lib_lck_resource_types {
@@ -64,7 +63,7 @@ enum res_lib_lck_resource_types {
 };
 
 struct req_lib_lck_resourceopen {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaInvocationT invocation;
 	mar_name_t lockResourceName;
 	SaLckResourceOpenFlagsT resourceOpenFlags;
@@ -74,30 +73,30 @@ struct req_lib_lck_resourceopen {
 };
 
 struct res_lib_lck_resourceopen {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaLckResourceHandleT resourceHandle;
 	mar_message_source_t source;
 };
 
 struct res_lib_lck_resourceopenasync {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaLckResourceHandleT resourceHandle;
 	mar_message_source_t source;
 };
 
 struct req_lib_lck_resourceclose {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_name_t lockResourceName;
 	SaLckResourceHandleT resourceHandle;
 };
 
 struct res_lib_lck_resourceclose {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_lck_resourcelock {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_name_t lockResourceName;
 	SaInvocationT invocation;
 	SaLckLockModeT lockMode;
@@ -113,7 +112,7 @@ struct req_lib_lck_resourcelock {
 static inline void swab_req_lib_lck_resourcelock (
 	struct req_lib_lck_resourcelock *to_swab)
 {
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_name_t (&to_swab->lockResourceName);
 	to_swab->invocation = swab64 (to_swab->invocation);
 	to_swab->lockMode = swab64 (to_swab->lockMode);
@@ -127,13 +126,13 @@ static inline void swab_req_lib_lck_resourcelock (
 }
 
 struct res_lib_lck_resourcelock {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaLckLockStatusT lockStatus;
 	void *resource_lock;
 };
 
 struct res_lib_lck_resourcelockasync {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaLckLockStatusT lockStatus;
 	SaLckLockIdT lockId;
 	void *resource_lock;
@@ -142,7 +141,7 @@ struct res_lib_lck_resourcelockasync {
 };
 
 struct req_lib_lck_resourceunlock {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_name_t lockResourceName;
 	SaLckLockIdT lockId;
 	SaInvocationT invocation;
@@ -152,33 +151,33 @@ struct req_lib_lck_resourceunlock {
 };
 
 struct res_lib_lck_resourceunlock {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct res_lib_lck_resourceunlockasync {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaLckLockIdT lockId;
 };
 
 struct req_lib_lck_lockpurge {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_name_t lockResourceName;
 };
 
 static inline void swab_req_lib_lck_lockpurge (
 	struct req_lib_lck_lockpurge *to_swab)
 {
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_name_t (&to_swab->lockResourceName);
 }
 
 struct res_lib_lck_lockpurge {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct res_lib_lck_lockwaitercallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaLckWaiterSignalT waiter_signal;
 	SaLckLockIdT lock_id;
 	SaLckLockModeT mode_held;

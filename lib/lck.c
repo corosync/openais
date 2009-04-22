@@ -48,10 +48,13 @@
 #include <sys/un.h>
 
 #include <saAis.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
+#include <corosync/mar_gen.h>
 #include <corosync/list.h>
 #include <saLck.h>
-#include <corosync/ipc_gen.h>
 #include "ipc_lck.h"
 #include "mar_sa.h"
 
@@ -239,7 +242,7 @@ saLckInitialize (
 	}
 
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		LCK_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
@@ -317,7 +320,7 @@ saLckDispatch (
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
 	int cont = 1; /* always continue do loop except when set to 0 */
-	mar_res_header_t *dispatch_data;
+	coroipc_response_header_t *dispatch_data;
 	struct res_lib_lck_lockwaitercallback *res_lib_lck_lockwaitercallback;
 	struct res_lib_lck_resourceopenasync *res_lib_lck_resourceopenasync = NULL;
 	struct res_lib_lck_resourcelockasync *res_lib_lck_resourcelockasync = NULL;
@@ -833,7 +836,7 @@ saLckResourceLock (
 	}
 
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		LCK_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
@@ -932,7 +935,7 @@ saLckResourceLockAsync (
 	}
 
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		LCK_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,

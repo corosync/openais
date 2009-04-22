@@ -37,7 +37,6 @@
 
 #include "saAis.h"
 #include "saCkpt.h"
-#include <corosync/ipc_gen.h>
 #include <corosync/hdb.h>
 #include "mar_ckpt.h"
 
@@ -83,7 +82,7 @@ enum res_lib_ckpt_checkpoint_types {
 };
 
 struct req_lib_ckpt_checkpointopen {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_ckpt_checkpoint_creation_attributes_t checkpoint_creation_attributes __attribute__((aligned(8)));
 	int checkpoint_creation_attributes_set __attribute__((aligned(8)));
@@ -96,71 +95,71 @@ struct req_lib_ckpt_checkpointopen {
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointopen {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointopenasync {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_ckpt_checkpoint_handle_t checkpoint_handle __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_checkpointclose {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointclose {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_checkpointunlink {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointunlink {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_checkpointretentiondurationset {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_time_t retention_duration __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointretentiondurationset {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_activereplicaset {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_activereplicaset {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_checkpointstatusget {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointstatusget {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_ckpt_checkpoint_descriptor_t checkpoint_descriptor __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectioncreate {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t id_len __attribute__((aligned(8)));
 	mar_time_t expiration_time __attribute__((aligned(8)));
@@ -169,22 +168,22 @@ struct req_lib_ckpt_sectioncreate {
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectioncreate {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectiondelete {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 	mar_uint32_t id_len __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectiondelete {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectionexpirationtimeset {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t id_len __attribute__((aligned(8)));
 	mar_time_t expiration_time __attribute__((aligned(8)));
@@ -192,11 +191,11 @@ struct req_lib_ckpt_sectionexpirationtimeset {
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectionexpirationtimeset {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectioniterationinitialize {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 	mar_ckpt_sections_chosen_t sections_chosen __attribute__((aligned(8)));
@@ -204,32 +203,32 @@ struct req_lib_ckpt_sectioniterationinitialize {
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectioniterationinitialize {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	hdb_handle_t iteration_handle __attribute__((aligned(8)));
 	mar_size_t max_section_id_size;
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectioniterationfinalize {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	hdb_handle_t iteration_handle __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectioniterationfinalize {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectioniterationnext {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	hdb_handle_t iteration_handle __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectioniterationnext {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_ckpt_section_descriptor_t section_descriptor __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectionwrite {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 	mar_uint32_t id_len __attribute__((aligned(8)));
@@ -238,11 +237,11 @@ struct req_lib_ckpt_sectionwrite {
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectionwrite {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectionoverwrite {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 	mar_uint32_t id_len __attribute__((aligned(8)));
@@ -250,11 +249,11 @@ struct req_lib_ckpt_sectionoverwrite {
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectionoverwrite {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_sectionread {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 	mar_uint32_t id_len __attribute__((aligned(8)));
@@ -263,29 +262,29 @@ struct req_lib_ckpt_sectionread {
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_sectionread {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_size_t data_read __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_checkpointsynchronize {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointsynchronize {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_ckpt_checkpointsynchronizeasync {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_ckpt_checkpointsynchronizeasync {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 

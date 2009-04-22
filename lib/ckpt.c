@@ -47,10 +47,12 @@
 #include <sys/select.h>
 #include <sys/un.h>
 
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include "../include/saAis.h"
 #include <corosync/mar_gen.h>
-#include <corosync/ipc_gen.h>
 #include <corosync/list.h>
 #include "../include/saCkpt.h"
 #include "../include/ipc_ckpt.h"
@@ -260,7 +262,7 @@ saCkptInitialize (
 	}
 
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		CKPT_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
@@ -328,7 +330,7 @@ saCkptDispatch (
 	int dispatch_avail;
 	struct ckptInstance *ckptInstance;
 	int cont = 1; /* always continue do loop except when set to 0 */
-	mar_res_header_t *dispatch_data;
+	coroipc_response_header_t *dispatch_data;
 	struct res_lib_ckpt_checkpointopenasync *res_lib_ckpt_checkpointopenasync;
 	struct res_lib_ckpt_checkpointsynchronizeasync *res_lib_ckpt_checkpointsynchronizeasync;
 	struct ckptCheckpointInstance *ckptCheckpointInstance;

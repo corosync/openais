@@ -41,7 +41,10 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/list.h>
 #include "ipc_evt.h"
 #include "mar_sa.h"
@@ -361,7 +364,7 @@ saEvtInitialize(
 	 * Set up communication with the event server
 	 */
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		EVT_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
@@ -574,7 +577,7 @@ saEvtDispatch(
 	struct event_instance *evti;
 	SaEvtEventHandleT event_handle;
 	SaEvtCallbacksT callbacks;
-	mar_res_header_t *dispatch_data;
+	coroipc_response_header_t *dispatch_data;
 	int cont = 1; /* always continue do loop except when set to 0 */
 	struct lib_event_data *evt = 0;
 

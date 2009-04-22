@@ -48,7 +48,10 @@
 #include <signal.h>
 #include <arpa/inet.h>
 
-#include <corosync/ipc_gen.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/mar_gen.h>
 #include <corosync/list.h>
 #include <corosync/lcr/lcr_comp.h>
@@ -419,7 +422,7 @@ __attribute__ ((constructor)) static void register_this_component (void) {
  * All data types used for executive messages
  */
 struct req_exec_lck_resourceopen {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_message_source_t source;
 	mar_name_t resource_name;
 	SaLckResourceHandleT resource_handle;
@@ -435,7 +438,7 @@ static void exec_lck_resourceopen_endian_convert (void *msg)
 	struct req_exec_lck_resourceopen *to_swab =
 		(struct req_exec_lck_resourceopen *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->resource_name);
 	to_swab->resource_handle = swab64 (to_swab->resource_handle);
@@ -447,7 +450,7 @@ static void exec_lck_resourceopen_endian_convert (void *msg)
 }
 
 struct req_exec_lck_resourceclose {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_message_source_t source;
 	mar_name_t lockResourceName;
 	SaLckResourceHandleT resource_handle;
@@ -458,14 +461,14 @@ static void exec_lck_resourceclose_endian_convert (void *msg)
 	struct req_exec_lck_resourceclose *to_swab =
 		(struct req_exec_lck_resourceclose *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->lockResourceName);
 	to_swab->resource_handle = swab64 (to_swab->resource_handle);
 }
 
 struct req_exec_lck_resourcelock {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaLckResourceHandleT resource_handle;
 	SaInvocationT invocation;
 	int async_call;
@@ -479,7 +482,7 @@ static void exec_lck_resourcelock_endian_convert (void *msg)
 	struct req_exec_lck_resourcelock *to_swab =
 		(struct req_exec_lck_resourcelock *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	to_swab->resource_handle = swab64 (to_swab->resource_handle);
 	to_swab->invocation = swab64 (to_swab->invocation);
 	to_swab->async_call = swab32 (to_swab->async_call);
@@ -489,7 +492,7 @@ static void exec_lck_resourcelock_endian_convert (void *msg)
 }
 
 struct req_exec_lck_resourceunlock {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_message_source_t source;
 	mar_name_t resource_name;
 	SaLckLockIdT lock_id;
@@ -503,7 +506,7 @@ static void exec_lck_resourceunlock_endian_convert (void *msg)
 	struct req_exec_lck_resourceunlock *to_swab =
 		(struct req_exec_lck_resourceunlock *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->resource_name);
 	to_swab->lock_id = swab64 (to_swab->lock_id);
@@ -513,7 +516,7 @@ static void exec_lck_resourceunlock_endian_convert (void *msg)
 }
 
 struct req_exec_lck_resourcelockorphan {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_message_source_t source;
 	mar_name_t resource_name;
 	SaLckLockIdT lock_id;
@@ -524,14 +527,14 @@ static void exec_lck_resourcelockorphan_endian_convert (void *msg)
 	struct req_exec_lck_resourcelockorphan *to_swab =
 		(struct req_exec_lck_resourcelockorphan *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->resource_name);
 	to_swab->lock_id = swab64 (to_swab->lock_id);
 }
 
 struct req_exec_lck_lockpurge {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	mar_message_source_t source;
 	struct req_lib_lck_lockpurge req_lib_lck_lockpurge;
 };
@@ -541,13 +544,13 @@ static void exec_lck_lockpurge_endian_convert (void *msg)
 	struct req_exec_lck_lockpurge *to_swab =
 		(struct req_exec_lck_lockpurge *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_req_lib_lck_lockpurge (&to_swab->req_lib_lck_lockpurge);
 }
 
 struct req_exec_lck_sync_resource {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	struct memb_ring_id ring_id;
 	mar_name_t resource_name;
 };
@@ -557,13 +560,13 @@ static void exec_lck_sync_resource_endian_convert (void *msg)
 	struct req_exec_lck_sync_resource *to_swab =
 		(struct req_exec_lck_sync_resource *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	/* swab_mar_memb_ring_id_t (&to_swab->memb_ring_id); */
 	swab_mar_name_t (&to_swab->resource_name);
 }
 
 struct req_exec_lck_sync_resource_lock {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	struct memb_ring_id ring_id;
 	mar_name_t resource_name;
 	SaLckLockIdT lock_id;
@@ -579,7 +582,7 @@ static void exec_lck_sync_resource_lock_endian_convert (void *msg)
 	struct req_exec_lck_sync_resource_lock *to_swab =
 		(struct req_exec_lck_sync_resource_lock *)msg;
 
-	swab_mar_req_header_t (&to_swab->header);
+	swab_coroipc_request_header_t (&to_swab->header);
 	/* swab_mar_memb_ring_id_t (&to_swab->memb_ring_id); */
 	swab_mar_name_t (&to_swab->resource_name);
 	to_swab->lock_id = swab64 (to_swab->lock_id);
@@ -591,7 +594,7 @@ static void exec_lck_sync_resource_lock_endian_convert (void *msg)
 }
 
 struct req_exec_lck_sync_resource_refcount {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	struct memb_ring_id ring_id __attribute__((aligned(8)));
 	mar_name_t resource_name __attribute__((aligned(8)));
 	mar_refcount_set_t refcount_set[PROCESSOR_COUNT_MAX] __attribute__((aligned(8)));

@@ -57,7 +57,10 @@
 #include <regex.h>
 #include <netinet/in.h>
 
-#include <corosync/ipc_gen.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/mar_gen.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/list.h>
@@ -77,7 +80,7 @@ LOGSYS_DECLARE_SUBSYS ("AMF");
 extern char *strstr_rs (const char *haystack, const char *needle);
 
 struct req_exec_amf_msg {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 };
 
 static const char *presence_state_text[] = {

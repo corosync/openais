@@ -49,7 +49,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <corosync/ipc_gen.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/mar_gen.h>
 #include <corosync/hdb.h>
 #include <corosync/swab.h>
@@ -331,7 +334,7 @@ struct open_chan_req {
  * u:			union of operation options.
  */
 struct req_evt_chan_command {
-	mar_req_header_t	chc_head __attribute__((aligned(8)));
+	coroipc_request_header_t	chc_head __attribute__((aligned(8)));
 	mar_uint32_t		chc_op __attribute__((aligned(8)));
 	union {
 		struct open_chan_req		chc_chan __attribute__((aligned(8)));

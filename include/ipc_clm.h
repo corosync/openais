@@ -35,7 +35,6 @@
 #define IPC_CLM_H_DEFINED
 
 #include <netinet/in.h>
-#include <corosync/ipc_gen.h>
 #include "saAis.h"
 #include "saClm.h"
 #include "mar_clm.h"
@@ -57,53 +56,53 @@ enum res_clm_types {
 };
 
 struct req_lib_clm_clustertrack {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	unsigned char track_flags __attribute__((aligned(8)));
 	int return_in_callback __attribute__((aligned(8)));
 };
 
 struct res_lib_clm_clustertrack {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	unsigned long long view __attribute__((aligned(8)));
 	unsigned int number_of_items __attribute__((aligned(8)));
 	mar_clm_cluster_notification_t notification[PROCESSOR_COUNT_MAX] __attribute__((aligned(8)));
 };
 
 struct req_lib_clm_trackstop {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	unsigned long long data_read __attribute__((aligned(8)));
 	SaAisErrorT error __attribute__((aligned(8)));
 };
 
 struct res_lib_clm_trackstop {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 };
 
 struct req_lib_clm_nodeget {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	unsigned long long invocation __attribute__((aligned(8)));
 	unsigned int node_id __attribute__((aligned(8)));
 };
 
 struct res_clm_nodeget {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	unsigned long long invocation __attribute__((aligned(8)));
 	mar_clm_cluster_node_t cluster_node __attribute__((aligned(8)));
 	int valid __attribute__((aligned(8)));
 };
 
 struct req_lib_clm_nodegetasync {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	unsigned long long invocation __attribute__((aligned(8)));
 	unsigned int node_id __attribute__((aligned(8)));
 };
 
 struct res_clm_nodegetasync {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 };
 
 struct res_clm_nodegetcallback {
-	mar_res_header_t header __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 	SaInvocationT invocation __attribute__((aligned(8)));
 	mar_clm_cluster_node_t cluster_node __attribute__((aligned(8)));
 };

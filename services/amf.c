@@ -140,7 +140,10 @@
 #include <netdb.h>
 #include <sys/stat.h>
 
-#include <corosync/ipc_gen.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/mar_gen.h>
 #include <corosync/hdb.h>
 #include <corosync/swab.h>
@@ -431,13 +434,13 @@ __attribute__ ((constructor)) static void register_this_component (void)
 }
 
 struct req_exec_amf_comp_register {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaNameT proxyCompName;
 };
 
 struct req_exec_amf_comp_error_report {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT reportingComponent;
 	SaNameT erroneousComponent;
 	SaTimeT errorDetectionTime;
@@ -446,7 +449,7 @@ struct req_exec_amf_comp_error_report {
 };
 
 struct req_exec_amf_response {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaUint32T interface;
 	SaNameT dn;
 	SaAmfHealthcheckKeyT healtcheck_key;
@@ -455,13 +458,13 @@ struct req_exec_amf_response {
 };
 
 struct req_exec_amf_sync_data {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaUint32T protocol_version;
 	SaUint32T object_type;
 };
 
 struct req_exec_amf_sync_request {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaUint32T protocol_version;
 	char hostname[HOST_NAME_MAX + 1];
 };
@@ -692,7 +695,7 @@ static void mcast_sync_request (char *hostname)
 	memcpy (msg.hostname, hostname, strlen (hostname) + 1);
 	msg.protocol_version = AMF_PROTOCOL_VERSION;
 	amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_SYNC_REQUEST,
-		&msg.protocol_version, sizeof (msg) - sizeof (mar_req_header_t));
+		&msg.protocol_version, sizeof (msg) - sizeof (coroipc_request_header_t));
 }
 
 /**

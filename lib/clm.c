@@ -48,13 +48,15 @@
 #include <sys/un.h>
 
 #define PROCESSOR_COUNT_MAX 384
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/swab.h>
-#include <corosync/ipc_gen.h>
 #include <corosync/mar_gen.h>
 #include <saAis.h>
 #include <saClm.h>
 #include <ipc_clm.h>
-#include <corosync/coroipcc.h>
 #include "../include/mar_clm.h"
 
 #include "util.h"
@@ -164,7 +166,7 @@ saClmInitialize (
 	}
 
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		CLM_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
@@ -270,7 +272,7 @@ saClmDispatch (
 	struct res_lib_clm_clustertrack *res_lib_clm_clustertrack;
 	struct res_clm_nodegetcallback *res_clm_nodegetcallback;
 	SaClmCallbacksT callbacks;
-	mar_res_header_t *dispatch_data;
+	coroipc_response_header_t *dispatch_data;
 	SaClmClusterNotificationBufferT notificationBuffer;
 	SaClmClusterNotificationT notification[PROCESSOR_COUNT_MAX];
 	SaClmClusterNodeT clusterNode;

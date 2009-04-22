@@ -54,7 +54,6 @@
 #include <assert.h>
 
 #include <saAis.h>
-#include <corosync/ipc_gen.h>
 #include "util.h"
 
 SaAisErrorT

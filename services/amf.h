@@ -43,7 +43,11 @@
 #include <regex.h>
 #include <netinet/in.h>
 
-#include <corosync/ipc_gen.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
+#include <corosync/mar_gen.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/list.h>
 #include "../include/saAis.h"
@@ -629,35 +633,35 @@ enum amf_message_req_types {
 };
 
 struct req_exec_amf_clc_cleanup_completed {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	int cleanup_exit_code;
 };
 
 struct req_exec_amf_healthcheck_tmo {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaAmfHealthcheckKeyT safHealthcheckKey;
 	SaAmfRecommendedRecoveryT recommendedRecovery;
 };
 
 struct req_exec_amf_comp_instantiate {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 };
 
 struct req_exec_amf_comp_instantiate_tmo {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 };
 
 struct req_exec_amf_comp_cleanup_tmo {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 };
 
 struct req_exec_amf_cluster_start_tmo {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT sourceNodeName;
 };
 

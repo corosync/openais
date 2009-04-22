@@ -47,7 +47,10 @@
 #include <signal.h>
 #include <arpa/inet.h>
 
-#include <corosync/ipc_gen.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/mar_gen.h>
 #include <corosync/hdb.h>
 #include <corosync/swab.h>
@@ -653,7 +656,7 @@ __attribute__ ((constructor)) static void register_this_component (void) {
  * All data types used for executive messages
  */
 struct req_exec_ckpt_checkpointopen {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -667,14 +670,14 @@ struct req_exec_ckpt_checkpointopen {
 };
 
 struct req_exec_ckpt_checkpointclose {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 };
 
 struct req_exec_ckpt_checkpointretentiondurationset {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -682,19 +685,19 @@ struct req_exec_ckpt_checkpointretentiondurationset {
 };
 
 struct req_exec_ckpt_checkpointretentiondurationexpire {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
 };
 
 struct req_exec_ckpt_checkpointunlink {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 };
 
 struct req_exec_ckpt_sectioncreate {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -704,7 +707,7 @@ struct req_exec_ckpt_sectioncreate {
 };
 
 struct req_exec_ckpt_sectiondelete {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -712,7 +715,7 @@ struct req_exec_ckpt_sectiondelete {
 };
 
 struct req_exec_ckpt_sectionexpirationtimeset {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -721,7 +724,7 @@ struct req_exec_ckpt_sectionexpirationtimeset {
 };
 
 struct req_exec_ckpt_sectionwrite {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -731,7 +734,7 @@ struct req_exec_ckpt_sectionwrite {
 };
 
 struct req_exec_ckpt_sectionoverwrite {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -740,7 +743,7 @@ struct req_exec_ckpt_sectionoverwrite {
 };
 
 struct req_exec_ckpt_sectionread {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -750,7 +753,7 @@ struct req_exec_ckpt_sectionread {
 };
 
 struct req_exec_ckpt_sync_checkpoint {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	struct memb_ring_id ring_id __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -761,7 +764,7 @@ struct req_exec_ckpt_sync_checkpoint {
 };
 
 struct req_exec_ckpt_sync_checkpoint_section {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	struct memb_ring_id ring_id __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -771,7 +774,7 @@ struct req_exec_ckpt_sync_checkpoint_section {
 };
 
 struct req_exec_ckpt_sync_checkpoint_refcount {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	struct memb_ring_id ring_id __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));
 	mar_uint32_t ckpt_id __attribute__((aligned(8)));
@@ -1062,7 +1065,7 @@ static void exec_ckpt_checkpointopen_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_checkpointopen *req_exec_ckpt_checkpointopen = (struct req_exec_ckpt_checkpointopen *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_checkpointopen->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_checkpointopen->header);
 	swab_mar_message_source_t (&req_exec_ckpt_checkpointopen->source);
 	swab_mar_name_t (&req_exec_ckpt_checkpointopen->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_checkpointopen->ckpt_id);
@@ -1079,7 +1082,7 @@ static void exec_ckpt_checkpointclose_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_checkpointclose *req_exec_ckpt_checkpointclose = (struct req_exec_ckpt_checkpointclose *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_checkpointclose->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_checkpointclose->header);
 	swab_mar_message_source_t (&req_exec_ckpt_checkpointclose->source);
 	swab_mar_name_t (&req_exec_ckpt_checkpointclose->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_checkpointclose->ckpt_id);
@@ -1088,7 +1091,7 @@ static void exec_ckpt_checkpointunlink_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_checkpointunlink *req_exec_ckpt_checkpointunlink = (struct req_exec_ckpt_checkpointunlink *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_checkpointunlink->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_checkpointunlink->header);
 	swab_mar_message_source_t (&req_exec_ckpt_checkpointunlink->source);
 	swab_mar_name_t (&req_exec_ckpt_checkpointunlink->checkpoint_name);
 }
@@ -1097,7 +1100,7 @@ static void exec_ckpt_checkpointretentiondurationset_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_checkpointretentiondurationset *req_exec_ckpt_checkpointretentiondurationset = (struct req_exec_ckpt_checkpointretentiondurationset *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_checkpointretentiondurationset->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_checkpointretentiondurationset->header);
 	swab_mar_message_source_t (&req_exec_ckpt_checkpointretentiondurationset->source);
 	swab_mar_name_t (&req_exec_ckpt_checkpointretentiondurationset->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_checkpointretentiondurationset->ckpt_id);
@@ -1108,7 +1111,7 @@ static void exec_ckpt_checkpointretentiondurationexpire_endian_convert (void *ms
 {
 	struct req_exec_ckpt_checkpointretentiondurationexpire *req_exec_ckpt_checkpointretentiondurationexpire = (struct req_exec_ckpt_checkpointretentiondurationexpire *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_checkpointretentiondurationexpire->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_checkpointretentiondurationexpire->header);
 	swab_mar_name_t (&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_checkpointretentiondurationexpire->ckpt_id);
 }
@@ -1117,7 +1120,7 @@ static void exec_ckpt_sectioncreate_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_sectioncreate *req_exec_ckpt_sectioncreate = (struct req_exec_ckpt_sectioncreate *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_sectioncreate->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sectioncreate->header);
 	swab_mar_message_source_t (&req_exec_ckpt_sectioncreate->source);
 	swab_mar_name_t (&req_exec_ckpt_sectioncreate->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sectioncreate->ckpt_id);
@@ -1130,7 +1133,7 @@ static void exec_ckpt_sectiondelete_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_sectiondelete *req_exec_ckpt_sectiondelete = (struct req_exec_ckpt_sectiondelete *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_sectiondelete->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sectiondelete->header);
 	swab_mar_message_source_t (&req_exec_ckpt_sectiondelete->source);
 	swab_mar_name_t (&req_exec_ckpt_sectiondelete->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sectiondelete->ckpt_id);
@@ -1141,7 +1144,7 @@ static void exec_ckpt_sectrionexpirationtimeset_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_sectionexpirationtimeset *req_exec_ckpt_sectionexpirationtimeset = (struct req_exec_ckpt_sectionexpirationtimeset *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_sectionexpirationtimeset->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sectionexpirationtimeset->header);
 	swab_mar_message_source_t (&req_exec_ckpt_sectionexpirationtimeset->source);
 	swab_mar_name_t (&req_exec_ckpt_sectionexpirationtimeset->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sectionexpirationtimeset->ckpt_id);
@@ -1153,7 +1156,7 @@ static void exec_ckpt_sectionwrite_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_sectionwrite *req_exec_ckpt_sectionwrite = (struct req_exec_ckpt_sectionwrite *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_sectionwrite->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sectionwrite->header);
 	swab_mar_message_source_t (&req_exec_ckpt_sectionwrite->source);
 	swab_mar_name_t (&req_exec_ckpt_sectionwrite->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sectionwrite->ckpt_id);
@@ -1165,7 +1168,7 @@ static void exec_ckpt_sectionoverwrite_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_sectionoverwrite *req_exec_ckpt_sectionoverwrite = (struct req_exec_ckpt_sectionoverwrite *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_sectionoverwrite->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sectionoverwrite->header);
 	swab_mar_message_source_t (&req_exec_ckpt_sectionoverwrite->source);
 	swab_mar_name_t (&req_exec_ckpt_sectionoverwrite->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sectionoverwrite->ckpt_id);
@@ -1177,7 +1180,7 @@ static void exec_ckpt_sectionread_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_sectionread *req_exec_ckpt_sectionread = (struct req_exec_ckpt_sectionread *)msg;
 
-	swab_mar_req_header_t (&req_exec_ckpt_sectionread->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sectionread->header);
 	swab_mar_message_source_t (&req_exec_ckpt_sectionread->source);
 	swab_mar_name_t (&req_exec_ckpt_sectionread->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sectionread->ckpt_id);
@@ -1202,7 +1205,7 @@ static void exec_ckpt_sync_state_endian_convert (void *msg)
 	struct req_exec_ckpt_sync_state *req_exec_ckpt_sync_state = (struct req_exec_ckpt_sync_state *)msg;
 	unsigned int i;
 
-	swab_mar_req_header_t (&req_exec_ckpt_sync_state->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sync_state->header);
 //	swab_mar_memb_ring_id_t (&req_exec_ckpt_sync_state->memb_ring_id);
 	swab_mar_name_t (&req_exec_ckpt_sync_state->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sync_state->ckpt_id);
@@ -1217,7 +1220,7 @@ static void exec_ckpt_sync_state_endian_convert (void *msg)
 static void exec_ckpt_sync_section_endian_convert (void *msg)
 {
 	struct req_exec_ckpt_sync_section *req_exec_ckpt_sync_section = (struct req_exec_ckpt_sync_section *)msg;
-	swab_mar_req_header_t (&req_exec_ckpt_sync_section->header);
+	swab_coroipc_request_header_t (&req_exec_ckpt_sync_section->header);
 //	swab_mar_memb_ring_id_t (&req_exec_ckpt_sync_section->memb_ring_id);
 	swab_mar_name_t (&req_exec_ckpt_sync_section->checkpoint_name);
 	swab_mar_uint32_t (&req_exec_ckpt_sync_section->ckpt_id);

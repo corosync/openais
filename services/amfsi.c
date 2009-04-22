@@ -115,7 +115,6 @@
 #include <stdlib.h>
 #include "amf.h"
 #include <netinet/in.h>
-#include <corosync/ipc_gen.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
 

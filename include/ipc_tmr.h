@@ -38,7 +38,6 @@
 #include "saAis.h"
 #include "saTmr.h"
 
-#include <corosync/ipc_gen.h>
 
 enum req_lib_tmr_timer_types {
 	MESSAGE_REQ_TMR_TIMERSTART = 0,
@@ -65,91 +64,91 @@ enum res_lib_tmr_timer_types {
 };
 
 struct req_lib_tmr_timerstart {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaTmrTimerAttributesT timer_attributes;
 	void *timer_data;
 };
 
 struct res_lib_tmr_timerstart {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTmrTimerIdT timer_id;
 	SaTimeT call_time;
 };
 
 struct req_lib_tmr_timerreschedule {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaTmrTimerIdT timer_id;
 	SaTmrTimerAttributesT timer_attributes;
 };
 
 struct res_lib_tmr_timerreschedule {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTimeT call_time;
 };
 
 struct req_lib_tmr_timercancel {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaTmrTimerIdT timer_id;
 };
 
 struct res_lib_tmr_timercancel {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	void *timer_data;
 };
 
 struct req_lib_tmr_periodictimerskip {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaTmrTimerIdT timer_id;
 };
 
 struct res_lib_tmr_periodictimerskip {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_tmr_timerremainingtimeget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaTmrTimerIdT timer_id;
 };
 
 struct res_lib_tmr_timerremainingtimeget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTimeT remaining_time;
 };
 
 struct req_lib_tmr_timerattributesget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaTmrTimerIdT timer_id;
 };
 
 struct res_lib_tmr_timerattributesget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTmrTimerAttributesT timer_attributes;
 };
 
 struct req_lib_tmr_timeget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 };
 
 struct res_lib_tmr_timeget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTimeT current_time;
 };
 
 struct req_lib_tmr_clocktickget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 };
 
 struct res_lib_tmr_clocktickget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTimeT clock_tick;
 };
 
 struct req_lib_tmr_timerexpiredcallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct res_lib_tmr_timerexpiredcallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTmrTimerIdT timer_id;
 	SaUint64T expiration_count;
 	void *timer_data;

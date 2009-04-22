@@ -145,11 +145,9 @@
 #include <assert.h>
 #include <netinet/in.h>
 
-#include <corosync/ipc_gen.h>
-#include <corosync/mar_gen.h>
+#include "amf.h"
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
-#include "amf.h"
 
 LOGSYS_DECLARE_SUBSYS ("AMF");
 

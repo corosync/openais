@@ -47,11 +47,13 @@
 #include <sys/select.h>
 #include <sys/un.h>
 
+#include <corosync/coroipcc.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/corodefs.h>
+
 #include <saAis.h>
 #include <saAmf.h>
-#include <corosync/ipc_gen.h>
 #include <ipc_amf.h>
-#include <corosync/coroipcc.h>
 #include "util.h"
 
 /*
@@ -123,7 +125,7 @@ saAmfInitialize (
 	}
 
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		CPG_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
@@ -187,7 +189,7 @@ saAmfDispatch (
 	struct res_lib_amf_csiremovecallback *res_lib_amf_csiremovecallback;
 	struct res_lib_amf_componentterminatecallback *res_lib_amf_componentterminatecallback;
 	SaAmfCallbacksT callbacks;
-	mar_res_header_t *dispatch_data;
+	coroipc_response_header_t *dispatch_data;
 
 	if (dispatchFlags != SA_DISPATCH_ONE &&
 		dispatchFlags != SA_DISPATCH_ALL &&

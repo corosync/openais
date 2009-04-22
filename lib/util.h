@@ -40,7 +40,6 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 
-#include <corosync/ipc_gen.h>
 
 struct saVersionDatabase {
 	int versionCount;

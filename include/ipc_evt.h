@@ -35,7 +35,6 @@
 #define IPC_EVT_H_DEFINED
 
 #include <netinet/in.h>
-#include <corosync/ipc_gen.h>
 #include "saAis.h"
 #include "saEvt.h"
 #include "saClm.h"
@@ -79,7 +78,7 @@ enum res_evt_types {
  *
  */
 struct req_evt_channel_open {
-	mar_req_header_t	ico_head __attribute__((aligned(8)));
+	coroipc_request_header_t	ico_head __attribute__((aligned(8)));
 	mar_uint8_t		ico_open_flag __attribute__((aligned(8)));
 	mar_name_t		ico_channel_name __attribute__((aligned(8)));
 	mar_evtchannelhandle_t	ico_c_handle __attribute__((aligned(8)));
@@ -103,7 +102,7 @@ struct req_evt_channel_open {
  */
 struct res_evt_channel_open {
 
-	mar_res_header_t	ico_head __attribute__((aligned(8)));
+	coroipc_response_header_t	ico_head __attribute__((aligned(8)));
 	mar_uint32_t		ico_channel_handle __attribute__((aligned(8)));/* svr chan handle */
 
 };
@@ -120,7 +119,7 @@ struct res_evt_channel_open {
  * 						to the particular open.
  */
 struct res_evt_open_chan_async {
-	mar_res_header_t	ica_head __attribute__((aligned(8)));
+	coroipc_response_header_t	ica_head __attribute__((aligned(8)));
 	mar_evtchannelhandle_t	ica_c_handle __attribute__((aligned(8)));
 	mar_uint32_t		ica_channel_handle __attribute__((aligned(8)));
 	mar_invocation_t	ica_invocation __attribute__((aligned(8)));
@@ -136,7 +135,7 @@ struct res_evt_open_chan_async {
  *
  */
 struct req_evt_channel_close {
-	mar_req_header_t	icc_head __attribute__((aligned(8)));
+	coroipc_request_header_t	icc_head __attribute__((aligned(8)));
 	mar_uint32_t		icc_channel_handle __attribute__((aligned(8)));
 };
 
@@ -147,7 +146,7 @@ struct req_evt_channel_close {
  *
  */
 struct res_evt_channel_close {
-	mar_res_header_t	icc_head __attribute__((aligned(8)));
+	coroipc_response_header_t	icc_head __attribute__((aligned(8)));
 };
 
 /*
@@ -158,7 +157,7 @@ struct res_evt_channel_close {
  *
  */
 struct req_evt_channel_unlink {
-	mar_req_header_t	iuc_head __attribute__((aligned(8)));
+	coroipc_request_header_t	iuc_head __attribute__((aligned(8)));
 	mar_name_t		iuc_channel_name __attribute__((aligned(8)));
 };
 
@@ -169,7 +168,7 @@ struct req_evt_channel_unlink {
  *
  */
 struct res_evt_channel_unlink {
-	mar_res_header_t	iuc_head __attribute__((aligned(8)));
+	coroipc_response_header_t	iuc_head __attribute__((aligned(8)));
 };
 
 /*
@@ -184,7 +183,7 @@ struct res_evt_channel_unlink {
  *
  */
 struct req_evt_event_subscribe {
-	mar_req_header_t	ics_head __attribute__((aligned(8)));
+	coroipc_request_header_t	ics_head __attribute__((aligned(8)));
 	mar_uint32_t		ics_channel_handle __attribute__((aligned(8)));
 	mar_evtsubscriptionid_t	ics_sub_id __attribute__((aligned(8)));
 	mar_uint32_t		ics_filter_size __attribute__((aligned(8)));
@@ -201,7 +200,7 @@ struct req_evt_event_subscribe {
  *
  */
 struct res_evt_event_subscribe {
-	mar_res_header_t	ics_head __attribute__((aligned(8)));
+	coroipc_response_header_t	ics_head __attribute__((aligned(8)));
 };
 
 /*
@@ -213,7 +212,7 @@ struct res_evt_event_subscribe {
  *
  */
 struct req_evt_event_unsubscribe {
-	mar_req_header_t	icu_head __attribute__((aligned(8)));
+	coroipc_request_header_t	icu_head __attribute__((aligned(8)));
 	mar_uint32_t		icu_channel_handle __attribute__((aligned(8)));
 	mar_evtsubscriptionid_t icu_sub_id __attribute__((aligned(8)));
 };
@@ -227,7 +226,7 @@ struct req_evt_event_unsubscribe {
  *
  */
 struct res_evt_event_unsubscribe {
-	mar_res_header_t	icu_head __attribute__((aligned(8)));
+	coroipc_response_header_t	icu_head __attribute__((aligned(8)));
 
 };
 
@@ -238,7 +237,7 @@ struct res_evt_event_unsubscribe {
  * evd_head:		Request Head
  */
 struct res_evt_event_data {
-	mar_res_header_t	evd_head __attribute__((aligned(8)));
+	coroipc_response_header_t	evd_head __attribute__((aligned(8)));
 };
 
 /*
@@ -268,7 +267,7 @@ struct res_evt_event_data {
  * led_body:			Pattern and user data
  */
 struct lib_event_data {
-	mar_res_header_t	led_head __attribute__((aligned(8)));
+	coroipc_response_header_t	led_head __attribute__((aligned(8)));
 	mar_uint32_t		led_nodeid __attribute__((aligned(8)));
 	mar_time_t		led_receive_time __attribute__((aligned(8)));
 	mar_uint32_t		led_svr_channel_handle __attribute__((aligned(8)));
@@ -298,7 +297,7 @@ struct lib_event_data {
  *
  */
 struct res_evt_event_publish {
-	mar_res_header_t	iep_head __attribute__((aligned(8)));
+	coroipc_response_header_t	iep_head __attribute__((aligned(8)));
 	mar_evteventid_t	iep_event_id __attribute__((aligned(8)));
 };
 
@@ -314,7 +313,7 @@ struct res_evt_event_publish {
  */
 struct req_evt_event_clear_retentiontime {
 
-	mar_req_header_t	iec_head __attribute__((aligned(8)));
+	coroipc_request_header_t	iec_head __attribute__((aligned(8)));
 	mar_evteventid_t	iec_event_id __attribute__((aligned(8)));
 	mar_uint32_t		iec_channel_handle __attribute__((aligned(8)));
 
@@ -328,7 +327,7 @@ struct req_evt_event_clear_retentiontime {
  *
  */
 struct res_evt_event_clear_retentiontime {
-	mar_res_header_t	iec_head __attribute__((aligned(8)));
+	coroipc_response_header_t	iec_head __attribute__((aligned(8)));
 };
 
 #endif  /* AIS_EVT_H_DEFINED */

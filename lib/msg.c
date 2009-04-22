@@ -52,9 +52,11 @@
 #include <saAis.h>
 #include <saMsg.h>
 
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/list.h>
-#include <corosync/ipc_gen.h>
 
 #include "../include/ipc_msg.h"
 #include "util.h"
@@ -154,7 +156,7 @@ saMsgInitialize (
 	}
 
 	error = coroipcc_service_connect (
-		IPC_SOCKET_NAME,
+		COROSYNC_SOCKET_NAME,
 		MSG_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
@@ -220,7 +222,7 @@ saMsgDispatch (
 	SaAisErrorT error = SA_AIS_OK;
 	struct msgInstance *msgInstance;
 	/* struct queueInstance *queueInstance; */
-	mar_res_header_t *dispatch_data;
+	coroipc_response_header_t *dispatch_data;
 	int dispatch_avail;
 	int timeout = 1;
 	int cont = 1;

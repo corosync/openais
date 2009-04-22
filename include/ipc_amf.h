@@ -35,7 +35,6 @@
 #define AIS_IPC_AMF_H_DEFINED
 
 #include <netinet/in.h>
-#include <corosync/ipc_gen.h>
 #include "saAis.h"
 #include "saAmf.h"
 
@@ -78,27 +77,27 @@ enum res_lib_amf_types {
 };
 
 struct req_lib_amf_componentregister {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaNameT proxyCompName;
 } __attribute__((packed));
 
 struct res_lib_amf_componentregister {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_componentunregister {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaNameT proxyCompName;
 };
 
 struct res_lib_amf_componentunregister {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_pmstart {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaUint64T processId;
 	SaInt32T descendentsTreeDepth;
@@ -107,11 +106,11 @@ struct req_lib_amf_pmstart {
 };
 
 struct res_lib_amf_pmstart {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_pmstop {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaAmfPmStopQualifierT stopQualifier;
 	SaUint64T processId;
@@ -119,11 +118,11 @@ struct req_lib_amf_pmstop {
 };
 
 struct res_lib_amf_pmstop {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_healthcheckstart {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaAmfHealthcheckKeyT healthcheckKey;
 	SaAmfHealthcheckInvocationT invocationType;
@@ -131,74 +130,74 @@ struct req_lib_amf_healthcheckstart {
 };
 
 struct res_lib_amf_healthcheckstart {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_healthcheckconfirm {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaAmfHealthcheckKeyT healthcheckKey;
 	SaAisErrorT healthcheckResult;
 };
 
 struct res_lib_amf_healthcheckconfirm {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_healthcheckstop {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaAmfHealthcheckKeyT healthcheckKey;
 };
 
 struct res_lib_amf_healthcheckstop {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_hastateget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 	SaNameT csiName;
 };
 
 struct res_lib_amf_hastateget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaAmfHAStateT haState;
 };
 
 struct req_lib_amf_csiquiescingcomplete {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaInvocationT invocation;
 	SaAisErrorT error;
 };
 
 struct res_lib_amf_csiquiescingcomplete {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_protectiongrouptrack {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT csiName;
 	SaUint8T trackFlags;
 	SaAmfProtectionGroupNotificationBufferT *notificationBufferAddress;
 };
 
 struct res_lib_amf_protectiongrouptrack {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 
 struct req_lib_amf_protectiongrouptrackstop {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT csiName;
 };
 
 struct res_lib_amf_protectiongrouptrackstop {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_componenterrorreport {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT reportingComponent;
 	SaNameT erroneousComponent;
 	SaTimeT errorDetectionTime;
@@ -207,29 +206,29 @@ struct req_lib_amf_componenterrorreport {
 };
 
 struct res_lib_amf_componenterrorreport {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_componenterrorclear {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT compName;
 };
 
 struct res_lib_amf_componenterrorclear {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_amf_response {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaInvocationT invocation;
 	SaAisErrorT error;
 };
 
 struct res_lib_amf_response {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 struct res_lib_amf_healthcheckcallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaNameT compName;
 	SaAmfHealthcheckKeyT key;
@@ -238,7 +237,7 @@ struct res_lib_amf_healthcheckcallback {
 #ifdef COMPILE_OUT
 
 struct res_lib_amf_componentterminatecallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaNameT compName;
 };
@@ -247,7 +246,7 @@ struct res_lib_amf_componentterminatecallback {
 #endif
 
 /* struct res_lib_amf_csisetcallback {        */
-/*         mar_res_header_t header;          */
+/*         coroipc_response_header_t header;          */
 /*         SaInvocationT invocation;          */
 /*         SaNameT compName;                  */
 /*         SaAmfHAStateT haState;             */
@@ -255,7 +254,7 @@ struct res_lib_amf_componentterminatecallback {
 /* };                                         */
 
 struct res_lib_amf_csisetcallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaNameT compName;
 	SaAmfHAStateT haState;
@@ -267,7 +266,7 @@ struct res_lib_amf_csisetcallback {
 };
 
 struct res_lib_amf_csiremovecallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaNameT compName;
 	SaNameT csiName;
@@ -275,7 +274,7 @@ struct res_lib_amf_csiremovecallback {
 };
 
 struct res_lib_amf_componentterminatecallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaNameT compName;
 };
@@ -283,7 +282,7 @@ struct res_lib_amf_componentterminatecallback {
 
 #ifdef COMPILE_OUT
 struct res_lib_amf_protectiongrouptrackcallback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaNameT csiName;
 	SaAmfProtectionGroupNotificationT *notificationBufferAddress;
 	SaUint32T numberOfItems;

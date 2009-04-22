@@ -59,7 +59,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <corosync/ipc_gen.h>
+#include <corosync/corotypes.h>
+#include <corosync/coroipc_types.h>
+#include <corosync/coroipcc.h>
+#include <corosync/corodefs.h>
 #include <corosync/mar_gen.h>
 #include <corosync/swab.h>
 #include <corosync/list.h>
@@ -282,7 +285,7 @@ __attribute__ ((constructor)) static void clm_comp_register (void) {
 }
 
 struct req_exec_clm_nodejoin {
-	mar_req_header_t header __attribute__((aligned(8)));
+	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_clm_cluster_node_t cluster_node __attribute__((aligned(8)));
 };
 
@@ -622,7 +625,7 @@ static void exec_clm_nodejoin_endian_convert (void *msg)
 {
 	struct req_exec_clm_nodejoin *node_join = msg;
 
-	swab_mar_req_header_t (&node_join->header);
+	swab_coroipc_request_header_t (&node_join->header);
 	swab_mar_clm_cluster_node_t (&node_join->cluster_node);
 }
 

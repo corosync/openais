@@ -38,7 +38,6 @@
 #include "saAis.h"
 #include "saMsg.h"
 
-#include <corosync/ipc_gen.h>
 
 enum req_lib_msg_queue_types {
 	MESSAGE_REQ_MSG_QUEUEOPEN = 0,
@@ -101,7 +100,7 @@ enum res_lib_msg_queue_types {
 };
 
 struct req_lib_msg_queueopen {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaMsgQueueHandleT queue_handle;
 	SaNameT queue_name;
 	SaUint8T create_attrs_flag;
@@ -111,12 +110,12 @@ struct req_lib_msg_queueopen {
 };
 
 struct res_lib_msg_queueopen {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaUint32T queue_id;
 };
 
 struct req_lib_msg_queueopenasync {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaMsgQueueHandleT queue_handle;
 	SaNameT queue_name;
 	SaUint8T create_attrs_flag;
@@ -126,263 +125,263 @@ struct req_lib_msg_queueopenasync {
 };
 
 struct res_lib_msg_queueopenasync {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaUint32T queue_id;
 };
 
 struct req_lib_msg_queueclose {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
 };
 
 struct res_lib_msg_queueclose {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuestatusget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 };
 
 struct res_lib_msg_queuestatusget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaMsgQueueStatusT queue_status;
 };
 
 struct req_lib_msg_queueretentiontimeset {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
 	SaTimeT retention_time;
 };
 
 struct res_lib_msg_queueretentiontimeset {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queueunlink {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 };
 
 struct res_lib_msg_queueunlink {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuegroupcreate {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT group_name;
 	SaMsgQueueGroupPolicyT policy;
 };
 
 struct res_lib_msg_queuegroupcreate {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuegroupinsert {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT group_name;
 	SaNameT queue_name;
 };
 
 struct res_lib_msg_queuegroupinsert {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuegroupremove {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT group_name;
 	SaNameT queue_name;
 };
 
 struct res_lib_msg_queuegroupremove {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuegroupdelete {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT group_name;
 };
 
 struct res_lib_msg_queuegroupdelete {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuegrouptrack {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT group_name;
 	SaUint8T track_flags;
 	SaUint8T buffer_flag;
 };
 
 struct res_lib_msg_queuegrouptrack {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaMsgQueueGroupNotificationBufferT buffer;
 };
 
 struct req_lib_msg_queuegrouptrackstop {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT group_name;
 };
 
 struct res_lib_msg_queuegrouptrackstop {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuegroupnotificationfree {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 };
 
 struct res_lib_msg_queuegroupnotificationfree {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_messagesend {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT destination;
 	SaTimeT timeout;
 	SaMsgMessageT message;
 };
 
 struct res_lib_msg_messagesend {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_messagesendasync {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT destination;
 	SaInvocationT invocation;
 	SaMsgMessageT message;
 };
 
 struct res_lib_msg_messagesendasync {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_messageget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
 	SaTimeT timeout;
 };
 
 struct res_lib_msg_messageget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaTimeT send_time;
 	SaMsgSenderIdT sender_id;
 	SaMsgMessageT message;
 };
 
 struct req_lib_msg_messagedatafree {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 };
 
 struct res_lib_msg_messagedatafree {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_messagecancel {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
 };
 
 struct res_lib_msg_messagecancel {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_messagesendreceive {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT destination;
 	SaTimeT timeout;
 	SaMsgMessageT message;
 };
 
 struct res_lib_msg_messagesendreceive {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_messagereply {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaMsgMessageT reply_message;
 	SaMsgSenderIdT sender_id;
 	SaTimeT timeout;
 };
 
 struct res_lib_msg_messagereply {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 }
 ;
 struct req_lib_msg_messagereplyasync {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaMsgMessageT reply_message;
 	SaMsgSenderIdT sender_id;
 	SaInvocationT invocation;
 };
 
 struct res_lib_msg_messagereplyasync {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuecapacitythresholdset {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
 };
 
 struct res_lib_msg_queuecapacitythresholdset {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_queuecapacitythresholdget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
 };
 
 struct res_lib_msg_queuecapacitythresholdget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_metadatasizeget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 };
 
 struct res_lib_msg_metadatasizeget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 };
 
 struct req_lib_msg_limitget {
-	mar_req_header_t header;
+	coroipc_request_header_t header;
 	SaMsgLimitIdT limit_id;
 };
 
 struct res_lib_msg_limitget {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaUint64T value;
 };
 
 struct res_lib_msg_queueopen_callback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaMsgQueueHandleT queue_handle;
 	SaInvocationT invocation;
 };
 
 struct res_lib_msg_queuegrouptrack_callback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaNameT group_name;
 	SaMsgQueueGroupNotificationBufferT buffer;
 	SaUint32T member_count;
 };
 
 struct res_lib_msg_messagedelivered_callback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaInvocationT invocation;
 };
 
 struct res_lib_msg_messagereceived_callback {
-	mar_res_header_t header;
+	coroipc_response_header_t header;
 	SaMsgQueueHandleT queue_handle;
 };
 
