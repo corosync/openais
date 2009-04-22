@@ -198,6 +198,14 @@ static SaCkptCallbacksT callbacks = {
 	0
 };
 
+static char *print_section_id (SaCkptSectionIdT *section_id)
+{
+	static char ret_buf[128];
+	memcpy (ret_buf, section_id->id, section_id->idLen);
+	ret_buf[section_id->idLen] = '\0';
+	return (ret_buf);
+}
+
 int main (void) {
 	SaCkptHandleT ckptHandle;
 	SaCkptCheckpointHandleT checkpointHandle2;
@@ -539,7 +547,7 @@ sleep (1);
 		}
 		if (error == SA_AIS_OK) {
 			printf ("Section '%s' expires %llx size %llu state %x update %llx\n",
-				sectionDescriptor.sectionId.id,
+				print_section_id (&sectionDescriptor.sectionId),
 				(unsigned long long)sectionDescriptor.expirationTime,
 				(unsigned long long)sectionDescriptor.sectionSize,
 				sectionDescriptor.sectionState,
