@@ -532,5 +532,3 @@ saAmfComponentErrorReport()			This function takes a parameter
 
 saAmfComponentErrorClear()			Is implemented in the library
 						but not in aisexec.
-
-

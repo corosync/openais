@@ -59,4 +59,3 @@ SaTimeT clustTimeNow(void);
 #define IPC_DISPATCH_SIZE	8192*128
 
 #endif /* AIS_UTIL_H_DEFINED */
-

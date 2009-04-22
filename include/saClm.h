@@ -151,5 +151,3 @@ saClmClusterNodeGetAsync (
 #endif
 
 #endif /* AIS_CLM_H_DEFINED */
-
-

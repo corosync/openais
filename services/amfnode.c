@@ -790,4 +790,3 @@ struct amf_node *amf_node_find_by_hostname (const char *hostname) {
 
 	return NULL;
 }
-

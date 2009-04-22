@@ -2404,4 +2404,3 @@ send_response:
 	api->ipc_response_send (conn, &res_lib, sizeof (res_lib));
 	return;
 }
-

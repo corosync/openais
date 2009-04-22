@@ -549,4 +549,3 @@ struct amf_application *amf_application_find (
 	}
 	return app;
 }
-

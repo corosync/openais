@@ -135,4 +135,3 @@ SaTimeT clustTimeNow(void)
 
 	return time_now;
 }
-

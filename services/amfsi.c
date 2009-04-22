@@ -1056,4 +1056,3 @@ void amf_si_comp_csi_removed (
 			csi_assignment->si_assignment);
 	}
 }
-

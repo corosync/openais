@@ -239,5 +239,3 @@ __attribute__ ((constructor)) static void aisparser_comp_register (void) {
         lcr_interfaces_set (&openais_aisparser_ver0[0], &aisparser_iface_ver0);
 	lcr_component_register (&aisparser_comp_ver0);
 }
-
-

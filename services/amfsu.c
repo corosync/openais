@@ -1794,4 +1794,3 @@ int amf_su_are_all_comps_in_su (struct amf_su *su,
 	}
 	return all_comps_in_su_are_set;
 }
-

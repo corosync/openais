@@ -2748,4 +2748,3 @@ int amf_comp_is_error_suspected (amf_comp_t *comp)
 {
 	return comp->error_suspected ? 1 : 0;
 }
-

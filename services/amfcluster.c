@@ -575,7 +575,3 @@ int amf_cluster_applications_assigned (struct amf_cluster *cluster)
 	}
 	return is_all_application_assigned;
 }
-
-
-
-

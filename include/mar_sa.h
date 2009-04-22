@@ -52,4 +52,3 @@ static inline void marshall_mar_name_t_to_SaNameT (
 }
 
 #endif /* AIS_MAR_SA_H_DEFINED */
-

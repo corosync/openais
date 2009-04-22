@@ -623,5 +623,3 @@ int main (int argc, char **argv)
 	fprintf(stderr, "%d: exiting...\n", (int)getpid());
 	exit (EXIT_SUCCESS);
 }
-
-

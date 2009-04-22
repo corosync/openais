@@ -1479,4 +1479,3 @@ void amf_call_function_asynchronous (async_func_t async_func, void *func_param)
 		0, func_param, async_func,
 		&async_func_timer_handle);
 }
-

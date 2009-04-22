@@ -124,5 +124,3 @@ __attribute__ ((constructor)) static void serviceenable_comp_register (void) {
         lcr_interfaces_set (&openais_serviceenable_ver0[0], &serviceenable_iface_ver0);
 	lcr_component_register (&serviceenable_comp_ver0);
 }
-
-
