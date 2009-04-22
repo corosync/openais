@@ -56,6 +56,7 @@
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
 #include <corosync/corodefs.h>
+#include <corosync/hdb.h>
 #include <corosync/list.h>
 
 #include "../include/ipc_msg.h"
@@ -85,9 +86,9 @@ struct queueInstance {
 void msgHandleInstanceDestructor (void *instance);
 void queueHandleInstanceDestructor (void *instance);
 
-DECLARE_SAHDB_DATABASE(msgHandleDatabase,msgHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(msgHandleDatabase,msgHandleInstanceDestructor);
 
-DECLARE_SAHDB_DATABASE(queueHandleDatabase,queueHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(queueHandleDatabase,queueHandleInstanceDestructor);
 
 static SaVersionT msgVersionsSupported[] = {
 	{ 'B', 1, 1 }
@@ -143,14 +144,14 @@ saMsgInitialize (
 		goto error_no_destroy;
 	}
 
-	error = saHandleCreate (&msgHandleDatabase,
-		sizeof (struct msgInstance), msgHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&msgHandleDatabase,
+		sizeof (struct msgInstance), msgHandle));
 	if (error != SA_AIS_OK) {
 		goto error_no_destroy;
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, *msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, *msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -176,14 +177,14 @@ saMsgInitialize (
 
 	pthread_mutex_init (&msgInstance->response_mutex, NULL);
 
-	saHandleInstancePut (&msgHandleDatabase, *msgHandle);
+	hdb_handle_put (&msgHandleDatabase, *msgHandle);
 
 	return (SA_AIS_OK);
 
 error_put_destroy:
-	saHandleInstancePut (&msgHandleDatabase, *msgHandle);
+	hdb_handle_put (&msgHandleDatabase, *msgHandle);
 error_destroy:
-	saHandleDestroy (&msgHandleDatabase, *msgHandle);
+	hdb_handle_destroy (&msgHandleDatabase, *msgHandle);
 error_no_destroy:
 	return (error);
 }
@@ -200,15 +201,15 @@ saMsgSelectionObjectGet (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
 	*selectionObject = coroipcc_fd_get (msgInstance->ipc_ctx);
 
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
 	return (SA_AIS_OK);
 }
@@ -239,8 +240,8 @@ saMsgDispatch (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -359,7 +360,7 @@ saMsgDispatch (
 
 	pthread_mutex_unlock (&msgInstance->dispatch_mutex);
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -371,8 +372,8 @@ saMsgFinalize (
 	struct msgInstance *msgInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -381,7 +382,7 @@ saMsgFinalize (
 
 	if (msgInstance->finalize) {
 		pthread_mutex_unlock (&msgInstance->response_mutex);
-		saHandleInstancePut (&msgHandleDatabase, msgHandle);
+		hdb_handle_put (&msgHandleDatabase, msgHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
@@ -393,7 +394,7 @@ saMsgFinalize (
 
 	error = coroipcc_service_disconnect (msgInstance->ipc_ctx); /* ? */
 
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
 	return (SA_AIS_OK);
 }
@@ -418,8 +419,8 @@ saMsgQueueOpen (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpen\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -431,14 +432,14 @@ saMsgQueueOpen (
 		goto error_exit;
 	}
 
-	error = saHandleCreate (&queueHandleDatabase,
-		sizeof (struct queueInstance), queueHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&queueHandleDatabase,
+		sizeof (struct queueInstance), queueHandle));
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
-	error = saHandleInstanceGet (&queueHandleDatabase,
-		*queueHandle, (void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase,
+		*queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -497,8 +498,8 @@ saMsgQueueOpen (
 
 	queueInstance->queue_id = res_lib_msg_queueopen.queue_id;
 
-	saHandleInstancePut (&queueHandleDatabase, *queueHandle);
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&queueHandleDatabase, *queueHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
 	/* DEBUG */
 	printf ("[DEBUG]:\t queue_id = %u\n",
@@ -507,11 +508,11 @@ saMsgQueueOpen (
 	return (error);
 
 error_put_destroy:
-	saHandleInstancePut (&queueHandleDatabase, *queueHandle);
+	hdb_handle_put (&queueHandleDatabase, *queueHandle);
 error_destroy:
-	saHandleDestroy (&queueHandleDatabase, *queueHandle);
+	hdb_handle_destroy (&queueHandleDatabase, *queueHandle);
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -536,8 +537,8 @@ saMsgQueueOpenAsync (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpenAsync\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -553,14 +554,14 @@ saMsgQueueOpenAsync (
 		goto error_put;
 	}
 
-	error = saHandleCreate (&queueHandleDatabase,
-		sizeof (struct queueInstance), &queueHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&queueHandleDatabase,
+		sizeof (struct queueInstance), &queueHandle));
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
-	error = saHandleInstanceGet (&queueHandleDatabase,
-		queueHandle, (void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase,
+		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -619,8 +620,8 @@ saMsgQueueOpenAsync (
 
 	queueInstance->queue_id = res_lib_msg_queueopenasync.queue_id;
 
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
 	/* DEBUG */
 	printf ("[DEBUG]:\t queue_id = %u\n",
@@ -629,11 +630,11 @@ saMsgQueueOpenAsync (
 	return (error);
 
 error_put_destroy:
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_destroy:
-	saHandleDestroy (&queueHandleDatabase, queueHandle);
+	hdb_handle_destroy (&queueHandleDatabase, queueHandle);
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -652,8 +653,8 @@ saMsgQueueClose (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueClose\n");
 
-	error = saHandleInstanceGet (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
+		(void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -694,7 +695,7 @@ saMsgQueueClose (
 	}
 
 error_put:
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
 }
@@ -715,8 +716,8 @@ saMsgQueueStatusGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueStatusGet\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -758,7 +759,7 @@ saMsgQueueStatusGet (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -778,8 +779,8 @@ saMsgQueueRetentionTimeSet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueRetentionTimeSet\n");
 
-	error = saHandleInstanceGet (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
+		(void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -822,7 +823,7 @@ saMsgQueueRetentionTimeSet (
 	}
 
 error_put:
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
 }
@@ -842,8 +843,8 @@ saMsgQueueUnlink (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueUnlink\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -880,7 +881,7 @@ saMsgQueueUnlink (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -901,8 +902,8 @@ saMsgQueueGroupCreate (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupCreate\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -941,7 +942,7 @@ saMsgQueueGroupCreate (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -962,8 +963,8 @@ saMsgQueueGroupInsert (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupInsert\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1004,7 +1005,7 @@ saMsgQueueGroupInsert (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1025,8 +1026,8 @@ saMsgQueueGroupRemove (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupRemove\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1067,7 +1068,7 @@ saMsgQueueGroupRemove (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1087,8 +1088,8 @@ saMsgQueueGroupDelete (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupDelete\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1125,7 +1126,7 @@ saMsgQueueGroupDelete (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1172,8 +1173,8 @@ saMsgQueueGroupTrack (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1245,7 +1246,7 @@ saMsgQueueGroupTrack (
 error_unlock:
 	pthread_mutex_unlock (&msgInstance->response_mutex);
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1265,8 +1266,8 @@ saMsgQueueGroupTrackStop (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupTrackStop\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1303,7 +1304,7 @@ saMsgQueueGroupTrackStop (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1323,8 +1324,8 @@ saMsgQueueGroupNotificationFree (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupNotificationfree\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1354,7 +1355,7 @@ saMsgQueueGroupNotificationFree (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1392,8 +1393,8 @@ saMsgMessageSend (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1442,7 +1443,7 @@ saMsgMessageSend (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1475,8 +1476,8 @@ saMsgMessageSendAsync (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1532,7 +1533,7 @@ saMsgMessageSendAsync (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1557,8 +1558,8 @@ saMsgMessageGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageGet\n");
 
-	error = saHandleInstanceGet (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
+		(void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1628,7 +1629,7 @@ saMsgMessageGet (
 
 error_unlock:
 	pthread_mutex_unlock (&queueInstance->response_mutex);
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
 }
@@ -1644,8 +1645,8 @@ saMsgMessageDataFree (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageDataFree\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1675,8 +1676,8 @@ saMsgMessageCancel (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageCancel\n");
 
-	error = saHandleInstanceGet (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
+		(void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1715,7 +1716,7 @@ saMsgMessageCancel (
 	}
 
 error_put:
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
 }
@@ -1739,8 +1740,8 @@ saMsgMessageSendReceive (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageSendReceive\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1789,7 +1790,7 @@ saMsgMessageSendReceive (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1816,8 +1817,8 @@ saMsgMessageReply (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1864,7 +1865,7 @@ saMsgMessageReply (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1892,8 +1893,8 @@ saMsgMessageReplyAsync (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1947,7 +1948,7 @@ saMsgMessageReplyAsync (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -1967,8 +1968,8 @@ saMsgQueueCapacityThresholdSet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueCapacityThresholdSet\n");
 
-	error = saHandleInstanceGet (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
+		(void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -2009,7 +2010,7 @@ saMsgQueueCapacityThresholdSet (
 	}
 
 error_put:
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
 }
@@ -2029,8 +2030,8 @@ saMsgQueueCapacityThresholdGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueCapacityThresholdGet\n");
 
-	error = saHandleInstanceGet (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
+		(void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -2071,7 +2072,7 @@ saMsgQueueCapacityThresholdGet (
 	}
 
 error_put:
-	saHandleInstancePut (&queueHandleDatabase, queueHandle);
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
 }
@@ -2091,8 +2092,8 @@ saMsgMetadataSizeGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMetadataSizeGet\n");
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -2122,7 +2123,7 @@ saMsgMetadataSizeGet (
 	}
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }
@@ -2148,8 +2149,8 @@ saMsgLimitGet (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
+		(void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -2182,7 +2183,7 @@ saMsgLimitGet (
 	(*limitValue).uint64Value = res_lib_msg_limitget.value;
 
 error_put:
-	saHandleInstancePut (&msgHandleDatabase, msgHandle);
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
 }

@@ -50,10 +50,12 @@
 #include <corosync/coroipcc.h>
 #include <corosync/coroipc_types.h>
 #include <corosync/corodefs.h>
+#include <corosync/hdb.h>
 
 #include <saAis.h>
 #include <saAmf.h>
 #include <ipc_amf.h>
+
 #include "util.h"
 
 /*
@@ -74,7 +76,7 @@ static void amfHandleInstanceDestructor (void *);
 /*
  * All instances in one database
  */
-DECLARE_SAHDB_DATABASE(amfHandleDatabase,amfHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(amfHandleDatabase,amfHandleInstanceDestructor);
 
 /*
  * Versions supported
@@ -114,12 +116,12 @@ saAmfInitialize (
 		goto error_no_destroy;
 	}
 
-	error = saHandleCreate (&amfHandleDatabase, sizeof (struct amfInstance), amfHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&amfHandleDatabase, sizeof (struct amfInstance), amfHandle));
 	if (error != SA_AIS_OK) {
 		goto error_no_destroy;
 	}
 
-	error = saHandleInstanceGet (&amfHandleDatabase, *amfHandle, (void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, *amfHandle, (void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -141,14 +143,14 @@ saAmfInitialize (
 
 	pthread_mutex_init (&amfInstance->dispatch_mutex, NULL);
 
-	saHandleInstancePut (&amfHandleDatabase, *amfHandle);
+	hdb_handle_put (&amfHandleDatabase, *amfHandle);
 
 	return (SA_AIS_OK);
 
 error_put_destroy:
-	saHandleInstancePut (&amfHandleDatabase, *amfHandle);
+	hdb_handle_put (&amfHandleDatabase, *amfHandle);
 error_destroy:
-	saHandleDestroy (&amfHandleDatabase, *amfHandle);
+	hdb_handle_destroy (&amfHandleDatabase, *amfHandle);
 error_no_destroy:
 	return (error);
 }
@@ -161,14 +163,14 @@ saAmfSelectionObjectGet (
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle, (void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle, (void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
 	*selectionObject = coroipcc_fd_get (amfInstance->ipc_ctx);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 	return (SA_AIS_OK);
 }
 
@@ -198,8 +200,8 @@ saAmfDispatch (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -357,7 +359,7 @@ saAmfDispatch (
 	} while (cont);
 
 error_put:
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 error_exit:
 	return (error);
 }
@@ -369,7 +371,7 @@ saAmfFinalize (
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle, (void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle, (void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -384,7 +386,7 @@ saAmfFinalize (
 	if (amfInstance->finalize) {
 		pthread_mutex_unlock (&amfInstance->response_mutex);
 		pthread_mutex_unlock (&amfInstance->dispatch_mutex);
-		saHandleInstancePut (&amfHandleDatabase, amfHandle);
+		hdb_handle_put (&amfHandleDatabase, amfHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
@@ -396,9 +398,9 @@ saAmfFinalize (
 
 	pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 
-	saHandleDestroy (&amfHandleDatabase, amfHandle);
+	hdb_handle_destroy (&amfHandleDatabase, amfHandle);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
 	return (error);
 }
@@ -415,8 +417,8 @@ saAmfComponentRegister (
 	struct res_lib_amf_componentregister res_lib_amf_componentregister;
 	struct iovec iov;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -445,7 +447,7 @@ saAmfComponentRegister (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
 	if (res_lib_amf_componentregister.header.error == SA_AIS_OK) {
 		amfInstance->compRegistered = 1;
@@ -466,8 +468,8 @@ saAmfComponentUnregister (
 	SaAisErrorT error;
 	struct iovec iov;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -497,7 +499,7 @@ saAmfComponentUnregister (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_componentunregister.header.error : error);
 }
@@ -511,8 +513,8 @@ saAmfComponentNameGet (
 	SaAisErrorT error;
 	char *env_value;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -534,7 +536,7 @@ saAmfComponentNameGet (
 error_exit:
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
 	return (error);
 }
@@ -554,8 +556,8 @@ saAmfPmStart (
 	SaAisErrorT error;
 	struct iovec iov;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -582,7 +584,7 @@ saAmfPmStart (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_pmstart.header.error : error);
 }
@@ -601,8 +603,8 @@ saAmfPmStop (
 	SaAisErrorT error;
 	struct iovec iov;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -627,7 +629,7 @@ saAmfPmStop (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_pmstop.header.error : error);
 	return (SA_AIS_OK);
@@ -647,8 +649,8 @@ saAmfHealthcheckStart (
 	SaAisErrorT error;
 	struct iovec iov;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -675,7 +677,7 @@ saAmfHealthcheckStart (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_healthcheckstart.header.error : error);
 }
@@ -693,8 +695,8 @@ saAmfHealthcheckConfirm (
 	SaAisErrorT error;
 	struct iovec iov;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -720,7 +722,7 @@ saAmfHealthcheckConfirm (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_healthcheckconfirm.header.error : error);
 }
@@ -737,8 +739,8 @@ saAmfHealthcheckStop (
 	struct iovec iov;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -763,7 +765,7 @@ saAmfHealthcheckStop (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_healthcheckstop.header.error : error);
 }
@@ -782,8 +784,8 @@ saAmfHAStateGet (
 	struct iovec iov;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -806,7 +808,7 @@ saAmfHAStateGet (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
 	if (res_lib_amf_hastateget.header.error == SA_AIS_OK) {
 		memcpy (haState, &res_lib_amf_hastateget.haState,
@@ -827,8 +829,8 @@ saAmfCSIQuiescingComplete (
 	struct iovec iov;
 	SaAisErrorT errorResult;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -851,7 +853,7 @@ saAmfCSIQuiescingComplete (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (errorResult == SA_AIS_OK ? res_lib_amf_csiquiescingcomplete.header.error : errorResult);
 }
@@ -876,8 +878,8 @@ saAmfProtectionGroupTrack (
 	req_lib_amf_protectiongrouptrack.trackFlags = trackFlags;
 	req_lib_amf_protectiongrouptrack.notificationBufferAddress = (SaAmfProtectionGroupNotificationBufferT *)notificationBuffer;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -895,7 +897,7 @@ saAmfProtectionGroupTrack (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_protectiongrouptrack.header.error : error);
 }
@@ -911,8 +913,8 @@ saAmfProtectionGroupTrackStop (
 	struct iovec iov;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -933,7 +935,7 @@ saAmfProtectionGroupTrackStop (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_protectiongrouptrackstop.header.error : error);
 }
@@ -952,8 +954,8 @@ saAmfComponentErrorReport (
 	struct iovec iov;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -979,7 +981,7 @@ saAmfComponentErrorReport (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_componenterrorreport.header.error : error);
 }
@@ -996,8 +998,8 @@ saAmfComponentErrorClear (
 	struct iovec iov;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -1019,7 +1021,7 @@ saAmfComponentErrorClear (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (error == SA_AIS_OK ? res_lib_amf_componenterrorclear.header.error : error);
 }
@@ -1036,8 +1038,8 @@ saAmfResponse (
 	struct iovec iov;
 	SaAisErrorT errorResult;
 
-	errorResult = saHandleInstanceGet (&amfHandleDatabase, amfHandle,
-		(void *)&amfInstance);
+	errorResult = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle,
+		(void *)&amfInstance));
 	if (errorResult != SA_AIS_OK) {
 		return (errorResult);
 	}
@@ -1060,7 +1062,7 @@ saAmfResponse (
 
 	pthread_mutex_unlock (&amfInstance->response_mutex);
 
-	saHandleInstancePut (&amfHandleDatabase, amfHandle);
+	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
         return (errorResult == SA_AIS_OK ? res_lib_amf_response.header.error : errorResult);
 }

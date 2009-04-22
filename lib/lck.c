@@ -52,6 +52,7 @@
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
 #include <corosync/corodefs.h>
+#include <corosync/hdb.h>
 #include <corosync/mar_gen.h>
 #include <corosync/list.h>
 #include <saLck.h>
@@ -99,11 +100,11 @@ void lckResourceHandleLockIdInstanceDestructor (void *instance);
 /*
  * All LCK instances in this database
  */
-DECLARE_SAHDB_DATABASE(lckHandleDatabase,lckHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(lckHandleDatabase,lckHandleInstanceDestructor);
 
-DECLARE_SAHDB_DATABASE(lckResourceHandleDatabase,lckResourceHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(lckResourceHandleDatabase,lckResourceHandleInstanceDestructor);
 
-DECLARE_SAHDB_DATABASE(lckLockIdHandleDatabase,lckResourceHandleLockIdInstanceDestructor);
+DECLARE_HDB_DATABASE(lckLockIdHandleDatabase,lckResourceHandleLockIdInstanceDestructor);
 
 /*
  * Versions supported
@@ -161,7 +162,7 @@ static void lckSectionIterationInstanceFinalize (struct lckSectionIterationInsta
 
 	list_del (&lckSectionIterationInstance->list);
 
-	saHandleDestroy (&lckSectionIterationHandleDatabase,
+	hdb_handle_destroy (&lckSectionIterationHandleDatabase,
 		lckSectionIterationInstance->sectionIterationHandle);
 }
 
@@ -185,7 +186,7 @@ static void lckResourceInstanceFinalize (struct lckResourceInstance *lckResource
 
 	list_del (&lckResourceInstance->list);
 
-	saHandleDestroy (&lckResourceHandleDatabase, lckResourceInstance->lckResourceHandle);
+	hdb_handle_destroy (&lckResourceHandleDatabase, lckResourceInstance->lckResourceHandle);
 }
 
 static void lckInstanceFinalize (struct lckInstance *lckInstance)
@@ -206,7 +207,7 @@ static void lckInstanceFinalize (struct lckInstance *lckInstance)
 		lckResourceInstanceFinalize (lckResourceInstance);
 	}
 
-	saHandleDestroy (&lckHandleDatabase, lckInstance->lckHandle);
+	hdb_handle_destroy (&lckHandleDatabase, lckInstance->lckHandle);
 }
 
 #endif
@@ -229,14 +230,14 @@ saLckInitialize (
 		goto error_no_destroy;
 	}
 
-	error = saHandleCreate (&lckHandleDatabase, sizeof (struct lckInstance),
-		lckHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&lckHandleDatabase, sizeof (struct lckInstance),
+		lckHandle));
 	if (error != SA_AIS_OK) {
 		goto error_no_destroy;
 	}
 
-	error = saHandleInstanceGet (&lckHandleDatabase, *lckHandle,
-		(void *)&lckInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, *lckHandle,
+		(void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -264,14 +265,14 @@ saLckInitialize (
 
 	pthread_mutex_init (&lckInstance->response_mutex, NULL);
 
-	saHandleInstancePut (&lckHandleDatabase, *lckHandle);
+	hdb_handle_put (&lckHandleDatabase, *lckHandle);
 
 	return (SA_AIS_OK);
 
 error_put_destroy:
-	saHandleInstancePut (&lckHandleDatabase, *lckHandle);
+	hdb_handle_put (&lckHandleDatabase, *lckHandle);
 error_destroy:
-	saHandleDestroy (&lckHandleDatabase, *lckHandle);
+	hdb_handle_destroy (&lckHandleDatabase, *lckHandle);
 error_no_destroy:
 	return (error);
 }
@@ -287,14 +288,14 @@ saLckSelectionObjectGet (
 	if (selectionObject == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
-	error = saHandleInstanceGet (&lckHandleDatabase, lckHandle, (void *)&lckInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
 	*selectionObject = coroipcc_fd_get (lckInstance->ipc_ctx);
 
-	saHandleInstancePut (&lckHandleDatabase, lckHandle);
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
 	return (SA_AIS_OK);
 }
@@ -334,8 +335,8 @@ saLckDispatch (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = saHandleInstanceGet (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
+		(void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -408,9 +409,9 @@ saLckDispatch (
 			 * later has the proper list of resources
 			 */
 			if (res_lib_lck_resourceopenasync->header.error == SA_AIS_OK) {
-				error = saHandleInstanceGet (&lckResourceHandleDatabase,
+				error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
 					res_lib_lck_resourceopenasync->resourceHandle,
-					(void *)&lckResourceInstance);
+					(void *)&lckResourceInstance));
 
 					assert (error == SA_AIS_OK); /* should only be valid handles here */
 				/*
@@ -424,7 +425,7 @@ saLckDispatch (
 				memcpy (&lckResourceInstance->source,
 						&res_lib_lck_resourceopenasync->source,
 						sizeof (mar_message_source_t));
-				saHandleInstancePut (&lckResourceHandleDatabase,
+				hdb_handle_put (&lckResourceHandleDatabase,
 					res_lib_lck_resourceopenasync->resourceHandle);
 			} else {
 				/*
@@ -446,9 +447,9 @@ saLckDispatch (
 			 * later has the proper list of resources
 			 */
 			if (res_lib_lck_resourcelockasync->header.error == SA_AIS_OK) {
-				error = saHandleInstanceGet (&lckLockIdHandleDatabase,
+				error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase,
 					res_lib_lck_resourcelockasync->lockId,
-					(void *)&lckLockIdInstance);
+					(void *)&lckLockIdInstance));
 
 					assert (error == SA_AIS_OK); /* should only be valid handles here */
 				/*
@@ -460,7 +461,7 @@ saLckDispatch (
 					res_lib_lck_resourcelockasync->invocation,
 					res_lib_lck_resourcelockasync->lockStatus,
 					res_lib_lck_resourcelockasync->header.error);
-				saHandleInstancePut (&lckLockIdHandleDatabase,
+				hdb_handle_put (&lckLockIdHandleDatabase,
 					res_lib_lck_resourcelockasync->lockId);
 			} else {
 				/*
@@ -484,13 +485,13 @@ saLckDispatch (
 				res_lib_lck_resourceunlockasync->header.error);
 
 			if (res_lib_lck_resourceunlockasync->header.error == SA_AIS_OK) {
-				error = saHandleInstanceGet (&lckLockIdHandleDatabase,
+				error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase,
 				     res_lib_lck_resourceunlockasync->lockId,
-				     (void *)&lckLockIdInstance);
+				     (void *)&lckLockIdInstance));
 				if (error == SA_AIS_OK) {
-					saHandleInstancePut (&lckLockIdHandleDatabase, res_lib_lck_resourceunlockasync->lockId);
+					hdb_handle_put (&lckLockIdHandleDatabase, res_lib_lck_resourceunlockasync->lockId);
 
-					saHandleDestroy (&lckLockIdHandleDatabase, res_lib_lck_resourceunlockasync->lockId);
+					hdb_handle_destroy (&lckLockIdHandleDatabase, res_lib_lck_resourceunlockasync->lockId);
 				}
 			}
 			break;
@@ -531,7 +532,7 @@ saLckDispatch (
 	} while (cont);
 
 error_put:
-	saHandleInstancePut(&lckHandleDatabase, lckHandle);
+	hdb_handle_put(&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
 }
@@ -543,8 +544,8 @@ saLckFinalize (
 	struct lckInstance *lckInstance;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
+		(void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -556,7 +557,7 @@ saLckFinalize (
 	 */
 	if (lckInstance->finalize) {
 		pthread_mutex_unlock (&lckInstance->response_mutex);
-		saHandleInstancePut (&lckHandleDatabase, lckHandle);
+		hdb_handle_put (&lckHandleDatabase, lckHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
@@ -568,7 +569,7 @@ saLckFinalize (
 
 // TODO	lckInstanceFinalize (lckInstance);
 
-	saHandleInstancePut (&lckHandleDatabase, lckHandle);
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
 	return (SA_AIS_OK);
 }
@@ -596,20 +597,20 @@ saLckResourceOpen (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = saHandleInstanceGet (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
+		(void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
-	error = saHandleCreate (&lckResourceHandleDatabase,
-		sizeof (struct lckResourceInstance), lckResourceHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&lckResourceHandleDatabase,
+		sizeof (struct lckResourceInstance), lckResourceHandle));
 	if (error != SA_AIS_OK) {
 		goto error_put_lck;
 	}
 
-	error = saHandleInstanceGet (&lckResourceHandleDatabase,
-		*lckResourceHandle, (void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
+		*lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -653,9 +654,9 @@ saLckResourceOpen (
 		&res_lib_lck_resourceopen.source,
 		sizeof (mar_message_source_t));
 
-	saHandleInstancePut (&lckResourceHandleDatabase, *lckResourceHandle);
+	hdb_handle_put (&lckResourceHandleDatabase, *lckResourceHandle);
 
-	saHandleInstancePut (&lckHandleDatabase, lckHandle);
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
 	list_init (&lckResourceInstance->list);
 
@@ -663,11 +664,11 @@ saLckResourceOpen (
 	return (error);
 
 error_put_destroy:
-	saHandleInstancePut (&lckResourceHandleDatabase, *lckResourceHandle);
+	hdb_handle_put (&lckResourceHandleDatabase, *lckResourceHandle);
 error_destroy:
-	saHandleDestroy (&lckResourceHandleDatabase, *lckResourceHandle);
+	hdb_handle_destroy (&lckResourceHandleDatabase, *lckResourceHandle);
 error_put_lck:
-	saHandleInstancePut (&lckHandleDatabase, lckHandle);
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
 }
@@ -687,8 +688,8 @@ saLckResourceOpenAsync (
 	struct req_lib_lck_resourceopen req_lib_lck_resourceopen;
 	struct res_lib_lck_resourceopenasync res_lib_lck_resourceopenasync;
 
-	error = saHandleInstanceGet (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
+		(void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -698,14 +699,14 @@ saLckResourceOpenAsync (
 		goto error_put_lck;
 	}
 
-	error = saHandleCreate (&lckResourceHandleDatabase,
-		sizeof (struct lckResourceInstance), &lckResourceHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&lckResourceHandleDatabase,
+		sizeof (struct lckResourceInstance), &lckResourceHandle));
 	if (error != SA_AIS_OK) {
 		goto error_put_lck;
 	}
 
-	error = saHandleInstanceGet (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
+		(void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -741,17 +742,17 @@ saLckResourceOpenAsync (
 	pthread_mutex_unlock (&lckInstance->response_mutex);
 
 	if (error == SA_AIS_OK) {
-		saHandleInstancePut (&lckResourceHandleDatabase,
-			lckResourceHandle);
-		saHandleInstancePut (&lckHandleDatabase, lckHandle);
+		hdb_error_to_sa(hdb_handle_put (&lckResourceHandleDatabase,
+			lckResourceHandle));
+		hdb_handle_put (&lckHandleDatabase, lckHandle);
 		return (res_lib_lck_resourceopenasync.header.error);
 	}
 
-	saHandleInstancePut (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 error_destroy:
-	saHandleDestroy (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_destroy (&lckResourceHandleDatabase, lckResourceHandle);
 error_put_lck:
-	saHandleInstancePut (&lckHandleDatabase, lckHandle);
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
 }
@@ -766,8 +767,8 @@ saLckResourceClose (
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 
-	error = saHandleInstanceGet (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
+		(void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -792,9 +793,9 @@ saLckResourceClose (
 
 	pthread_mutex_unlock (lckResourceInstance->response_mutex);
 
-	saHandleInstancePut (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 
-	saHandleDestroy (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_destroy (&lckResourceHandleDatabase, lckResourceHandle);
 
 	return (error == SA_AIS_OK ? res_lib_lck_resourceclose.header.error : error);
 }
@@ -817,20 +818,20 @@ saLckResourceLock (
 	struct lckLockIdInstance *lckLockIdInstance;
 	void *lock_ctx;
 
-	error = saHandleInstanceGet (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
+		(void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
-	error = saHandleCreate (&lckLockIdHandleDatabase,
-		sizeof (struct lckLockIdInstance), lockId);
+	error = hdb_error_to_sa(hdb_handle_create (&lckLockIdHandleDatabase,
+		sizeof (struct lckLockIdInstance), lockId));
 	if (error != SA_AIS_OK) {
 		goto error_put_lck;
 	}
 
-	error = saHandleInstanceGet (&lckLockIdHandleDatabase, *lockId,
-		(void *)&lckLockIdInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, *lockId,
+		(void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -888,13 +889,13 @@ saLckResourceLock (
 	/*
 	 * Error
 	 */
-	saHandleInstancePut (&lckLockIdHandleDatabase, *lockId);
+	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
 
 error_destroy:
-	saHandleDestroy (&lckLockIdHandleDatabase, *lockId);
+	hdb_handle_destroy (&lckLockIdHandleDatabase, *lockId);
 
 error_put_lck:
-	saHandleInstancePut (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 	return (error);
 
 }
@@ -916,20 +917,20 @@ saLckResourceLockAsync (
 	struct lckLockIdInstance *lckLockIdInstance;
 	void *lock_ctx;
 
-	error = saHandleInstanceGet (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
+		(void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
-	error = saHandleCreate (&lckLockIdHandleDatabase,
-		sizeof (struct lckLockIdInstance), lockId);
+	error = hdb_error_to_sa(hdb_handle_create (&lckLockIdHandleDatabase,
+		sizeof (struct lckLockIdInstance), lockId));
 	if (error != SA_AIS_OK) {
 		goto error_put_lck;
 	}
 
-	error = saHandleInstanceGet (&lckLockIdHandleDatabase, *lockId,
-		(void *)&lckLockIdInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, *lockId,
+		(void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -985,13 +986,13 @@ saLckResourceLockAsync (
 	/*
 	 * Error
 	 */
-	saHandleInstancePut (&lckLockIdHandleDatabase, *lockId);
+	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
 
 error_destroy:
-	saHandleDestroy (&lckLockIdHandleDatabase, *lockId);
+	hdb_handle_destroy (&lckLockIdHandleDatabase, *lockId);
 
 error_put_lck:
-	saHandleInstancePut (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 	return (error);
 }
 
@@ -1007,8 +1008,8 @@ saLckResourceUnlock (
 	struct lckLockIdInstance *lckLockIdInstance;
 	struct lckResourceInstance *lckResourceInstance;
 
-	error = saHandleInstanceGet (&lckLockIdHandleDatabase, lockId,
-		(void *)&lckLockIdInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, lockId,
+		(void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -1016,17 +1017,17 @@ saLckResourceUnlock (
 	/*
 	 * Retrieve resource name
 	 */
-	error = saHandleInstanceGet (&lckResourceHandleDatabase,
-		lckLockIdInstance->lckResourceHandle, (void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
+		lckLockIdInstance->lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		saHandleInstancePut (&lckLockIdHandleDatabase, lockId);
+		hdb_handle_put (&lckLockIdHandleDatabase, lockId);
 		return (error);
 	}
 
 	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 
-	saHandleInstancePut (&lckResourceHandleDatabase,
+	hdb_handle_put (&lckResourceHandleDatabase,
 		lckLockIdInstance->lckResourceHandle);
 
 	req_lib_lck_resourceunlock.header.size = sizeof (struct req_lib_lck_resourceunlock);
@@ -1051,9 +1052,9 @@ saLckResourceUnlock (
 
 	pthread_mutex_unlock (lckLockIdInstance->response_mutex);
 
-	saHandleInstancePut (&lckLockIdHandleDatabase, lockId);
+	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
 
-	saHandleDestroy (&lckLockIdHandleDatabase, lockId);
+	hdb_handle_destroy (&lckLockIdHandleDatabase, lockId);
 
 	return (error == SA_AIS_OK ? res_lib_lck_resourceunlock.header.error : error);
 }
@@ -1070,8 +1071,8 @@ saLckResourceUnlockAsync (
 	struct lckLockIdInstance *lckLockIdInstance;
 	struct lckResourceInstance *lckResourceInstance;
 
-	error = saHandleInstanceGet (&lckLockIdHandleDatabase, lockId,
-		(void *)&lckLockIdInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, lockId,
+		(void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -1079,17 +1080,17 @@ saLckResourceUnlockAsync (
 	/*
 	 * Retrieve resource name
 	 */
-	error = saHandleInstanceGet (&lckResourceHandleDatabase,
-		lckLockIdInstance->lckResourceHandle, (void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
+		lckLockIdInstance->lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		saHandleInstancePut (&lckLockIdHandleDatabase, lockId);
+		hdb_handle_put (&lckLockIdHandleDatabase, lockId);
 		return (error);
 	}
 
 	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
 		&lckResourceInstance->lockResourceName);
 
-	saHandleInstancePut (&lckResourceHandleDatabase,
+	hdb_handle_put (&lckResourceHandleDatabase,
 		lckLockIdInstance->lckResourceHandle);
 
 
@@ -1115,7 +1116,7 @@ saLckResourceUnlockAsync (
 
 	pthread_mutex_unlock (lckLockIdInstance->response_mutex);
 
-	saHandleInstancePut (&lckLockIdHandleDatabase, lockId);
+	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
 
 	return (error == SA_AIS_OK ? res_lib_lck_resourceunlockasync.header.error : error);
 }
@@ -1130,8 +1131,8 @@ saLckLockPurge (
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 
-	error = saHandleInstanceGet (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
+		(void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -1154,7 +1155,7 @@ saLckLockPurge (
 
 	pthread_mutex_unlock (lckResourceInstance->response_mutex);
 
-	saHandleInstancePut (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 
 	return (error == SA_AIS_OK ? res_lib_lck_lockpurge.header.error : error);
 }

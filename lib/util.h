@@ -36,6 +36,7 @@
 #ifndef AIS_UTIL_H_DEFINED
 #define AIS_UTIL_H_DEFINED
 
+#include <saAis.h>
 #include <pthread.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
@@ -56,5 +57,21 @@ SaTimeT clustTimeNow(void);
 #define IPC_REQUEST_SIZE	8192*128
 #define IPC_RESPONSE_SIZE	8192*128
 #define IPC_DISPATCH_SIZE	8192*128
+
+static inline SaAisErrorT hdb_error_to_sa (int res)		\
+{								\
+	if (res == 0) {						\
+		return (SA_AIS_OK);				\
+	} else {						\
+		if (errno == EBADF) {				\
+			return (SA_AIS_ERR_BAD_HANDLE);		\
+		} else						\
+		if (errno == ENOMEM) {				\
+			return (SA_AIS_ERR_NO_MEMORY);		\
+		}						\
+		return (SA_AIS_ERR_LIBRARY);			\
+	}							\
+}
+
 
 #endif /* AIS_UTIL_H_DEFINED */

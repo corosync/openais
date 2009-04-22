@@ -45,6 +45,7 @@
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
 #include <corosync/corodefs.h>
+#include <corosync/hdb.h>
 #include <corosync/list.h>
 #include "ipc_evt.h"
 #include "mar_sa.h"
@@ -72,11 +73,11 @@ static struct saVersionDatabase evt_version_database = {
 /*
  * Event instance data
  */
-DECLARE_SAHDB_DATABASE(evt_instance_handle_db,evtHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(evt_instance_handle_db,evtHandleInstanceDestructor);
 
-DECLARE_SAHDB_DATABASE(channel_handle_db,chanHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(channel_handle_db,chanHandleInstanceDestructor);
 
-DECLARE_SAHDB_DATABASE(event_handle_db,eventHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(event_handle_db,eventHandleInstanceDestructor);
 
 struct handle_list {
 	SaUint64T			hl_handle;
@@ -217,16 +218,16 @@ static void evtHandleInstanceDestructor(void *instance)
 
 		hl = list_entry(l, struct handle_list, hl_entry);
 		handle = hl->hl_handle;
-		error = saHandleInstanceGet(&channel_handle_db, hl->hl_handle,
-			(void*)&eci);
+		error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, hl->hl_handle,
+			(void*)&eci));
 		if (error != SA_AIS_OK) {
 			/*
 			 * already gone
 			 */
 			continue;
 		}
-		saHandleDestroy(&channel_handle_db, handle);
-		saHandleInstancePut(&channel_handle_db, handle);
+		hdb_handle_destroy(&channel_handle_db, handle);
+		hdb_handle_put(&channel_handle_db, handle);
 	}
 
 	pthread_mutex_destroy(&evti->ei_dispatch_mutex);
@@ -337,13 +338,13 @@ saEvtInitialize(
 	 * Allocate instance data, allocate unique handle for instance,
 	 * assign instance data to unique handle
 	 */
-	error = saHandleCreate(&evt_instance_handle_db, sizeof(*evti),
-			evtHandle);
+	error = hdb_error_to_sa(hdb_handle_create(&evt_instance_handle_db, sizeof(*evti),
+			evtHandle));
 	if (error != SA_AIS_OK) {
 		goto error_nofree;
 	}
-	error = saHandleInstanceGet(&evt_instance_handle_db, *evtHandle,
-			(void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db, *evtHandle,
+			(void*)&evti));
 	if (error != SA_AIS_OK) {
 		if (error == SA_AIS_ERR_BAD_HANDLE) {
 			error = SA_AIS_ERR_LIBRARY;
@@ -385,14 +386,14 @@ saEvtInitialize(
 
  	pthread_mutex_init(&evti->ei_dispatch_mutex, NULL);
  	pthread_mutex_init(&evti->ei_response_mutex, NULL);
-	saHandleInstancePut(&evt_instance_handle_db, *evtHandle);
+	hdb_handle_put(&evt_instance_handle_db, *evtHandle);
 
 	return SA_AIS_OK;
 
 error_handle_put:
-	saHandleInstancePut(&evt_instance_handle_db, *evtHandle);
+	hdb_handle_put(&evt_instance_handle_db, *evtHandle);
 error_handle_free:
-	(void)saHandleDestroy(&evt_instance_handle_db, *evtHandle);
+	(void)hdb_handle_destroy(&evt_instance_handle_db, *evtHandle);
 error_nofree:
 	return error;
 }
@@ -418,8 +419,8 @@ saEvtSelectionObjectGet(
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
-			(void *)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db, evtHandle,
+			(void *)&evti));
 
 	if (error != SA_AIS_OK) {
 		return error;
@@ -427,7 +428,7 @@ saEvtSelectionObjectGet(
 
 	*selectionObject = coroipcc_fd_get (evti->ipc_ctx);
 
-	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
+	hdb_handle_put(&evt_instance_handle_db, evtHandle);
 
 	return SA_AIS_OK;
 }
@@ -448,8 +449,8 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 	struct handle_list *hl;
 	int i;
 
-	error = saHandleCreate(&event_handle_db, sizeof(*edi),
-		event_handle);
+	error = hdb_error_to_sa(hdb_handle_create(&event_handle_db, sizeof(*edi),
+		event_handle));
 	if (error != SA_AIS_OK) {
 		if (error == SA_AIS_ERR_NO_MEMORY) {
 			error = SA_AIS_ERR_LIBRARY;
@@ -457,18 +458,18 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 			goto make_evt_done;
 	}
 
-	error = saHandleInstanceGet(&event_handle_db, *event_handle,
-				(void*)&edi);
+	error = hdb_error_to_sa(hdb_handle_get(&event_handle_db, *event_handle,
+				(void*)&edi));
 	if (error != SA_AIS_OK) {
-			saHandleDestroy(&event_handle_db, *event_handle);
+			hdb_handle_destroy(&event_handle_db, *event_handle);
 			goto make_evt_done;
 	}
 
-	error = saHandleInstanceGet(&channel_handle_db,
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db,
 			evt->led_lib_channel_handle,
-			(void*)&eci);
+			(void*)&eci));
 	if (error != SA_AIS_OK) {
-		saHandleDestroy(&event_handle_db, *event_handle);
+		hdb_handle_destroy(&event_handle_db, *event_handle);
 		goto make_evt_done_put;
 	}
 
@@ -487,7 +488,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 	if (edi->edi_event_data_size) {
 		edi->edi_event_data = malloc(edi->edi_event_data_size);
 		if (!edi->edi_event_data) {
-			saHandleDestroy(&event_handle_db, *event_handle);
+			hdb_handle_destroy(&event_handle_db, *event_handle);
 
 			/*
 			 * saEvtDispatch doesn't return SA_AIS_ERR_NO_MEMORY
@@ -513,7 +514,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 		 * allocated.
 		 */
 		edi->edi_patterns.patternsNumber = 0;
-		saHandleDestroy(&event_handle_db, *event_handle);
+		hdb_handle_destroy(&event_handle_db, *event_handle);
 
 		/*
 		 * saEvtDispatch doesn't return SA_AIS_ERR_NO_MEMORY
@@ -531,7 +532,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 		edi->edi_patterns.patterns[i].allocatedSize = pat->pattern_size;
 		edi->edi_patterns.patterns[i].pattern = malloc(pat->pattern_size);
 		if (!edi->edi_patterns.patterns[i].pattern) {
-			saHandleDestroy(&event_handle_db, *event_handle);
+			hdb_handle_destroy(&event_handle_db, *event_handle);
 			error =  SA_AIS_ERR_LIBRARY;
 			goto make_evt_done_put2;
 		}
@@ -543,7 +544,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 
 	hl = malloc(sizeof(*hl));
 	if (!hl) {
-		saHandleDestroy(&event_handle_db, *event_handle);
+		hdb_handle_destroy(&event_handle_db, *event_handle);
 		error = SA_AIS_ERR_LIBRARY;
 	} else {
 		edi->edi_hl = hl;
@@ -553,10 +554,10 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 	}
 
 make_evt_done_put2:
-	saHandleInstancePut (&channel_handle_db, evt->led_lib_channel_handle);
+	hdb_handle_put (&channel_handle_db, evt->led_lib_channel_handle);
 
 make_evt_done_put:
-	saHandleInstancePut (&event_handle_db, *event_handle);
+	hdb_handle_put (&event_handle_db, *event_handle);
 
 make_evt_done:
 	return error;
@@ -588,8 +589,8 @@ saEvtDispatch(
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
-		(void *)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db, evtHandle,
+		(void *)&evti));
 	if (error != SA_AIS_OK) {
 		goto dispatch_exit;
 	}
@@ -697,11 +698,11 @@ saEvtDispatch(
 			 */
 			error = resa->ica_head.error;
 			if (error == SA_AIS_OK) {
-				error = saHandleInstanceGet(&channel_handle_db,
-						resa->ica_c_handle, (void*)&eci);
+				error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db,
+						resa->ica_c_handle, (void*)&eci));
 				if (error == SA_AIS_OK) {
 					eci->eci_svr_channel_handle = resa->ica_channel_handle;
-					saHandleInstancePut (&channel_handle_db,
+					hdb_handle_put (&channel_handle_db,
 							resa->ica_c_handle);
 				}
 			}
@@ -739,7 +740,7 @@ saEvtDispatch(
 	} while (cont);
 
 error_put:
-	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
+	hdb_handle_put(&evt_instance_handle_db, evtHandle);
 dispatch_exit:
 	return error;
 }
@@ -760,8 +761,8 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 	struct event_instance *evti;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
-			(void *)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db, evtHandle,
+			(void *)&evti));
 	if (error != SA_AIS_OK) {
 		return error;
 	}
@@ -773,7 +774,7 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 	 */
 	if (evti->ei_finalize) {
 		pthread_mutex_unlock(&evti->ei_response_mutex);
-		saHandleInstancePut(&evt_instance_handle_db, evtHandle);
+		hdb_handle_put(&evt_instance_handle_db, evtHandle);
 		return SA_AIS_ERR_BAD_HANDLE;
 	}
 
@@ -783,9 +784,9 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 
 	pthread_mutex_unlock(&evti->ei_response_mutex);
 
-	saHandleDestroy(&evt_instance_handle_db, evtHandle);
+	hdb_handle_destroy(&evt_instance_handle_db, evtHandle);
 
-	saHandleInstancePut(&evt_instance_handle_db, evtHandle);
+	hdb_handle_put(&evt_instance_handle_db, evtHandle);
 
 	return error;
 }
@@ -830,8 +831,8 @@ saEvtChannelOpen(
 	if (timeout == 0) {
 		return (SA_AIS_ERR_TIMEOUT);
 	}
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
-			(void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db, evtHandle,
+			(void*)&evti));
 
 	if (error != SA_AIS_OK) {
 		goto chan_open_done;
@@ -840,17 +841,17 @@ saEvtChannelOpen(
 	/*
 	 * create a handle for this open channel
 	 */
-	error = saHandleCreate(&channel_handle_db, sizeof(*eci),
-			channelHandle);
+	error = hdb_error_to_sa(hdb_handle_create(&channel_handle_db, sizeof(*eci),
+			channelHandle));
 	if (error != SA_AIS_OK) {
 		goto chan_open_put;
 	}
 
 
-	error = saHandleInstanceGet(&channel_handle_db, *channelHandle,
-					(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, *channelHandle,
+					(void*)&eci));
 	if (error != SA_AIS_OK) {
-		saHandleDestroy(&channel_handle_db, *channelHandle);
+		hdb_handle_destroy(&channel_handle_db, *channelHandle);
 		goto chan_open_put;
 	}
 
@@ -906,16 +907,16 @@ saEvtChannelOpen(
 	list_add(&hl->hl_entry, &evti->ei_channel_list);
 
 	pthread_mutex_init(&eci->eci_mutex, NULL);
-	saHandleInstancePut (&evt_instance_handle_db, evtHandle);
-	saHandleInstancePut (&channel_handle_db, *channelHandle);
+	hdb_handle_put (&evt_instance_handle_db, evtHandle);
+	hdb_handle_put (&channel_handle_db, *channelHandle);
 
 	return SA_AIS_OK;
 
 chan_open_free:
-	saHandleDestroy(&channel_handle_db, *channelHandle);
-	saHandleInstancePut (&channel_handle_db, *channelHandle);
+	hdb_handle_destroy(&channel_handle_db, *channelHandle);
+	hdb_handle_put (&channel_handle_db, *channelHandle);
 chan_open_put:
-	saHandleInstancePut (&evt_instance_handle_db, evtHandle);
+	hdb_handle_put (&evt_instance_handle_db, evtHandle);
 chan_open_done:
 	return error;
 }
@@ -935,8 +936,8 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	struct res_evt_channel_close res;
 	struct iovec iov;
 
-	error = saHandleInstanceGet(&channel_handle_db, channelHandle,
-			(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, channelHandle,
+			(void*)&eci));
 	if (error != SA_AIS_OK) {
 		goto chan_close_done;
 	}
@@ -944,8 +945,8 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	/*
 	 * get the evt handle for the fd
 	 */
-	error = saHandleInstanceGet(&evt_instance_handle_db,
-			eci->eci_instance_handle, (void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db,
+			eci->eci_instance_handle, (void*)&evti));
 	if (error != SA_AIS_OK) {
 		goto chan_close_put1;
 	}
@@ -956,7 +957,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	pthread_mutex_lock(&eci->eci_mutex);
 	if (eci->eci_closing) {
 		pthread_mutex_unlock(&eci->eci_mutex);
-		saHandleInstancePut(&channel_handle_db, channelHandle);
+		hdb_handle_put(&channel_handle_db, channelHandle);
 		return SA_AIS_ERR_BAD_HANDLE;
 	}
 	eci->eci_closing = 1;
@@ -998,18 +999,18 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 		goto chan_close_put2;
 	}
 
-	saHandleInstancePut(&evt_instance_handle_db,
+	hdb_handle_put(&evt_instance_handle_db,
 					eci->eci_instance_handle);
-	saHandleDestroy(&channel_handle_db, channelHandle);
-	saHandleInstancePut(&channel_handle_db, channelHandle);
+	hdb_handle_destroy(&channel_handle_db, channelHandle);
+	hdb_handle_put(&channel_handle_db, channelHandle);
 
 	return error;
 
 chan_close_put2:
-	saHandleInstancePut(&evt_instance_handle_db,
+	hdb_handle_put(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 chan_close_put1:
-	saHandleInstancePut(&channel_handle_db, channelHandle);
+	hdb_handle_put(&channel_handle_db, channelHandle);
 chan_close_done:
 	return error;
 }
@@ -1044,8 +1045,8 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 		return SA_AIS_ERR_BAD_FLAGS;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
-			(void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db, evtHandle,
+			(void*)&evti));
 
 	if (error != SA_AIS_OK) {
 		goto chan_open_done;
@@ -1063,17 +1064,17 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 	/*
 	 * create a handle for this open channel
 	 */
-	error = saHandleCreate(&channel_handle_db, sizeof(*eci),
-			&channel_handle);
+	error = hdb_error_to_sa(hdb_handle_create(&channel_handle_db, sizeof(*eci),
+			&channel_handle));
 	if (error != SA_AIS_OK) {
 		goto chan_open_put;
 	}
 
 
-	error = saHandleInstanceGet(&channel_handle_db, channel_handle,
-					(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, channel_handle,
+					(void*)&eci));
 	if (error != SA_AIS_OK) {
-		saHandleDestroy(&channel_handle_db, channel_handle);
+		hdb_handle_destroy(&channel_handle_db, channel_handle);
 		goto chan_open_put;
 	}
 
@@ -1133,16 +1134,16 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 	list_add(&hl->hl_entry, &evti->ei_channel_list);
 
 	pthread_mutex_init(&eci->eci_mutex, NULL);
-	saHandleInstancePut (&evt_instance_handle_db, evtHandle);
-	saHandleInstancePut (&channel_handle_db, channel_handle);
+	hdb_handle_put (&evt_instance_handle_db, evtHandle);
+	hdb_handle_put (&channel_handle_db, channel_handle);
 
 	return SA_AIS_OK;
 
 chan_open_free:
-	saHandleDestroy(&channel_handle_db, channel_handle);
-	saHandleInstancePut (&channel_handle_db, channel_handle);
+	hdb_handle_destroy(&channel_handle_db, channel_handle);
+	hdb_handle_put (&channel_handle_db, channel_handle);
 chan_open_put:
-	saHandleInstancePut (&evt_instance_handle_db, evtHandle);
+	hdb_handle_put (&evt_instance_handle_db, evtHandle);
 chan_open_done:
 	return error;
 }
@@ -1179,8 +1180,8 @@ saEvtChannelUnlink(
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
-			(void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db, evtHandle,
+			(void*)&evti));
 
 	if (error != SA_AIS_OK) {
 		goto chan_unlink_done;
@@ -1215,7 +1216,7 @@ saEvtChannelUnlink(
 	error = res.iuc_head.error;
 
 chan_unlink_put:
-	saHandleInstancePut (&evt_instance_handle_db, evtHandle);
+	hdb_handle_put (&evt_instance_handle_db, evtHandle);
 chan_unlink_done:
 	return error;
 }
@@ -1246,27 +1247,27 @@ saEvtEventAllocate(
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
-	error = saHandleInstanceGet(&channel_handle_db, channelHandle,
-			(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, channelHandle,
+			(void*)&eci));
 	if (error != SA_AIS_OK) {
 		goto alloc_done;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db,
-			eci->eci_instance_handle, (void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db,
+			eci->eci_instance_handle, (void*)&evti));
 	if (error != SA_AIS_OK) {
 		goto alloc_put1;
 	}
 
-	error = saHandleCreate(&event_handle_db, sizeof(*edi),
-			eventHandle);
+	error = hdb_error_to_sa(hdb_handle_create(&event_handle_db, sizeof(*edi),
+			eventHandle));
 	if (error != SA_AIS_OK) {
 		goto alloc_put2;
 	}
-	error = saHandleInstanceGet(&event_handle_db, *eventHandle,
-					(void*)&edi);
+	error = hdb_error_to_sa(hdb_handle_get(&event_handle_db, *eventHandle,
+					(void*)&edi));
 	if (error != SA_AIS_OK) {
-		saHandleDestroy(&event_handle_db, *eventHandle);
+		hdb_handle_destroy(&event_handle_db, *eventHandle);
 		goto alloc_put2;
 	}
 
@@ -1281,7 +1282,7 @@ saEvtEventAllocate(
 	edi->edi_retention_time = 0;
 	hl = malloc(sizeof(*hl));
 	if (!hl) {
-		saHandleDestroy(&event_handle_db, *eventHandle);
+		hdb_handle_destroy(&event_handle_db, *eventHandle);
 		error = SA_AIS_ERR_NO_MEMORY;
 		goto alloc_put2;
 	}
@@ -1291,12 +1292,12 @@ saEvtEventAllocate(
 	list_add(&hl->hl_entry, &eci->eci_event_list);
 
 
-	saHandleInstancePut (&event_handle_db, *eventHandle);
+	hdb_handle_put (&event_handle_db, *eventHandle);
 
 alloc_put2:
-	saHandleInstancePut (&evt_instance_handle_db, eci->eci_instance_handle);
+	hdb_handle_put (&evt_instance_handle_db, eci->eci_instance_handle);
 alloc_put1:
-	saHandleInstancePut (&channel_handle_db, channelHandle);
+	hdb_handle_put (&channel_handle_db, channelHandle);
 alloc_done:
 	return error;
 }
@@ -1313,8 +1314,8 @@ saEvtEventFree(SaEvtEventHandleT eventHandle)
 	SaAisErrorT error;
 	struct event_data_instance *edi;
 
-	error = saHandleInstanceGet(&event_handle_db, eventHandle,
-			(void*)&edi);
+	error = hdb_error_to_sa(hdb_handle_get(&event_handle_db, eventHandle,
+			(void*)&edi));
 	if (error != SA_AIS_OK) {
 		goto evt_free_done;
 	}
@@ -1325,14 +1326,14 @@ saEvtEventFree(SaEvtEventHandleT eventHandle)
 	pthread_mutex_lock(&edi->edi_mutex);
 	if (edi->edi_freeing) {
 		pthread_mutex_unlock(&edi->edi_mutex);
-		saHandleInstancePut(&event_handle_db, eventHandle);
+		hdb_handle_put(&event_handle_db, eventHandle);
 		return SA_AIS_ERR_BAD_HANDLE;
 	}
 	edi->edi_freeing = 1;
 
 	pthread_mutex_unlock(&edi->edi_mutex);
-	saHandleDestroy(&event_handle_db, eventHandle);
-	saHandleInstancePut(&event_handle_db, eventHandle);
+	hdb_handle_destroy(&event_handle_db, eventHandle);
+	hdb_handle_put(&event_handle_db, eventHandle);
 
 evt_free_done:
 	return error;
@@ -1363,8 +1364,8 @@ saEvtEventAttributesSet(
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
-	error = saHandleInstanceGet(&event_handle_db, eventHandle,
-			(void*)&edi);
+	error = hdb_error_to_sa(hdb_handle_get(&event_handle_db, eventHandle,
+			(void*)&edi));
 	if (error != SA_AIS_OK) {
 		goto attr_set_done;
 	}
@@ -1442,7 +1443,7 @@ attr_set_done_reset:
 	edi->edi_patterns.patternsNumber = oldnumber;
 attr_set_unlock:
 	pthread_mutex_unlock(&edi->edi_mutex);
-	saHandleInstancePut(&event_handle_db, eventHandle);
+	hdb_handle_put(&event_handle_db, eventHandle);
 attr_set_done:
 	return error;
 }
@@ -1475,8 +1476,8 @@ saEvtEventAttributesGet(
 	SaSizeT npats;
 	int i;
 
-	error = saHandleInstanceGet(&event_handle_db, eventHandle,
-			(void*)&edi);
+	error = hdb_error_to_sa(hdb_handle_get(&event_handle_db, eventHandle,
+			(void*)&edi));
 	if (error != SA_AIS_OK) {
 		goto attr_get_done;
 	}
@@ -1588,7 +1589,7 @@ saEvtEventAttributesGet(
 
 attr_get_unlock:
 	pthread_mutex_unlock(&edi->edi_mutex);
-	saHandleInstancePut(&event_handle_db, eventHandle);
+	hdb_handle_put(&event_handle_db, eventHandle);
 attr_get_done:
 	return error;
 }
@@ -1612,8 +1613,8 @@ saEvtEventDataGet(
 		goto data_get_done;
 	}
 
-	error = saHandleInstanceGet(&event_handle_db, eventHandle,
-			(void*)&edi);
+	error = hdb_error_to_sa(hdb_handle_get(&event_handle_db, eventHandle,
+			(void*)&edi));
 	if (error != SA_AIS_OK) {
 		goto data_get_done;
 	}
@@ -1651,7 +1652,7 @@ saEvtEventDataGet(
 
 unlock_put:
 	pthread_mutex_unlock(&edi->edi_mutex);
-	saHandleInstancePut(&event_handle_db, eventHandle);
+	hdb_handle_put(&event_handle_db, eventHandle);
 data_get_done:
 	return error;
 }
@@ -1801,15 +1802,15 @@ saEvtEventPublish(
 		goto pub_done;
 	}
 
-	error = saHandleInstanceGet(&event_handle_db, eventHandle,
-			(void*)&edi);
+	error = hdb_error_to_sa(hdb_handle_get(&event_handle_db, eventHandle,
+			(void*)&edi));
 	if (error != SA_AIS_OK) {
 		goto pub_done;
 	}
 	pthread_mutex_lock(&edi->edi_mutex);
 
-	error = saHandleInstanceGet(&channel_handle_db, edi->edi_channel_handle,
-			(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, edi->edi_channel_handle,
+			(void*)&eci));
 	if (error != SA_AIS_OK) {
 		goto pub_put1;
 	}
@@ -1822,8 +1823,8 @@ saEvtEventPublish(
 		goto pub_put2;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db,
-			eci->eci_instance_handle, (void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db,
+			eci->eci_instance_handle, (void*)&evti));
 	if (error != SA_AIS_OK) {
 		goto pub_put2;
 	}
@@ -1887,12 +1888,12 @@ saEvtEventPublish(
 	}
 
 pub_put3:
-	saHandleInstancePut (&evt_instance_handle_db, eci->eci_instance_handle);
+	hdb_handle_put (&evt_instance_handle_db, eci->eci_instance_handle);
 pub_put2:
-	saHandleInstancePut (&channel_handle_db, edi->edi_channel_handle);
+	hdb_handle_put (&channel_handle_db, edi->edi_channel_handle);
 pub_put1:
 	pthread_mutex_unlock(&edi->edi_mutex);
-	saHandleInstancePut(&event_handle_db, eventHandle);
+	hdb_handle_put(&event_handle_db, eventHandle);
 pub_done:
 	return error;
 }
@@ -1930,8 +1931,8 @@ saEvtEventSubscribe(
 	if (!filters) {
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
-	error = saHandleInstanceGet(&channel_handle_db, channelHandle,
-			(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, channelHandle,
+			(void*)&eci));
 	if (error != SA_AIS_OK) {
 		goto subscribe_done;
 	}
@@ -1939,8 +1940,8 @@ saEvtEventSubscribe(
 	/*
 	 * get the evt handle for the fd
 	 */
-	error = saHandleInstanceGet(&evt_instance_handle_db,
-			eci->eci_instance_handle, (void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db,
+			eci->eci_instance_handle, (void*)&evti));
 	if (error != SA_AIS_OK) {
 		goto subscribe_put1;
 	}
@@ -2000,10 +2001,10 @@ saEvtEventSubscribe(
 	error = res.ics_head.error;
 
 subscribe_put2:
-	saHandleInstancePut(&evt_instance_handle_db,
+	hdb_handle_put(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 subscribe_put1:
-	saHandleInstancePut(&channel_handle_db, channelHandle);
+	hdb_handle_put(&channel_handle_db, channelHandle);
 subscribe_done:
 	return error;
 }
@@ -2030,14 +2031,14 @@ saEvtEventUnsubscribe(
 	struct res_evt_event_unsubscribe res;
 	struct iovec iov;
 
-	error = saHandleInstanceGet(&channel_handle_db, channelHandle,
-			(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, channelHandle,
+			(void*)&eci));
 	if (error != SA_AIS_OK) {
 		goto unsubscribe_done;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db,
-			eci->eci_instance_handle, (void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db,
+			eci->eci_instance_handle, (void*)&evti));
 	if (error != SA_AIS_OK) {
 		goto unsubscribe_put1;
 	}
@@ -2067,10 +2068,10 @@ saEvtEventUnsubscribe(
 	error = res.icu_head.error;
 
 unsubscribe_put2:
-	saHandleInstancePut(&evt_instance_handle_db,
+	hdb_handle_put(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 unsubscribe_put1:
-	saHandleInstancePut(&channel_handle_db, channelHandle);
+	hdb_handle_put(&channel_handle_db, channelHandle);
 unsubscribe_done:
 	return error;
 }
@@ -2100,14 +2101,14 @@ saEvtEventRetentionTimeClear(
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
-	error = saHandleInstanceGet(&channel_handle_db, channelHandle,
-			(void*)&eci);
+	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, channelHandle,
+			(void*)&eci));
 	if (error != SA_AIS_OK) {
 		goto ret_time_done;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db,
-			eci->eci_instance_handle, (void*)&evti);
+	error = hdb_error_to_sa(hdb_handle_get(&evt_instance_handle_db,
+			eci->eci_instance_handle, (void*)&evti));
 	if (error != SA_AIS_OK) {
 		goto ret_time_put1;
 	}
@@ -2137,10 +2138,10 @@ saEvtEventRetentionTimeClear(
 	error = res.iec_head.error;
 
 ret_time_put2:
-	saHandleInstancePut(&evt_instance_handle_db,
+	hdb_handle_put(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 ret_time_put1:
-	saHandleInstancePut(&channel_handle_db, channelHandle);
+	hdb_handle_put(&channel_handle_db, channelHandle);
 ret_time_done:
 	return error;
 }

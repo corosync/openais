@@ -56,6 +56,7 @@
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
 #include <corosync/corodefs.h>
+#include <corosync/hdb.h>
 #include <corosync/list.h>
 
 #include "../include/ipc_tmr.h"
@@ -72,7 +73,7 @@ struct tmrInstance {
 
 void tmrHandleInstanceDestructor (void *instance);
 
-DECLARE_SAHDB_DATABASE(tmrHandleDatabase,tmrHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(tmrHandleDatabase,tmrHandleInstanceDestructor);
 
 static SaVersionT tmrVersionsSupported[] = {
 	{ 'A', 1, 1 }
@@ -120,12 +121,12 @@ saTmrInitialize (
 		goto error_exit;
 	}
 
-	error = saHandleCreate (&tmrHandleDatabase, sizeof (struct tmrInstance), tmrHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&tmrHandleDatabase, sizeof (struct tmrInstance), tmrHandle));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, *tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, *tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -151,14 +152,14 @@ saTmrInitialize (
 
 	pthread_mutex_init (&tmrInstance->response_mutex, NULL);
 
-	saHandleInstancePut (&tmrHandleDatabase, *tmrHandle);
+	hdb_handle_put (&tmrHandleDatabase, *tmrHandle);
 
 	return (SA_AIS_OK);
 
 error_put_destroy:
-	saHandleInstancePut (&tmrHandleDatabase, *tmrHandle);
+	hdb_handle_put (&tmrHandleDatabase, *tmrHandle);
 error_destroy:
-	saHandleDestroy (&tmrHandleDatabase, *tmrHandle);
+	hdb_handle_destroy (&tmrHandleDatabase, *tmrHandle);
 error_exit:
 	return (error);
 }
@@ -179,14 +180,14 @@ saTmrSelectionObjectGet (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
 	*selectionObject = coroipcc_fd_get (&tmrInstance->ipc_ctx);
 
-	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+	hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 
 error_exit:
 	return (SA_AIS_OK);
@@ -215,8 +216,8 @@ saTmrDispatch (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle,
-		(void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle,
+		(void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -286,7 +287,7 @@ saTmrDispatch (
 	} while (cont);
 
 error_put:
-	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+	hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 error_exit:
 	return (error);
 }
@@ -301,7 +302,7 @@ saTmrFinalize (
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrFinalize\n");
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -310,7 +311,7 @@ saTmrFinalize (
 
 	if (tmrInstance->finalize) {
 		pthread_mutex_unlock (&tmrInstance->response_mutex);
-		saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+		hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 		error = SA_AIS_ERR_BAD_HANDLE;
 		goto error_exit;
 	}
@@ -323,7 +324,7 @@ saTmrFinalize (
 
 	/* tmrInstanceFinalize (tmrInstance); */
 
-	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+	hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 
 error_exit:
 	return (SA_AIS_OK);
@@ -369,7 +370,7 @@ saTmrTimerStart (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -410,7 +411,7 @@ saTmrTimerStart (
 	}
 
 error_put:
-	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+	hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 error_exit:
 	return (error);
 }
@@ -445,7 +446,7 @@ saTmrTimerReschedule (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -477,7 +478,7 @@ saTmrTimerReschedule (
 		error = res_lib_tmr_timerreschedule.header.error;
 	}
 
-	saHandleInstancePut (&tmrHandleDatabase, tmrHandle);
+	hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 
 error_exit:
 	return (error);
@@ -505,7 +506,7 @@ saTmrTimerCancel (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -558,7 +559,7 @@ saTmrPeriodicTimerSkip (
 	printf ("[DEBUG]: saTmrPeriodicTimerSkip { id=%u }\n",
 		(unsigned int)(timerId));
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -613,7 +614,7 @@ saTmrTimerRemainingTimeGet (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -670,7 +671,7 @@ saTmrTimerAttributesGet (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -726,7 +727,7 @@ saTmrTimeGet (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -780,7 +781,7 @@ saTmrClockTickGet (
 		goto error_exit;
 	}
 
-	error = saHandleInstanceGet (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}

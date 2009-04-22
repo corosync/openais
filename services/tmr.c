@@ -79,7 +79,7 @@ struct timer_instance {
 	struct list_head cleanup_list;
 };
 
-DECLARE_HDB_DATABASE (timer_hdb);
+DECLARE_HDB_DATABASE (timer_hdb,NULL);
 
 static struct corosync_api_v1 *api;
 

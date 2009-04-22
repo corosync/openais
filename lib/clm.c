@@ -52,6 +52,7 @@
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
 #include <corosync/corodefs.h>
+#include <corosync/hdb.h>
 #include <corosync/swab.h>
 #include <corosync/mar_gen.h>
 #include <saAis.h>
@@ -71,7 +72,7 @@ struct clmInstance {
 
 static void clmHandleInstanceDestructor (void *);
 
-DECLARE_SAHDB_DATABASE(clmHandleDatabase,clmHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(clmHandleDatabase,clmHandleInstanceDestructor);
 
 /*
  * Versions supported
@@ -153,14 +154,14 @@ saClmInitialize (
 		goto error_no_destroy;
 	}
 
-	error = saHandleCreate (&clmHandleDatabase, sizeof (struct clmInstance),
-		clmHandle);
+	error = hdb_error_to_sa(hdb_handle_create (&clmHandleDatabase, sizeof (struct clmInstance),
+		clmHandle));
 	if (error != SA_AIS_OK) {
 		goto error_no_destroy;
 	}
 
-	error = saHandleInstanceGet (&clmHandleDatabase, *clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, *clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -186,14 +187,14 @@ saClmInitialize (
 
 	pthread_mutex_init (&clmInstance->dispatch_mutex, NULL);
 
-	saHandleInstancePut (&clmHandleDatabase, *clmHandle);
+	hdb_handle_put (&clmHandleDatabase, *clmHandle);
 
 	return (SA_AIS_OK);
 
 error_put_destroy:
-	saHandleInstancePut (&clmHandleDatabase, *clmHandle);
+	hdb_handle_put (&clmHandleDatabase, *clmHandle);
 error_destroy:
-	saHandleDestroy (&clmHandleDatabase, *clmHandle);
+	hdb_handle_destroy (&clmHandleDatabase, *clmHandle);
 error_no_destroy:
 	return (error);
 }
@@ -231,15 +232,15 @@ saClmSelectionObjectGet (
 	if (selectionObject == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
-	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
 	*selectionObject = coroipcc_fd_get (clmInstance->ipc_ctx);
 
-	saHandleInstancePut (&clmHandleDatabase, clmHandle);
+	hdb_handle_put (&clmHandleDatabase, clmHandle);
 	return (SA_AIS_OK);
 }
 
@@ -286,8 +287,8 @@ saClmDispatch (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -409,7 +410,7 @@ saClmDispatch (
 	goto error_put;
 
 error_put:
-	saHandleInstancePut (&clmHandleDatabase, clmHandle);
+	hdb_handle_put (&clmHandleDatabase, clmHandle);
 	return (error);
 }
 
@@ -444,8 +445,8 @@ saClmFinalize (
 	struct clmInstance *clmInstance;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -457,7 +458,7 @@ saClmFinalize (
 	 */
 	if (clmInstance->finalize) {
 		pthread_mutex_unlock (&clmInstance->response_mutex);
-		saHandleInstancePut (&clmHandleDatabase, clmHandle);
+		hdb_handle_put (&clmHandleDatabase, clmHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
@@ -467,9 +468,9 @@ saClmFinalize (
 
 	pthread_mutex_unlock (&clmInstance->response_mutex);
 
-	saHandleDestroy (&clmHandleDatabase, clmHandle);
+	hdb_handle_destroy (&clmHandleDatabase, clmHandle);
 
-	saHandleInstancePut (&clmHandleDatabase, clmHandle);
+	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
 	return (error);
 }
@@ -488,8 +489,8 @@ saClmClusterTrack (
 	unsigned int i;
 	struct iovec iov;
 
-	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -570,7 +571,7 @@ error_exit:
 	pthread_mutex_unlock (&clmInstance->response_mutex);
 
 error_nounlock:
-	saHandleInstancePut (&clmHandleDatabase, clmHandle);
+	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
         return (error == SA_AIS_OK ? res_lib_clm_clustertrack.header.error : error);
 }
@@ -587,8 +588,8 @@ saClmClusterTrackStop (
 
 	req_lib_clm_trackstop.header.size = sizeof (struct req_lib_clm_trackstop);
 	req_lib_clm_trackstop.header.id = MESSAGE_REQ_CLM_TRACKSTOP;
-	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -606,7 +607,7 @@ saClmClusterTrackStop (
 
 	pthread_mutex_unlock (&clmInstance->response_mutex);
 
-	saHandleInstancePut (&clmHandleDatabase, clmHandle);
+	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
         return (error == SA_AIS_OK ? res_lib_clm_trackstop.header.error : error);
 }
@@ -632,8 +633,8 @@ saClmClusterNodeGet (
 		return (SA_AIS_ERR_TIMEOUT);
 	}
 
-	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -667,7 +668,7 @@ saClmClusterNodeGet (
 error_exit:
 	pthread_mutex_unlock (&clmInstance->response_mutex);
 
-	saHandleInstancePut (&clmHandleDatabase, clmHandle);
+	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
 	return (error);
 }
@@ -689,8 +690,8 @@ saClmClusterNodeGetAsync (
 	req_lib_clm_nodegetasync.invocation = invocation;
 	req_lib_clm_nodegetasync.node_id = nodeId;
 
-	error = saHandleInstanceGet (&clmHandleDatabase, clmHandle,
-		(void *)&clmInstance);
+	error = hdb_error_to_sa(hdb_handle_get (&clmHandleDatabase, clmHandle,
+		(void *)&clmInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -720,7 +721,7 @@ saClmClusterNodeGetAsync (
 error_exit:
 	pthread_mutex_unlock (&clmInstance->response_mutex);
 
-	saHandleInstancePut (&clmHandleDatabase, clmHandle);
+	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
 	return (error);
 }
