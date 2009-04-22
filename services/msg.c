@@ -1091,7 +1091,7 @@ static void msg_confchg_fn (
 	const unsigned int *joined_list, size_t joined_list_entries,
 	const struct memb_ring_id *ring_id)
 {
-	unsigned int i, j;
+	unsigned int i;
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_confchg_fn\n");
 
@@ -1107,13 +1107,11 @@ static void msg_confchg_fn (
 
 	msg_sync_state = MSG_SYNC_STATE_STARTED;
 
-	for (i = 0; i < msg_member_list_entries; i++) {
-		for (j = 0; j < member_list_entries; j++) {
-			if (msg_member_list[i] == member_list[j]) {
-				if (lowest_nodeid > member_list[j]) {
-					lowest_nodeid = member_list[j];
-				}
-			}
+	lowest_nodeid =  0xffffffff;
+
+	for (i = 0; i < member_list_entries; i++) {
+		if (lowest_nodeid > member_list[i]) {
+			lowest_nodeid = member_list[i];
 		}
 	}
 
