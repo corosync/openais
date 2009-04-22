@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -102,7 +102,7 @@ static inline void marshall_to_mar_ckpt_checkpoint_creation_attributes_t (
 	dest->max_section_size = src->maxSectionSize;
 	dest->max_section_id_size = src->maxSectionIdSize;
 }
-	
+
 #define MAR_CKPT_CHECKPOINT_READ	0x1
 #define MAR_CKPT_CHECKPOINT_WRITE	0x2
 #define MAR_CKPT_CHECKPOINT_CREATE	0x4
@@ -260,7 +260,7 @@ typedef struct {
 } mar_ckpt_io_vector_element_t;
 
 /*
- * Marshalling the SaCkptCheckpointDescriptorT 
+ * Marshalling the SaCkptCheckpointDescriptorT
  */
 typedef struct {
 	mar_ckpt_checkpoint_creation_attributes_t checkpoint_creation_attributes __attribute__((aligned(8)));

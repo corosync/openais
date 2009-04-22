@@ -594,7 +594,7 @@ struct corosync_service_engine ckpt_service_engine = {
 	.name				= "openais checkpoint service B.01.01",
 	.id				= CKPT_SERVICE,
 	.private_data_size		= sizeof (struct ckpt_pd),
-	.flow_control			= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED, 
+	.flow_control			= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED,
 	.lib_init_fn			= ckpt_lib_init_fn,
 	.lib_exit_fn			= ckpt_lib_exit_fn,
 	.lib_engine			= ckpt_lib_engine,
@@ -1344,9 +1344,9 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 			&checkpoint->checkpoint_creation_attributes,
 			sizeof (mar_ckpt_checkpoint_creation_attributes_t));
 
-		my_creation_attributes.retention_duration = 
+		my_creation_attributes.retention_duration =
 			checkpoint->checkpoint_creation_attributes.retention_duration;
-        
+
 		if (req_exec_ckpt_checkpointopen->checkpoint_creation_attributes_set &&
 			memcmp (&checkpoint->checkpoint_creation_attributes,
 				&my_creation_attributes,
@@ -1800,13 +1800,13 @@ static void message_handler_req_exec_ckpt_sectioncreate (
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
-	
+
 	if (checkpoint->checkpoint_creation_attributes.max_section_id_size <
 		req_exec_ckpt_sectioncreate->id_len) {
-		
+
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
-	}	
+	}
 
 	/*
 	 * Determine if user-specified checkpoint section already exists
@@ -2385,7 +2385,7 @@ error_exit:
 		iov[0].iov_len = sizeof (struct res_lib_ckpt_sectionread);
 		iov_len = 1;
 
-		if (error == SA_AIS_OK) { 
+		if (error == SA_AIS_OK) {
 			char *sd;
 			sd = (char *)checkpoint_section->section_data;
 			iov[1].iov_base = &sd[req_exec_ckpt_sectionread->data_offset],
@@ -3097,7 +3097,7 @@ static void message_handler_req_lib_ckpt_sectioniterationinitialize (
 	memcpy (&iteration_instance->checkpoint_name,
 		&req_lib_ckpt_sectioniterationinitialize->checkpoint_name,
 		sizeof (mar_name_t));
-	iteration_instance->ckpt_id = 
+	iteration_instance->ckpt_id =
 		req_lib_ckpt_sectioniterationinitialize->ckpt_id;
 
 	/*
@@ -3151,7 +3151,7 @@ static void message_handler_req_lib_ckpt_sectioniterationinitialize (
 			checkpoint_section->section_descriptor.section_id.id_len);
 		iteration_entries[iteration_instance->iteration_entries_count].section_id_len = checkpoint_section->section_descriptor.section_id.id_len;
 		iteration_instance->iteration_entries_count += 1;
-			
+
 	}
 
 error_put:
@@ -3381,7 +3381,7 @@ static void sync_refcount_calculate (
 		if (checkpoint->refcount_set[i].nodeid == 0) {
 			break;
 		}
-		
+
 		checkpoint->reference_count += checkpoint->refcount_set[i].refcount;
 	}
 }
@@ -3456,7 +3456,7 @@ static int sync_checkpoint_transmit (struct checkpoint *checkpoint)
 
 	memcpy (&req_exec_ckpt_sync_checkpoint.ring_id,
 		&my_saved_ring_id, sizeof (struct memb_ring_id));
-		
+
 	memcpy (&req_exec_ckpt_sync_checkpoint.checkpoint_name,
 		&checkpoint->name, sizeof (mar_name_t));
 
@@ -3518,7 +3518,7 @@ static int sync_checkpoint_section_transmit (
 	req_exec_ckpt_sync_checkpoint_section.id_len =
 		checkpoint_section->section_descriptor.section_id.id_len;
 
-	req_exec_ckpt_sync_checkpoint_section.section_size = 
+	req_exec_ckpt_sync_checkpoint_section.section_size =
 		 checkpoint_section->section_descriptor.section_size;
 
 	req_exec_ckpt_sync_checkpoint_section.section_size =
@@ -3564,7 +3564,7 @@ static int sync_checkpoint_refcount_transmit (
 	marshall_to_mar_refcount_set_t_all (
 		req_exec_ckpt_sync_checkpoint_refcount.refcount_set,
 		checkpoint->refcount_set);
-	
+
 	iovec.iov_base = (char *)&req_exec_ckpt_sync_checkpoint_refcount;
 	iovec.iov_len = sizeof (struct req_exec_ckpt_sync_checkpoint_refcount);
 
@@ -3695,7 +3695,7 @@ static int ckpt_sync_process (void)
 			/*
 			 * Not done iterating checkpoints
 			 */
-			if (res != 0) { 
+			if (res != 0) {
 				done_queueing = 0;
 			}
 		}
@@ -3708,7 +3708,7 @@ static int ckpt_sync_process (void)
 		if (my_should_sync) {
 			TRACE1 ("transmit refcounts because this processor is the lowest member in old configuration.\n");
 			res = sync_refcounts_iterate ();
-			if (res != 0) { 
+			if (res != 0) {
 				continue_processing = 1;
 			}
 		}
@@ -3768,7 +3768,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 	 * Discard checkpoints that are used to synchronize the global_ckpt_id
 	 * also setting the global ckpt_id as well.
 	 */
-	if (memcmp (&req_exec_ckpt_sync_checkpoint->checkpoint_name.value, 
+	if (memcmp (&req_exec_ckpt_sync_checkpoint->checkpoint_name.value,
 		GLOBALID_CHECKPOINT_NAME,
 		req_exec_ckpt_sync_checkpoint->checkpoint_name.length) == 0) {
 
@@ -3858,7 +3858,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 	 * Discard checkpoints that are used to synchronize the global_ckpt_id
 	 * also setting the global ckpt_id as well.
 	 */
-	if (memcmp (&req_exec_ckpt_sync_checkpoint_section->checkpoint_name.value, 
+	if (memcmp (&req_exec_ckpt_sync_checkpoint_section->checkpoint_name.value,
 		GLOBALID_CHECKPOINT_NAME,
 		req_exec_ckpt_sync_checkpoint_section->checkpoint_name.length) == 0) {
 
@@ -3929,7 +3929,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 			 */
 			section_id = NULL;
 		}
-		
+
 		memcpy (section_contents,
 		((char *)req_exec_ckpt_sync_checkpoint_section) +
 			sizeof (struct req_exec_ckpt_sync_checkpoint_section) +
@@ -3987,7 +3987,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_refcount (
 	 * Discard checkpoints that are used to synchronize the global_ckpt_id
 	 * also setting the global ckpt_id as well.
 	 */
-	if (memcmp (&req_exec_ckpt_sync_checkpoint_refcount->checkpoint_name.value, 
+	if (memcmp (&req_exec_ckpt_sync_checkpoint_refcount->checkpoint_name.value,
 		GLOBALID_CHECKPOINT_NAME,
 		req_exec_ckpt_sync_checkpoint_refcount->checkpoint_name.length) == 0) {
 

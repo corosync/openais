@@ -9,7 +9,7 @@
  *
  * All rights reserved.
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -131,7 +131,7 @@ typedef enum {
 	NODE_ACSM_LEAVING_SPONTANEOUSLY_WAITING_FOR_NODE_TO_JOIN,
 	NODE_ACSM_JOINING_STARTING_APPLICATIONS,
 	NODE_ACSM_JOINING_ASSIGNING_WORKLOAD
-} amf_node_acsm_state_t; 
+} amf_node_acsm_state_t;
 
 typedef enum {
 	SG_AC_Idle = 0,
@@ -243,7 +243,7 @@ typedef struct amf_fifo {
 
 
 typedef enum {
-	AMF_PRESENCE_TERMINATION_FAILED_REBOOT = 
+	AMF_PRESENCE_TERMINATION_FAILED_REBOOT =
 	SA_AMF_PRESENCE_TERMINATION_FAILED + 1
 } AmfPresenceStateT;
 
@@ -669,7 +669,7 @@ extern void amf_runtime_attributes_print (struct amf_cluster *cluster);
 extern int amf_enabled (struct corosync_api_v1 *coroapi);
 extern void *_amf_malloc (size_t size, const char *file, unsigned int line);
 #define amf_malloc(size) _amf_malloc ((size), __FILE__, __LINE__)
-extern void *_amf_realloc (void* ptr, size_t size, const char *file, 
+extern void *_amf_realloc (void* ptr, size_t size, const char *file,
 	unsigned int line);
 #define amf_realloc(ptr,size) _amf_realloc ((ptr), (size), __FILE__, __LINE__)
 extern void *_amf_calloc (size_t nmemb, size_t size, const char *file,
@@ -702,7 +702,7 @@ extern char *amf_deserialize_SaUint32T (char *buf, SaUint32T *num);
 extern char *amf_deserialize_SaUint64T (char *buf, SaUint64T *num);
 extern char *amf_deserialize_opaque (char *buf, void *dst, int *cnt);
 extern int amf_msg_mcast (int msg_id, void *buf, size_t len);
-extern void amf_fifo_put (int entry_type, amf_fifo_t **root, 
+extern void amf_fifo_put (int entry_type, amf_fifo_t **root,
 	int size_of_data, void *data);
 extern int amf_fifo_get (amf_fifo_t **root, void *data);
 extern void amf_call_function_asynchronous (async_func_t async_func, void *param);
@@ -718,7 +718,7 @@ extern struct amf_node *amf_node_deserialize (
 extern struct amf_node *amf_node_find (SaNameT *name);
 extern struct amf_node *amf_node_find_by_nodeid (unsigned int nodeid);
 extern struct amf_node *amf_node_find_by_hostname (const char *hostname);
-extern void amf_node_sg_failed_over (struct amf_node *node, 
+extern void amf_node_sg_failed_over (struct amf_node *node,
 	struct amf_sg *sg_in);
 
 /* Event methods */
@@ -764,12 +764,12 @@ extern int amf_cluster_applications_started_with_no_starting_sgs (
 
 
 /* Event methods */
-extern void amf_cluster_start_tmo_event (int is_sync_master, 
+extern void amf_cluster_start_tmo_event (int is_sync_master,
 	struct amf_cluster *cluster, const SaNameT *sourceNodeName);
-extern void amf_cluster_sync_ready (struct amf_cluster *cluster, 
+extern void amf_cluster_sync_ready (struct amf_cluster *cluster,
 	struct amf_node *node);
 /**
- * 
+ *
  * @param cluster
  * @param app
  */
@@ -823,7 +823,7 @@ extern struct amf_sg *amf_sg_deserialize (
 
 /**
  * Request SG to start (instantiate all SUs)
- * 
+ *
  * @param sg
  * @param node - NULL start all SUs in the SG
  * @param node - !NULL start all SUs in the SG for the specified
@@ -883,7 +883,7 @@ extern int amf_su_are_all_comps_in_su (struct amf_su *su,
 
 /* Event methods */
 /**
- * 
+ *
  * @param su
  * @param comp
  */
@@ -966,7 +966,7 @@ extern void amf_comp_cleanup_failed_completed (amf_comp_t *comp);
 /**
  * Count number of active CSI assignments
  * @param component
- * 
+ *
  * @return int
  */
 extern int amf_comp_get_saAmfCompNumCurrActiveCsi(struct amf_comp *component);
@@ -974,13 +974,13 @@ extern int amf_comp_get_saAmfCompNumCurrActiveCsi(struct amf_comp *component);
 /**
  * Count number of standby CSI assignments
  * @param component
- * 
+ *
  * @return int
  */
 extern int amf_comp_get_saAmfCompNumCurrStandbyCsi(struct amf_comp *component);
 
 /*
- * Originates from library                                                                
+ * Originates from library
  */
 
 extern SaAisErrorT amf_comp_healthcheck_start (
@@ -1013,7 +1013,7 @@ extern int amf_comp_response_1 (
 	SaAmfRecommendedRecoveryT *recommendedRecovery);
 extern struct amf_comp *amf_comp_response_2 (
 	SaUint32T interface, const SaNameT *dn, const SaAmfHealthcheckKeyT *healthcheckKey,
-	SaAisErrorT error, SaAisErrorT *retval, 
+	SaAisErrorT error, SaAisErrorT *retval,
 	SaAmfRecommendedRecoveryT recommendedRecovery);
 extern SaAisErrorT amf_comp_hastate_get (
 	struct amf_comp *comp, const SaNameT *csi_name, SaAmfHAStateT *ha_state);
@@ -1061,7 +1061,7 @@ char *amf_si_assignment_dn_make (struct amf_su *su, struct amf_si *si,
 /**
  * Get number of active assignments for the specified SI
  * @param si
- * 
+ *
  * @return int
  */
 extern int amf_si_get_saAmfSINumCurrActiveAssignments (struct amf_si *si);
@@ -1069,7 +1069,7 @@ extern int amf_si_get_saAmfSINumCurrActiveAssignments (struct amf_si *si);
  * Get number of active assignments for the specified SI and SU
  * @param si
  * @param su
- * 
+ *
  * @return int
  */
 extern int amf_si_su_get_saAmfSINumCurrActiveAssignments (struct amf_si *si,
@@ -1078,7 +1078,7 @@ extern int amf_si_su_get_saAmfSINumCurrActiveAssignments (struct amf_si *si,
 /**
  * Get number of standby assignments for the specified SI
  * @param si
- * 
+ *
  * @return int
  */
 
@@ -1087,7 +1087,7 @@ extern int amf_si_get_saAmfSINumCurrStandbyAssignments (struct amf_si *si);
 /**
  * Get number of standby assignments for the specified SI and SU
  * @param si
- * 
+ *
  * @return int
  */
 extern int amf_si_su_get_saAmfSINumCurrStandbyAssignments (struct amf_si *si,
@@ -1096,7 +1096,7 @@ extern int amf_si_su_get_saAmfSINumCurrStandbyAssignments (struct amf_si *si,
 /**
  * Get assignment state for the specified SI.
  * @param si
- * 
+ *
  * @return SaAmfAssignmentStateT
  */
 
@@ -1118,10 +1118,10 @@ extern void amf_si_activate (
 /**
  * Deactivate all active assignments. Request component to
  * change HA state to quiesced.
- * 
+ *
  * @param si_assignment
  * @param deactivated_callback_fn
- * 
+ *
  * @return int 1 - deactived immediately
  * @return int 0 - asynchronous response through callback
  */
@@ -1133,7 +1133,7 @@ extern int amf_si_deactivate (
 
 /**
  * Request SI (SU) to assume a HA state (request component)
- * 
+ *
  * @param si_assignment
  * @param assumed_ha_state_callback_fn
  */
@@ -1144,7 +1144,7 @@ extern void amf_si_ha_state_assume (
 
 /**
  * Component reports to SI that a workload assignment succeeded.
- * 
+ *
  * @param si
  * @param csi_assignment
  */
@@ -1168,7 +1168,7 @@ extern void amf_si_comp_csi_removed (
 
 /**
  * Request a CSI to delete all CSI assignments.
- * 
+ *
  * @param component
  * @param csi
  */

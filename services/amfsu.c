@@ -1,5 +1,5 @@
 /** @file exec/amfsu.c
- * 
+ *
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
  * Author: Steven Dake (sdake@redhat.com)
  *
@@ -17,7 +17,7 @@
  *
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -41,15 +41,15 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF Service Unit Class Implementation
- * 
- * This file contains functions for handling AMF-service units(SUs). It can be 
+ *
+ * This file contains functions for handling AMF-service units(SUs). It can be
  * viewed as the implementation of the AMF Service Unit class (called SU)
- * as described in SAI-Overview-B.02.01. The SA Forum specification 
+ * as described in SAI-Overview-B.02.01. The SA Forum specification
  * SAI-AIS-AMF-B.02.01 has been used as specification of the behaviour
  * and is referred to as 'the spec' below.
- * 
+ *
  * The functions in this file are responsible for:
  *	- instantiating and terminating service units on request
  *	  (considering the dependencies between components described in paragraph
@@ -80,7 +80,7 @@
  * reported state transitions from its contained components according to
  * paragraph 3.3.1.1.
  *
- * The operational state machine is not responsible for any control function. 
+ * The operational state machine is not responsible for any control function.
  * It assumes the DISABLED state if an incoming operational state change report
  * from a component indicates the component has assumed the DISABLED state.
  * Operational state changes are reported to IMM.
@@ -99,7 +99,7 @@
  *	- RESTARTING_COMPONENT (DEACTIVATING, RESTARTING, SETTING and ACTIVATING)
  *	- RESTARTING_SERVICE_UNIT (DEACTIVATING, TERMINATING, INSTANTIATING,
  *                             and ACTIVATING)
- * 
+ *
  * IDLE is a kind of state where no actions are performed and used only to
  * remember the escallation level. Substate LEVEL_0 indicates no escallation.
  * LEVEL_1 indicates that a component restart has been executed recently and the
@@ -110,13 +110,13 @@
  * hosting this component. State RESTARTING_SERVICE_UNIT will only be assumed if
  * the node explicitly requests the SU to execute a restart of itself (after
  * having evaluated its part of the error escallation policy).
- * 
+ *
 * 1. Service Unit Restart Control State Machine
 *  ============================================
- * 
+ *
  * 1.1  State Transition Table
  * ===========================
- * 
+ *
  * State:                  Event:                 Action:  New state:
  * ===========================================================================
  * IDLE_ESCALATION_x       comp_restart           A9	   RS_COMP_RESTARTING
@@ -134,7 +134,7 @@
  * RS_COMP_T-ING_2         comp_uninst..ed [C101] A25      IDLE_ESCALATION_x
  * RS_COMP_T-ING_2         comp_uninst..ed [C102] A26      IDLE_ESCALATION_x
  * RS_COMP_T-ING_2         comp_term_failed [C100]         RS_COMP_T-ING_2
- * RS_COMP_T-ING_2         error_suspected        A18      RS_COMP_T-ING_2      
+ * RS_COMP_T-ING_2         error_suspected        A18      RS_COMP_T-ING_2
  * RS_COMP_SETTING         ha_state_assumed [C7]  A19      IDLE_ESCALATION_x
  * RS_COMP_SETTING         error_suspected        A18      RS_COMP_SETTING
  * RS_SU_TERMINATING       comp_uninst..ed [C8]   A16,A15  RS_SU_TERMINATING
@@ -155,10 +155,10 @@
  * RS_SU_T-ING_2           error_suspected        A18      RS_SU_T-ING_2
  * RS_SU_SETTING           ha_state_assumed [C10] A19      IDLE_ESCALATION_X
  * RS_SU_SETTING           error_suspected        A18      RS_SU_SETTING
- * 
+ *
  * 1.2 State Description
  * =====================
- * IDLE_ESCALATION_x - This is just an abbreviated notation for 
+ * IDLE_ESCALATION_x - This is just an abbreviated notation for
  *                     IDLE_ESCALATION_0, IDLE_ESCALATION_1 or IDLE_ESCALATION_2
  *                     When leaving any of the idle states, a history state
  *                     is used to save the (exact) state value. When returning
@@ -197,11 +197,11 @@
  *                     components. In this sub-state, the service unit has
  *                     ordered one of its components to restart and waits for
  *                     the component to indicate that the restart is done.
- * 
+ *
  * RS_COMP_T-ING_2 - SU_RC_RESTART_COMP_TERMINATING_AFTER_INST_FAILED
  *					Service unit is busy handling restart of one of its
  *					components. In this sub-state, the restart of the component
- *					has failed and the rest of the components in the service 
+ *					has failed and the rest of the components in the service
  *					unit has to be terminated.
  *
  * RS_COMP_SETTING - SU_RC_RESTART_COMP_SETTING
@@ -211,7 +211,7 @@
  *                  the HA-states it had before, provided none of the states
  *                  were ACTIVE. It waits for an acknowledgement that the
  *                  setting of the HA-states are done.
- * 
+ *
  * RS_COMP_ACTIVATING - SU_RC_RESTART_COMP_ACTIVATING
  *                     Service unit is busy handling restart of one of its
  *                     components. In this sub-state, the service unit has
@@ -239,7 +239,7 @@
  *                    ordered all its components to terminate and is waiting
  *                    for an acknowledgement that all components are done with
  *                    the termination.
- * 
+ *
  * RS_SU_INSTANTIATING - SU_RC_RESTART_SU_INSTANTIATING
  *                    Service unit is busy handling restart of all of its
  *                    components. In this sub-state, the service unit has
@@ -286,7 +286,7 @@
  * A11 - initiate setting of the same HA-state as was set before the restart
  * A12 - SI activate
  * A13 - [foreach si-assignment assigned to su] SI deactivate
- * A14 - set current instantiation level = highest level 
+ * A14 - set current instantiation level = highest level
  * A15 - [foreach component on current instantiation level]/terminate component
  * A16 - current instantiation level is decremented
  * A17 - request the presence state state machine to instantiate the su
@@ -365,8 +365,8 @@
  * E10 - si_state(ha-state)
  * E11 - activated
  * E12 - comp_state(prsm, UNINSTANTIATED)
- * E13 - 
- * E14 - 
+ * E13 -
+ * E14 -
  *
  */
 
@@ -381,11 +381,11 @@
 
 LOGSYS_DECLARE_SUBSYS ("AMF");
 
-static int terminate_all_components_in_level (struct amf_su *su, 
+static int terminate_all_components_in_level (struct amf_su *su,
 	SaUint32T current_instantiation_level);
 static int are_all_comps_in_level_uninst_or_term_failed (struct amf_su *su);
 static int are_all_comps_in_level_instantiated (struct amf_su *su);
-static int instantiate_all_components_in_level (struct amf_su *su, 
+static int instantiate_all_components_in_level (struct amf_su *su,
 	SaUint32T current_instantiation_level);
 static SaUint32T su_lowest_comp_instantiation_level_set (struct amf_su *su);
 static void si_ha_state_assumed_cbfn (
@@ -404,7 +404,7 @@ typedef struct su_event {
  *****************************************************************************/
 
 
-static void su_event_set(struct amf_su *su, struct amf_comp *comp, 
+static void su_event_set(struct amf_su *su, struct amf_comp *comp,
 	SaAmfRecommendedRecoveryT recommended_recovery,
 	su_event_t *su_event, amf_su_event_type_t event_type)
 {
@@ -414,8 +414,8 @@ static void su_event_set(struct amf_su *su, struct amf_comp *comp,
 	su_event->recommended_recovery = recommended_recovery;
 }
 
-static void su_defer_event (amf_su_t *su, amf_comp_t *comp, 
-	SaAmfRecommendedRecoveryT recommended_recovery, 
+static void su_defer_event (amf_su_t *su, amf_comp_t *comp,
+	SaAmfRecommendedRecoveryT recommended_recovery,
 	amf_su_event_type_t su_event_type)
 {
 	su_event_t event;
@@ -488,7 +488,7 @@ static void clear_ha_state (
 static void su_presence_state_set (struct amf_su *su,
 	SaAmfPresenceStateT presence_state)
 {
-	/*                                                              
+	/*
 	 * Set all SI's confirmed HA state to unknown if uninstantiated
 	*/
 	if (su->saAmfSUPresenceState == SA_AMF_PRESENCE_UNINSTANTIATED) {
@@ -503,7 +503,7 @@ static void su_presence_state_set (struct amf_su *su,
 
 	if (su->restart_control_state != SU_RC_RESTART_SU_SETTING &&
 		su->restart_control_state != SU_RC_RESTART_COMP_RESTARTING) {
-		amf_sg_su_state_changed (su->sg, su, SA_AMF_PRESENCE_STATE, 
+		amf_sg_su_state_changed (su->sg, su, SA_AMF_PRESENCE_STATE,
 			presence_state);
 	}
 }
@@ -602,7 +602,7 @@ static void comp_restart (struct amf_comp *comp)
  * the specified su via its csi and si objects.
  * @param su
  * @param current_instantiation_level
- * 
+ *
  * @return - 1 if there were no components on the specified instantiation level
  */
 static void reassume_ha_state(struct amf_su *su)
@@ -624,14 +624,14 @@ static int is_any_component_instantiating (amf_su_t *su)
 {
 	amf_comp_t *component;
 	int any_component_instantiating = 0;
-	for (component = su->comp_head; component != NULL; 
+	for (component = su->comp_head; component != NULL;
 		  component = component->next) {
-		if (component->saAmfCompPresenceState == 
+		if (component->saAmfCompPresenceState ==
 			SA_AMF_PRESENCE_INSTANTIATING) {
 			any_component_instantiating = 1;
 			break;
 		}
-		
+
 	}
 	return any_component_instantiating;
 }
@@ -640,14 +640,14 @@ static int is_any_component_terminating (amf_su_t *su)
 {
 	amf_comp_t *component;
 	int any_component_terminating = 0;
-	for (component = su->comp_head; component != NULL; 
+	for (component = su->comp_head; component != NULL;
 		  component = component->next) {
-		if (component->saAmfCompPresenceState == 
+		if (component->saAmfCompPresenceState ==
 			SA_AMF_PRESENCE_TERMINATING) {
 			any_component_terminating = 1;
 			break;
 		}
-		
+
 	}
 	return any_component_terminating;
 }
@@ -660,7 +660,7 @@ static int is_any_comp_instantiation_failed (amf_su_t *su)
 
 	for (comp_ = su->comp_head; comp_ != NULL; comp_ = comp_->next) {
 
-		if (comp_->saAmfCompPresenceState == 
+		if (comp_->saAmfCompPresenceState ==
 			SA_AMF_PRESENCE_INSTANTIATION_FAILED) {
 			comp_instantiation_failed = 1;
 			break;
@@ -676,7 +676,7 @@ static int is_any_comp_termination_failed (amf_su_t *su)
 
 	for (comp_ = su->comp_head; comp_ != NULL; comp_ = comp_->next) {
 
-		if (comp_->saAmfCompPresenceState == 
+		if (comp_->saAmfCompPresenceState ==
 			SA_AMF_PRESENCE_TERMINATION_FAILED) {
 			comp_instantiation_failed = 1;
 			break;
@@ -694,7 +694,7 @@ static int is_any_comp_termination_failed (amf_su_t *su)
  * (TERMINATION_FAILED) it can not take any workload before it has been manually
  * repaired.
  * @param su
- * 
+ *
  * @return - worst presence state
  */
 static SaAmfPresenceStateT 	get_worst_comps_presence_state_in_su (amf_su_t *su)
@@ -702,7 +702,7 @@ static SaAmfPresenceStateT 	get_worst_comps_presence_state_in_su (amf_su_t *su)
 	amf_comp_t *component;
 	SaAmfPresenceStateT worst_presence_state = 0;
 
-	for (component = su->comp_head; component != NULL; 
+	for (component = su->comp_head; component != NULL;
 		  component = component->next) {
 		if (component->saAmfCompPresenceState > worst_presence_state) {
 			worst_presence_state = component->saAmfCompPresenceState;
@@ -717,7 +717,7 @@ static SaAmfPresenceStateT 	get_worst_comps_presence_state_in_su (amf_su_t *su)
  * @param comp - component which has changed its presence state
  * @param state - new value of presence state
  */
-static void su_comp_presence_state_changed (struct amf_su *su, 
+static void su_comp_presence_state_changed (struct amf_su *su,
 	struct amf_comp *comp, int state)
 {
 	amf_node_t *node;
@@ -734,15 +734,15 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 				case SU_RC_IDLE_ESCALATION_LEVEL_0:
 					if (!is_any_component_instantiating (su)) {
 						if (are_all_comps_in_level_instantiated (su)) {
-							if (instantiate_all_components_in_level (su, 
+							if (instantiate_all_components_in_level (su,
 								++comp->su->current_comp_instantiation_level)) {
 								/* All levels of instantiation is done */
-								su_presence_state_set (comp->su, 
+								su_presence_state_set (comp->su,
 									SA_AMF_PRESENCE_INSTANTIATED);
 							}
 						} else {
 							if (is_any_comp_instantiation_failed (su)) {
-								su_presence_state_set (su, 
+								su_presence_state_set (su,
 									SA_AMF_PRESENCE_INSTANTIATION_FAILED);
 
 							} else {
@@ -758,15 +758,15 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 				case SU_RC_RESTART_SU_INSTANTIATING:
 					if (!is_any_component_instantiating(su)) {
 						if (are_all_comps_in_level_instantiated (su)) {
-							if (instantiate_all_components_in_level (su, 
+							if (instantiate_all_components_in_level (su,
 								++comp->su->current_comp_instantiation_level)) {
 								su->restart_control_state = SU_RC_RESTART_SU_SETTING;
-								su_presence_state_set (comp->su, 
+								su_presence_state_set (comp->su,
 									SA_AMF_PRESENCE_INSTANTIATED);
 								reassume_ha_state (comp->su);
 							}
 						} else if (is_any_comp_instantiation_failed (su)) {
-							su->restart_control_state = 
+							su->restart_control_state =
 								SU_RC_TERMINATING_AFTER_INSTANTIATION_FAILED;
 							terminate_all_components_in_level (su,
 								su->current_comp_instantiation_level);
@@ -794,7 +794,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 									get_worst_comps_presence_state_in_su (su));
 							} else {
 								if (is_any_comp_termination_failed (su)) {
-									su_presence_state_set (comp->su, 
+									su_presence_state_set (comp->su,
 										SA_AMF_PRESENCE_TERMINATION_FAILED);
 								} else {
 									assert (0);
@@ -812,7 +812,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 						if (terminate_all_components_in_level (su,
 							--su->current_comp_instantiation_level)) {
 							if (!is_any_comp_termination_failed (su)) {
-								su_presence_state_set (su, 
+								su_presence_state_set (su,
 									SA_AMF_PRESENCE_INSTANTIATION_FAILED);
 								if (node->saAmfNodeRebootOnInstantiationFailure) {
 									amf_node_failover(node);
@@ -838,9 +838,9 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 						if (terminate_all_components_in_level (su,
 							--su->current_comp_instantiation_level)) {
 							if (!is_any_comp_termination_failed (su)) {
-								su->restart_control_state = 
+								su->restart_control_state =
 									SU_RC_RESTART_SU_INSTANTIATING;
-								instantiate_all_components_in_level (su, 
+								instantiate_all_components_in_level (su,
 									su_lowest_comp_instantiation_level_set (
 									su));
 							} else {
@@ -879,20 +879,20 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 				case SU_RC_IDLE_ESCALATION_LEVEL_1:
 				case SU_RC_IDLE_ESCALATION_LEVEL_2:
 					if (!is_any_component_instantiating (su)) {
-						su_presence_state_set (su, 
+						su_presence_state_set (su,
 							SA_AMF_PRESENCE_INSTANTIATION_FAILED);
 					}
 					break;
 				case SU_RC_RESTART_COMP_RESTARTING:
-					su->restart_control_state = 
+					su->restart_control_state =
 						SU_RC_TERMINATING_AFTER_INSTANTIATION_FAILED;
 					amf_su_terminate (su);
 					break;
 				case SU_RC_RESTART_SU_INSTANTIATING:
 					if (!is_any_component_instantiating (su)) {
-						su->restart_control_state = 
+						su->restart_control_state =
 							SU_RC_TERMINATING_AFTER_INSTANTIATION_FAILED;
-						su_presence_state_set (su, 
+						su_presence_state_set (su,
 							SA_AMF_PRESENCE_INSTANTIATION_FAILED);
 						terminate_all_components_in_level (su,
 							su->current_comp_instantiation_level);
@@ -937,7 +937,7 @@ static void su_comp_presence_state_changed (struct amf_su *su,
 					}
 					break;
 				default:
-					log_printf (LOGSYS_LEVEL_NOTICE,"%s %d",su->name.value, 
+					log_printf (LOGSYS_LEVEL_NOTICE,"%s %d",su->name.value,
 						su->restart_control_state);
 					TRACE1 ("state %d", su->restart_control_state);
 					assert (0);
@@ -976,10 +976,10 @@ static void su_comp_op_state_changed (
 					}
 				}
 				if (all_set) {
-					amf_su_operational_state_set (comp->su, 
+					amf_su_operational_state_set (comp->su,
 						SA_AMF_OPERATIONAL_ENABLED);
 				} else {
-					amf_su_operational_state_set (comp->su, 
+					amf_su_operational_state_set (comp->su,
 						SA_AMF_OPERATIONAL_DISABLED);
 				}
 				break;
@@ -998,17 +998,17 @@ static void su_comp_op_state_changed (
  * Instantiates all components on specified instantiation level.
  * @param su
  * @param current_instantiation_level
- * 
+ *
  * @return - 1 if there were no components on the specified instantiation level
  */
-static int instantiate_all_components_in_level (struct amf_su *su, 
+static int instantiate_all_components_in_level (struct amf_su *su,
 	SaUint32T current_instantiation_level)
 {
 	amf_comp_t *comp;
 	SaUint32T all_components_instantiated = 1;
 
 	for (comp = su->comp_head; comp != NULL; comp = comp->next) {
-		if (su->current_comp_instantiation_level == 
+		if (su->current_comp_instantiation_level ==
 			comp->saAmfCompInstantiationLevel) {
 			all_components_instantiated = 0;
 			amf_comp_instantiate (comp);
@@ -1076,7 +1076,7 @@ static void su_rc_enter_idle_escalation_level_2 (amf_comp_t *component,
 
 	node = amf_node_find (&component->su->saAmfSUHostedByNode);
 	component->su->restart_control_state = SU_RC_IDLE_ESCALATION_LEVEL_2;
-	amf_node_comp_restart_req (node, component); 
+	amf_node_comp_restart_req (node, component);
 }
 static int get_instantiation_max_level (amf_su_t *su)
 {
@@ -1094,18 +1094,18 @@ static int get_instantiation_max_level (amf_su_t *su)
  * instantiation level.
  * @param su
  * @param current_instantiation_level
- * 
+ *
  * @return int -1 if no component has the specified instantiation level
  */
-static int terminate_all_components_in_level (struct amf_su *su, 
+static int terminate_all_components_in_level (struct amf_su *su,
 	SaUint32T current_instantiation_level)
 {
 	amf_comp_t *comp;
 	int all_components_in_level = 1;
-	TRACE8("terminate comp->saAmfCompInstantiationLevel=%u", 
+	TRACE8("terminate comp->saAmfCompInstantiationLevel=%u",
 		current_instantiation_level);
 	for (comp = su->comp_head; comp != NULL; comp = comp->next) {
-		/* 
+		/*
          * Terminate all components in instantiation level in SU
          * abruptly.
          */
@@ -1120,7 +1120,7 @@ static int terminate_all_components_in_level (struct amf_su *su,
 /**
  * su_current_instantiation_level_init
  * @param su
- * 
+ *
  * @return SaUint32T - the value of the instantiation level which has been set
  */
 static SaUint32T su_lowest_comp_instantiation_level_set (struct amf_su *su)
@@ -1131,9 +1131,9 @@ static SaUint32T su_lowest_comp_instantiation_level_set (struct amf_su *su)
 		TRACE1("component->saAmfCompInstantiationLevel=%d",
 			component->saAmfCompInstantiationLevel);
 
-			if (component->saAmfCompInstantiationLevel < 
+			if (component->saAmfCompInstantiationLevel <
 				comp_instantiation_level) {
-				comp_instantiation_level = 
+				comp_instantiation_level =
 					component->saAmfCompInstantiationLevel;
 			}
 	}
@@ -1145,7 +1145,7 @@ static SaUint32T su_lowest_comp_instantiation_level_set (struct amf_su *su)
 /**
  * An order to SU to instantiate its components.
  * @param su
- * 
+ *
  * @return int - 1 if its state allows it to request its contained components to
  *               instantiate or its state indicates that its components are in
  *               the process of instantiation.
@@ -1157,7 +1157,7 @@ int amf_su_instantiate (struct amf_su *su)
 	ENTER ();
 	switch (su->saAmfSUPresenceState) {
 		case SA_AMF_PRESENCE_UNINSTANTIATED:
-			instantiate_all_components_in_level(su, 
+			instantiate_all_components_in_level(su,
 				su_lowest_comp_instantiation_level_set (su));
 			break;
 		case SA_AMF_PRESENCE_RESTARTING:
@@ -1172,7 +1172,7 @@ int amf_su_instantiate (struct amf_su *su)
 		default:
 			assert (0);
 			break;
-		
+
 	}
 	return is_instantiating;
 }
@@ -1218,7 +1218,7 @@ void amf_su_comp_error_suspected (
 			break;
 		case SU_RC_IDLE_ESCALATION_LEVEL_2: {
 				amf_node_t *node = amf_node_find (&comp->su->saAmfSUHostedByNode);
-				amf_node_comp_restart_req (node, comp); 
+				amf_node_comp_restart_req (node, comp);
 
 #ifdef COMPILE_OUT
 				if (su->saAmfSURestartCount >= su->sg->saAmfSGSuRestartMax) {
@@ -1227,11 +1227,11 @@ void amf_su_comp_error_suspected (
 					 * TODO: delegate to node
 					*/
 					SaNameT dn;
-					amf_comp_operational_state_set (comp, 
+					amf_comp_operational_state_set (comp,
 						SA_AMF_OPERATIONAL_DISABLED);
-					amf_su_operational_state_set (su, 
+					amf_su_operational_state_set (su,
 						SA_AMF_OPERATIONAL_DISABLED);
-					
+
 					amf_comp_dn_make (comp, &dn);
 					log_printf (LOGSYS_LEVEL_NOTICE, "Error detected for '%s', recovery "
 						"action:\n\t\tSU failover", dn.value);
@@ -1248,7 +1248,7 @@ void amf_su_comp_error_suspected (
 		case SU_RC_RESTART_COMP_SETTING:
 			/* TODO: Complete the implementation of SU defer event */
 			su_defer_event (su, comp, recommended_recovery,
-				SU_COMP_ERROR_SUSPECTED_EV); 
+				SU_COMP_ERROR_SUSPECTED_EV);
 			break;
 		default:
 			TRACE1 ("restart_control_state = %d",su->restart_control_state);
@@ -1322,7 +1322,7 @@ static void si_ha_state_assumed_cbfn (
 			csi_assignment = amf_comp_get_next_csi_assignment(comp, NULL);
 			while (csi_assignment != NULL) {
 
-				if (csi_assignment->requested_ha_state != 
+				if (csi_assignment->requested_ha_state !=
 					csi_assignment->saAmfCSICompHAState) {
 					all_confirmed = 0;
 				}
@@ -1361,7 +1361,7 @@ static void si_ha_state_assumed_cbfn (
  * Default values are initialized.
  * @param sg
  * @param name
- * 
+ *
  * @return struct amf_su*
  */
 struct amf_su *amf_su_new (struct amf_sg *sg, const char *name)
@@ -1515,7 +1515,7 @@ struct amf_su *amf_su_find (struct amf_cluster *cluster, SaNameT *name)
 		if (strncmp (sg_name, (char*)sg->name.value,
 			sg->name.length) == 0) {
 			for (su = sg->su_head; su != NULL; su = su->next) {
-				if (su->name.length == strlen(su_name) && 
+				if (su->name.length == strlen(su_name) &&
 					strncmp (su_name, (char*)su->name.value,
 					su->name.length) == 0) {
 					goto end;
@@ -1533,7 +1533,7 @@ end:
  * This function makes a distinguished name for specified su object.
  * @param su
  * @param name -[out] pointer to where the distinguished name shall be stored
- * 
+ *
  * @return SaNameT* - distinguished name
  */
 char *amf_su_dn_make (struct amf_su *su, SaNameT *name)
@@ -1560,7 +1560,7 @@ char *amf_su_dn_make (struct amf_su *su, SaNameT *name)
  * @param su
  * @param si
  * @param ha_state
- * 
+ *
  * @return amf_si_assignment_t*
  */
 amf_si_assignment_t *amf_su_assign_si (struct amf_su *su, struct amf_si *si,
@@ -1686,15 +1686,15 @@ void amf_su_foreach_si_assignment (
  * which currently are associated with the specified su.
  * TODO: Split into two functions and remove dependency to sg's avail_state
  * @param su
- * 
- * @return int 
+ *
+ * @return int
  */
 int amf_su_get_saAmfSUNumCurrActiveSIs(struct amf_su *su)
 {
 	int cnt = 0;
 	struct amf_si_assignment *si_assignment;
 
-	si_assignment = amf_su_get_next_si_assignment (su, NULL); 
+	si_assignment = amf_su_get_next_si_assignment (su, NULL);
 	while (si_assignment != NULL) {
 		if (su->sg->avail_state == SG_AC_AssigningOnRequest &&
 			si_assignment->requested_ha_state == SA_AMF_HA_ACTIVE) {
@@ -1715,15 +1715,15 @@ int amf_su_get_saAmfSUNumCurrActiveSIs(struct amf_su *su)
  * which currently are associated with the specified su.
  * TODO: Split into two functions and remove dependency to sg's avail_state
  * @param su
- * 
- * @return int 
+ *
+ * @return int
  */
 int amf_su_get_saAmfSUNumCurrStandbySIs(struct amf_su *su)
 {
 	int cnt = 0;
 	struct amf_si_assignment *si_assignment;
 
-	si_assignment = amf_su_get_next_si_assignment (su, NULL); 
+	si_assignment = amf_su_get_next_si_assignment (su, NULL);
 	while (si_assignment != NULL) {
 		if (su->sg->avail_state == SG_AC_AssigningOnRequest &&
 			si_assignment->requested_ha_state == SA_AMF_HA_STANDBY) {
@@ -1742,8 +1742,8 @@ int amf_su_get_saAmfSUNumCurrStandbySIs(struct amf_su *su)
 /**
  * This function calculates the readiness state for specified su
  * @param su
- * 
- * @return SaAmfReadinessStateT 
+ *
+ * @return SaAmfReadinessStateT
  */
 SaAmfReadinessStateT amf_su_get_saAmfSUReadinessState (struct amf_su *su)
 {
@@ -1761,7 +1761,7 @@ SaAmfReadinessStateT amf_su_get_saAmfSUReadinessState (struct amf_su *su)
 /**
  * Determine if the SU is hosted on the local node.
  * @param su
- * 
+ *
  * @return int
  */
 int amf_su_is_local (struct amf_su *su)
@@ -1777,7 +1777,7 @@ int amf_su_is_local (struct amf_su *su)
  * Determine if all components have the specified HA-state.
  * @param su
  * @param state -specified HA-state
- * 
+ *
  * @return int - return 0 if not all components have the specified HA-state
  */
 int amf_su_are_all_comps_in_su (struct amf_su *su,
@@ -1785,7 +1785,7 @@ int amf_su_are_all_comps_in_su (struct amf_su *su,
 {
 	int all_comps_in_su_are_set = 1;
 	amf_comp_t *component;
-	for (component = su->comp_head; component != NULL; 
+	for (component = su->comp_head; component != NULL;
 		  component = component->next) {
 
 		if (component->saAmfCompPresenceState != state) {

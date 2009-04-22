@@ -7,7 +7,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -70,7 +70,7 @@ static inline void marshall_from_mar_clm_node_address_t (
 {
 	dest->family = src->family;
 	dest->length = src->length;
-	memcpy (dest->value, src->value, SA_CLM_MAX_ADDRESS_LENGTH);	
+	memcpy (dest->value, src->value, SA_CLM_MAX_ADDRESS_LENGTH);
 }
 
 static inline void marshall_to_mar_clm_node_address_t (
@@ -79,9 +79,9 @@ static inline void marshall_to_mar_clm_node_address_t (
 {
 	dest->family = src->family;
 	dest->length = src->length;
-	memcpy (dest->value, src->value, SA_CLM_MAX_ADDRESS_LENGTH);	
+	memcpy (dest->value, src->value, SA_CLM_MAX_ADDRESS_LENGTH);
 }
-	
+
 /*
  * Marshalling the SaClmClusterNodeT data structure
  */

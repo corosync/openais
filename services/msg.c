@@ -183,7 +183,7 @@ struct group_entry {
 	struct list_head queue_head;
 };
 
-/* 
+/*
  * Define the limits for the message service.
  * These limits are implementation specific and
  * can be obtained via the library call saMsgLimitGet
@@ -1086,7 +1086,7 @@ static void msg_confchg_fn (
 	const unsigned int *member_list, size_t member_list_entries,
 	const unsigned int *left_list, size_t left_list_entries,
 	const unsigned int *joined_list, size_t joined_list_entries,
-	const struct memb_ring_id *ring_id) 
+	const struct memb_ring_id *ring_id)
 {
 	unsigned int i, j;
 
@@ -1165,7 +1165,7 @@ static void msg_print_queue_priority_list (
 		msg = list_entry (list, struct message_entry, list);
 
 		/* DEBUG */
-		/* log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t message = %s\n", 
+		/* log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t message = %s\n",
 		   (char *)(msg->message.data)); */
 	}
 	return;
@@ -2408,7 +2408,7 @@ static void message_handler_req_exec_msg_queueopen (
 			log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t empty queue = %s\n",
 				    (char *)(req_exec_msg_queueopen->queue_name.value));
 
-			/* 
+			/*
 			 * If this queue already exists and is opened by another
 			 * process with the SA_MSG_QUEUE_EMPTY flag set, then we
 			 * should delete all existing messages in the queue.
@@ -2555,7 +2555,7 @@ static void message_handler_req_exec_msg_queueopenasync (
 			log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t empty queue = %s\n",
 				    (char *)(req_exec_msg_queueopenasync->queue_name.value));
 
-			/* 
+			/*
 			 * If this queue already exists and is opened by another
 			 * process with the SA_MSG_QUEUE_EMPTY flag set, then we
 			 * should delete all existing messages in the queue.
@@ -2654,7 +2654,7 @@ static void message_handler_req_exec_msg_queueclose (
 	{
 		queue->close_time = api->timer_time_get();
 
-		/* 
+		/*
 		 * If this queue is non-persistent and we are the lowest nodeid,
 		 * create a timer that will expire based on the retention time
 		 * (specified at queue creation time). When the timer expires,
@@ -2778,7 +2778,7 @@ static void message_handler_req_exec_msg_queueretentiontimeset (
 		goto error_exit;
 	}
 
-	/* 
+	/*
 	 * Note that if this queue has an active retention timer,
 	 * changing the retention time has no effect on that timer.
 	 * Alternative is to delete any active retention timer and
@@ -4198,7 +4198,7 @@ static void message_handler_req_exec_msg_sync_queue (
 	queue = msg_find_queue_id (&sync_queue_list_head,
 		&req_exec_msg_sync_queue->queue_name,
 		req_exec_msg_sync_queue->queue_id);
-	/* 
+	/*
 	 * This queue should not exist yet.
 	 */
 	assert (queue == NULL);
@@ -4382,11 +4382,11 @@ static void message_handler_req_exec_msg_sync_group (
 	group = msg_find_group (&sync_group_list_head,
 		&req_exec_msg_sync_group->group_name);
 
-	/* 
+	/*
 	 * This group should not exist yet.
 	 */
 	assert (group == NULL);
-	
+
 	group = malloc (sizeof (struct group_entry));
 	if (group == NULL) {
 		corosync_fatal_error (COROSYNC_OUT_OF_MEMORY);
@@ -4437,7 +4437,7 @@ static void message_handler_req_exec_msg_sync_group_member (
 		&req_exec_msg_sync_group_member->queue_name,
 		req_exec_msg_sync_group_member->queue_id);
 
-	/* 
+	/*
 	 * Both the group and the queue must already exist.
 	 */
 	assert (group != NULL);

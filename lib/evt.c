@@ -5,7 +5,7 @@
  * All rights reserved.
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -123,7 +123,7 @@ struct event_instance {
  * eci_svr_channel_handle:	channel handle returned from server
  * eci_closing:				channel in process of being closed
  * eci_mutex:				channel mutex
- * eci_event_list:			events associated with this 
+ * eci_event_list:			events associated with this
  * 							channel (struct handle_list)
  * eci_hl:					pointer to event instance handle struct
  * 						    for this channel.
@@ -138,11 +138,11 @@ struct event_channel_instance {
 	pthread_mutex_t			eci_mutex;
 	struct list_head		eci_event_list;
 	struct handle_list		*eci_hl;
-	 
+
 };
 
 /*
- * Event data. 
+ * Event data.
  *
  * Store event data from saEvtEventAllocate function.
  * Store event data from received events.
@@ -159,7 +159,7 @@ struct event_channel_instance {
  * edi_event_data_size:	size of edi_event_data
  * edi_freeing:			event is being freed
  * edi_mutex:			event data mutex
- * edi_hl:				pointer to channel's handle 
+ * edi_hl:				pointer to channel's handle
  * 						struct for this event.
  * edi_ro:				read only flag
  */
@@ -206,9 +206,9 @@ static void evtHandleInstanceDestructor(void *instance)
 	SaAisErrorT error;
 
 	/*
-	 * Free up any channel data 
+	 * Free up any channel data
 	 */
-	for (l = evti->ei_channel_list.next; 
+	for (l = evti->ei_channel_list.next;
 								l != &evti->ei_channel_list; l = nxt) {
 		nxt = l->next;
 
@@ -301,15 +301,15 @@ static void evt_recv_event(void *ipc_ctx, struct lib_event_data **msg)
 		(void **)msg);
 }
 
-/* 
- * The saEvtInitialize() function initializes the Event Service for the 
- * invoking process. A user of the Event Service must invoke this function 
- * before it invokes any other function of the Event Service API. Each 
- * initialization returns a different callback handle that the process 
+/*
+ * The saEvtInitialize() function initializes the Event Service for the
+ * invoking process. A user of the Event Service must invoke this function
+ * before it invokes any other function of the Event Service API. Each
+ * initialization returns a different callback handle that the process
  * can use to communicate with that library instance.
  */
 
-SaAisErrorT 
+SaAisErrorT
 saEvtInitialize(
 	SaEvtHandleT *evtHandle,
 	const SaEvtCallbacksT *callbacks,
@@ -334,7 +334,7 @@ saEvtInitialize(
 	 * Allocate instance data, allocate unique handle for instance,
 	 * assign instance data to unique handle
 	 */
-	error = saHandleCreate(&evt_instance_handle_db, sizeof(*evti), 
+	error = saHandleCreate(&evt_instance_handle_db, sizeof(*evti),
 			evtHandle);
 	if (error != SA_AIS_OK) {
 		goto error_nofree;
@@ -348,7 +348,7 @@ saEvtInitialize(
 		goto error_handle_free;
 	}
 	memset(evti, 0, sizeof(*evti));
-	
+
 	list_init(&evti->ei_channel_list);
 
 	/*
@@ -372,11 +372,11 @@ saEvtInitialize(
 	}
 
 	/*
-	 * The callback function is saved in the event instance for 
+	 * The callback function is saved in the event instance for
 	 * saEvtDispatch() to use.
 	 */
 	if (callbacks) {
-		memcpy(&evti->ei_callback, callbacks, 
+		memcpy(&evti->ei_callback, callbacks,
 				sizeof(evti->ei_callback));
 	}
 
@@ -395,12 +395,12 @@ error_nofree:
 }
 
 /*
- * The saEvtSelectionObjectGet() function returns the operating system 
- * handle selectionObject, associated with the handle evtHandle, allowing 
- * the invoking process to ascertain when callbacks are pending. This 
- * function allows a process to avoid repeated invoking saEvtDispatch() to 
- * see if there is a new event, thus, needlessly consuming CPU time. In a 
- * POSIX environment the system handle could be a file descriptor that is 
+ * The saEvtSelectionObjectGet() function returns the operating system
+ * handle selectionObject, associated with the handle evtHandle, allowing
+ * the invoking process to ascertain when callbacks are pending. This
+ * function allows a process to avoid repeated invoking saEvtDispatch() to
+ * see if there is a new event, thus, needlessly consuming CPU time. In a
+ * POSIX environment the system handle could be a file descriptor that is
  * used with the poll() or select() system calls to detect incoming callbacks.
  */
 SaAisErrorT
@@ -415,7 +415,7 @@ saEvtSelectionObjectGet(
 		return SA_AIS_ERR_INVALID_PARAM;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle, 
+	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
 			(void *)&evti);
 
 	if (error != SA_AIS_OK) {
@@ -445,7 +445,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 	struct handle_list *hl;
 	int i;
 
-	error = saHandleCreate(&event_handle_db, sizeof(*edi), 
+	error = saHandleCreate(&event_handle_db, sizeof(*edi),
 		event_handle);
 	if (error != SA_AIS_OK) {
 		if (error == SA_AIS_ERR_NO_MEMORY) {
@@ -461,7 +461,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 			goto make_evt_done;
 	}
 
-	error = saHandleInstanceGet(&channel_handle_db, 
+	error = saHandleInstanceGet(&channel_handle_db,
 			evt->led_lib_channel_handle,
 			(void*)&eci);
 	if (error != SA_AIS_OK) {
@@ -492,7 +492,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 			error = SA_AIS_ERR_LIBRARY;
 			goto make_evt_done_put2;
 		}
-		memcpy(edi->edi_event_data, 
+		memcpy(edi->edi_event_data,
 				evt->led_body + evt->led_user_data_offset,
 				edi->edi_event_data_size);
 	}
@@ -502,7 +502,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 	 */
 	edi->edi_patterns.patternsNumber = evt->led_patterns_number;
 	edi->edi_patterns.allocatedNumber = evt->led_patterns_number;
-	edi->edi_patterns.patterns = malloc(sizeof(SaEvtEventPatternT) * 
+	edi->edi_patterns.patterns = malloc(sizeof(SaEvtEventPatternT) *
 					edi->edi_patterns.patternsNumber);
 	if (!edi->edi_patterns.patterns) {
 		/*
@@ -521,7 +521,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 	memset(edi->edi_patterns.patterns, 0, sizeof(SaEvtEventPatternT) *
 					edi->edi_patterns.patternsNumber);
 	pat = (mar_evt_event_pattern_t *)evt->led_body;
-	str = evt->led_body + sizeof(mar_evt_event_pattern_t) * 
+	str = evt->led_body + sizeof(mar_evt_event_pattern_t) *
 						edi->edi_patterns.patternsNumber;
 	for (i = 0; i < evt->led_patterns_number; i++) {
 		edi->edi_patterns.patterns[i].patternSize = pat->pattern_size;
@@ -535,7 +535,7 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 		memcpy(edi->edi_patterns.patterns[i].pattern,
 				str, pat->pattern_size);
 		str += pat->pattern_size;
-		pat++; 
+		pat++;
 	}
 
 	hl = malloc(sizeof(*hl));
@@ -560,7 +560,7 @@ make_evt_done:
 }
 
 /*
- * The saEvtDispatch() function invokes, in the context of the calling 
+ * The saEvtDispatch() function invokes, in the context of the calling
  * thread, one or all of the pending callbacks for the handle evtHandle.
  */
 SaAisErrorT
@@ -623,12 +623,12 @@ saEvtDispatch(
 			}
 			goto error_put;
 		}
-		
+
 
 		/*
-		 * Make copy of callbacks, message data, unlock instance, 
-		 * and call callback. A risk of this dispatch method is that 
-		 * the callback routines may operate at the same time that 
+		 * Make copy of callbacks, message data, unlock instance,
+		 * and call callback. A risk of this dispatch method is that
+		 * the callback routines may operate at the same time that
 		 * EvtFinalize has been called in another thread.
 		 */
 		memcpy(&callbacks, &evti->ei_callback, sizeof(evti->ei_callback));
@@ -640,7 +640,7 @@ saEvtDispatch(
 
 		case MESSAGE_RES_EVT_AVAILABLE:
 			evti->ei_data_available = 0;
- 
+
  			pthread_mutex_lock(&evti->ei_response_mutex);
 			evt_recv_event(evti->ipc_ctx, &evt);
  			pthread_mutex_unlock(&evti->ei_response_mutex);
@@ -674,31 +674,31 @@ saEvtDispatch(
 			 * Only call if there was a function registered
 			 */
 			if (callbacks.saEvtEventDeliverCallback) {
-				callbacks.saEvtEventDeliverCallback(evt->led_sub_id, 
+				callbacks.saEvtEventDeliverCallback(evt->led_sub_id,
 						event_handle, evt->led_user_data_size);
 			}
 			break;
 
 		case MESSAGE_RES_EVT_CHAN_OPEN_CALLBACK:
 		{
-			struct res_evt_open_chan_async *resa = 
+			struct res_evt_open_chan_async *resa =
 				(struct res_evt_open_chan_async *)dispatch_data;
 			struct event_channel_instance *eci;
 
 			/*
 			 * Check for errors.  If there are none, then
 			 * look up the local channel via the handle that we
-			 * got from the callback request.  All we need to do 
-			 * is place in the handle from the server side and then 
+			 * got from the callback request.  All we need to do
+			 * is place in the handle from the server side and then
 			 * we can call the callback.
 			 */
 			error = resa->ica_head.error;
 			if (error == SA_AIS_OK) {
-				error = saHandleInstanceGet(&channel_handle_db, 
+				error = saHandleInstanceGet(&channel_handle_db,
 						resa->ica_c_handle, (void*)&eci);
 				if (error == SA_AIS_OK) {
 					eci->eci_svr_channel_handle = resa->ica_channel_handle;
-					saHandleInstancePut (&channel_handle_db, 
+					saHandleInstancePut (&channel_handle_db,
 							resa->ica_c_handle);
 				}
 			}
@@ -716,7 +716,7 @@ saEvtDispatch(
 
 		default:
 			coroipcc_dispatch_put (evti->ipc_ctx);
-			error = SA_AIS_ERR_LIBRARY;	
+			error = SA_AIS_ERR_LIBRARY;
 			goto error_put;
 		}
 		coroipcc_dispatch_put (evti->ipc_ctx);
@@ -742,13 +742,13 @@ dispatch_exit:
 }
 
 /*
- * The saEvtFinalize() function closes the association, represented by the 
- * evtHandle parameter, between the process and the Event Service. It may 
- * free up resources. 
- * This function cannot be invoked before the process has invoked the 
- * corresponding saEvtInitialize() function for the Event Service. After 
- * this function is invoked, the selection object is no longer valid. 
- * Moreover, the Event Service is unavailable for further use unless it is 
+ * The saEvtFinalize() function closes the association, represented by the
+ * evtHandle parameter, between the process and the Event Service. It may
+ * free up resources.
+ * This function cannot be invoked before the process has invoked the
+ * corresponding saEvtInitialize() function for the Event Service. After
+ * this function is invoked, the selection object is no longer valid.
+ * Moreover, the Event Service is unavailable for further use unless it is
  * reinitialized using the saEvtInitialize() function.
  */
 SaAisErrorT
@@ -757,7 +757,7 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 	struct event_instance *evti;
 	SaAisErrorT error;
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle, 
+	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
 			(void *)&evti);
 	if (error != SA_AIS_OK) {
 		return error;
@@ -788,22 +788,22 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 }
 
 /*
- * The saEvtChannelOpen() function creates a new event channel or open an 
- * existing channel. The saEvtChannelOpen() function is a blocking operation 
- * and returns a new event channel handle. An event channel may be opened 
- * multiple times by the same or different processes for publishing, and 
- * subscribing to, events. If a process opens an event channel multiple 
- * times, it is possible to receive the same event multiple times. However, 
- * a process shall never receive an event more than once on a particular 
- * event channel handle. If a process opens a channel twice and an event is 
- * matched on both open channels, the Event Service performs two 
+ * The saEvtChannelOpen() function creates a new event channel or open an
+ * existing channel. The saEvtChannelOpen() function is a blocking operation
+ * and returns a new event channel handle. An event channel may be opened
+ * multiple times by the same or different processes for publishing, and
+ * subscribing to, events. If a process opens an event channel multiple
+ * times, it is possible to receive the same event multiple times. However,
+ * a process shall never receive an event more than once on a particular
+ * event channel handle. If a process opens a channel twice and an event is
+ * matched on both open channels, the Event Service performs two
  * callbacks -- one for each opened channel.
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtChannelOpen(
-	SaEvtHandleT evtHandle, 
-	const SaNameT *channelName, 
-	SaEvtChannelOpenFlagsT channelOpenFlags, 
+	SaEvtHandleT evtHandle,
+	const SaNameT *channelName,
+	SaEvtChannelOpenFlagsT channelOpenFlags,
 	SaTimeT timeout,
 	SaEvtChannelHandleT *channelHandle)
 {
@@ -829,7 +829,7 @@ saEvtChannelOpen(
 	}
 	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
 			(void*)&evti);
-	
+
 	if (error != SA_AIS_OK) {
 		goto chan_open_done;
 	}
@@ -837,7 +837,7 @@ saEvtChannelOpen(
 	/*
 	 * create a handle for this open channel
 	 */
-	error = saHandleCreate(&channel_handle_db, sizeof(*eci), 
+	error = saHandleCreate(&channel_handle_db, sizeof(*eci),
 			channelHandle);
 	if (error != SA_AIS_OK) {
 		goto chan_open_put;
@@ -918,11 +918,11 @@ chan_open_done:
 }
 
 /*
- * The saEvtChannelClose() function closes an event channel and frees 
- * resources allocated for that event channel in the invoking process. 
+ * The saEvtChannelClose() function closes an event channel and frees
+ * resources allocated for that event channel in the invoking process.
  */
 
-SaAisErrorT 
+SaAisErrorT
 saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 {
 	SaAisErrorT error;
@@ -941,7 +941,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	/*
 	 * get the evt handle for the fd
 	 */
-	error = saHandleInstanceGet(&evt_instance_handle_db, 
+	error = saHandleInstanceGet(&evt_instance_handle_db,
 			eci->eci_instance_handle, (void*)&evti);
 	if (error != SA_AIS_OK) {
 		goto chan_close_put1;
@@ -958,7 +958,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	}
 	eci->eci_closing = 1;
 	pthread_mutex_unlock(&eci->eci_mutex);
-	
+
 
 	/*
 	 * Send the request to the server and wait for a response
@@ -995,7 +995,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 		goto chan_close_put2;
 	}
 
-	saHandleInstancePut(&evt_instance_handle_db, 
+	saHandleInstancePut(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 	saHandleDestroy(&channel_handle_db, channelHandle);
 	saHandleInstancePut(&channel_handle_db, channelHandle);
@@ -1003,7 +1003,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	return error;
 
 chan_close_put2:
-	saHandleInstancePut(&evt_instance_handle_db, 
+	saHandleInstancePut(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 chan_close_put1:
 	saHandleInstancePut(&channel_handle_db, channelHandle);
@@ -1012,8 +1012,8 @@ chan_close_done:
 }
 
 /*
- * The saEvtChannelOpenAsync() function creates a new event channel or open an 
- * existing channel. The saEvtChannelOpenAsync() function is a non-blocking 
+ * The saEvtChannelOpenAsync() function creates a new event channel or open an
+ * existing channel. The saEvtChannelOpenAsync() function is a non-blocking
  * operation. A new event channel handle is returned in the channel open
  * callback function (SaEvtChannelOpenCallbackT).
  */
@@ -1043,13 +1043,13 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 
 	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
 			(void*)&evti);
-	
+
 	if (error != SA_AIS_OK) {
 		goto chan_open_done;
 	}
 
 	/*
-	 * Make sure that an open channel callback has been 
+	 * Make sure that an open channel callback has been
 	 * registered before  allowing the open to continue.
 	 */
 	if (!evti->ei_callback.saEvtChannelOpenCallback) {
@@ -1060,7 +1060,7 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 	/*
 	 * create a handle for this open channel
 	 */
-	error = saHandleCreate(&channel_handle_db, sizeof(*eci), 
+	error = saHandleCreate(&channel_handle_db, sizeof(*eci),
 			&channel_handle);
 	if (error != SA_AIS_OK) {
 		goto chan_open_put;
@@ -1144,21 +1144,21 @@ chan_open_done:
 	return error;
 }
 /*
- *  The SaEvtChannelUnlink function deletes an existing event channel 
- *  from the cluster. 
+ *  The SaEvtChannelUnlink function deletes an existing event channel
+ *  from the cluster.
  *
- *	After completion of the invocation: 
+ *	After completion of the invocation:
  *		- An open of the channel name without a create will fail.
  *		- The channel remains available to any already opened instances.
  *		- If an open/create is performed on this channel name a new instance
  *		  is created.
  *		- The ulinked channel's resources will be deleted when the last open
  *		  instance is closed.
- *		   
- *		Note that an event channel is only deleted from the cluster 
- *		namespace when saEvtChannelUnlink() is invoked on it. The deletion 
- *		of an event channel frees all resources allocated by the Event 
- *		Service for it, such as published events with non-zero retention 
+ *
+ *		Note that an event channel is only deleted from the cluster
+ *		namespace when saEvtChannelUnlink() is invoked on it. The deletion
+ *		of an event channel frees all resources allocated by the Event
+ *		Service for it, such as published events with non-zero retention
  *		time.
  */
 SaAisErrorT
@@ -1178,7 +1178,7 @@ saEvtChannelUnlink(
 
 	error = saHandleInstanceGet(&evt_instance_handle_db, evtHandle,
 			(void*)&evti);
-	
+
 	if (error != SA_AIS_OK) {
 		goto chan_unlink_done;
 	}
@@ -1217,20 +1217,20 @@ chan_unlink_done:
 	return error;
 }
 
-/* 
- * The saEvtEventAllocate() function allocates memory for the event, but not 
+/*
+ * The saEvtEventAllocate() function allocates memory for the event, but not
  * for the eventHandle, and initializes all event attributes to default values.
- * The event allocated by saEvtEventAllocate() is freed by invoking 
- * saEvtEventFree(). 
- * The memory associated with the eventHandle is not deallocated by the 
- * saEvtEventAllocate() function or the saEvtEventFree() function. It is the 
- * responsibility of the invoking process to deallocate the memory for the 
- * eventHandle when the process has published the event and has freed the 
+ * The event allocated by saEvtEventAllocate() is freed by invoking
+ * saEvtEventFree().
+ * The memory associated with the eventHandle is not deallocated by the
+ * saEvtEventAllocate() function or the saEvtEventFree() function. It is the
+ * responsibility of the invoking process to deallocate the memory for the
+ * eventHandle when the process has published the event and has freed the
  * event by invoking saEvtEventFree().
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventAllocate(
-	const SaEvtChannelHandleT channelHandle, 
+	const SaEvtChannelHandleT channelHandle,
 	SaEvtEventHandleT *eventHandle)
 {
 	SaAisErrorT error;
@@ -1249,13 +1249,13 @@ saEvtEventAllocate(
 		goto alloc_done;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, 
+	error = saHandleInstanceGet(&evt_instance_handle_db,
 			eci->eci_instance_handle, (void*)&evti);
 	if (error != SA_AIS_OK) {
 		goto alloc_put1;
 	}
 
-	error = saHandleCreate(&event_handle_db, sizeof(*edi), 
+	error = saHandleCreate(&event_handle_db, sizeof(*edi),
 			eventHandle);
 	if (error != SA_AIS_OK) {
 		goto alloc_put2;
@@ -1299,12 +1299,12 @@ alloc_done:
 }
 
 /*
- * The saEvtEventFree() function gives the Event Service premission to 
- * deallocate the memory that contains the attributes of the event that is 
- * associated with eventHandle. The function is used to free events allocated 
+ * The saEvtEventFree() function gives the Event Service premission to
+ * deallocate the memory that contains the attributes of the event that is
+ * associated with eventHandle. The function is used to free events allocated
  * by saEvtEventAllocate() and by saEvtEventDeliverCallback().
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventFree(SaEvtEventHandleT eventHandle)
 {
 	SaAisErrorT error;
@@ -1336,18 +1336,18 @@ evt_free_done:
 }
 
 /*
- * This function may be used to assign writeable event attributes. It takes 
- * as arguments an event handle eventHandle and the attribute to be set in 
- * the event structure of the event with that handle. Note: The only 
- * attributes that a process can set are the patternArray, priority, 
+ * This function may be used to assign writeable event attributes. It takes
+ * as arguments an event handle eventHandle and the attribute to be set in
+ * the event structure of the event with that handle. Note: The only
+ * attributes that a process can set are the patternArray, priority,
  * retentionTime and publisherName attributes.
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventAttributesSet(
-	const SaEvtEventHandleT eventHandle, 
-	const SaEvtEventPatternArrayT *patternArray, 
-	SaEvtEventPriorityT priority, 
-	SaTimeT retentionTime, 
+	const SaEvtEventHandleT eventHandle,
+	const SaEvtEventPatternArrayT *patternArray,
+	SaEvtEventPriorityT priority,
+	SaTimeT retentionTime,
 	const SaNameT *publisherName)
 {
 	SaEvtEventPatternT *oldpatterns;
@@ -1389,7 +1389,7 @@ saEvtEventAttributesSet(
 	oldpatterns = edi->edi_patterns.patterns;
 	oldnumber = edi->edi_patterns.patternsNumber;
 	edi->edi_patterns.patterns = 0;
-	edi->edi_patterns.patterns = malloc(sizeof(SaEvtEventPatternT) * 
+	edi->edi_patterns.patterns = malloc(sizeof(SaEvtEventPatternT) *
 					patternArray->patternsNumber);
 	if (!edi->edi_patterns.patterns) {
 		error = SA_AIS_ERR_NO_MEMORY;
@@ -1403,7 +1403,7 @@ saEvtEventAttributesSet(
 	 * of all the strings.
 	 */
 	for (i = 0; i < patternArray->patternsNumber; i++) {
-		edi->edi_patterns.patterns[i].pattern = 
+		edi->edi_patterns.patterns[i].pattern =
 			malloc(patternArray->patterns[i].patternSize);
 		if (!edi->edi_patterns.patterns[i].pattern) {
 			int j;
@@ -1417,14 +1417,14 @@ saEvtEventAttributesSet(
 		memcpy(edi->edi_patterns.patterns[i].pattern,
 			patternArray->patterns[i].pattern,
 				patternArray->patterns[i].patternSize);
-		edi->edi_patterns.patterns[i].patternSize = 
+		edi->edi_patterns.patterns[i].patternSize =
 			patternArray->patterns[i].patternSize;
-		edi->edi_patterns.patterns[i].allocatedSize = 
+		edi->edi_patterns.patterns[i].allocatedSize =
 			patternArray->patterns[i].patternSize;
 	}
 
 	/*
-	 * free up the old pattern memory 
+	 * free up the old pattern memory
 	 */
 	if (oldpatterns) {
 		for (i = 0; i < oldnumber; i++) {
@@ -1444,27 +1444,27 @@ attr_set_done:
 	return error;
 }
 
-/* 
- * This function takes as parameters an event handle eventHandle and the 
- * attributes of the event with that handle. The function retrieves the 
- * value of the attributes for the event and stores them at the address 
- * provided for the out parameters. 
- * It is the responsibility of the invoking process to allocate memory for 
- * the out parameters before it invokes this function. The Event Service 
- * assigns the out values into that memory. For each of the out, or in/out, 
- * parameters, if the invoking process provides a NULL reference, the 
- * Availability Management Framework does not return the out value. 
- * Similarly, it is the responsibility of the invoking process to allocate 
+/*
+ * This function takes as parameters an event handle eventHandle and the
+ * attributes of the event with that handle. The function retrieves the
+ * value of the attributes for the event and stores them at the address
+ * provided for the out parameters.
+ * It is the responsibility of the invoking process to allocate memory for
+ * the out parameters before it invokes this function. The Event Service
+ * assigns the out values into that memory. For each of the out, or in/out,
+ * parameters, if the invoking process provides a NULL reference, the
+ * Availability Management Framework does not return the out value.
+ * Similarly, it is the responsibility of the invoking process to allocate
  * memory for the patternArray.
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventAttributesGet(
-	SaEvtEventHandleT eventHandle, 
-	SaEvtEventPatternArrayT *patternArray, 
-	SaEvtEventPriorityT *priority, 
-	SaTimeT *retentionTime, 
-	SaNameT *publisherName, 
-	SaTimeT *publishTime, 
+	SaEvtEventHandleT eventHandle,
+	SaEvtEventPatternArrayT *patternArray,
+	SaEvtEventPriorityT *priority,
+	SaTimeT *retentionTime,
+	SaNameT *publisherName,
+	SaTimeT *publishTime,
 	SaEvtEventIdT *eventId)
 {
 	SaAisErrorT error;
@@ -1521,18 +1521,18 @@ saEvtEventAttributesGet(
 		npats = edi->edi_patterns.patternsNumber;
 		patternArray->allocatedNumber = edi->edi_patterns.patternsNumber;
 		patternArray->patternsNumber = edi->edi_patterns.patternsNumber;
-		patternArray->patterns = malloc(sizeof(*patternArray->patterns) * 
+		patternArray->patterns = malloc(sizeof(*patternArray->patterns) *
 				edi->edi_patterns.patternsNumber);
 		if (!patternArray->patterns) {
 			error = SA_AIS_ERR_LIBRARY;
 			goto attr_get_unlock;
 		}
 		for (i = 0; i < edi->edi_patterns.patternsNumber; i++) {
-			patternArray->patterns[i].allocatedSize = 
+			patternArray->patterns[i].allocatedSize =
 				edi->edi_patterns.patterns[i].allocatedSize;
-			patternArray->patterns[i].patternSize = 
+			patternArray->patterns[i].patternSize =
 				edi->edi_patterns.patterns[i].patternSize;
-			patternArray->patterns[i].pattern = 
+			patternArray->patterns[i].pattern =
 				malloc(edi->edi_patterns.patterns[i].patternSize);
 			if (!patternArray->patterns[i].pattern) {
 				int j;
@@ -1574,12 +1574,12 @@ saEvtEventAttributesGet(
 			min(patternArray->patterns[i].allocatedSize,
 				edi->edi_patterns.patterns[i].patternSize));
 
-		if (patternArray->patterns[i].allocatedSize < 
+		if (patternArray->patterns[i].allocatedSize <
 								edi->edi_patterns.patterns[i].patternSize) {
 			error = SA_AIS_ERR_NO_SPACE;
 		}
 
-		patternArray->patterns[i].patternSize = 
+		patternArray->patterns[i].patternSize =
 			edi->edi_patterns.patterns[i].patternSize;
 	}
 
@@ -1591,14 +1591,14 @@ attr_get_done:
 }
 
 /*
- * The saEvtEventDataGet() function allows a process to retrieve the data 
- * associated with an event previously delivered by 
+ * The saEvtEventDataGet() function allows a process to retrieve the data
+ * associated with an event previously delivered by
  * saEvtEventDeliverCallback().
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventDataGet(
-	const SaEvtEventHandleT eventHandle, 
-	void *eventData, 
+	const SaEvtEventHandleT eventHandle,
+	void *eventData,
 	SaSizeT *eventDataSize)
 {
 	SaAisErrorT error = SA_AIS_ERR_INVALID_PARAM;
@@ -1618,7 +1618,7 @@ saEvtEventDataGet(
 
 	/*
 	 * If no buffer was supplied, then just tell the caller
-	 * how large a buffer is needed.  
+	 * how large a buffer is needed.
 	 */
 	if (!eventData) {
 		error = SA_AIS_ERR_NO_SPACE;
@@ -1627,7 +1627,7 @@ saEvtEventDataGet(
 	}
 
 	/*
-	 * Can't get data from an event that wasn't 
+	 * Can't get data from an event that wasn't
 	 * a delivered event.
 	 */
 	if (!edi->edi_ro) {
@@ -1671,12 +1671,12 @@ static size_t patt_size(const SaEvtEventPatternArrayT *patterns)
  * copy patterns to a form for sending to the server
  */
 static uint32_t aispatt_to_evt_patt(
-	const SaEvtEventPatternArrayT *patterns, 
+	const SaEvtEventPatternArrayT *patterns,
 		void *data)
 {
 	int i;
 	mar_evt_event_pattern_t *pats = data;
-	SaUint8T *str  = (SaUint8T *)pats + 
+	SaUint8T *str  = (SaUint8T *)pats +
 				(patterns->patternsNumber * sizeof(*pats));
 
 	/*
@@ -1684,7 +1684,7 @@ static uint32_t aispatt_to_evt_patt(
 	 * will be later converted back into pointers when received as events.
 	 */
 	for (i = 0; i < patterns->patternsNumber; i++) {
-		memcpy(str, patterns->patterns[i].pattern, 
+		memcpy(str, patterns->patterns[i].pattern,
 			 	patterns->patterns[i].patternSize);
 		pats->pattern_size = patterns->patterns[i].patternSize;
 		pats->pattern = (SaUint8T *)((char *)str - (char *)data);
@@ -1715,7 +1715,7 @@ static size_t filt_size(const SaEvtEventFilterArrayT *filters)
  * by the receiver.
  */
 static uint32_t aisfilt_to_evt_filt(
-	const SaEvtEventFilterArrayT *filters, 
+	const SaEvtEventFilterArrayT *filters,
 	void *data)
 {
 	int i;
@@ -1733,10 +1733,10 @@ static uint32_t aisfilt_to_evt_filt(
 
 	for (i = 0; i < filters->filtersNumber; i++) {
 		filts->filter_type = filters->filters[i].filterType;
-		filts->filter.pattern_size = 
+		filts->filter.pattern_size =
 			filters->filters[i].filter.patternSize;
 		memcpy(str,
-			 filters->filters[i].filter.pattern, 
+			 filters->filters[i].filter.pattern,
 			 filters->filters[i].filter.patternSize);
 		filts->filter.pattern = (SaUint8T *)(((char *)str) - ((char *)data));
 		str += filters->filters[i].filter.patternSize;
@@ -1746,35 +1746,35 @@ static uint32_t aisfilt_to_evt_filt(
 }
 
 /*
- * The saEvtEventPublish() function publishes an event on the associated 
- * channel. The event to be published consists of a 
- * standard set of attributes (the event header) and an optional data part. 
- * Before an event can be published, the publisher process must invoke the 
- * saEvtEventPatternArraySet() function to set the event patterns. The event 
- * is delivered to subscribers whose subscription filter matches the event 
- * patterns. 
- * When the Event Service publishes an event, it automatically sets 
- * the following readonly event attributes: 
- * 	- Event attribute time 
- * 	- Event publisher identifier 
+ * The saEvtEventPublish() function publishes an event on the associated
+ * channel. The event to be published consists of a
+ * standard set of attributes (the event header) and an optional data part.
+ * Before an event can be published, the publisher process must invoke the
+ * saEvtEventPatternArraySet() function to set the event patterns. The event
+ * is delivered to subscribers whose subscription filter matches the event
+ * patterns.
+ * When the Event Service publishes an event, it automatically sets
+ * the following readonly event attributes:
+ * 	- Event attribute time
+ * 	- Event publisher identifier
  * 	- Event publisher node identifier
- * 	- Event identifier 
- * In addition to the event attributes, a process can supply values for the 
- * eventData and eventDataSize parameters for publication as part of the 
- * event. The data portion of the event may be at most SA_EVT_DATA_MAX_LEN 
- * bytes in length. 
- * The process may assume that the invocation of saEvtEventPublish() copies 
- * all pertinent parameters, including the memory associated with the 
- * eventHandle and eventData parameters, to its own local memory. However, 
- * the invocation does not automatically deallocate memory associated with 
- * the eventHandle and eventData parameters. It is the responsibility of the 
- * invoking process to deallocate the memory for those parameters after 
+ * 	- Event identifier
+ * In addition to the event attributes, a process can supply values for the
+ * eventData and eventDataSize parameters for publication as part of the
+ * event. The data portion of the event may be at most SA_EVT_DATA_MAX_LEN
+ * bytes in length.
+ * The process may assume that the invocation of saEvtEventPublish() copies
+ * all pertinent parameters, including the memory associated with the
+ * eventHandle and eventData parameters, to its own local memory. However,
+ * the invocation does not automatically deallocate memory associated with
+ * the eventHandle and eventData parameters. It is the responsibility of the
+ * invoking process to deallocate the memory for those parameters after
  * saEvtEventPublish() returns.
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventPublish(
-	const SaEvtEventHandleT eventHandle, 
-	const void *eventData, 
+	const SaEvtEventHandleT eventHandle,
+	const void *eventData,
 	SaSizeT eventDataSize,
 	SaEvtEventIdT *eventId)
 {
@@ -1819,7 +1819,7 @@ saEvtEventPublish(
 		goto pub_put2;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, 
+	error = saHandleInstanceGet(&evt_instance_handle_db,
 			eci->eci_instance_handle, (void*)&evti);
 	if (error != SA_AIS_OK) {
 		goto pub_put2;
@@ -1895,25 +1895,25 @@ pub_done:
 }
 
 /*
- * The saEvtEventSubscribe() function enables a process to subscribe for 
- * events on an event channel by registering one or more filters on that 
- * event channel. The process must have opened the event channel, designated 
- * by channelHandle, with the SA_EVT_CHANNEL_SUBSCRIBER flag set for an 
- * invocation of this function to be successful. 
- * The memory associated with the filters is not deallocated by the 
- * saEvtEventSubscribe() function. It is the responsibility of the invoking 
- * process to deallocate the memory when the saEvtEventSubscribe() function 
- * returns. 
- * For a given subscription, the filters parameter cannot be modified. To 
- * change the filters parameter without losing events, a process must 
- * establish a new subscription with the new filters parameter. After the new 
- * subscription is established, the old subscription can be removed by 
+ * The saEvtEventSubscribe() function enables a process to subscribe for
+ * events on an event channel by registering one or more filters on that
+ * event channel. The process must have opened the event channel, designated
+ * by channelHandle, with the SA_EVT_CHANNEL_SUBSCRIBER flag set for an
+ * invocation of this function to be successful.
+ * The memory associated with the filters is not deallocated by the
+ * saEvtEventSubscribe() function. It is the responsibility of the invoking
+ * process to deallocate the memory when the saEvtEventSubscribe() function
+ * returns.
+ * For a given subscription, the filters parameter cannot be modified. To
+ * change the filters parameter without losing events, a process must
+ * establish a new subscription with the new filters parameter. After the new
+ * subscription is established, the old subscription can be removed by
  * invoking the saEvtEventUnsubscribe() function.
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventSubscribe(
-	const SaEvtChannelHandleT channelHandle, 
-	const SaEvtEventFilterArrayT *filters, 
+	const SaEvtChannelHandleT channelHandle,
+	const SaEvtEventFilterArrayT *filters,
 	SaEvtSubscriptionIdT subscriptionId)
 {
 	SaAisErrorT error;
@@ -1936,14 +1936,14 @@ saEvtEventSubscribe(
 	/*
 	 * get the evt handle for the fd
 	 */
-	error = saHandleInstanceGet(&evt_instance_handle_db, 
+	error = saHandleInstanceGet(&evt_instance_handle_db,
 			eci->eci_instance_handle, (void*)&evti);
 	if (error != SA_AIS_OK) {
 		goto subscribe_put1;
 	}
 
 	/*
-	 * Make sure that a deliver callback has been 
+	 * Make sure that a deliver callback has been
 	 * registered before allowing the subscribe to continue.
 	 */
 	if (!evti->ei_callback.saEvtEventDeliverCallback) {
@@ -1965,7 +1965,7 @@ saEvtEventSubscribe(
 	sz = filt_size(filters);
 
 	req = malloc(sizeof(*req) + sz);
-	
+
 	if (!req) {
 		error = SA_AIS_ERR_NO_MEMORY;
 		goto subscribe_put2;
@@ -1974,7 +1974,7 @@ saEvtEventSubscribe(
 	/*
 	 * Copy the supplied filters to the request
 	 */
-	req->ics_filter_count = aisfilt_to_evt_filt(filters, 
+	req->ics_filter_count = aisfilt_to_evt_filt(filters,
 		req->ics_filter_data);
 	req->ics_head.id = MESSAGE_REQ_EVT_SUBSCRIBE;
 	req->ics_head.size = sizeof(*req) + sz;
@@ -1997,7 +1997,7 @@ saEvtEventSubscribe(
 	error = res.ics_head.error;
 
 subscribe_put2:
-	saHandleInstancePut(&evt_instance_handle_db, 
+	saHandleInstancePut(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 subscribe_put1:
 	saHandleInstancePut(&channel_handle_db, channelHandle);
@@ -2006,18 +2006,18 @@ subscribe_done:
 }
 
 /*
- * The saEvtEventUnsubscribe() function allows a process to stop receiving 
- * events for a particular subscription on an event channel by removing the 
- * subscription. The saEvtEventUnsubscribe() operation is successful if the 
- * subscriptionId parameter matches a previously registered subscription. 
- * Pending events that no longer match any subscription, because the 
- * saEvtEventUnsubscribe() operation had been invoked, are purged. a process 
- * that wishes to modify a subscription without losing any events must 
+ * The saEvtEventUnsubscribe() function allows a process to stop receiving
+ * events for a particular subscription on an event channel by removing the
+ * subscription. The saEvtEventUnsubscribe() operation is successful if the
+ * subscriptionId parameter matches a previously registered subscription.
+ * Pending events that no longer match any subscription, because the
+ * saEvtEventUnsubscribe() operation had been invoked, are purged. a process
+ * that wishes to modify a subscription without losing any events must
  * establish the new subscription before removing the existing subscription.
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventUnsubscribe(
-	const SaEvtChannelHandleT channelHandle, 
+	const SaEvtChannelHandleT channelHandle,
 	SaEvtSubscriptionIdT subscriptionId)
 {
 	SaAisErrorT error;
@@ -2033,7 +2033,7 @@ saEvtEventUnsubscribe(
 		goto unsubscribe_done;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, 
+	error = saHandleInstanceGet(&evt_instance_handle_db,
 			eci->eci_instance_handle, (void*)&evti);
 	if (error != SA_AIS_OK) {
 		goto unsubscribe_put1;
@@ -2064,7 +2064,7 @@ saEvtEventUnsubscribe(
 	error = res.icu_head.error;
 
 unsubscribe_put2:
-	saHandleInstancePut(&evt_instance_handle_db, 
+	saHandleInstancePut(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 unsubscribe_put1:
 	saHandleInstancePut(&channel_handle_db, channelHandle);
@@ -2074,16 +2074,16 @@ unsubscribe_done:
 
 
 /*
- * The saEvtEventRetentionTimeClear() function is used to clear the retention 
- * time of a published event. It indicates to the Event Service that it does 
- * not need to keep the event any longer for potential new subscribers. Once 
- * the value of the retention time is reset to 0, the event is no longer 
- * available for new subscribers. The event is held until all old subscribers 
+ * The saEvtEventRetentionTimeClear() function is used to clear the retention
+ * time of a published event. It indicates to the Event Service that it does
+ * not need to keep the event any longer for potential new subscribers. Once
+ * the value of the retention time is reset to 0, the event is no longer
+ * available for new subscribers. The event is held until all old subscribers
  * in the system process the event and free the event using saEvtEventFree().
  */
-SaAisErrorT 
+SaAisErrorT
 saEvtEventRetentionTimeClear(
-	const SaEvtChannelHandleT channelHandle, 
+	const SaEvtChannelHandleT channelHandle,
 	const SaEvtEventIdT eventId)
 {
 	SaAisErrorT error;
@@ -2103,7 +2103,7 @@ saEvtEventRetentionTimeClear(
 		goto ret_time_done;
 	}
 
-	error = saHandleInstanceGet(&evt_instance_handle_db, 
+	error = saHandleInstanceGet(&evt_instance_handle_db,
 			eci->eci_instance_handle, (void*)&evti);
 	if (error != SA_AIS_OK) {
 		goto ret_time_put1;
@@ -2134,7 +2134,7 @@ saEvtEventRetentionTimeClear(
 	error = res.iec_head.error;
 
 ret_time_put2:
-	saHandleInstancePut(&evt_instance_handle_db, 
+	saHandleInstancePut(&evt_instance_handle_db,
 					eci->eci_instance_handle);
 ret_time_put1:
 	saHandleInstancePut(&channel_handle_db, channelHandle);

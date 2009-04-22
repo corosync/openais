@@ -7,7 +7,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -86,7 +86,7 @@ static void printSaClmClusterNodeT (const char *description, SaClmClusterNodeT *
 static void NodeGetCallback (
 	SaInvocationT invocation,
 	const SaClmClusterNodeT *clusterNode,
-	SaAisErrorT error) 
+	SaAisErrorT error)
 {
 	char buf[128];
 

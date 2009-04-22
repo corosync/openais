@@ -78,7 +78,7 @@ uint32_t subscription_id[MAX_SUB] = {0xfedcba98};
 int sub_next = 0;
 
 char pubname[256] = "Test Pub Name";
-	
+
 #define patt1 "Filter pattern 1"
 #define patt1_size sizeof(patt1)
 
@@ -87,8 +87,8 @@ SaEvtEventFilterT filters[MAX_SUB] = {
 };
 
 SaEvtEventFilterArrayT subscribe_filters[MAX_SUB] = {
-	{ 
-		1, &filters[0] 
+	{
+		1, &filters[0]
 	},
 };
 
@@ -130,9 +130,9 @@ test_subscription()
 	int i;
 
 
-	
+
 	SaAisErrorT result;
-	 
+
 	flags = SA_EVT_CHANNEL_SUBSCRIBER | SA_EVT_CHANNEL_CREATE;
 	strcpy((char *)channel_name.value, channel);
 	channel_name.length = strlen(channel);
@@ -148,7 +148,7 @@ test_subscription()
 		return result;
 	}
 	do {
-		result = saEvtChannelOpen(handle, &channel_name, flags, 
+		result = saEvtChannelOpen(handle, &channel_name, flags,
 				SA_TIME_MAX, &channel_handle);
 	} while ((result == SA_AIS_ERR_TRY_AGAIN) && !sleep(TRY_WAIT));
 	if (result != SA_AIS_OK) {
@@ -157,7 +157,7 @@ test_subscription()
 		goto init_fin;
 	}
 
-	if (sub_next == 0) 
+	if (sub_next == 0)
 		sub_next = 1;
 
 	for (i = 0; i < sub_next; i++) {
@@ -220,12 +220,12 @@ test_subscription()
 sub_fin:
 #if 0
 	result = saEvtEventUnsubscribe(channel_handle, subscription_id);
-	if (result != SA_AIS_OK) 
+	if (result != SA_AIS_OK)
 		printf("Channel unsubscribe result: %d\n", result);
 #endif
 chan_fin:
 	result = saEvtChannelClose(channel_handle);
-	if (result != SA_AIS_OK) 
+	if (result != SA_AIS_OK)
 		get_sa_error(result, result_buf, result_buf_len);
 		printf("Channel close result: %s\n", result_buf);
 init_fin:
@@ -260,7 +260,7 @@ char *ais_time_str(SaTimeT time)
 	did_dot = 0;				\
 	}
 
-void 
+void
 event_callback( SaEvtSubscriptionIdT subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT event_data_size)
@@ -306,7 +306,7 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 		goto evt_free;
 	}
 	if (!quiet) {
-		dprintf("pattern array count: %llu\n", 
+		dprintf("pattern array count: %llu\n",
 				(unsigned long long)evt_pat_get_array.patternsNumber);
 		for (i = 0; i < evt_pat_get_array.patternsNumber; i++) {
 			dprintf( "pattern %d =\"%s\"\n", i,
@@ -315,15 +315,15 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 
 		dprintf("priority: 0x%x\n", priority);
 		dprintf("retention: 0x%llx\n", (unsigned long long)retention_time);
-		dprintf("publisher name content: \"%s\"\n", 
-				publisher_name.value); 
+		dprintf("publisher name content: \"%s\"\n",
+				publisher_name.value);
 	}
 
 	if (event_id == SA_EVT_EVENTID_LOST) {
 		dprintf("*** Events have been dropped at %s",
 			ais_time_str(publish_time));
 
-		if ((evt_pat_get_array.patternsNumber == 0)|| 
+		if ((evt_pat_get_array.patternsNumber == 0)||
 			(strcmp((char *)evt_pat_get_array.patterns[0].pattern, SA_EVT_LOST_EVENT) != 0)) {
 			dprintf("*** Received SA_EVT_EVENTID_LOST but pattern is wrong: %s\n",
 				evt_pat_get_array.patterns[0].pattern);
@@ -371,7 +371,7 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 		dprintf("unexpected data size: e=%d, a=%llu\n",
 				user_data_size, (unsigned long long)event_data_size);
 		goto evt_free;
-	} 
+	}
 
 	received_size = user_data_size;
 	result = saEvtEventDataGet(event_handle, event_data,
@@ -383,7 +383,7 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 	}
 	if (received_size != event_data_size) {
 		dprintf("event data mismatch e=%llu, a=%llu\n",
-				(unsigned long long)event_data_size, 
+				(unsigned long long)event_data_size,
 				(unsigned long long)received_size);
 		goto evt_free;
 	}
@@ -392,7 +392,7 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 		goto evt_free;
 	}
 	if (!quiet) {
-		dprintf("Received %d bytes of data OK\n", 
+		dprintf("Received %d bytes of data OK\n",
 				user_data_size);
 	}
 
@@ -425,7 +425,7 @@ int main (int argc, char **argv)
 
 	while (1) {
 		option = getopt(argc, argv, opts);
-		if (option == -1) 
+		if (option == -1)
 			break;
 
 		switch (option) {
@@ -456,7 +456,7 @@ int main (int argc, char **argv)
 			strcpy(channel, optarg);
 			break;
 		case 'f':
-			err_wait_time = 
+			err_wait_time =
 				(unsigned int)strtoul(optarg, NULL, 0);
 			break;
 		case 'n':
@@ -464,7 +464,7 @@ int main (int argc, char **argv)
 			break;
 		case 's':
 			p = strsep(&optarg, ",");
-			subscription_id[sub_next] = 
+			subscription_id[sub_next] =
 				(unsigned int)strtoul(p, NULL, 0);
 			p = strsep(&optarg, ",");
 			filters[sub_next].filter.pattern = malloc(strlen(p));

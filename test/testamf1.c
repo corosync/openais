@@ -9,7 +9,7 @@
  *	    Hans Feldt
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -162,7 +162,7 @@ void ComponentTerminateCallback (
 #if 0
     #include <sys/time.h>
     #define TRU "%d"
-    #define TRS "%s" 
+    #define TRS "%s"
     #define TR(format,x) do {                               \
 	struct timeval t;\
 	gettimeofday(&t,NULL);                                   \
@@ -172,7 +172,7 @@ void ComponentTerminateCallback (
     }while(0)
 #else
     #define TRU "%d"
-    #define TRS "%s" 
+    #define TRS "%s"
     #define TR(format,x)
 #endif
 
@@ -205,13 +205,13 @@ void CSISetCallback (
 		    if( strcmp((char*)csiDescriptor->csiAttr.attr[i].attrName, "good_health_limit") == 0){
 				good_health = strcmp((char*)csiDescriptor->csiAttr.attr[i].attrValue, "0") ? 0 : 1;
 				good_health_limit = atoi((char*)csiDescriptor->csiAttr.attr[i].attrValue);
-			
+
 		    }
 #if 0
 		    TR(TRS,csiDescriptor->csiAttr.attr[i].attrName);
 		    TR(TRS, csiDescriptor->csiAttr.attr[i].attrValue);
 #endif
-		} 
+		}
 
 		TR(TRU, csiDescriptor->csiFlags);
 
@@ -219,23 +219,23 @@ void CSISetCallback (
 		printSaNameT((SaNameT*) &csiDescriptor->csiStateDescriptor.activeDescriptor.activeCompName);
 		TR(TRU, csiDescriptor->csiStateDescriptor.activeDescriptor.transitionDescriptor);
 
-		break;  
-         
+		break;
+
 	case SA_AMF_HA_STANDBY:
 		printf ("PID %d: Component '%s' requested to enter hastate SA_AMF_STANDBY "
 				"for \n\tCSI '%s'\n",
 			(int)getpid(), compName->value, csiDescriptor->csiName.value);
 		response (handle, invocation, SA_AIS_OK);
-		
+
 		TR(TRU,csiDescriptor->csiAttr.number);
 		for(i=0; i<csiDescriptor->csiAttr.number; i++) {
-		    if(!strcmp((char*)csiDescriptor->csiAttr.attr[i].attrName, "good_health") && 
+		    if(!strcmp((char*)csiDescriptor->csiAttr.attr[i].attrName, "good_health") &&
 		       !strcmp((char*)csiDescriptor->csiAttr.attr[i].attrValue, "true")){
 			good_health = 1;
 		    }
 		    TR(TRS,csiDescriptor->csiAttr.attr[i].attrName);
 		    TR(TRS,csiDescriptor->csiAttr.attr[i].attrValue);
-		} 
+		}
 		TR(TRU,csiDescriptor->csiFlags);
 
 		printSaNameT((SaNameT*) &csiDescriptor->csiStateDescriptor.standbyDescriptor.activeCompName);
@@ -325,7 +325,7 @@ void write_pid (void) {
 	char filename[256];
 	int fd;
 	int res;
-	
+
 	sprintf (filename,  "/var/run/openais_cleanup_%s", compNameGlobal.value);
 	fd = open (filename, O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
 	if (fd == -1) {
@@ -344,8 +344,8 @@ static SaSelectionObjectT comp_init ()
 	char *env;
 	int result;
 	SaSelectionObjectT select_fd;
-	SaAmfPmErrorsT pmErrors = (SA_AMF_PM_ZERO_EXIT | 
-							   SA_AMF_PM_NON_ZERO_EXIT | 
+	SaAmfPmErrorsT pmErrors = (SA_AMF_PM_ZERO_EXIT |
+							   SA_AMF_PM_NON_ZERO_EXIT |
 							   SA_AMF_PM_ABNORMAL_END);
 
 	name = getenv ("SA_AMF_COMPONENT_NAME");
@@ -494,7 +494,7 @@ static SaSelectionObjectT comp_init ()
 	do {
 		result = saAmfPmStart (handle,
 			&compNameGlobal, getpid(), 1,
-			pmErrors, 
+			pmErrors,
 			SA_AMF_COMPONENT_FAILOVER);
 
 		if (result == SA_AIS_ERR_TRY_AGAIN) {

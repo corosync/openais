@@ -6,7 +6,7 @@
  * Author: Rabbe Fogelholm (rabbe.fogelholm@ericsson.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -31,21 +31,21 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
- 
+
 /*
  * testclm2.c
- * 
+ *
  * Simple program to test cluster membership on an SA Forum platform.
  * The program expects one command-line argument which is "query"
  * or "callback". "Query" means that a single saClmClusterTrack call
  * is to be made. "Callback" means that callbacks are wanted when
  * there are changes in cluster membership. At least a 2-node cluster
  * is required to test this program mode.
- * 
+ *
  * Tested on platforms:
  *   Gentoo Linux 2005-08 (build)
  *   Fedora Core 4 (build and run)
- * 
+ *
  * Change history:
  *   2005-08-28 Rabbe Fogelholm:
  *     Initial version
@@ -53,7 +53,7 @@
  *     Added call to saClmClusterTrackStop()
  *     Possible to test SA_TRACK_CHANGES_ONLY
  *     Improved diagnostics
- */ 
+ */
 
 
 #include <stdio.h>
@@ -113,13 +113,13 @@ int main(int argc, char *argv[])
 	{
 		printf("sigaction returned: %d\n", status);
 	}
-	
+
 	if (argc != 2 && argc != 3)
 	{
 		usage();
 		return 1;
 	}
-	
+
 	mode =
 		strcmp(argv[1], "query") == 0     ? MODE_QUERY :
 		strcmp(argv[1], "callback") == 0  ? MODE_CALLBACK :
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 		usage();
 		return 1;
 	}
-	
+
 	if (mode == MODE_CALLBACK && argc != 3)
 	{
 		usage();
@@ -148,18 +148,18 @@ int main(int argc, char *argv[])
 
 	callbacks.saClmClusterNodeGetCallback = NULL;
 	callbacks.saClmClusterTrackCallback = (SaClmClusterTrackCallbackT)clusterTrack;
-	
+
 	version.releaseCode = 'B';
 	version.majorVersion = 1;
 	version.minorVersion = 0;
-	
-	
+
+
 	if (! apiCall("Initialize", saClmInitialize(&handle ,&callbacks, &version)))
 		return 1;
 
 	printf("AIS version supported: %c.%d.%d\n",
 		version.releaseCode, version.majorVersion, version.minorVersion);
-	
+
 	if (mode == MODE_QUERY)
 	{
 		SaClmClusterNotificationBufferT buffer = {123456789, 123456789, NULL};
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 		printCluster(&buffer);
 		free(buffer.notification);
 	}
-	
+
 	if (mode == MODE_CALLBACK)
 	{
 		printf("(type ctrl-C to finish)\n");
@@ -235,7 +235,7 @@ static int apiCall(const char *call, SaAisErrorT code)
 
 static const char *decodeStatus(int code)
 {
- 	return  
+ 	return
   	  code == SA_AIS_OK                      ? "successful"                                                  :
   	  code == SA_AIS_ERR_LIBRARY             ? "error in library, cannot be used anymore"                    :
   	  code == SA_AIS_ERR_VERSION             ? "version incompatibility"                                     :
@@ -298,7 +298,7 @@ static void printAddress(SaClmNodeAddressT *nodeAddress)
 			nodeAddress->value[3]);
 	}
 	else
-	{		
+	{
 		int k;
 		for (k = 0; k < nodeAddress->length; k++)
 		{
@@ -311,7 +311,7 @@ static void printAddress(SaClmNodeAddressT *nodeAddress)
 
 static void printCluster(const SaClmClusterNotificationBufferT *buffer)
 {
-	int j; 
+	int j;
 
 	printf("  view number: %llu\n", (unsigned long long)buffer->viewNumber);
 	printf("  number of items: %u\n\n",  buffer->numberOfItems);
@@ -334,10 +334,10 @@ static void printDate(SaTimeT nanoseconds)
 {
 	time_t tt = nanoseconds/SA_TIME_ONE_SECOND;
 	struct tm *decodedTime = localtime(&tt);
-	
+
 	printf("%d-%02d-%02d %02d:%02d:%02d\n",
 		decodedTime->tm_year + 1900,
-		decodedTime->tm_mon + 1, 
+		decodedTime->tm_mon + 1,
 		decodedTime->tm_mday,
 		decodedTime->tm_hour,
 		decodedTime->tm_min,
@@ -347,7 +347,7 @@ static void printDate(SaTimeT nanoseconds)
 
 static const char *decodeClusterChange(int code)
 {
- 	return  
+ 	return
   	  code == SA_CLM_NODE_NO_CHANGE     ? "node has not changed"           :
   	  code == SA_CLM_NODE_JOINED        ? "node has joined the cluster"    :
   	  code == SA_CLM_NODE_LEFT          ? "node has left the cluster"      :

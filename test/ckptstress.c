@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -110,7 +110,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer1,
 		sizeof (readBuffer1),
-		0, 
+		0,
 		0
 	},
 	{
@@ -120,7 +120,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer2,
 		sizeof (readBuffer2),
-		0, 
+		0,
 		0
 	}
 };
@@ -135,7 +135,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data, /*"written data #1, this should extend past end of old section data", */
 		DATASIZE, /*sizeof ("written data #1, this should extend past end of old section data") + 1, */
-		0, //5, 
+		0, //5,
 		0
 	}
 #ifdef COMPILE_OUT
@@ -146,7 +146,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data, /*"written data #2, this should extend past end of old section data" */
 		DATASIZE, /*sizeof ("written data #2, this should extend past end of old section data") + 1, */
-		0, //3, 
+		0, //3,
 		0
 	}
 #endif

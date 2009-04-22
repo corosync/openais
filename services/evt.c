@@ -6,7 +6,7 @@
  * All rights reserved.
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -1576,7 +1576,7 @@ clear_retention_time(mar_evteventid_t event_id)
 	struct event_data *edp;
 	struct list_head *l, *nxt;
 
-	log_printf(RETENTION_TIME_DEBUG, "Search for Event ID %llx\n", 
+	log_printf(RETENTION_TIME_DEBUG, "Search for Event ID %llx\n",
 		(unsigned long long)event_id);
 	for (l = retained_list.next; l != &retained_list; l = nxt) {
 		nxt = l->next;
@@ -3635,18 +3635,18 @@ convert_chan_packet(void *msg)
 		break;
 
 	case EVT_SET_ID_OP:
-		cpkt->u.chc_set_id.chc_nodeid = 
+		cpkt->u.chc_set_id.chc_nodeid =
 			swab32(cpkt->u.chc_set_id.chc_nodeid);
 		cpkt->u.chc_set_id.chc_last_id = swab64(cpkt->u.chc_set_id.chc_last_id);
 		break;
 
 	case EVT_OPEN_COUNT:
 		swab_mar_name_t (&cpkt->u.chc_set_opens.chc_chan_name);
-		cpkt->u.chc_set_opens.chc_open_count = 
+		cpkt->u.chc_set_opens.chc_open_count =
 			swab32(cpkt->u.chc_set_opens.chc_open_count);
 		break;
 
-	/* 
+	/*
 	 * No data assocaited with these ops.
 	 */
 	case EVT_CONF_DONE:

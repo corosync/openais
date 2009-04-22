@@ -8,7 +8,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -204,12 +204,12 @@ static struct corosync_exec_handler clm_exec_engine[] =
 		.exec_endian_convert_fn	= exec_clm_nodejoin_endian_convert
 	}
 };
-	
+
 struct corosync_service_engine clm_service_engine = {
 	.name			= "openais cluster membership service B.01.01",
 	.id			= CLM_SERVICE,
 	.private_data_size	= sizeof (struct clm_pd),
-	.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED, 
+	.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED,
 	.lib_init_fn		= clm_lib_init_fn,
 	.lib_exit_fn		= clm_lib_exit_fn,
 	.lib_engine		= clm_lib_engine,
@@ -348,7 +348,7 @@ static int clm_exec_init_fn (struct corosync_api_v1 *corosync_api)
 		int mib[2] = { CTL_KERN, KERN_BOOTTIME };
 		struct timeval boot_time;
 		size_t size = sizeof(boot_time);
-		
+
 		if ( sysctl(mib, 2, &boot_time, &size, NULL, 0) == -1 )
 			boot_time.tv_sec = time (NULL);
 		 /* (currenttime (s) - uptime (s)) * 1 billion (ns) / 1 (s) */
@@ -467,7 +467,7 @@ static void notification_join (const mar_clm_cluster_node_t *cluster_node)
 	notification.cluster_change = SA_CLM_NODE_JOINED;
 	notification.cluster_node.member = 1;
 	memcpy (&notification.cluster_node, cluster_node,
-		sizeof (mar_clm_cluster_node_t)); 
+		sizeof (mar_clm_cluster_node_t));
 	library_notification_send (&notification, 1);
 }
 
@@ -483,7 +483,7 @@ static void lib_notification_leave (unsigned int *nodes, int nodes_entries)
 	for (notify_count = 0, i = 0; i < cluster_node_count; i++) {
 		for (j = 0; j < nodes_entries; j++) {
 			if (cluster_node_entries[i].node_id == nodes[j]) {
-				memcpy (&cluster_notification[notify_count].cluster_node, 
+				memcpy (&cluster_notification[notify_count].cluster_node,
 					&cluster_node_entries[i],
 					sizeof (mar_clm_cluster_node_t));
 				cluster_notification[notify_count].cluster_change = SA_CLM_NODE_LEFT;
@@ -522,14 +522,14 @@ static int clm_nodejoin_send (void)
 	int result;
 
 	req_exec_clm_nodejoin.header.size = sizeof (struct req_exec_clm_nodejoin);
-	req_exec_clm_nodejoin.header.id = 
+	req_exec_clm_nodejoin.header.id =
 		SERVICE_ID_MAKE (CLM_SERVICE, MESSAGE_REQ_EXEC_CLM_NODEJOIN);
 
 	my_cluster_node.initial_view_number = view_initial;
 
 	memcpy (&req_exec_clm_nodejoin.cluster_node, &my_cluster_node,
 		sizeof (mar_clm_cluster_node_t));
-	
+
 	req_exec_clm_iovec.iov_base = (char *)&req_exec_clm_nodejoin;
 	req_exec_clm_iovec.iov_len = sizeof (req_exec_clm_nodejoin);
 
@@ -636,7 +636,7 @@ static void message_handler_req_exec_clm_nodejoin (
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "got nodejoin message %s\n",
 		req_exec_clm_nodejoin->cluster_node.node_name.value);
-	
+
 	/*
 	 * Determine if nodejoin already received
 	 */
@@ -700,7 +700,7 @@ static void message_handler_req_lib_clm_clustertrack (
 		}
 		res_lib_clm_clustertrack.number_of_items = cluster_node_count;
 	}
-	
+
 	/*
 	 * Record requests for cluster tracking
 	 */
@@ -767,7 +767,7 @@ static void message_handler_req_lib_clm_nodeget (
 	if (req_lib_clm_nodeget->node_id == SA_CLM_LOCAL_NODE_ID) {
 		cluster_node = &cluster_node_entries[0];
 		valid = 1;
-	} else 
+	} else
 	for (i = 0; i < cluster_node_count; i++) {
 		if (cluster_node_entries[i].node_id == req_lib_clm_nodeget->node_id) {
 			log_printf (LOGSYS_LEVEL_DEBUG, "found host that matches one desired in nodeget.\n");
@@ -805,7 +805,7 @@ static void message_handler_req_lib_clm_nodegetasync (
 	if (req_lib_clm_nodegetasync->node_id == SA_CLM_LOCAL_NODE_ID) {
 		cluster_node = &cluster_node_entries[0];
 		error = SA_AIS_OK;
-	} else 
+	} else
 	for (i = 0; i < cluster_node_count; i++) {
 		if (cluster_node_entries[i].node_id == req_lib_clm_nodegetasync->node_id) {
 			log_printf (LOGSYS_LEVEL_DEBUG, "found host that matches one desired in nodeget.\n");

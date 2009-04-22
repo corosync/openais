@@ -75,7 +75,7 @@ SaEvtEventFilterT filters[] = {
 
 SaEvtEventFilterArrayT subscribe_filters = {
 	sizeof(filters)/sizeof(SaEvtEventFilterT),
-	filters 
+	filters
 };
 
 
@@ -150,9 +150,9 @@ test_pub()
 #endif
 
 
-	
+
 	int result;
-	 
+
 	flags = SA_EVT_CHANNEL_PUBLISHER |
 #ifdef EVENT_SUBSCRIBE
 		SA_EVT_CHANNEL_SUBSCRIBER |
@@ -167,7 +167,7 @@ test_pub()
 		printf("Event Initialize result: %d\n", result);
 		exit(1);
 	}
-	result = saEvtChannelOpen(handle, &channel_name, flags, 
+	result = saEvtChannelOpen(handle, &channel_name, flags,
 			SA_TIME_MAX, &channel_handle);
 	if (result != SA_AIS_OK) {
 		printf("channel open result: %d\n", result);
@@ -187,10 +187,10 @@ test_pub()
 	if (result != SA_AIS_OK) {
 		printf("event subscribe result: %d\n", result);
 		result = saEvtChannelClose(channel_handle);
-		if (result != SA_AIS_OK) 
+		if (result != SA_AIS_OK)
 			printf("Channel close result: %d\n", result);
 		result = saEvtFinalize(handle);
-		if (result != SA_AIS_OK) 
+		if (result != SA_AIS_OK)
 			printf("Finalize result: %d\n", result);
 		return;
 	}
@@ -216,7 +216,7 @@ test_pub()
 
 	gettimeofday (&tv1, NULL);
 	for (i = 0; i < write_count; i++) {
-		result = saEvtEventPublish(event_handle, user_data, 
+		result = saEvtEventPublish(event_handle, user_data,
 						write_size, &event_id);
 		if (result != SA_AIS_OK) {
 			printf("event Publish result(2): %d\n", result);
@@ -280,7 +280,7 @@ evt_free:
 
 evt_close:
 	result = saEvtChannelClose(channel_handle);
-	
+
 	if (result != SA_AIS_OK) {
 		printf("channel close result: %d\n", result);
 	}
@@ -294,7 +294,7 @@ evt_fin:
 
 }
 
-void 
+void
 event_callback( SaEvtSubscriptionIdT subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT event_data_size)
@@ -334,7 +334,7 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 
 	printf("priority: 0x%x\n", priority);
 	printf("retention: %llx\n", (unsigned long long)retention_time);
-	printf("publisher name content: \"%s\"\n", publisher_name.value); 
+	printf("publisher name content: \"%s\"\n", publisher_name.value);
 	printf("event id: %llx\n", (unsigned long long)event_id);
 evt_free:
 	result = saEvtEventFree(event_handle);
@@ -351,7 +351,7 @@ int main (int argc, char **argv)
 
 	while (1) {
 		option = getopt(argc, argv, opts);
-		if (option == -1) 
+		if (option == -1)
 			break;
 
 		switch (option) {
@@ -383,7 +383,7 @@ int main (int argc, char **argv)
 			strcpy(pubname, optarg);
 			break;
 		case 'i':
-			subscription_id = 
+			subscription_id =
 				(unsigned int)strtoul(optarg, NULL, 0);
 			break;
 		case 't':

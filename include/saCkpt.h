@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -119,12 +119,12 @@ typedef struct {
 } SaCkptCheckpointDescriptorT;
 
 typedef void (*SaCkptCheckpointOpenCallbackT) (
-	SaInvocationT invocation,	
+	SaInvocationT invocation,
 	const SaCkptCheckpointHandleT checkpointHandle,
 	SaAisErrorT error);
 
 typedef void (*SaCkptCheckpointSynchronizeCallbackT) (
-	SaInvocationT invocation,	
+	SaInvocationT invocation,
 	SaAisErrorT error);
 
 typedef struct {
@@ -165,7 +165,7 @@ saCkptCheckpointOpen (
 SaAisErrorT
 saCkptCheckpointOpenAsync (
 	SaCkptHandleT ckptHandle,
-	SaInvocationT invocation,	
+	SaInvocationT invocation,
 	const SaNameT *checkpointName,
 	const SaCkptCheckpointCreationAttributesT *checkpointCreationAttributes,
 	SaCkptCheckpointOpenFlagsT checkpointOpenFlags);

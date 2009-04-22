@@ -1,5 +1,5 @@
 /** @file amfnode.c
- * 
+ *
  * Copyright (c) 2006 Ericsson AB.
  * Author: Hans Feldt, Anders Eriksson, Lars Holm
  * - Constructors/destructors
@@ -9,7 +9,7 @@
  *
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -33,15 +33,15 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF Node Class Implementation
- * 
- * This file contains functions for handling AMF nodes. It can be 
+ *
+ * This file contains functions for handling AMF nodes. It can be
  * viewed as the implementation of the AMF Node class (called NODE)
- * as described in SAI-Overview-B.02.01. The SA Forum specification 
+ * as described in SAI-Overview-B.02.01. The SA Forum specification
  * SAI-AIS-AMF-B.02.01 has been used as specification of the behaviour
  * and is referred to as 'the spec' below.
- * 
+ *
  * The functions in this file are responsible for:
  *	- controlling the instantiation of the SUs hosted on current node and
  *	  controlling the assigning of workload to them when a node joins the
@@ -75,21 +75,21 @@
  *      . LEAVING_SPONTANEOUSLY (SWITCHING_OVER, FAILING_OVER and
  *								 WAITING_FOR_NODE_TO_JOIN)
  *      . JOINING (STARTING_APPLICATIONS and ASSIGNING_WORKLOAD)
- * 
+ *
  * REPAIR_NEEDED indicates the node needs a manual repair and this state will be
  * maintained until the administrative command REPAIRED is entered (implemented
  * in the future)
  *
  * IDLE is a composite state where no actions are actually performed
  * and used only to remember the escallation level. Substate LEVEL_0 indicates
- * no escallation. LEVEL_2 indicates that so many component restarts have been 
- * executed recently that a new component restart request will escalate 
+ * no escallation. LEVEL_2 indicates that so many component restarts have been
+ * executed recently that a new component restart request will escalate
  * to service unit restart action. Node will request a service unit restart
  * from SU.
  * LEVEL_3 will be entered if either there are too many service unit restarts
  * been made or a component failover recovery action is requested. On level 3
  * the recovery action performed is service unit failover (paragraph 3.12.1.3).
- * 
+ *
  * FAILING_FAST state executes a node re-boot and waits for the node to join
  * the cluster again. (not implemented)
  *
@@ -102,13 +102,13 @@
  * LEAVING_SPONTANEOUSLY state handles the spontaneous leave of a node.
  *
  * JOINING state handles the start of a node in all cases except cluster start,
- * which is handled by the CLUSTER class. 
- * 
+ * which is handled by the CLUSTER class.
+ *
  * 1. Node Availability Control State Machine
  * ==========================================
- * 
+ *
  * 1.1  State Transition Table
- * 
+ *
  * State:                  Event:              Action:  New state:
  * ============================================================================
  * ESCALATION_LEVEL_X      node_sync_ready     A6       JOINING_STARTING_APPLS
@@ -126,7 +126,7 @@
  * LEAVING_SP_WAIT_FOR_JOIN node_sync_ready    A6       JOINING_STARTING_APPLS
  * GRACEFULLY_FAILING_OVER sg_failed_over [C1] A12      GRACEFULLY_REBOOTING
  * GRACEFULLY_REBOOTING    node_leave					ESCALATION_LEVEL_X
- * 
+ *
  *  1.2 State Description
  *  =====================
  * ESCALATION_LEVEL_X -  Node is synchronized and idle (X = 0,2 or 3).
@@ -152,13 +152,13 @@
  *                           has left the cluster and has ordered all service
  *                           groups to failover those of its SUs that were
  *							 hosted on current node.
- * 
+ *
  * LEAVING_SP_WAIT_FOR_JOIN - LEAVING_SPONTANEOUSLY_WAITING_FOR_NODE_TO_JOIN
  *                            Node is waiting for current node to join again.
  *
  * 1.3 Actions
  * ===========
- * A1 - 
+ * A1 -
  * A2 -
  * A3 -
  * A4 -
@@ -171,13 +171,13 @@
  *      [foreach SG in application ]
  *      [foreach SU in SG where the SU is hosted on current node]
  *      [foreach comp in such an SU]indicate that the node has left the cluster
- * A10- 
+ * A10-
  * A11- [foreach SG in cluster]failover node
  * A12- reboot node
  * A13- restart SU
  * A14- failover SU
  * A15- failover node
- * 
+ *
  * 1.4 Guards
  * ==========
  * C1 - All SG availability control state machines (ACSM) == IDLE
@@ -187,7 +187,7 @@
  * C5 - All applications have ACSM state == WORKLOAD_ASSIGNED
  * C6 - Specified number of SU restarts have been done.
  * C7 - Specified number of SU failover actions have been done.
- */ 
+ */
 
 #include <stdlib.h>
 #include <assert.h>
@@ -209,7 +209,7 @@ static void node_acsm_enter_leaving_spontaneously(struct amf_node *node)
 }
 
 static void node_acsm_enter_failing_over (struct amf_node *node)
-{ 
+{
 	struct amf_application *app;
 	struct amf_sg *sg;
 	struct amf_su *su;
@@ -272,7 +272,7 @@ static void node_acsm_enter_failing_gracefully_failing_over (amf_node_t *node)
 	failover_all_sg_on_node (node);
 }
 
-static int has_all_sg_on_node_failed_over (amf_node_t *node) 
+static int has_all_sg_on_node_failed_over (amf_node_t *node)
 {
 	amf_application_t *app;
 	amf_sg_t *sg;
@@ -312,7 +312,7 @@ static void repair_node (amf_node_t *node)
 			exit (0);
 #else
 			res = system ("reboot");
-#endif	
+#endif
 	}
 }
 
@@ -329,7 +329,7 @@ static void node_acsm_enter_idle (amf_node_t *node)
 	node->acsm_state =  node->history_state;
 }
 
-static void node_acsm_enter_joining_assigning_workload (struct amf_node *node, 
+static void node_acsm_enter_joining_assigning_workload (struct amf_node *node,
 	struct amf_application *app)
 {
 	log_printf(LOGSYS_LEVEL_NOTICE,
@@ -338,7 +338,7 @@ static void node_acsm_enter_joining_assigning_workload (struct amf_node *node,
 
 	ENTER();
 	node->acsm_state = NODE_ACSM_JOINING_ASSIGNING_WORKLOAD;
-	for (app = app->cluster->application_head; app != NULL; 
+	for (app = app->cluster->application_head; app != NULL;
 		app = app->next) {
 		amf_application_assign_workload (app, node);
 	}
@@ -351,7 +351,7 @@ static void node_acsm_enter_joining_assigning_workload (struct amf_node *node,
 /**
  * This event indicates that a node has unexpectedly left the cluster. Node
  * leave event is obtained from amf_confchg_fn.
- * 
+ *
  * @param node
  */
 void amf_node_leave (struct amf_node *node)
@@ -363,13 +363,13 @@ void amf_node_leave (struct amf_node *node)
 		case NODE_ACSM_IDLE_ESCALLATION_LEVEL_0:
 		case NODE_ACSM_IDLE_ESCALLATION_LEVEL_2:
 		case NODE_ACSM_IDLE_ESCALLATION_LEVEL_3:
-			node_acsm_enter_leaving_spontaneously(node);    
+			node_acsm_enter_leaving_spontaneously(node);
 			node_acsm_enter_failing_over (node);
 			break;
 		case NODE_ACSM_REPAIR_NEEDED:
 			break;
 		case NODE_ACSM_FAILING_GRACEFULLY_REBOOTING_NODE:
-			node->saAmfNodeOperState = SA_AMF_OPERATIONAL_ENABLED; 
+			node->saAmfNodeOperState = SA_AMF_OPERATIONAL_ENABLED;
 			node_acsm_enter_idle (node);
 			break;
 		default:
@@ -408,7 +408,7 @@ void amf_node_failover (struct amf_node *node)
 }
 
 /**
- * 
+ *
  * @param node
  */
 void amf_node_switchover (struct amf_node *node)
@@ -417,7 +417,7 @@ void amf_node_switchover (struct amf_node *node)
 }
 
 /**
- * 
+ *
  * @param node
  */
 void amf_node_failfast (struct amf_node *node)
@@ -428,7 +428,7 @@ void amf_node_failfast (struct amf_node *node)
 /**
  * This event is a request to restart a component which has been escalated,
  * because the component has already been restarted the number of times
- * specified by the configuration. 
+ * specified by the configuration.
  * This function evaluates which recovery measure shall now be
  * taken and initiates the action which result from the evaluation.
  * @param node
@@ -480,11 +480,11 @@ void amf_node_comp_restart_req (struct amf_node *node, struct amf_comp *comp)
 			TRACE1("%d",node->acsm_state);
 			assert (0);
 			break;
-	}                       	
+	}
 }
 
 /**
- * This event is a request to failover the specified component. 
+ * This event is a request to failover the specified component.
  * This function evaluates which recovery measure shall actually be
  * taken considering the escalation policy and initiates the action
  * which result from the evaluation.
@@ -500,15 +500,15 @@ void amf_node_comp_failover_req (amf_node_t *node, amf_comp_t *comp)
 			if (comp->su->saAmfSUFailover) {
 				/* SU failover */
 				amf_sg_failover_su_req (comp->su->sg,comp->su, node);
-			} 
+			}
 			break;
 		case NODE_ACSM_IDLE_ESCALLATION_LEVEL_3:
 			if (comp->su->su_failover_cnt < node->saAmfNodeSuFailoverMax) {
 				if (comp->su->saAmfSUFailover) {
 					/* SU failover */
 					amf_sg_failover_su_req (comp->su->sg,comp->su, node);
-					
-				} 
+
+				}
 			} else {
 				node->history_state = NODE_ACSM_IDLE_ESCALLATION_LEVEL_0;
 					amf_node_failover (node);
@@ -524,7 +524,7 @@ void amf_node_comp_failover_req (amf_node_t *node, amf_comp_t *comp)
 /**
  * This event indicates that current node has joined and its cluster model has
  * been synchronized with the other nodes cluster models.
- * 
+ *
  * @param node
  */
 void amf_node_sync_ready (struct amf_node *node)
@@ -569,11 +569,11 @@ void amf_node_sync_ready (struct amf_node *node)
  * words successfully instantiated, instantiation has failed or instantiation
  * was not possible (due to the node on which the SU was to be hosted is not
  * operational).
- * 
+ *
  * @param node
  * @param application which has been started
  */
-void amf_node_application_started (struct amf_node *node, 
+void amf_node_application_started (struct amf_node *node,
 	struct amf_application *app)
 {
 	assert (node != NULL && app != NULL );
@@ -598,11 +598,11 @@ void amf_node_application_started (struct amf_node *node,
 
 /**
  * This event indicates that an application has been assigned workload.
- * 
+ *
  * @param node
  * @param app - Application which has been assigned workload
  */
-void amf_node_application_workload_assigned (struct amf_node *node, 
+void amf_node_application_workload_assigned (struct amf_node *node,
 	struct amf_application *app)
 {
 	assert (node != NULL && app != NULL );
@@ -612,7 +612,7 @@ void amf_node_application_workload_assigned (struct amf_node *node,
 		case NODE_ACSM_JOINING_ASSIGNING_WORKLOAD:
 
 			if (amf_cluster_applications_assigned (amf_cluster)) {
-				log_printf(LOGSYS_LEVEL_NOTICE, "Node=%s: all workload assigned", 
+				log_printf(LOGSYS_LEVEL_NOTICE, "Node=%s: all workload assigned",
 					node->name.value);
 				node_acsm_enter_idle (node);
 			}
@@ -628,7 +628,7 @@ void amf_node_application_workload_assigned (struct amf_node *node,
 /**
  * This event indicates that an SG has failed over its workload after a node
  * failure.
- * 
+ *
  * @param node
  * @param sg_in SG which is now ready with its failover
  */
@@ -640,7 +640,7 @@ void amf_node_sg_failed_over (struct amf_node *node, struct amf_sg *sg_in)
 	switch (node->acsm_state) {
 		case NODE_ACSM_LEAVING_SPONTANEOUSLY_FAILING_OVER:
 			if (has_all_sg_on_node_failed_over (node)) { /*C2*/
-				node->acsm_state = 
+				node->acsm_state =
 					NODE_ACSM_LEAVING_SPONTANEOUSLY_WAITING_FOR_NODE_TO_JOIN;
 			}
 			break;
@@ -681,7 +681,7 @@ struct amf_node *amf_node_new (struct amf_cluster *cluster, const char *name) {
 	node->cluster = cluster;
 	node->next = cluster->node_head;
 	cluster->node_head = node;
-	node->acsm_state = NODE_ACSM_IDLE_ESCALLATION_LEVEL_0; 
+	node->acsm_state = NODE_ACSM_IDLE_ESCALLATION_LEVEL_0;
 	node->history_state = NODE_ACSM_IDLE_ESCALLATION_LEVEL_0;
 	return node;
 }

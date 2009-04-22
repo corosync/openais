@@ -1,5 +1,5 @@
 /** @file amfcomp.c
- * 
+ *
  * Copyright (c) 2006 Ericsson AB.
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
  * Copyright (c) 2006 Sun Microsystems, Inc. Copyright (c) 2006
@@ -18,7 +18,7 @@
  * - Serializers/deserializers
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -42,15 +42,15 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF Component Class Implementation
- * 
- * This file contains functions for handling AMF-components. It can be 
+ *
+ * This file contains functions for handling AMF-components. It can be
  * viewed as the implementation of the AMF Component class (called comp)
- * as described in SAI-Overview-B.02.01. The SA Forum specification 
+ * as described in SAI-Overview-B.02.01. The SA Forum specification
  * SAI-AIS-AMF-B.02.01 has been used as specification of the behaviour
  * and is referred to as 'the spec' below.
- * 
+ *
  * The functions in this file are responsible for handling the following
  * types of components:
  * 	- sa-aware components
@@ -86,7 +86,7 @@
  * Comp initiates error reports to its parent SU in the cases described in
  * paragraph 3.3.2.2 in the spec. Comp delegates all actions to SU except
  *	- it stores the received or pre-configured recommended recovery
- *	  action 
+ *	  action
  *	- sets the operational state to DISABLED unless the
  *	  recommended recovery action was SA_AMF_COMP_RESTART. (In this case
  *	  SU or node may set operational state of the component later on
@@ -106,7 +106,7 @@
  * value of the ha-state but only to faciltate the communication of the CSI
  * set (or remove) order and to evaluate the response from the library.
  *
- * The presence state machine implements all the states described in the 
+ * The presence state machine implements all the states described in the
  * specification.
  * The '-ING' states of PRSM are designed as composite states (UML terminology).
  * Being a composite state means that the state contains substates.
@@ -120,7 +120,7 @@
  * 4.1 - 4.6 in the spec. The comp PRSM implements all the logic described
  * except for node reboot, which is handled by the AMF Node class.
  * Also PRSM reports all changes of state to its parent SU.
- * 
+ *
  */
 
 
@@ -192,7 +192,7 @@ static void lib_csi_set_request (
 	struct amf_comp *comp,
 	struct amf_csi_assignment *csi_assignment);
 
-static void comp_recover_action (amf_comp_t *comp, 
+static void comp_recover_action (amf_comp_t *comp,
 	SaAmfRecommendedRecoveryT recommendedRecovery);
 
 /*
@@ -246,7 +246,7 @@ static int is_not_instantiating_or_instantiated_or_restarting (amf_comp_t *comp)
 }
 
 static int invocation_create (
-	int interface, 
+	int interface,
 	void *data)
 {
 	struct invocation *invocation_addr = 0;
@@ -311,7 +311,7 @@ static void invocation_destroy_by_data (void *data)
 
 /**
  * Set suspected error flag and report to SU.
- * 
+ *
  * @param comp
  * @param recommended_recovery
  */
@@ -372,11 +372,11 @@ static void *clc_command_run (void *context)
 		if (WIFSIGNALED (status) != 0) {
 			fprintf (stderr, "Error: CLC_CLI (%d) failed with exit status:"
 				" %d\n", (int)pid, WTERMSIG(status));
-			/*                                                              
+			/*
 			 * TODO: remove this and handle properly later...
 			 */
 
-			/*                                                              
+			/*
 			 * Healthcheck timout will expire laterfore the component
 			 * and this will lead to Intantiation failed for the component.
 			 */
@@ -441,7 +441,7 @@ static void *clc_command_run (void *context)
 			argv_size++;
 			argv = realloc (argv, sizeof (char*) * argv_size);
 			if (argv == NULL) {
-				fprintf (stderr, "out-of-memory");  
+				fprintf (stderr, "out-of-memory");
 				corosync_fatal_error(COROSYNC_OUT_OF_MEMORY);
 			}
 			argv[i] = arg;
@@ -599,7 +599,7 @@ static int clc_cli_terminate (struct amf_comp *comp)
 /**
  * Request component to terminate itself
  * @param comp
- * 
+ *
  * @return int
  */
 static int lib_comp_terminate_request (struct amf_comp *comp)
@@ -737,7 +737,7 @@ struct amf_healthcheck *amf_comp_find_healthcheck (
 		healthcheck != NULL;
 		healthcheck = healthcheck->next) {
 
-		if (key->keyLen == healthcheck->safHealthcheckKey.keyLen && 
+		if (key->keyLen == healthcheck->safHealthcheckKey.keyLen &&
 			memcmp (key, &healthcheck->safHealthcheckKey,key->keyLen) == 0) {
 			ret_healthcheck = healthcheck;
 			break;
@@ -754,7 +754,7 @@ struct amf_healthcheck *amf_comp_find_healthcheck (
  * here. Default values are initialized.
  * @param su
  * @param name
- * 
+ *
  * @return struct amf_comp*
  */
 struct amf_comp *amf_comp_new(struct amf_su *su, const char *name)
@@ -893,7 +893,7 @@ struct amf_comp *amf_comp_find (struct amf_cluster *cluster, const SaNameT *name
 	for (su = sg->su_head; su != NULL; su = su->next) {
 		if (strncmp (su_name, (char*)su->name.value, su->name.length) == 0) {
 			for (comp = su->comp_head; comp != NULL; comp = comp->next) {
-				if (comp->name.length == strlen(comp_name) && 
+				if (comp->name.length == strlen(comp_name) &&
 					strncmp (comp_name, (char*)comp->name.value,
 					comp->name.length) == 0) {
 					goto end;
@@ -915,7 +915,7 @@ static void amf_comp_healthcheck_deactivate (struct amf_comp *comp)
 	if (!amf_su_is_local (comp->su))
 		return;
 
-	ENTER (); 
+	ENTER ();
 
 	for (healthcheck = comp->healthcheck_head;
 		healthcheck != NULL;
@@ -955,7 +955,7 @@ static void comp_presence_state_set (struct amf_comp *comp,
 
 struct amf_csi_assignment *amf_comp_get_next_csi_assignment (
 	struct amf_comp *component,
-	const struct amf_csi_assignment *csi_assignment) 
+	const struct amf_csi_assignment *csi_assignment)
 {
 	struct amf_si *si;
 	struct amf_csi *csi;
@@ -1031,7 +1031,7 @@ void amf_comp_foreach_csi_assignment (
 }
 
 static struct amf_csi_assignment *csi_assignment_find_in (
-	struct amf_comp *component, const SaNameT *csi_name) 
+	struct amf_comp *component, const SaNameT *csi_name)
 {
 	struct amf_csi_assignment *csi_assignment;
 	SaNameT dn;
@@ -1094,8 +1094,8 @@ static void mcast_healthcheck_tmo_event (
 	if (healthcheck->active == 0) {
 		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheck timeout: ignored key = %s, "
 							 "due to wrong state = %d, comp = %s",
-			healthcheck->safHealthcheckKey.key, 
-			healthcheck->comp->saAmfCompPresenceState, 
+			healthcheck->safHealthcheckKey.key,
+			healthcheck->comp->saAmfCompPresenceState,
 			healthcheck->comp->name.value);
 		goto out;
 	}
@@ -1157,7 +1157,7 @@ static void lib_csi_set_request (
 	struct amf_comp *comp,
 	struct amf_csi_assignment *csi_assignment)
 {
-	struct res_lib_amf_csisetcallback* res_lib;     
+	struct res_lib_amf_csisetcallback* res_lib;
 	void*  p;
 	struct amf_csi_attribute *attribute;
 	size_t char_length_of_csi_attrs=0;
@@ -1206,17 +1206,17 @@ static void lib_csi_set_request (
 	}
 
 	res_lib->number = num_of_csi_attrs;
-	res_lib->csiFlags = SA_AMF_CSI_ADD_ONE;  
+	res_lib->csiFlags = SA_AMF_CSI_ADD_ONE;
 
 	switch (csi_assignment->requested_ha_state) {
 		case SA_AMF_HA_ACTIVE: {
 			res_lib->csiStateDescriptor.activeDescriptor.activeCompName.length = 0;
 			res_lib->csiStateDescriptor.activeDescriptor.transitionDescriptor =
-					SA_AMF_CSI_NEW_ASSIGN; 
+					SA_AMF_CSI_NEW_ASSIGN;
 			break;
 		}
 		case SA_AMF_HA_STANDBY: {
-			res_lib->csiStateDescriptor.standbyDescriptor.activeCompName.length = 0; 
+			res_lib->csiStateDescriptor.standbyDescriptor.activeCompName.length = 0;
 			res_lib->csiStateDescriptor.standbyDescriptor.standbyRank =  1;
 			break;
 		}
@@ -1229,13 +1229,13 @@ static void lib_csi_set_request (
 			break;
 		}
 		default: {
-			assert(SA_AMF_HA_ACTIVE||SA_AMF_HA_STANDBY||SA_AMF_HA_QUIESCING||SA_AMF_HA_QUIESCED);         
+			assert(SA_AMF_HA_ACTIVE||SA_AMF_HA_STANDBY||SA_AMF_HA_QUIESCING||SA_AMF_HA_QUIESCED);
 			break;
 		}
 	}
 
 	res_lib->header.id = MESSAGE_RES_AMF_CSISETCALLBACK;
-	res_lib->header.size = 
+	res_lib->header.size =
 		sizeof (struct res_lib_amf_csisetcallback) +
 		char_length_of_csi_attrs;
 	res_lib->header.error = SA_AIS_OK;
@@ -1248,7 +1248,7 @@ static void lib_csi_set_request (
 		invocation_create (AMF_RESPONSE_CSISETCALLBACK, csi_assignment);
 	api->ipc_dispatch_send (
 		comp->conn, res_lib, res_lib->header.size);
-	
+
 	free(p);
 }
 
@@ -1291,13 +1291,13 @@ SaAisErrorT amf_comp_register (struct amf_comp *comp)
 	return SA_AIS_OK;
 }
 
-void amf_comp_error_report (struct amf_comp *comp, amf_comp_t* reporting_comp, 
+void amf_comp_error_report (struct amf_comp *comp, amf_comp_t* reporting_comp,
 	SaAmfRecommendedRecoveryT recommendedRecovery)
 {
 	struct res_lib_amf_componenterrorreport res_lib;
 
 	if (reporting_comp != NULL) {
-		TRACE2("Exec comp error report on comp'%s' from %s", comp->name.value, 
+		TRACE2("Exec comp error report on comp'%s' from %s", comp->name.value,
 			   reporting_comp->name.value );
 
 		if (amf_su_is_local (reporting_comp->su)) {
@@ -1336,7 +1336,7 @@ static void clear_ha_state (
 }
 
 
-static void comp_recover_action (amf_comp_t *comp, 
+static void comp_recover_action (amf_comp_t *comp,
 	SaAmfRecommendedRecoveryT recommendedRecovery)
 {
 	amf_node_t *node;
@@ -1358,7 +1358,7 @@ static void comp_recover_action (amf_comp_t *comp,
 						amf_node_comp_failover_req (node, comp);
 					} else {
 						/* Component restart */
-						amf_su_comp_error_suspected (comp->su, comp, 
+						amf_su_comp_error_suspected (comp->su, comp,
 							recommendedRecovery);
 					}
 				case SA_AMF_COMPONENT_RESTART:
@@ -1367,7 +1367,7 @@ static void comp_recover_action (amf_comp_t *comp,
 						amf_node_comp_failover_req (node, comp);
 					} else {
 						/* Component restart */
-						amf_su_comp_error_suspected (comp->su, comp, 
+						amf_su_comp_error_suspected (comp->su, comp,
 							recommendedRecovery);
 					}
 					break;
@@ -1377,7 +1377,7 @@ static void comp_recover_action (amf_comp_t *comp,
 					break;
 				case SA_AMF_NODE_SWITCHOVER:
 					break;
-				case SA_AMF_NODE_FAILOVER: { 
+				case SA_AMF_NODE_FAILOVER: {
                     /* Node failover */
 					amf_node_t *node = amf_node_find (
 						&comp->su->saAmfSUHostedByNode);
@@ -1447,7 +1447,7 @@ void amf_comp_cleanup_completed (struct amf_comp *comp)
 {
 	TRACE2("Exec CLC cleanup completed for '%s' %d", comp->name.value,
 		comp->saAmfCompPresenceState);
-    
+
 	stop_component_cleanup_timer (comp);
 
 
@@ -1455,7 +1455,7 @@ void amf_comp_cleanup_completed (struct amf_comp *comp)
 	amf_comp_foreach_csi_assignment (comp, clear_ha_state);
 
 	amf_comp_error_suspected_clear (comp);
-	
+
 	if (comp->saAmfCompPresenceState == SA_AMF_PRESENCE_RESTARTING) {
 		amf_comp_instantiate (comp);
 	} else if (comp->saAmfCompPresenceState ==
@@ -1525,7 +1525,7 @@ static void timer_function_pm_fn (void *data)
 }
 
 /**
- * Find and add all children of a given PID 
+ * Find and add all children of a given PID
  * @param comp the component
  * @param pmErrors the errors to monitor
  * @param recommendedRecovery
@@ -1723,12 +1723,12 @@ SaAisErrorT amf_comp_pm_stop (
 
 /**
  * Handle the request from a component to start a healthcheck
- * 
+ *
  * @param comp
  * @param healthcheckKey
  * @param invocationType
  * @param recommendedRecovery
- * 
+ *
  * @return SaAisErrorT - return value to component
  */
 SaAisErrorT amf_comp_healthcheck_start (
@@ -1739,15 +1739,15 @@ SaAisErrorT amf_comp_healthcheck_start (
 {
 	struct amf_healthcheck *healthcheck;
 	SaAisErrorT error = SA_AIS_OK;
-	
+
 	if (is_not_instantiating_or_instantiated_or_restarting (comp)) {
 		log_printf (LOGSYS_LEVEL_ERROR, "Healthcheckstart: ignored key = %s, "
 							 "due to wrong state = %d, comp = %s",
 			healthcheckKey->key, comp->saAmfCompPresenceState, comp->name.value);
 		error = SA_AIS_OK;
-		goto error_exit;	
+		goto error_exit;
 	}
-		
+
 
 	healthcheck = amf_comp_find_healthcheck (comp, healthcheckKey);
 	if (healthcheck == 0) {
@@ -1803,7 +1803,7 @@ error_exit:
  * Stop all or a specifed healthcheck
  * @param comp
  * @param healthcheckKey - NULL if all
- * 
+ *
  * @return SaAisErrorT
  */
 SaAisErrorT amf_comp_healthcheck_stop (
@@ -1814,7 +1814,7 @@ SaAisErrorT amf_comp_healthcheck_stop (
 	SaAisErrorT error = SA_AIS_OK;
 
 	TRACE1 ("Healthcheckstop: '%s'", comp->name.value);
- 
+
 	if (!amf_su_is_local (comp->su)) {
 		return SA_AIS_OK;
 	}
@@ -1854,7 +1854,7 @@ void amf_comp_instantiate (struct amf_comp *comp)
 			/* fall through */
 		case SA_AMF_PRESENCE_UNINSTANTIATED:
 			if (amf_su_is_local (comp->su)) {
-				TRACE1("Send instantiate event for comp '%s' from host %s", 
+				TRACE1("Send instantiate event for comp '%s' from host %s",
 					comp->name.value, comp->su->saAmfSUHostedByNode.value);
 				amf_comp_dn_make (comp, &compName);
 				amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_COMPONENT_INSTANTIATE,
@@ -1862,7 +1862,7 @@ void amf_comp_instantiate (struct amf_comp *comp)
 			}
 			break;
 		default:
-			TRACE1("Instantiate ignored in Component presence state %d", 
+			TRACE1("Instantiate ignored in Component presence state %d",
 				comp->saAmfCompPresenceState);
 			break;
 	}
@@ -1871,7 +1871,7 @@ void amf_comp_instantiate (struct amf_comp *comp)
 void amf_comp_cleanup_tmo_event (struct amf_comp *comp)
 {
 	ENTER ();
-	amf_comp_error_suspected_clear(comp);	
+	amf_comp_error_suspected_clear(comp);
 	amf_comp_operational_state_set (comp, SA_AMF_OPERATIONAL_DISABLED);
 	comp_presence_state_set (comp, SA_AMF_PRESENCE_TERMINATION_FAILED);
 }
@@ -1911,13 +1911,13 @@ void amf_comp_instantiate_event (struct amf_comp *component)
 		case SA_AMF_PRESENCE_TERMINATING:
 		case SA_AMF_PRESENCE_INSTANTIATION_FAILED:
 		case SA_AMF_PRESENCE_TERMINATION_FAILED:
-			TRACE1("Instantiate ignored in Component presence state %d", 
+			TRACE1("Instantiate ignored in Component presence state %d",
 				component->saAmfCompPresenceState);
 			break;
 		case SA_AMF_PRESENCE_UNINSTANTIATED:
 
 			comp_presence_state_set (component, SA_AMF_PRESENCE_INSTANTIATING);
-			amf_su_comp_state_changed(component->su, 
+			amf_su_comp_state_changed(component->su,
 				component,SA_AMF_PRESENCE_STATE,SA_AMF_PRESENCE_INSTANTIATING);
 			if (amf_su_is_local (component->su)) {
 				res = clc_interfaces[component->comptype]->instantiate (
@@ -1932,7 +1932,7 @@ void amf_comp_instantiate_event (struct amf_comp *component)
 			}
 			break;
 		default:
-			TRACE1("Component presence state %d", 
+			TRACE1("Component presence state %d",
 				component->saAmfCompPresenceState);
 			assert (0);
 			break;
@@ -1952,7 +1952,7 @@ void amf_comp_readiness_state_set (struct amf_comp *comp,
  * @param invocation [in] associates the response with the request (callback)
  * @param error [in] response from the component of the associated callback
  * @param retval [out] contains return value to component when needed
- * 
+ *
  * @return ==0 respond to component, do not multicast
  * @return >0  do not respond to component, multicast response
  */
@@ -1986,15 +1986,15 @@ int amf_comp_response_1 (
 					sizeof (SaAmfHealthcheckKeyT));
 				*recommendedRecovery = healthcheck->recommendedRecovery;
 
-				if (error != SA_AIS_OK && 
+				if (error != SA_AIS_OK &&
 					!amf_comp_is_error_suspected (healthcheck->comp)) {
-					return 1; 
+					return 1;
 				}
 				if (is_not_instantiating_or_instantiated_or_restarting(
 					healthcheck->comp)) {
 					log_printf (LOGSYS_LEVEL_ERROR, "HealthcheckResponse: ignored for key = %s, "
 										 "due to wrong state = %d comp = %s",
-						healthcheck->safHealthcheckKey.key, 
+						healthcheck->safHealthcheckKey.key,
 						healthcheck->comp->saAmfCompPresenceState,
 						healthcheck->comp->name.value);
 					*retval = SA_AIS_OK;
@@ -2054,11 +2054,11 @@ int amf_comp_response_1 (
  * @param invocation [in] associates the response with the request (callback)
  * @param error [in] response from the component of the associated callback
  * @param retval [out] contains return value to component when needed
- * 
+ *
  * @return component to which the response should be sent
  */
-struct amf_comp *amf_comp_response_2 (SaUint32T interface, const SaNameT *dn, 
-	const SaAmfHealthcheckKeyT *healthcheck_key, SaAisErrorT error, 
+struct amf_comp *amf_comp_response_2 (SaUint32T interface, const SaNameT *dn,
+	const SaAmfHealthcheckKeyT *healthcheck_key, SaAisErrorT error,
 	SaAisErrorT *retval, SaAmfRecommendedRecoveryT recommendedRecovery)
 {
 	struct amf_csi_assignment *csi_assignment;
@@ -2109,14 +2109,14 @@ struct amf_comp *amf_comp_response_2 (SaUint32T interface, const SaNameT *dn,
 		case AMF_RESPONSE_HEALTHCHECKCALLBACK: {
 			TRACE1("AMF_RESPONSE_HEALTHCHECKCALLBACK for %s", dn->value);
 			comp = amf_comp_find (amf_cluster, dn);
-			
+
 			assert (comp);
 			healthcheck = amf_comp_find_healthcheck (
 				comp, healthcheck_key);
 			assert (comp);
-			healthcheck->recommendedRecovery = recommendedRecovery; 
+			healthcheck->recommendedRecovery = recommendedRecovery;
 			comp_recover_action (comp, healthcheck->recommendedRecovery);
-				
+
 			break;
 		}
 
@@ -2149,7 +2149,7 @@ void amf_comp_hastate_set (
 	struct amf_csi_assignment *csi_assignment)
 {
 	ENTER ();
-	
+
 	assert (component != NULL && csi_assignment != NULL);
 
 
@@ -2159,7 +2159,7 @@ void amf_comp_hastate_set (
 		if (csi_assignment->requested_ha_state == SA_AMF_HA_QUIESCED) {
 			csi_assignment->saAmfCSICompHAState = csi_assignment->requested_ha_state;
 		} else {
-			TRACE1 ("csi_assignment->requested_ha_state = %d", 
+			TRACE1 ("csi_assignment->requested_ha_state = %d",
 				component->error_suspected);
 			assert (0);
 		}
@@ -2212,7 +2212,7 @@ void amf_comp_restart (struct amf_comp *comp)
  * @param comp
  * @param csi_name
  * @param ha_state
- * 
+ *
  * @return SaAisErrorT
  */
 SaAisErrorT amf_comp_hastate_get (
@@ -2239,7 +2239,7 @@ SaAisErrorT amf_comp_hastate_get (
  * @param comp
  * @param healthcheckKey
  * @param healthcheckResult
- * 
+ *
  * @return SaAisErrorT
  */
 SaAisErrorT amf_comp_healthcheck_confirm (
@@ -2357,7 +2357,7 @@ SaAmfReadinessStateT amf_comp_get_saAmfCompReadinessState (
  * reporting the new state is uninstantiated while pending csi
  * operations are indicated by 'operation failed'.
  * @param comp
- * 
+ *
  * @return void
  */
 void amf_comp_node_left (struct amf_comp *component)
@@ -2405,7 +2405,7 @@ void amf_comp_node_left (struct amf_comp *component)
 
 	csi_assignment = amf_comp_get_next_csi_assignment (component, NULL);
 	while (csi_assignment != NULL) {
-		if (csi_assignment->requested_ha_state != 
+		if (csi_assignment->requested_ha_state !=
 			csi_assignment->saAmfCSICompHAState) {
 			amf_si_comp_set_ha_state_failed (
 				csi_assignment->csi->si,csi_assignment);
@@ -2421,7 +2421,7 @@ void amf_comp_node_left (struct amf_comp *component)
  * caller.
  * @param component
  * @param len
- * 
+ *
  * @return void*
  */
 void *amf_comp_serialize (struct amf_comp *component, int *len)
@@ -2549,7 +2549,7 @@ void *amf_comp_serialize (struct amf_comp *component, int *len)
  * @param su
  * @param buf
  * @param size
- * 
+ *
  * @return struct amf_comp*
  */
 struct amf_comp *amf_comp_deserialize (struct amf_su *su, char *buf)

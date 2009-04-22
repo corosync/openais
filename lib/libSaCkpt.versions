@@ -24,7 +24,7 @@ OPENAIS_CKPT_B.01.01 {
 		saCkptCheckpointRead;
 		saCkptCheckpointSynchronize;
 		saCkptCheckpointSynchronizeAsync;
-		
+
 	local:
 		clustTimeNow;
 };

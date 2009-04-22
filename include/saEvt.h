@@ -5,7 +5,7 @@
  * All rights reserved.
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -49,7 +49,7 @@ typedef void
 	const SaSizeT eventDataSize
 );
 
-typedef void 
+typedef void
 (*SaEvtChannelOpenCallbackT)(
 	SaInvocationT invocation,
 	SaEvtChannelHandleT channelHandle,
@@ -58,7 +58,7 @@ typedef void
 
 typedef struct{
 	SaEvtChannelOpenCallbackT saEvtChannelOpenCallback;
-	SaEvtEventDeliverCallbackT saEvtEventDeliverCallback; 
+	SaEvtEventDeliverCallbackT saEvtEventDeliverCallback;
 } SaEvtCallbacksT;
 
 #define SA_EVT_CHANNEL_PUBLISHER  0X1
@@ -134,7 +134,7 @@ extern "C" {
 
 SaAisErrorT
 saEvtInitialize(
-	SaEvtHandleT *evtHandle, 
+	SaEvtHandleT *evtHandle,
 	const SaEvtCallbacksT *callbacks,
         SaVersionT *version);
 
@@ -145,7 +145,7 @@ saEvtSelectionObjectGet(
 
 SaAisErrorT
 saEvtDispatch(
-	SaEvtHandleT evtHandle, 
+	SaEvtHandleT evtHandle,
 	SaDispatchFlagsT dispatchFlags);
 
 SaAisErrorT
@@ -154,7 +154,7 @@ saEvtFinalize(
 
 SaAisErrorT
 saEvtChannelOpen(
-	SaEvtHandleT evtHandle, 
+	SaEvtHandleT evtHandle,
 	const SaNameT *channelName,
 	SaEvtChannelOpenFlagsT channelOpenFlags,
         SaTimeT timeout,
@@ -173,7 +173,7 @@ saEvtChannelClose(
 
 SaAisErrorT
 saEvtChannelUnlink(
-	SaEvtHandleT evtHandle, 
+	SaEvtHandleT evtHandle,
 	const SaNameT *channelName);
 
 SaAisErrorT

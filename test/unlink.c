@@ -34,7 +34,7 @@ SaEvtCallbacksT callbacks = {
 
 char channel[256] = "EVENT_TEST_CHANNEL";
 
-	
+
 int
 do_unlink()
 {
@@ -42,7 +42,7 @@ do_unlink()
 	SaNameT channel_name;
 
 	SaAisErrorT result;
-	 
+
 	do {
 		result = saEvtInitialize (&handle, &callbacks, &version);
 	} while ((result == SA_AIS_ERR_TRY_AGAIN) && !sleep(TRY_WAIT));
@@ -80,7 +80,7 @@ int main (int argc, char **argv)
 
 	while (1) {
 		option = getopt(argc, argv, opts);
-		if (option == -1) 
+		if (option == -1)
 			break;
 
 		switch (option) {

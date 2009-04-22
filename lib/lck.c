@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -633,12 +633,12 @@ saLckResourceOpen (
 	pthread_mutex_lock (&lckInstance->response_mutex);
 
 	error = coroipcc_msg_send_reply_receive (
-		lckResourceInstance->ipc_ctx, 
+		lckResourceInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_lck_resourceopen,
 		sizeof (struct res_lib_lck_resourceopen));
-	
+
 	pthread_mutex_unlock (&lckInstance->response_mutex);
 
 	if (res_lib_lck_resourceopen.header.error != SA_AIS_OK) {
@@ -713,7 +713,7 @@ saLckResourceOpenAsync (
 	lckResourceInstance->lckResourceHandle = lckResourceHandle;
 	lckResourceInstance->resourceOpenFlags = resourceOpenFlags;
 
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName, 
+	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName,
 			(SaNameT *)lockResourceName);
 	memcpy (&lckResourceInstance->lockResourceName, lockResourceName, sizeof (SaNameT));
 	req_lib_lck_resourceopen.header.size = sizeof (struct req_lib_lck_resourceopen);
@@ -729,7 +729,7 @@ saLckResourceOpenAsync (
 	pthread_mutex_lock (&lckInstance->response_mutex);
 
 	error = coroipcc_msg_send_reply_receive (
-		lckResourceInstance->ipc_ctx, 
+		lckResourceInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_lck_resourceopenasync,
@@ -781,7 +781,7 @@ saLckResourceClose (
 	pthread_mutex_lock (lckResourceInstance->response_mutex);
 
 	error = coroipcc_msg_send_reply_receive (
-		lckResourceInstance->ipc_ctx, 
+		lckResourceInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_lck_resourceclose,
@@ -802,7 +802,7 @@ saLckResourceLock (
 	SaLckLockIdT *lockId,
 	SaLckLockModeT lockMode,
 	SaLckLockFlagsT lockFlags,
-	SaLckWaiterSignalT waiterSignal,	
+	SaLckWaiterSignalT waiterSignal,
 	SaTimeT timeout,
 	SaLckLockStatusT *lockStatus)
 {
@@ -863,13 +863,13 @@ saLckResourceLock (
 		&lckResourceInstance->source,
 		sizeof (mar_message_source_t));
 
-	iov.iov_base = &req_lib_lck_resourcelock;	
+	iov.iov_base = &req_lib_lck_resourcelock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
 
 	/*
 	 * no mutex needed here since its a new connection
 	 */
-	error = coroipcc_msg_send_reply_receive (lock_ctx, 
+	error = coroipcc_msg_send_reply_receive (lock_ctx,
 		&iov,
 		1,
 		&res_lib_lck_resourcelock,
@@ -969,7 +969,7 @@ saLckResourceLockAsync (
 	 * no mutex needed here since its a new connection
 	 */
 	error = coroipcc_msg_send_reply_receive (
-		lock_ctx, 
+		lock_ctx,
 		&iov,
 		1,
 		&res_lib_lck_resourcelockasync,
@@ -1040,7 +1040,7 @@ saLckResourceUnlock (
 	pthread_mutex_lock (lckLockIdInstance->response_mutex);
 
 	error = coroipcc_msg_send_reply_receive (
-		lckLockIdInstance->ipc_ctx, 
+		lckLockIdInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_lck_resourceunlock,
@@ -1057,7 +1057,7 @@ saLckResourceUnlock (
 
 SaAisErrorT
 saLckResourceUnlockAsync (
-	SaInvocationT invocation,	
+	SaInvocationT invocation,
 	SaLckLockIdT lockId)
 {
 	struct req_lib_lck_resourceunlock req_lib_lck_resourceunlock;
@@ -1104,7 +1104,7 @@ saLckResourceUnlockAsync (
 
 	pthread_mutex_lock (lckLockIdInstance->response_mutex);
 
-	error = coroipcc_msg_send_reply_receive (lckLockIdInstance->ipc_ctx, 
+	error = coroipcc_msg_send_reply_receive (lckLockIdInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_lck_resourceunlockasync,
@@ -1143,7 +1143,7 @@ saLckLockPurge (
 
 	pthread_mutex_lock (lckResourceInstance->response_mutex);
 
-	error = coroipcc_msg_send_reply_receive (lckResourceInstance->ipc_ctx, 
+	error = coroipcc_msg_send_reply_receive (lckResourceInstance->ipc_ctx,
 		&iov,
 		1,
 		&res_lib_lck_lockpurge,

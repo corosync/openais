@@ -1,5 +1,5 @@
 /** @file amfsi.c
- * 
+ *
  * Copyright (c) 2006 Ericsson AB.
  * Author: Hans Feldt, Anders Eriksson, Lars Holm
  * - Refactoring of code into several AMF files
@@ -11,7 +11,7 @@
  *
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -35,9 +35,9 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF Workload related classes Implementation
- * 
+ *
  * This file contains functions for handling :
  *	- AMF service instances(SI)
  *	- AMF SI Dependency
@@ -48,10 +48,10 @@
  *	- AMF CSI Type
  *	- AMF CSI Attribute
  * The file can be viewed as the implementation of the classes listed above
- * as described in SAI-Overview-B.02.01. The SA Forum specification 
+ * as described in SAI-Overview-B.02.01. The SA Forum specification
  * SAI-AIS-AMF-B.02.01 has been used as specification of the behaviour
  * and is referred to as 'the spec' below.
- * 
+ *
  * The functions in this file are responsible for:
  * - calculating and storing an SI_dependency_level integer per SI
  * - calculating and storing a csi_dependency_level integer per CSI
@@ -63,9 +63,9 @@
  * The si_dependency_level is an attribute calculated at init (in the future
  * also at reconfiguration) which indicates dependencies between SIs as
  * an integer. The si_dependency level indicates to which extent an SI depends
- * on other SIs such that an SI that depends on no other SI is on 
+ * on other SIs such that an SI that depends on no other SI is on
  * si_dependecy_level == 1, an SI that depends only on an SI on
- * si_dependency_level == 1 is on si_dependency-level == 2. 
+ * si_dependency_level == 1 is on si_dependency-level == 2.
  * An SI that depends on several SIs gets a si_dependency_level that is one
  * unit higher than the SI with the highest si_dependency_level it depends on.
  *
@@ -80,7 +80,7 @@
  * components to assume a new HA state for a CSI-assignment and to guarantee
  * the dependency rules, the active response from the component has to be
  * awaited before next HA state can be set.
- * 
+ *
  * This file implements an SI state machine that fully implements these rules.
  * This state machine is called SI Dependency Control State Machine (dcsm)
  * and has the following states:
@@ -102,12 +102,12 @@
  *							  state)
  *	- SETTING (a request to change the HA state when neither the existing
  *			   nor the requested state is ACTIVE)
- * 
+ *
  * This file also implements:
  *	- SI:             Assignment state (for report purposes)
  *	- SI Assignment:  HA state
  *	- CSI Assignment: HA state
- * 
+ *
  */
 
 #include <assert.h>
@@ -125,7 +125,7 @@ LOGSYS_DECLARE_SUBSYS ("AMF");
  * Check that all CSI assignments belonging to an SI assignment
  * has been removed.
  * @param si_assignment
- * 
+ *
  * @return int
  */
 static int all_csi_assignments_removed (amf_si_assignment_t *si_assignment)
@@ -138,7 +138,7 @@ static int all_csi_assignments_removed (amf_si_assignment_t *si_assignment)
 		for (csi_assignment = csi->assigned_csis; csi_assignment != NULL;
 			csi_assignment = csi_assignment->next) {
 
-			/* 
+			/*
 			 * If the CSI assignment and the SI assignment belongs to the
 			 * same SU, we have a match and can request the component to
 			 * remove the CSI.
@@ -162,7 +162,7 @@ static int all_csi_assignments_removed (amf_si_assignment_t *si_assignment)
  * state.
  * @param su
  * @param hastate
- * 
+ *
  * @return int
  */
 static int any_csi_has_hastate_in_su (struct amf_su *su, SaAmfHAStateT hastate)
@@ -194,7 +194,7 @@ static int any_csi_has_hastate_in_su (struct amf_su *su, SaAmfHAStateT hastate)
  * an SI assignemnt has the requested state.
  * @param su
  * @param hastate
- * 
+ *
  * @return int
  */
 static int all_csi_has_hastate_for_si (
@@ -303,7 +303,7 @@ void amf_si_comp_set_ha_state_done (
 
 	assert (csi_assignment->si_assignment->assumed_callback_fn != NULL);
 
-	/*                                                              
+	/*
 	 * Report to caller when the requested SI assignment state is
 	 * confirmed.
 	 */
@@ -333,7 +333,7 @@ void amf_si_activate (
 			csi_assignment->si_assignment->requested_ha_state =
 				SA_AMF_HA_ACTIVE;
 
-			/*                                                              
+			/*
 			 * TODO: only active assignments should be set when dependency
 			 * levels are used.
 			 */
@@ -376,7 +376,7 @@ void amf_si_ha_state_assume (
 		for (csi_assignment = csi->assigned_csis; csi_assignment != NULL;
 			csi_assignment = csi_assignment->next) {
 
-			/*                                                              
+			/*
 			 * If the CSI assignment and the SI assignment belongs to the
 			 * same SU, we have a match and can request the component to
 			 * change HA state.
@@ -399,7 +399,7 @@ void amf_si_ha_state_assume (
 		}
 	}
 
-	/*                                                              
+	/*
 	 * If the SU has only one component which is the faulty one, we
 	 * will not get an asynchronous response from the component.
 	 * This response (amf_si_comp_set_ha_state_done) is used to do
@@ -417,11 +417,11 @@ void amf_si_ha_state_assume (
 /**
  * Get number of active assignments for the specified SI
  * @param si
- * 
+ *
  * @return int
  */
 int amf_si_get_saAmfSINumCurrActiveAssignments (struct amf_si *si)
-	
+
 {
 	int cnt = 0;
 	struct amf_si_assignment *si_assignment;
@@ -446,7 +446,7 @@ int amf_si_su_get_saAmfSINumCurrActiveAssignments (struct amf_si *si,
 	for (si_assignment = si->assigned_sis; si_assignment != NULL;
 		si_assignment = si_assignment->next) {
 
-		if (si_assignment->su == su && 
+		if (si_assignment->su == su &&
 			si_assignment->saAmfSISUHAState == SA_AMF_HA_ACTIVE) {
 			cnt++;
 		}
@@ -530,7 +530,7 @@ void amf_csi_delete_assignments (struct amf_csi *csi, struct amf_su *su)
  * valid SI object, out-of-memory problems are handled here.
  * Default values are initialized.
  * @param app
- * 
+ *
  * @return struct amf_si*
  */
 struct amf_si *amf_si_new (struct amf_application *app, const char *name)
@@ -610,7 +610,7 @@ void *amf_si_serialize (struct amf_si *si, int *len)
 	return buf;
 }
 
-struct amf_si *amf_si_deserialize (struct amf_application *app, char *buf) 
+struct amf_si *amf_si_deserialize (struct amf_application *app, char *buf)
 {
 	char *tmp = buf;
 	struct amf_si *si;
@@ -629,7 +629,7 @@ struct amf_si *amf_si_deserialize (struct amf_application *app, char *buf)
 }
 
 /*****************************************************************************
- * SI Assignment class implementation                          *              
+ * SI Assignment class implementation                          *
  ****************************************************************************/
 
 struct amf_si_assignment *amf_si_assignment_new (struct amf_si *si)
@@ -683,7 +683,7 @@ struct amf_si *amf_si_find (struct amf_application *app, char *name)
 	struct amf_si *si;
 
 	for (si = app->si_head; si != NULL; si = si->next) {
-		if (si->name.length == strlen(name) && 
+		if (si->name.length == strlen(name) &&
 			strncmp (name, (char*)si->name.value, si->name.length) == 0) {
 			break;
 		}
@@ -755,7 +755,7 @@ struct amf_csi *amf_csi_find (struct amf_si *si, const char *name)
 	struct amf_csi *csi;
 
 	for (csi = si->csi_head; csi != NULL; csi = csi->next) {
-		if (csi->name.length == strlen(name) && 
+		if (csi->name.length == strlen(name) &&
 			strncmp (name, (char*)csi->name.value, csi->name.length) == 0) {
 			break;
 		}
@@ -768,7 +768,7 @@ struct amf_csi *amf_csi_find (struct amf_si *si, const char *name)
 }
 
 /*****************************************************************************
- * CSI Assignment class implementation                         *              
+ * CSI Assignment class implementation                         *
  ****************************************************************************/
 
 static struct amf_csi_assignment *amf_csi_assignment_new (struct amf_csi *csi)
@@ -808,12 +808,12 @@ static struct amf_si_assignment *si_assignment_find (
 	struct amf_comp *component;
 	struct amf_si_assignment *si_assignment = NULL;
 
-	component = amf_comp_find(csi_assignment->csi->si->application->cluster, 
+	component = amf_comp_find(csi_assignment->csi->si->application->cluster,
 		&csi_assignment->name);
 
 	for (si_assignment = csi_assignment->csi->si->assigned_sis;
 		si_assignment != NULL; si_assignment = si_assignment->next) {
-		SaNameT su_name; 
+		SaNameT su_name;
 		amf_su_dn_make (component->su,&su_name);
 
 		if (name_match(&su_name, &si_assignment->name)) {
@@ -921,7 +921,7 @@ struct amf_csi_assignment *amf_csi_assignment_find (
 	for (csi_assignment = csi->assigned_csis; csi_assignment != NULL;
 		csi_assignment = csi_assignment->next) {
 
-		if (csi_assignment->name.length == strlen(csi_assignment_name) && 
+		if (csi_assignment->name.length == strlen(csi_assignment_name) &&
 			strncmp (csi_assignment_name,
 			(char*)csi_assignment->name.value,
 			csi_assignment->name.length) == 0) {
@@ -1010,7 +1010,7 @@ void amf_si_assignment_remove (amf_si_assignment_t *si_assignment,
 		for (csi_assignment = csi->assigned_csis; csi_assignment != NULL;
 			csi_assignment = csi_assignment->next) {
 
-			/* 
+			/*
 			 * If the CSI assignment and the SI assignment belongs to the
 			 * same SU, we have a match and can request the component to
 			 * remove the CSI.
@@ -1025,7 +1025,7 @@ void amf_si_assignment_remove (amf_si_assignment_t *si_assignment,
 		}
 	}
 
-	/*                                                              
+	/*
 	 * If the SU has only one component which is the faulty one, we
 	 * will not get an asynchronous response from the component.
 	 * This response (amf_si_comp_set_ha_state_done) is used to do
@@ -1047,7 +1047,7 @@ void amf_si_comp_csi_removed (
 
 	csi_assignment->saAmfCSICompHAState = USR_AMF_HA_STATE_REMOVED;
 
-	/*                                                              
+	/*
      * Report to caller when all requested CSI assignments has
      * been removed.
 	 */

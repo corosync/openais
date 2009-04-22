@@ -1,5 +1,5 @@
 /** @file exec/amfutil.c
- * 
+ *
  * Copyright (c) 2002-2005 MontaVista Software, Inc.
  * Author: Steven Dake (sdake@redhat.com)
  *
@@ -15,7 +15,7 @@
  * All rights reserved.
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -39,12 +39,12 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF utility functions
- * 
+ *
  * This file contains functions that provide different services used by other
  * AMF files. For example parsing the configuration file, printing state etc.
- * 
+ *
  */
 
 #include <config.h>
@@ -169,7 +169,7 @@ static int init_category (struct amf_comp *comp, char *loc)
 	}
 
 	return 0;
-}   
+}
 
 static int init_capability (struct amf_comp *comp, char *loc)
 {
@@ -1296,7 +1296,7 @@ char *_amf_strdup (const char *in_str, const char *file, unsigned int line)
 }
 
 #ifdef TODO
-static int sa_amf_grep_one_sub_match(const char *string, char *pattern, 
+static int sa_amf_grep_one_sub_match(const char *string, char *pattern,
 	SaNameT *matches_arr)
 {
 	int             status;
@@ -1325,7 +1325,7 @@ static int sa_amf_grep_one_sub_match(const char *string, char *pattern,
 			sub_string_len = pmatch[i].rm_eo - pmatch[i].rm_so;
 			if (i==1) {
 
-				memcpy(matches_arr[i].value, string + pmatch[i].rm_so, 
+				memcpy(matches_arr[i].value, string + pmatch[i].rm_so,
 					sub_string_len);
 				matches_arr[i].value[sub_string_len] = '\0';
 			}
@@ -1364,8 +1364,8 @@ int sa_amf_grep(const char *string, const char *pattern, size_t nmatch,
 
 		for (i = 0; i < nmatch; i++) {
 			int sub_string_len;
-			sub_string_len = pmatch[i].rm_eo - pmatch[i].rm_so; 
-			memcpy(matches_arr[i].value, string + pmatch[i].rm_so, 
+			sub_string_len = pmatch[i].rm_eo - pmatch[i].rm_so;
+			memcpy(matches_arr[i].value, string + pmatch[i].rm_so,
 				sub_string_len);
 			matches_arr[i].value[sub_string_len] = '\0';
 			matches_arr[i].length = sub_string_len;
@@ -1384,7 +1384,7 @@ out:
  * @param msg_id
  * @param buf
  * @param len
- * 
+ *
  * @return int
  */
 int amf_msg_mcast (int msg_id, void *buf, size_t len)
@@ -1421,7 +1421,7 @@ int amf_msg_mcast (int msg_id, void *buf, size_t len)
 	return res;
 }
 
-void amf_fifo_put (int entry_type, amf_fifo_t **root, int size_of_data, 
+void amf_fifo_put (int entry_type, amf_fifo_t **root, int size_of_data,
 	void *data)
 {
 	amf_fifo_t *fifo;
@@ -1431,11 +1431,11 @@ void amf_fifo_put (int entry_type, amf_fifo_t **root, int size_of_data,
 	for (fifo = *root; fifo != NULL; fifo = fifo->next) {
 		if (fifo->next == NULL) {
 			new_item = &fifo->next;
-		}		
+		}
 	}
 	*new_item = amf_malloc (size_of_data + sizeof (amf_fifo_t));
 	fifo = *new_item;
-	
+
 	/* Set data of this entry*/
 	fifo->entry_type = entry_type;
 	fifo->next = NULL;
@@ -1466,17 +1466,17 @@ int amf_fifo_get (amf_fifo_t **root, void *data)
  * execution in this thread has been re-assumed because of a
  * time-out. Time-out time is 0 msec so f will be called as soon
  * as possible. *
- * 
+ *
  * @param async_func
  * @param func_param
  */
 
 void amf_call_function_asynchronous (async_func_t async_func, void *func_param)
 {
-	
+
 	static corosync_timer_handle_t async_func_timer_handle;
 	api->timer_add_duration (
-		0, func_param, async_func, 
+		0, func_param, async_func,
 		&async_func_timer_handle);
 }
 

@@ -5,7 +5,7 @@
  * All rights reserved.
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -66,7 +66,7 @@ enum res_evt_types {
 	MESSAGE_RES_EVT_AVAILABLE = 9
 };
 
-/* 
+/*
  * MESSAGE_REQ_EVT_OPEN_CHANNEL
  * MESSAGE_REQ_EVT_OPEN_CHANNEL_ASYNC
  *
@@ -94,7 +94,7 @@ struct req_evt_channel_open {
  * versions.  Only the error code in the header is used by the async
  * open.  The channel handle will be returnd via the channel open
  * callback.
- * 
+ *
  *
  * ico_head:			Results head
  * ico_error:			Request results
@@ -172,7 +172,7 @@ struct res_evt_channel_unlink {
 	mar_res_header_t	iuc_head __attribute__((aligned(8)));
 };
 
-/* 
+/*
  * MESSAGE_REQ_EVT_SUBSCRIBE
  *
  * ics_head:			Request head

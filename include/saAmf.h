@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -208,7 +208,7 @@ typedef enum {
 #define SA_AMF_COMP_LOCAL 0x0008
 typedef SaUint32T saAmfCompCategoryT;
 
-typedef enum {								
+typedef enum {
 	SA_AMF_2N_REDUNDANCY_MODEL = 1,
 	SA_AMF_NPM_REDUNDANCY_MODEL = 2,
 	SA_AMF_N_WAY_REDUNDANCY_MODEL = 3,
@@ -216,7 +216,7 @@ typedef enum {
 	SA_AMF_NO_REDUNDANCY_MODEL= 5
 } saAmfRedundancyModelT;
 
-typedef enum {								
+typedef enum {
 	SA_AMF_COMP_X_ACTIVE_AND_Y_STANDBY = 1,
 	SA_AMF_COMP_X_ACTIVE_OR_Y_STANDBY = 2,
 	SA_AMF_COMP_ONE_ACTIVE_OR_Y_STANDBY = 3,
@@ -245,7 +245,7 @@ typedef void (*SaAmfCSISetCallbackT) (
 	const SaNameT *compName,
 	SaAmfHAStateT haState,
 	SaAmfCSIDescriptorT *csiDescriptor);
-			
+
 typedef void (*SaAmfCSIRemoveCallbackT) (
 	SaInvocationT invocation,
 	const SaNameT *compName,

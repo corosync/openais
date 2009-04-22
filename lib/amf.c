@@ -7,7 +7,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -85,7 +85,7 @@ static struct saVersionDatabase amfVersionDatabase = {
 	sizeof (amfVersionsSupported) / sizeof (SaVersionT),
 	amfVersionsSupported
 };
-	
+
 /*
  * Implementation
  */
@@ -111,7 +111,7 @@ saAmfInitialize (
 	if (error != SA_AIS_OK) {
 		goto error_no_destroy;
 	}
-	
+
 	error = saHandleCreate (&amfHandleDatabase, sizeof (struct amfInstance), amfHandle);
 	if (error != SA_AIS_OK) {
 		goto error_no_destroy;
@@ -269,12 +269,12 @@ saAmfDispatch (
 
 
 			csi_descriptor.csiFlags = res_lib_amf_csisetcallback->csiFlags;
-			memcpy(&csi_descriptor.csiName, &res_lib_amf_csisetcallback->csiName, 
+			memcpy(&csi_descriptor.csiName, &res_lib_amf_csisetcallback->csiName,
 			       sizeof(SaNameT));
 			csi_descriptor.csiStateDescriptor = res_lib_amf_csisetcallback->csiStateDescriptor;
 			csi_descriptor.csiAttr.number = res_lib_amf_csisetcallback->number;
 
-			csi_attribute_array = malloc (sizeof (SaAmfCSIAttributeT) * 
+			csi_attribute_array = malloc (sizeof (SaAmfCSIAttributeT) *
 									  csi_descriptor.csiAttr.number);
 
 			if (csi_attribute_array == 0) {
@@ -283,7 +283,7 @@ saAmfDispatch (
 			csi_descriptor.csiAttr.attr = csi_attribute_array;
 
 			attr_buf = res_lib_amf_csisetcallback->csi_attr_buf;
-			
+
 			for (i = 0; i < csi_descriptor.csiAttr.number; i++) {
 				csi_attribute_array[i].attrName = (SaUint8T*)attr_buf;
 
@@ -292,7 +292,7 @@ saAmfDispatch (
 
 				attr_buf += strlen(attr_buf) + 1;
 			}
-			
+
 			callbacks.saAmfCSISetCallback (
 				res_lib_amf_csisetcallback->invocation,
 				&res_lib_amf_csisetcallback->compName,
@@ -334,7 +334,7 @@ saAmfDispatch (
 			break;
 		default:
 			coroipcc_dispatch_put (amfInstance->ipc_ctx);
-			error = SA_AIS_ERR_LIBRARY;	
+			error = SA_AIS_ERR_LIBRARY;
 			goto error_put;
 			break;
 		}
@@ -480,7 +480,7 @@ saAmfComponentUnregister (
 	} else {
 		memset (&req_lib_amf_componentunregister.proxyCompName, 0,
 			sizeof (SaNameT));
-	}	
+	}
 
 	iov.iov_base = &req_lib_amf_componentunregister;
 	iov.iov_len = sizeof (struct req_lib_amf_componentunregister);

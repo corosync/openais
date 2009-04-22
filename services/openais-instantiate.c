@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -86,7 +86,7 @@ int main (int argc, char **argv, char **envp)
 				}
 			}
 			nanosleep (&sleeptime, 0);
-			
+
 		}
 		xprintf ("openais-instantiate: component instantiated\n");
 		return (0);

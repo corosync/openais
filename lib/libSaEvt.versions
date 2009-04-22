@@ -2,7 +2,7 @@
 
 OPENAIS_EVT_B.01.01 {
 	global:
-		
+
 		saEvtInitialize;
 		saEvtSelectionObjectGet;
 		saEvtDispatch;

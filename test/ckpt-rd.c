@@ -7,7 +7,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -71,7 +71,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 		SA_CKPT_DEFAULT_SECTION_ID,
 		readBuffer1,
 		sizeof (readBuffer1),
-		0, 
+		0,
 		0
 	}
 };
@@ -89,14 +89,14 @@ int main (void) {
 	SaCkptCheckpointHandleT checkpointHandle;
 	SaAisErrorT error;
 	SaUint32T erroroneousVectorIndex = 0;
-	struct timespec delay;	
+	struct timespec delay;
 	delay.tv_sec = 1;
 	delay.tv_nsec = 0;
 
 
-	
+
 	error = saCkptInitialize (&ckptHandle, &callbacks, &version);
-	
+
 	error = saCkptCheckpointOpen (ckptHandle,
 		&checkpointName,
 		0,
@@ -105,7 +105,7 @@ int main (void) {
 		&checkpointHandle);
 	printf ("%s: initial open of checkpoint\n",
 		get_test_output (error, SA_AIS_OK));
-	
+
 	while (1) {
 		error = saCkptCheckpointRead (checkpointHandle,
 			ReadVectorElements,
@@ -117,7 +117,7 @@ int main (void) {
 			return (0);
 		}
 
-		printf ("Checkpoint contains %s\n", 
+		printf ("Checkpoint contains %s\n",
 			((((char*) ReadVectorElements->dataBuffer)[0] != '\0') ? (char *)ReadVectorElements->dataBuffer : "empty string."));
 		nanosleep(&delay,0);
 	}

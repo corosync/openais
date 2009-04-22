@@ -78,9 +78,9 @@ void process_message()
 
         SaUint32T erroroneousVectorIndex = 0;
         SaAisErrorT error;
-        
+
         writeElement.sectionId = sectionId;
-        writeElement.dataBuffer = getPayload(200); 
+        writeElement.dataBuffer = getPayload(200);
         writeElement.dataSize = 200;
         writeElement.dataOffset = 0;
         writeElement.readSize = 0;
@@ -88,7 +88,7 @@ void process_message()
         gettimeofday(&tv, NULL);
         t1 = tv.tv_usec;
 	told = tv.tv_sec;
-        
+
         do {
                 error = saCkptCheckpointWrite (WriteCheckpointHandle,
                                                &writeElement,
@@ -103,7 +103,7 @@ void process_message()
         } while (error == SA_AIS_ERR_TRY_AGAIN);
 
         gettimeofday(&tv, NULL);
-        t2 = tv.tv_usec;        
+        t2 = tv.tv_usec;
         fprintf(stderr," ,RTT::%d.%d\n",(long)tv.tv_sec - told, t2-t1);
 }
 
@@ -141,16 +141,16 @@ int main () {
                 fprintf(stderr,"saCkptSectionCreate result = %d\n", error);
                 return error;
         }
-        
+
 	struct timespec tv;
 	tv.tv_sec = 0;
 	tv.tv_nsec = 15000000; //15 milliseconds
-	
+
 	while(1) {
 		process_message();
 		nanosleep(&tv,NULL);
 	}
-	
+
 	return 1;
 
 }

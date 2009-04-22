@@ -38,8 +38,8 @@ const char *sa_error_list[] = {
 
 int get_sa_error(SaAisErrorT error, char *str, int len)
 {
-	if (error < SA_AIS_OK || 
-			error > SA_AIS_ERR_NO_SECTIONS || 
+	if (error < SA_AIS_OK ||
+			error > SA_AIS_ERR_NO_SECTIONS ||
 					len < strlen(sa_error_list[error])) {
 			errno = EINVAL;
 		return -1;

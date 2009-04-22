@@ -1,5 +1,5 @@
 /** @file exec/amf.c
- * 
+ *
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
  * Author: Steven Dake (sdake@redhat.com)
  *
@@ -16,7 +16,7 @@
  *
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -40,9 +40,9 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF Main
- * 
+ *
  * The functions in this file are responsible for:
  * - starting the AMF service (amf_exec_init_fn)
  * - build the information model from the configuration file or by
@@ -55,17 +55,17 @@
  * - handling EVS configuration change events (node leave/join)
  * - handling node synchronisation events (sync_*)
  * - printing the AMF runtime attributes upon user request (USR2 signal)
- * 
+ *
  * Some API requests are responded to directly in the lib message_handler.
  * This is normally done when the API request parameters are wrong, e.g. a
  * component cannot be found. In that case, the error handling must be taken
  * care of in the lib message handler.
- * 
+ *
  * 1. AMF Synchronization Control State Machine
  * =========================================
- * 
+ *
  * 1.1  State Transition Table
- * 
+ *
  * State:                  Event:                Action:  New state:
  * ===========================================================================
  * -                       init[AMF disabled]             UNCONFIGURED
@@ -99,7 +99,7 @@
  *             another node.
  * PROBING-2 - Waiting for SYNC_START
  * CREATING_CLUSTER_MODEL - Read configuration file and create cluster model
- * UPDATING_CLUSTER_MODEL - Save sync master node ID; receive SYNC_DATA, 
+ * UPDATING_CLUSTER_MODEL - Save sync master node ID; receive SYNC_DATA,
  *                          deserialize and save.
  * SYNCHRONIZING - If sync master: multicast SYNC_START followed by encoded AMF
  *                 objects as SYNC_DATA;
@@ -510,7 +510,7 @@ static int clm_node_list_entries;
  * @param nodeid
  * @param list
  * @param entries
- * 
+ *
  * @return int
  */
 static int is_list_member (
@@ -570,7 +570,7 @@ static void clm_node_list_update (unsigned int nodeid, const char *hostname)
 /**
  * Returns true (1) if the nodeid is member of the CLM node list
  * @param nodeid
- * 
+ *
  * @return int
  */
 static int clm_node_list_is_member (unsigned int nodeid)
@@ -621,9 +621,9 @@ static void nodeids_init (void)
 
 /**
  * Return pointer to this AMF node object.
- * 
+ *
  * @param cluster
- * 
+ *
  * @return struct amf_node*
  */
 static struct amf_node *get_this_node_obj (void)
@@ -651,11 +651,11 @@ static void sync_state_set (enum scsm_states state)
 
 /**
  * Multicast SYNC_DATA message containing a model object.
- * 
+ *
  * @param buf
  * @param len
  * @param object_type
- * 
+ *
  * @return int
  */
 static int mcast_sync_data (
@@ -741,12 +741,12 @@ static int create_cluster_model (void)
  * Calculate a sync master (has the lowest node ID) from the
  * members in the cluster. Possibly excluding some members
  * from the CLM node list.
- * 
+ *
  * @param member_list
  * @param member_list_entries
  * @param exclude_list
  * @param exclude_list_entries
- * 
+ *
  * @return int - node ID of new sync master
  */
 static unsigned int calc_sync_master (
@@ -955,7 +955,7 @@ static int csi_sync (struct amf_csi *csi)
 	if (scsm.csi_assignment == NULL && scsm.csi_attribute == NULL) {
 		scsm.csi_assignment = scsm.csi->assigned_csis;
 	}
-	for (; scsm.csi_assignment != NULL; 
+	for (; scsm.csi_assignment != NULL;
 	     scsm.csi_assignment = scsm.csi_assignment->next) {
 		if (csi_assignment_sync (scsm.csi_assignment) != 0) {
 			return 1; /* try again later */
@@ -1184,7 +1184,7 @@ static void amf_sync_init (void)
  * state, encode and send each object in the information model
  * as a SYNC_DATA message. Depth first traversal to preserve
  * parent/child relations.
- * 
+ *
  * @return int
  */
 static int amf_sync_process (void)
@@ -1299,7 +1299,7 @@ static void amf_sync_activate (void)
  * First AMF function to be called by the framework. AMF
  * execution continues when this node joins the cluster.
  * @param objdb
- * 
+ *
  * @return int
  */
 static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api)
@@ -1466,7 +1466,7 @@ static void amf_dump_fn (void)
 
 
 /******************************************************************************
- * Executive Message Implementation 
+ * Executive Message Implementation
  *****************************************************************************/
 
 static void message_handler_req_exec_amf_comp_register (
@@ -1485,7 +1485,7 @@ static void message_handler_req_exec_amf_comp_register (
 	assert (comp != NULL);
 	TRACE1 ("ComponentRegister: '%s'", comp->name.value);
 	error = amf_comp_register (comp);
-	
+
 	if (amf_su_is_local (comp->su)) {
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
@@ -1575,7 +1575,7 @@ static void message_handler_req_exec_amf_clc_cleanup_completed (
 		log_printf (LOGSYS_LEVEL_ERROR, "Error: '%s' not found", req_exec->compName.value);
 		return;
 	}
-	
+
 	if (req_exec->cleanup_exit_code != 0) {
 		amf_comp_cleanup_failed_completed (comp);
 	} else {
@@ -1798,7 +1798,7 @@ static void message_handler_req_exec_amf_cluster_start_tmo (
 	const struct req_exec_amf_cluster_start_tmo *req;
 
 	req = (struct req_exec_amf_cluster_start_tmo *)message;
-	
+
 	if (scsm.state != NORMAL_OPERATION) {
 		return;
 	}
@@ -1811,7 +1811,7 @@ static void message_handler_req_exec_amf_sync_request (
 	const void *message, unsigned int nodeid)
 {
 	const struct req_exec_amf_sync_request *req_exec = message;
-	
+
 	SYNCTRACE ("from: %s, name: %s, state %s", api->totem_ifaces_print (nodeid),
 		req_exec->hostname, scsm_state_names[scsm.state]);
 
@@ -1897,7 +1897,7 @@ static void message_handler_req_lib_amf_componentunregister (
 	log_printf (LOGSYS_LEVEL_FROM_LIB, "Handle : message_handler_req_lib_amf_componentunregister()\n");
 
 	req_exec_amf_componentunregister.header.size = sizeof (struct req_exec_amf_componentunregister);
-	req_exec_amf_componentunregister.header.id = 
+	req_exec_amf_componentunregister.header.id =
 		SERVICE_ID_MAKE (AMF_SERVICE, MESSAGE_REQ_EXEC_AMF_COMPONENTUNREGISTER);
 
 	message_source_set (&req_exec_amf_componentunregister.source, conn_info);
@@ -1927,7 +1927,7 @@ static void message_handler_req_lib_amf_pmstart (
 	SaAisErrorT error = SA_AIS_OK;
 
 	TRACE2("PmStart msg: '%s', %llu %d %d %d",
-				req_lib->compName.value, 
+				req_lib->compName.value,
 				req_lib->processId,
 				req_lib->descendentsTreeDepth,
 				req_lib->pmErrors,
@@ -1966,7 +1966,7 @@ static void message_handler_req_lib_amf_pmstop (
 	SaAisErrorT error = SA_AIS_OK;
 
 	TRACE2 ("PmStop msg: '%s', %llu %d %d",
-			req_lib->compName.value, 
+			req_lib->compName.value,
 			req_lib->processId,
 			req_lib->stopQualifier,
 			req_lib->pmErrors);
@@ -2133,7 +2133,7 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 		conn_info->ais_ci.u.libamf_ci.trackActive += 1;
 
 		list_add (&conn_info->conn_list, &library_notification_send_listhead);
-	
+
 		/*
 		 * If SA_TRACK_CURRENT is specified, write out all current connections
 		 */
@@ -2155,7 +2155,7 @@ static void message_handler_req_lib_amf_protectiongrouptrack (
 		req_lib_amf_protectiongrouptrack->trackFlags & SA_TRACK_CURRENT) {
 
 		protectiongroup_notification_send (conn_info,
-			track->notificationBufferAddress, 
+			track->notificationBufferAddress,
 			amfProtectionGroup,
 			0,
 			0,
@@ -2338,22 +2338,22 @@ static void message_handler_req_lib_amf_componenterrorclear (
 
 /**
  * Handle a response from a component.
- * 
+ *
  * Healthcheck responses are handled locally and directly. This
  * way we do not get healthcheck duration timeouts during e.g.
  * AMF sync.
- * 
+ *
  * Other events need to be multicasted. If we are syncing, defer
  * these event by returning TRY-AGAIN to the component.
- * 
+ *
  * No flow control was requested by AMF from the IPC layer (on
  * purpose) for this lib handler. It is needed to handle
  * healthcheck responses if it takes longer to sync than the
  * duration period.
- * 
+ *
  * When multicasting, check for space in the TOTEM outbound
  * queue and return TRY-AGAIN if the queue is full.
- * 
+ *
  * @param conn
  * @param msg
  */
@@ -2371,7 +2371,7 @@ static void message_handler_req_lib_amf_response (void *conn, const void *msg)
 	* This is an optimisation to avoid multicast of healthchecks while keeping
 	* a nice design. We multicast and make lib responses from this file.
 	*/
-	multicast = amf_comp_response_1 (req_lib->invocation, req_lib->error, 
+	multicast = amf_comp_response_1 (req_lib->invocation, req_lib->error,
 		&retval, &interface, &dn, &healthcheck_key, &recommendedRecovery);
 
 	if (multicast) {
@@ -2388,7 +2388,7 @@ static void message_handler_req_lib_amf_response (void *conn, const void *msg)
 			MESSAGE_REQ_EXEC_AMF_RESPONSE);
 		req_exec.interface = interface;
 		memcpy (&req_exec.dn, &dn, sizeof (SaNameT));
-		memcpy (&req_exec.healtcheck_key, &healthcheck_key, 
+		memcpy (&req_exec.healtcheck_key, &healthcheck_key,
 			sizeof(SaAmfHealthcheckKeyT));
 		req_exec.recommendedRecovery = recommendedRecovery;
 		req_exec.error = req_lib->error;

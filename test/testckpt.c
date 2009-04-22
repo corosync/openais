@@ -9,7 +9,7 @@
  * Author: Steven Dake (sdake@sdake.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -116,7 +116,7 @@ static SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer1,
 		sizeof (readBuffer1),
-		0, 
+		0,
 		0
 	},
 	{
@@ -126,7 +126,7 @@ static SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer2,
 		sizeof (readBuffer2),
-		0, 
+		0,
 		0
 	}
 };
@@ -154,7 +154,7 @@ static SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data1, /*"written data #1, this should extend past end of old section data", */
 		DATASIZE, /*sizeof ("data #1, this should extend past end of old section data") + 1, */
-		0, //5, 
+		0, //5,
 		0
 	},
 	{
@@ -164,7 +164,7 @@ static SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data2, /*"written data #2, this should extend past end of old section data" */
 		DATASIZE, /*sizeof ("written data #2, this should extend past end of old section data") + 1, */
-		0, //3, 
+		0, //3,
 		0
 	}
 };
@@ -172,7 +172,7 @@ static SaCkptIOVectorElementT WriteVectorElements[] = {
 SaCkptIOVectorElementT default_write_vector[] = {
 	{
 		SA_CKPT_DEFAULT_SECTION_ID,
-		default_write_data, /*"written data #1, this should extend past end of old section data", */	
+		default_write_data, /*"written data #1, this should extend past end of old section data", */
 		56, /*sizeof ("data #1, this should extend past end of old section data") + 1, */
 		0, //5,
 		0
@@ -185,9 +185,9 @@ static void OpenCallBack (
     SaInvocationT invocation,
     const SaCkptCheckpointHandleT chckpointHandle,
     SaAisErrorT error) {
-	
+
  	printf ("%s: This is a call back for open for invocation = %d\n",
-		get_test_output (error, SA_AIS_OK), (int)invocation);	
+		get_test_output (error, SA_AIS_OK), (int)invocation);
 
 	checkpointHandle = chckpointHandle;
 
@@ -213,7 +213,7 @@ int main (void) {
 	SaSelectionObjectT sel_fd;
 	fd_set read_set;
 	int i;
-	
+
 	error = saCkptInitialize (&ckptHandle, &callbacks, &version);
 	printf ("%s: checkpoint initialize\n",
 		get_test_output (error, SA_AIS_OK));
@@ -235,14 +235,14 @@ int main (void) {
 	select (sel_fd + 1, &read_set, 0, 0, 0);
 
 	error = saCkptDispatch (ckptHandle, SA_DISPATCH_ALL);
-	
+
 	printf ("%s: Dispatch response for open async of checkpoint\n",
 		get_test_output (error, SA_AIS_OK));
 
 	error = saCkptCheckpointClose (checkpointHandle);
 
 	printf ("%s: Closing checkpoint\n", get_test_output (error, SA_AIS_OK));
-	
+
 	error = saCkptCheckpointOpen (ckptHandle,
 		&defaultCheckpointName,
 		&checkpointCreationAttributes,
@@ -280,7 +280,7 @@ int main (void) {
 		get_test_output (error, SA_AIS_OK));
 
 	printf (" default_read_buffer:'%s'\n", default_read_buffer);
-	
+
 	error = saCkptCheckpointClose (checkpointHandle);
 
 	checkpointCreationAttributes.maxSections = 5;
@@ -350,7 +350,7 @@ sleep (1);
 		get_test_output (error, SA_AIS_OK));
 
 	error = saCkptCheckpointUnlink (ckptHandle, &sectionsCheckpointName);
-	printf ("%s: Unlinking checkpoint\n", 
+	printf ("%s: Unlinking checkpoint\n",
 		get_test_output (error, SA_AIS_OK));
 
 	error = saCkptCheckpointOpen (ckptHandle,
@@ -359,11 +359,11 @@ sleep (1);
 		SA_CKPT_CHECKPOINT_CREATE|SA_CKPT_CHECKPOINT_READ|SA_CKPT_CHECKPOINT_WRITE,
 		0,
 		&checkpointHandle2);
-	printf ("%s: Opening unlinked checkpoint\n", 
+	printf ("%s: Opening unlinked checkpoint\n",
 		get_test_output (error, SA_AIS_OK));
 
 	error = saCkptCheckpointClose (checkpointHandle);
-	printf ("%s: Closing checkpoint\n", 
+	printf ("%s: Closing checkpoint\n",
 		get_test_output (error, SA_AIS_OK));
 
 	error = saCkptCheckpointOpen (ckptHandle,
@@ -399,7 +399,7 @@ sleep (1);
 		printf ("Memory used %d in %d sections.\n", (int)checkpointStatus.memoryUsed,
 			(int)checkpointStatus.numberOfSections);
 	}
-	
+
 	error = saCkptSectionCreate (checkpointHandleRead,
 		&sectionCreationAttributes1,
 		"Initial Data #0",
@@ -415,19 +415,19 @@ sleep (1);
 		strlen ("Initial Data #0") + 1);
 	printf ("%s: Create checkpoint section on writeable checkpoint\n",
 		get_test_output (error, SA_AIS_OK));
-		
+
 	error = saCkptSectionCreate (checkpointHandle,
 		&sectionCreationAttributes1,
 		"Initial Data #0",
 		strlen ("Initial Data #0") + 1);
 	printf ("%s: Create checkpoint section when one already exists\n",
 		get_test_output (error, SA_AIS_ERR_EXIST));
-		
+
 	error = saCkptSectionDelete (checkpointHandle,
 		&sectionId1);
 	printf ("%s: deleting section handle\n",
 		get_test_output (error, SA_AIS_OK));
-		
+
 	error = saCkptSectionCreate (checkpointHandle,
 		&sectionCreationAttributes1,
 		"Initial Data #0",
@@ -453,7 +453,7 @@ sleep (1);
 		SA_TIME_END);
 	printf ("%s: Setting expiration time for section 2\n",
 		get_test_output (error, SA_AIS_OK));
-		
+
 	error = saCkptSectionOverwrite (checkpointHandle,
 		&sectionId1,
 		"Overwrite Data #1",

@@ -73,7 +73,7 @@ SaEvtEventFilterT filters[] = {
 
 SaEvtEventFilterArrayT subscribe_filters = {
 	sizeof(filters)/sizeof(SaEvtEventFilterT),
-	filters, 
+	filters,
 };
 
 
@@ -144,9 +144,9 @@ test_pub()
 #endif
 
 
-	
+
 	SaAisErrorT result;
-	 
+
 	flags = SA_EVT_CHANNEL_PUBLISHER |
 #ifdef EVENT_SUBSCRIBE
 		SA_EVT_CHANNEL_SUBSCRIBER |
@@ -165,7 +165,7 @@ test_pub()
 		return(result);
 	}
 	do {
-		result = saEvtChannelOpen(handle, &channel_name, flags, 
+		result = saEvtChannelOpen(handle, &channel_name, flags,
 				SA_TIME_MAX, &channel_handle);
 	} while ((result == SA_AIS_ERR_TRY_AGAIN) && !sleep(TRY_WAIT));
 	if (result != SA_AIS_OK) {
@@ -219,7 +219,7 @@ test_pub()
 
 	for (i = 0; i < pub_count; i++) {
 		do {
-			result = saEvtEventPublish(event_handle, user_data, 
+			result = saEvtEventPublish(event_handle, user_data,
 					user_data_size, &event_id);
 		} while ((result == SA_AIS_ERR_TRY_AGAIN) && !sleep(TRY_WAIT));
 		if (result != SA_AIS_OK) {
@@ -227,7 +227,7 @@ test_pub()
 			printf("event Publish result(2): %s\n", result_buf);
 			return(result);
 		}
-		printf("Published event ID: 0x%llx\n", 
+		printf("Published event ID: 0x%llx\n",
 				(unsigned long long)event_id);
 	}
 
@@ -285,7 +285,7 @@ test_pub()
 	do {
 		result = saEvtChannelClose(channel_handle);
 	} while ((result == SA_AIS_ERR_TRY_AGAIN) && !sleep(TRY_WAIT));
-	
+
 	if (result != SA_AIS_OK) {
 		get_sa_error(result, result_buf, result_buf_len);
 		printf("channel close result: %s\n", result_buf);
@@ -305,7 +305,7 @@ test_pub()
 
 }
 
-void 
+void
 event_callback( SaEvtSubscriptionIdT subscription_id,
 		const SaEvtEventHandleT event_handle,
 		const SaSizeT event_data_size)
@@ -320,7 +320,7 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 
 	printf("event_callback called\n");
 	printf("sub ID: %x\n", subscription_id);
-	printf("event_handle %llx\n", 
+	printf("event_handle %llx\n",
 			(unsigned long long)event_handle);
 	printf("event data size %llu\n", (unsigned long long)event_data_size);
 
@@ -348,10 +348,10 @@ event_callback( SaEvtSubscriptionIdT subscription_id,
 	}
 
 	printf("priority: 0x%x\n", priority);
-	printf("retention: 0x%llx\n", 
+	printf("retention: 0x%llx\n",
 			(unsigned long long)retention_time);
-	printf("publisher name content: \"%s\"\n", publisher_name.value); 
-	printf("event id: 0x%llx\n", 
+	printf("publisher name content: \"%s\"\n", publisher_name.value);
+	printf("event id: 0x%llx\n",
 			(unsigned long long)event_id);
 evt_free:
 	result = saEvtEventFree(event_handle);
@@ -371,7 +371,7 @@ int main (int argc, char **argv)
 
 	while (1) {
 		option = getopt(argc, argv, opts);
-		if (option == -1) 
+		if (option == -1)
 			break;
 
 		switch (option) {
@@ -403,15 +403,15 @@ int main (int argc, char **argv)
 			strcpy(pubname, optarg);
 			break;
 		case 'f':
-			err_wait_time = 
+			err_wait_time =
 				(unsigned int)strtoul(optarg, NULL, 0);
 			break;
 		case 'i':
-			subscription_id = 
+			subscription_id =
 				(unsigned int)strtoul(optarg, NULL, 0);
 			break;
 		case 'w':
-			wait_time = 
+			wait_time =
 				(unsigned int)strtoul(optarg, NULL, 0);
 			break;
 		case 't':

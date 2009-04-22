@@ -1,5 +1,5 @@
 /** @file amfapp.c
- * 
+ *
  * Copyright (c) 2006 Ericsson AB.
  * Author: Hans Feldt, Anders Eriksson, Lars Holm
  *  - Refactoring of code into several AMF files
@@ -10,7 +10,7 @@
  *
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -34,17 +34,17 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF Application Class implementation
- * 
- * This file contains functions for handling the AMF Applications. It can 
+ *
+ * This file contains functions for handling the AMF Applications. It can
  * be viewed as the implementation of the AMF Application class
- * as described in SAI-Overview-B.02.01. The SA Forum specification 
+ * as described in SAI-Overview-B.02.01. The SA Forum specification
  * SAI-AIS-AMF-B.02.01 has been used as specification of the behaviour
  * and is referred to as 'the spec' below.
- * 
+ *
  * The functions in this file are responsible for:
- *	- on request start the service groups it contains 
+ *	- on request start the service groups it contains
  *	- on request order the service groups to assign workload to all
  *    service units contained in the service group, level by level
  *	- to handle administrative operation support for the application (FUTURE)
@@ -68,12 +68,12 @@
  * State WORKLOAD_ASSIGNED is assumed when the Application has been initially
  * started and will in the future be re-assumed after the administrative
  * command RESTART have been executed.
- * 
+ *
 *  1. AMF Application Availability Control State Machine
 *  =====================================================
- * 
+ *
  * 1.1  State Transition Table
- * 
+ *
  * State:                  Event:                Action:  New state:
  * ===========================================================================
  * UNINSTANTIATED          start                 A6,A1    STARTING_SGS
@@ -88,7 +88,7 @@
  * ASSIGNING_WORKLOAD      sg_assigned [C2]      A10,A9   WORKLOAD_ASSIGNED
  * WORKLOAD_ASSIGNED       start                 A6,A1    STARTING_SGS
  * WORKLOAD_ASSIGNED       assign_workload       A3       ASSIGNING_WORKLOAD
-* 
+*
 *  1.2 State Description
 *  =====================
 * UNINSTANTIATED -  No SUs within the SGs contained in the Application have been
@@ -101,7 +101,7 @@
 *                      assigned workload to its SUs.
 * WORKLOAD_ASSIGNED - at least some workload has been assigned to the SUs that
 *                     are in-service.
-* 
+*
 *  1.3 Actions
 *  ===========
 *  A1 - [foreach SG in Application] sg_start
@@ -115,7 +115,7 @@
 *  A9 - recall deferred events
 *  A10 - [node == NULL] cluster_application_assigned else
 *         node_application_assigned
-* 
+*
 *  1.4 Guards
 *  ==========
 *  C1 - No SU has presence state == INSTANTIATING
@@ -132,7 +132,7 @@
 LOGSYS_DECLARE_SUBSYS ("AMF");
 
 typedef struct application_event {
-	amf_application_event_type_t event_type;  
+	amf_application_event_type_t event_type;
 	amf_application_t *app;
 	amf_node_t	*node;
 } application_event_t;
@@ -147,12 +147,12 @@ static	int is_cluster_start(amf_node_t *node_to_start)
 }
 
 static void application_defer_event (
-	amf_application_event_type_t event_type, amf_application_t *app, 
-	amf_node_t *node) 
+	amf_application_event_type_t event_type, amf_application_t *app,
+	amf_node_t *node)
 {
 	application_event_t app_event = {event_type, app, node};
 	ENTER();
-	amf_fifo_put (event_type, &app->deferred_events, 
+	amf_fifo_put (event_type, &app->deferred_events,
 		sizeof (application_event_t), &app_event);
 }
 
@@ -172,7 +172,7 @@ static void application_recall_deferred_events (amf_application_t *app)
 			}
 			case APPLICATION_START_EV: {
 
-				log_printf (LOGSYS_LEVEL_NOTICE, 
+				log_printf (LOGSYS_LEVEL_NOTICE,
 					"Recall APPLICATION_START_EV");
 				amf_application_start (application_event.app,
 						application_event.node);
@@ -193,7 +193,7 @@ static void timer_function_application_recall_deferred_events (void *data)
 	application_recall_deferred_events (app);
 }
 
-static int no_su_is_instantiating (struct amf_application *app) 
+static int no_su_is_instantiating (struct amf_application *app)
 {
 	struct amf_sg *sg;
 	struct amf_su *su;
@@ -253,7 +253,7 @@ static void timer_function_node_application_started (void* app)
 	amf_node_application_started (application->node_to_start, application);
 }
 
-static void application_enter_starting_sgs (struct amf_application *app, 
+static void application_enter_starting_sgs (struct amf_application *app,
 	struct amf_node *node)
 {
 	amf_sg_t *sg = 0;
@@ -273,11 +273,11 @@ static void application_enter_starting_sgs (struct amf_application *app,
 		} else {
 			amf_call_function_asynchronous (
 				timer_function_node_application_started, app);
-		}   
+		}
 	}
 }
 
-static void application_enter_assigning_workload (amf_application_t *app) 
+static void application_enter_assigning_workload (amf_application_t *app)
 {
 	amf_sg_t *sg = 0;
 	int posible_to_assign_si = 0;
@@ -307,7 +307,7 @@ static void application_enter_workload_assigned (amf_application_t *app)
 			amf_node_application_workload_assigned(
 				app->node_to_start, app);
 		}
-		
+
 		amf_call_function_asynchronous (
 			timer_function_application_recall_deferred_events, app);
 	}
@@ -357,7 +357,7 @@ void amf_application_start (
 	}
 }
 
-void amf_application_assign_workload (struct amf_application *app, 
+void amf_application_assign_workload (struct amf_application *app,
 	struct amf_node *node)
 {
 	/*
@@ -392,7 +392,7 @@ void amf_application_assign_workload (struct amf_application *app,
 					" application =%s in state APP_AC_ASSIGNING_WORKLOAD "
 					"(should be deferred)", app->name.value);
 
-				application_defer_event (APPLICATION_ASSIGN_WORKLOAD_EV, app, 
+				application_defer_event (APPLICATION_ASSIGN_WORKLOAD_EV, app,
 					node);
 			}
 			break;
@@ -414,7 +414,7 @@ void amf_application_sg_started (struct amf_application *app, struct amf_sg *sg,
 		struct amf_node *node)
 {
 	ENTER ();
-	
+
 	assert (app != NULL);
 
 	switch (app->acsm_state) {
@@ -425,7 +425,7 @@ void amf_application_sg_started (struct amf_application *app, struct amf_sg *sg,
 					amf_cluster_application_started (app->cluster, app);
 				} else {
 					amf_node_application_started (app->node_to_start, app);
-				}   
+				}
 			}
 			break;
 		default:
@@ -447,7 +447,7 @@ void amf_application_sg_assigned (
 			application_enter_workload_assigned (app);
 			break;
 		default:
-			log_printf (LOGSYS_LEVEL_ERROR, 
+			log_printf (LOGSYS_LEVEL_ERROR,
 				"amf_application_sg_assigned()"
 				" called in state = %d", app->acsm_state);
 			corosync_fatal_error (COROSYNC_FATAL_ERR);
@@ -460,7 +460,7 @@ void amf_application_sg_assigned (
  *****************************************************************************/
 
 struct amf_application *amf_application_new (struct amf_cluster *cluster) {
-	struct amf_application *app = amf_calloc (1, 
+	struct amf_application *app = amf_calloc (1,
 					sizeof (struct amf_application));
 
 	app->cluster = cluster;
@@ -515,7 +515,7 @@ void *amf_application_serialize (
 }
 
 struct amf_application *amf_application_deserialize (
-	struct amf_cluster *cluster, char *buf) 
+	struct amf_cluster *cluster, char *buf)
 {
 	char *tmp = buf;
 	struct amf_application *app = amf_application_new (cluster);
@@ -536,8 +536,8 @@ struct amf_application *amf_application_find (
 
 	assert (cluster != NULL);
 	for (app = cluster->application_head; app != NULL; app = app->next) {
-		
-		if (app->name.length == strlen(name) && 
+
+		if (app->name.length == strlen(name) &&
 			strncmp (name, (char*)app->name.value, app->name.length)
 			 == 0) {
 			break;

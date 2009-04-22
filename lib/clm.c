@@ -7,7 +7,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -509,7 +509,7 @@ saClmClusterTrack (
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_nounlock;
 	}
-		
+
 	req_lib_clm_clustertrack.header.size = sizeof (struct req_lib_clm_clustertrack);
 	req_lib_clm_clustertrack.header.id = MESSAGE_REQ_CLM_TRACKSTART;
 	req_lib_clm_clustertrack.track_flags = trackFlags;

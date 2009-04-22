@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -186,7 +186,7 @@ struct req_lib_amf_protectiongrouptrack {
 struct res_lib_amf_protectiongrouptrack {
 	mar_res_header_t header;
 };
-	
+
 
 struct req_lib_amf_protectiongrouptrackstop {
 	mar_req_header_t header;

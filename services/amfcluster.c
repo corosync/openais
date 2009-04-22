@@ -1,6 +1,6 @@
 
 /** @file amfcluster.c
- * 
+ *
  * Copyright (c) 2006 Ericsson AB.
  * Author: Hans Feldt, Anders Eriksson, Lars Holm
  *  - Refactoring of code into several AMF files
@@ -11,7 +11,7 @@
  *
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -35,15 +35,15 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * AMF Cluster Class Implementation
- * 
- * This file contains functions for handling the AMF cluster. It can be 
+ *
+ * This file contains functions for handling the AMF cluster. It can be
  * viewed as the implementation of the AMF Cluster class
- * as described in SAI-Overview-B.02.01. The SA Forum specification 
+ * as described in SAI-Overview-B.02.01. The SA Forum specification
  * SAI-AIS-AMF-B.02.01 has been used as specification of the behaviour
  * and is referred to as 'the spec' below.
- * 
+ *
  * The functions in this file are responsible for:
  *	- to start the cluster initially
  *	- to handle the administrative operation support for the cluster (FUTURE)
@@ -66,12 +66,12 @@
  * State STARTED is assumed when the cluster has been initially started and
  * will in the future be re-assumed after the administrative command RESTART
  * have been executed.
- * 
+ *
  * 1. Cluster Availability Control State Machine
  * =============================================
- * 
+ *
  * 1.1  State Transition Table
- * 
+ *
  * State:                  Event:                Action:  New state:
  * ===========================================================================
  * UNINSTANTIATED          sync_ready [C1]       A2,A1    STARTING_APPS
@@ -88,13 +88,13 @@
  * ASSIGNING_WORKLOAD      sync_ready            A4       ASSIGNING_WORKLOAD
  * ASSIGNING_WORKLOAD      app_assigned [C4]     A6       STARTED
  * STARTED                 sync_ready            A5       STARTED
- * 
+ *
  * 1.2 State Description
  * =====================
  * UNINSTANTIATED -  No SUs within any SG in any Application is instantiated.
  * STARTING_APPLICATIONS - All applications have been requested to start
  *                         their contained SGs, which in its turn has requested
- *                         their contained SUs to instantiate all their 
+ *                         their contained SUs to instantiate all their
  *                         components. The cluster startup timer is running.
  * WAITING_OVERTIME_1 - The cluster startup timer has expired but all
  *                      applications have yet not responded that they have been
@@ -163,23 +163,23 @@ typedef struct cluster_event {
  * Internal (static) utility functions
  *****************************************************************************/
 
-static void cluster_defer_event (amf_cluster_event_type_t event_type, 
+static void cluster_defer_event (amf_cluster_event_type_t event_type,
 	struct amf_cluster *cluster, struct amf_node * node)
 {
 	cluster_event_t sync_ready_event = {event_type, cluster, node};
-	amf_fifo_put (event_type, &cluster->deferred_events, 
+	amf_fifo_put (event_type, &cluster->deferred_events,
 		sizeof (cluster_event_t),
 		&sync_ready_event);
 }
 
-static void cluster_recall_deferred_events (amf_cluster_t *cluster) 
+static void cluster_recall_deferred_events (amf_cluster_t *cluster)
 {
 	cluster_event_t cluster_event;
-	
+
 	if (amf_fifo_get (&cluster->deferred_events, &cluster_event)) {
 		switch (cluster_event.event_type) {
 			case CLUSTER_SYNC_READY_EV:
-				log_printf (LOGSYS_LEVEL_NOTICE, 
+				log_printf (LOGSYS_LEVEL_NOTICE,
 					"Recall CLUSTER_SYNC_READY_EV");
 
 				amf_node_sync_ready (cluster_event.node);
@@ -203,7 +203,7 @@ static void timer_function_cluster_recall_deferred_events (void *data)
  * Determine if all applications are started so that all
  * SUs is in SA_AMF_PRESENCE_INSTANTIATED presense state
  * @param cluster
- * 
+ *
  * @return 1; All applications are started
  */
 static int cluster_applications_started_instantiated (struct amf_cluster *cluster)
@@ -231,7 +231,7 @@ static int cluster_applications_started_instantiated (struct amf_cluster *cluste
 /**
  * Determine if any SGs are in the process of instantiating their SUs.
  * @param cluster
- * 
+ *
  * @return 1; At least one SG is in the process of instantiating.
  */
 static int cluster_applications_are_starting_sgs(struct amf_cluster *cluster)
@@ -246,7 +246,7 @@ static int cluster_applications_are_starting_sgs(struct amf_cluster *cluster)
 		for (sg = application->sg_head; sg != NULL; sg = sg->next) {
 			for (su = sg->su_head; su != NULL; su = su->next) {
 
-				if (su->saAmfSUPresenceState == 
+				if (su->saAmfSUPresenceState ==
 					SA_AMF_PRESENCE_INSTANTIATING) {
 					is_starting_sgs = 1;
 					break;
@@ -281,7 +281,7 @@ static void timer_function_cluster_assign_workload_tmo (void *cluster)
 
 	ENTER ();
 
-	amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_CLUSTER_START_TMO, &this_amf_node->name, 
+	amf_msg_mcast (MESSAGE_REQ_EXEC_AMF_CLUSTER_START_TMO, &this_amf_node->name,
 		sizeof(SaNameT));
 }
 
@@ -326,7 +326,7 @@ static void acsm_cluster_enter_started (amf_cluster_t *cluster)
  * Event methods
  *****************************************************************************/
 
-void amf_cluster_start_tmo_event (int is_sync_masterm, 
+void amf_cluster_start_tmo_event (int is_sync_masterm,
 	struct amf_cluster *cluster, const SaNameT *sourceNodeName)
 {
 	ENTER ();
@@ -336,10 +336,10 @@ void amf_cluster_start_tmo_event (int is_sync_masterm,
 	switch (cluster->acsm_state) {
 		case CLUSTER_AC_WAITING_OVER_TIME_1:
 			if (cluster_applications_are_starting_sgs (cluster)) {
-				TRACE1 ("Cluster startup timeout," 
+				TRACE1 ("Cluster startup timeout,"
 					"start waiting over time");
-				amf_cluster->acsm_state = 
-					CLUSTER_AC_WAITING_OVER_TIME_2; 
+				amf_cluster->acsm_state =
+					CLUSTER_AC_WAITING_OVER_TIME_2;
 			} else {
 				TRACE1 ("Cluster startup timeout,"
 					" assigning workload");
@@ -351,7 +351,7 @@ void amf_cluster_start_tmo_event (int is_sync_masterm,
 			if (name_match (&this_amf_node->name, sourceNodeName)) {
 				timer_function_cluster_assign_workload_tmo (cluster);
 			}
-			
+
 			break;
 		case CLUSTER_AC_ASSIGNING_WORKLOAD:
 			/* ignore cluster startup timer expiration */
@@ -395,11 +395,11 @@ void amf_cluster_sync_ready (struct amf_cluster *cluster, struct amf_node *node)
 	ENTER ();
 	switch (amf_cluster->acsm_state) {
 		case CLUSTER_AC_UNINSTANTIATED:
-			if (amf_cluster->saAmfClusterAdminState == 
+			if (amf_cluster->saAmfClusterAdminState ==
 				SA_AMF_ADMIN_UNLOCKED) {
 				cluster_enter_starting_applications (cluster);
 			}
-			break;    
+			break;
 		case CLUSTER_AC_STARTING_APPLICATIONS:
 			cluster_enter_starting_applications(cluster);
 			break;
@@ -441,7 +441,7 @@ void amf_cluster_sync_ready (struct amf_cluster *cluster, struct amf_node *node)
 /**
  * An application indicates it has been started or the application indicates it
  * was not even possible to try to start because the required nodes were not
- * available. 
+ * available.
  * @param cluster
  * @param application
  */
@@ -472,7 +472,7 @@ void amf_cluster_application_started (
 }
 
 /**
- * An application indicates it has assigned workload to all its contained SUs. 
+ * An application indicates it has assigned workload to all its contained SUs.
  * @param cluster
  */
 void amf_cluster_application_workload_assigned (
@@ -497,15 +497,15 @@ void amf_cluster_application_workload_assigned (
  * General methods
  *****************************************************************************/
 
-struct amf_cluster *amf_cluster_new (void) 
+struct amf_cluster *amf_cluster_new (void)
 {
-	struct amf_cluster *cluster = amf_calloc (1, 
+	struct amf_cluster *cluster = amf_calloc (1,
 					sizeof (struct amf_cluster));
 
 	cluster->saAmfClusterStartupTimeout = -1;
 	cluster->saAmfClusterAdminState = SA_AMF_ADMIN_UNLOCKED;
 	cluster->deferred_events = 0;
-	cluster->acsm_state = CLUSTER_AC_UNINSTANTIATED; 
+	cluster->acsm_state = CLUSTER_AC_UNINSTANTIATED;
 	return cluster;
 }
 
@@ -530,7 +530,7 @@ void *amf_cluster_serialize (struct amf_cluster *cluster, int *len)
 	return buf;
 }
 
-struct amf_cluster *amf_cluster_deserialize (char *buf) 
+struct amf_cluster *amf_cluster_deserialize (char *buf)
 {
 	char *tmp = buf;
 	struct amf_cluster *cluster = amf_cluster_new ();
@@ -547,7 +547,7 @@ struct amf_cluster *amf_cluster_deserialize (char *buf)
 /**
  * Determine if any SGs are in the process of instantiating their SUs.
  * @param cluster
- * 
+ *
  * @return 1; At least one SG is in the process of instantiating.
  */
 int amf_cluster_applications_started_with_no_starting_sgs (
@@ -559,7 +559,7 @@ struct amf_cluster *cluster)
 /**
  * Determine if all Applications have been assigned workload.
  * @param cluster
- * 
+ *
  * @return 1; All Applications have been assigned workload.
  */
 int amf_cluster_applications_assigned (struct amf_cluster *cluster)

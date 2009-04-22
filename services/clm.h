@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -62,7 +62,7 @@ openais_clm_services_api_reference (
 	return_api = (struct openais_clm_services_api_ver1 *)clm_services_api_p;
 	return (return_api);
 }
-	
+
 static int inline openais_clm_services_api_release (
 	struct corosync_api_v1 *coroapi,
 	unsigned int handle)
@@ -72,5 +72,5 @@ static int inline openais_clm_services_api_release (
 	res = coroapi->plugin_interface_release (handle);
 	return (res);
 }
-	
+
 #endif /* CLM_H_DEFINED */

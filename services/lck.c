@@ -360,7 +360,7 @@ struct corosync_service_engine lck_service_engine = {
 	.name				= "openais distributed locking service B.01.01",
 	.id				= LCK_SERVICE,
 	.private_data_size		= sizeof (struct lck_pd),
-	.flow_control			= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED, 
+	.flow_control			= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED,
 	.lib_init_fn			= lck_lib_init_fn,
 	.lib_exit_fn			= lck_lib_exit_fn,
 	.lib_engine			= lck_lib_engine,
@@ -1151,9 +1151,9 @@ static void resource_lock_orphan (struct resource_lock *resource_lock)
 	memcpy (&req_exec_lck_resourcelockorphan.resource_name,
 		&resource_lock->resource->name,
 		sizeof (mar_name_t));
-		
+
 	req_exec_lck_resourcelockorphan.lock_id = resource_lock->lock_id;
-	
+
 	iovec.iov_base = (char *)&req_exec_lck_resourcelockorphan;
 	iovec.iov_len = sizeof (req_exec_lck_resourcelockorphan);
 
@@ -1315,7 +1315,7 @@ static void message_handler_req_exec_lck_resourceopen (
 
 	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceOpen %s\n",
 		get_mar_name_t (&req_exec_lck_resourceopen->resource_name));
-	
+
 	if (req_exec_lck_resourceopen->fail_with_error != SA_AIS_OK) {
 		error = req_exec_lck_resourceopen->fail_with_error;
 		goto error_exit;
@@ -2186,7 +2186,7 @@ static void message_handler_req_lib_lck_resourceopenasync (
 	memcpy (&req_exec_lck_resourceopen.resource_name,
 		&req_lib_lck_resourceopen->lockResourceName,
 		sizeof (mar_name_t));
-	
+
 	req_exec_lck_resourceopen.resource_handle = req_lib_lck_resourceopen->resourceHandle;
 	req_exec_lck_resourceopen.invocation = req_lib_lck_resourceopen->invocation;
 	req_exec_lck_resourceopen.open_flags = req_lib_lck_resourceopen->resourceOpenFlags;
@@ -2335,11 +2335,11 @@ static void message_handler_req_lib_lck_resourceunlock (
 	memcpy (&req_exec_lck_resourceunlock.resource_name,
 		&req_lib_lck_resourceunlock->lockResourceName,
 		sizeof (mar_name_t));
-		
+
 	req_exec_lck_resourceunlock.lock_id = req_lib_lck_resourceunlock->lockId;
 	req_exec_lck_resourceunlock.async_call = 0;
 	req_exec_lck_resourceunlock.invocation = 0;
-	
+
 	iovec.iov_base = (char *)&req_exec_lck_resourceunlock;
 	iovec.iov_len = sizeof (req_exec_lck_resourceunlock);
 
@@ -2368,11 +2368,11 @@ static void message_handler_req_lib_lck_resourceunlockasync (
 	memcpy (&req_exec_lck_resourceunlock.resource_name,
 		&req_lib_lck_resourceunlock->lockResourceName,
 		sizeof (mar_name_t));
-		
+
 	req_exec_lck_resourceunlock.lock_id = req_lib_lck_resourceunlock->lockId;
 	req_exec_lck_resourceunlock.invocation = req_lib_lck_resourceunlock->invocation;
 	req_exec_lck_resourceunlock.async_call = 1;
-	
+
 	iovec.iov_base = (char *)&req_exec_lck_resourceunlock;
 	iovec.iov_len = sizeof (req_exec_lck_resourceunlock);
 

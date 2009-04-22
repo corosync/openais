@@ -7,7 +7,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -125,7 +125,7 @@ void CSISetCallback (
 {
 	switch (haState) {
 	case SA_AMF_HA_ACTIVE:
-		printf ("CSISetCallback: '"); 
+		printf ("CSISetCallback: '");
 		printSaNameT ((SaNameT *)&csiDescriptor->csiName);
 		printf ("' for CSI '");
 		printSaNameT ((SaNameT *)compName);
@@ -135,7 +135,7 @@ void CSISetCallback (
 		break;
 
 	case SA_AMF_HA_STANDBY:
-		printf ("CSISetCallback: '"); 
+		printf ("CSISetCallback: '");
 		printSaNameT ((SaNameT *)compName);
 		printf ("' for CSI '");
 		printSaNameT ((SaNameT *)compName);

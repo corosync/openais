@@ -63,7 +63,7 @@ main(
   // and registers the various callback functions
   amf_comp_init( &VG_AMF_ha_state );
 
-  // 
+  //
   for (;;sleep(1)) {
 
     switch( VG_AMF_ha_state ) {

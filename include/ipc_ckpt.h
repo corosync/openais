@@ -7,7 +7,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -252,7 +252,7 @@ struct req_lib_ckpt_sectionoverwrite {
 struct res_lib_ckpt_sectionoverwrite {
 	mar_res_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
-	
+
 struct req_lib_ckpt_sectionread {
 	mar_req_header_t header __attribute__((aligned(8)));
 	mar_name_t checkpoint_name __attribute__((aligned(8)));

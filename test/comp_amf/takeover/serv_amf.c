@@ -161,7 +161,7 @@ amf_ip_takeover(
 static void
 amf_csi_setCallback(
 	SaInvocationT p_invocation,		// to acknowledge the new state
-	const SaNameT *p_compName,		// name of the component 
+	const SaNameT *p_compName,		// name of the component
 	SaAmfHAStateT p_haState,		// new HA state to be assumed by the component for the CSI
 	SaAmfCSIDescriptorT *p_csiDescriptor	// information about the CSI targeted
 
@@ -300,7 +300,7 @@ amf_comp_init(
 			       &VG_amfCallbacks,	// callback functions that AMF may invoke
 			       &VG_amf_version );	// version that should support AMF
     if (v_error != SA_AIS_ERR_TRY_AGAIN) break;
-  } 
+  }
   if (v_error != SA_AIS_OK) {
     fprintf( stderr, "saAmfInitialize result is %d\n", v_error );
     exit( EXIT_FAILURE );
@@ -321,7 +321,7 @@ amf_comp_init(
   // Get the name of the component the calling process belongs to
   for (;;usleep(10000)) {
     v_error = saAmfComponentNameGet( VG_amf_handle,		// AMF handle
-				     &VG_compNameGlobal );	// name of the component 
+				     &VG_compNameGlobal );	// name of the component
     if (v_error != SA_AIS_ERR_TRY_AGAIN) break;
   }
   if (v_error != SA_AIS_OK) {

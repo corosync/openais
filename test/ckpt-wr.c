@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -76,10 +76,10 @@ char readBuffer1[1025];
 
 SaCkptIOVectorElementT ReadVectorElements[] = {
 	{
-		SA_CKPT_DEFAULT_SECTION_ID,	
+		SA_CKPT_DEFAULT_SECTION_ID,
 		readBuffer1,
 		sizeof (readBuffer1),
-		0, 
+		0,
 		0
 	}
 };
@@ -91,7 +91,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 		SA_CKPT_DEFAULT_SECTION_ID,
 		data, /*"written data #1, this should extend past end of old section data", */
 		DATASIZE, /*sizeof ("data #1, this should extend past end of old section data") + 1, */
-		0, //5, 
+		0, //5,
 		0
 	}
 };
@@ -141,13 +141,13 @@ int main (void) {
 printf ("error is %d\n", error);
 				return (0);
 			}
-			
+
 			if (ReadVectorElements->dataBuffer == 0) {
 				printf ("Default Checkpoint has no data\n");
 			} else {
 				count = atol((char *)ReadVectorElements->dataBuffer);
 			}
-			
+
 			count++;
 			sprintf((char*)&data, "%d",(int)count);
 			writeElement.sectionId = (SaCkptSectionIdT)SA_CKPT_DEFAULT_SECTION_ID;

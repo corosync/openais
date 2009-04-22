@@ -8,7 +8,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -130,7 +130,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer1,
 		sizeof (readBuffer1),
-		0, 
+		0,
 		0
 	},
 	{
@@ -140,7 +140,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer2,
 		sizeof (readBuffer2),
-		0, 
+		0,
 		0
 	}
 };
@@ -157,7 +157,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data, /*"written data #1, this should extend past end of old section data", */
 		DATASIZE, /*sizeof ("data #1, this should extend past end of old section data") + 1, */
-		0, //5, 
+		0, //5,
 		0
 	}
 #ifdef COMPILE_OUT
@@ -168,7 +168,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data, /*"written data #2, this should extend past end of old section data" */
 		DATASIZE, /*sizeof ("written data #2, this should extend past end of old section data") + 1, */
-		0, //3, 
+		0, //3,
 		0
 	}
 #endif
@@ -188,9 +188,9 @@ struct threaddata {
 
 extern void pthread_exit(void *) __attribute__((noreturn));
 
-void *benchmark_thread (void *arg) 
+void *benchmark_thread (void *arg)
 {
-	
+
 	SaCkptCheckpointHandleT checkpoint_handle;
 	SaCkptHandleT ckpt_handle;
 	int write_size;
@@ -261,11 +261,11 @@ void threaded_bench (
 
 	printf ("%5d Writes ", written);
 	printf ("%5d bytes per write ", write_size);
-	printf ("%7.3f Seconds runtime ", 
+	printf ("%7.3f Seconds runtime ",
 		(tv_elapsed.tv_sec + (tv_elapsed.tv_usec / 1000000.0)));
 	printf ("%9.3f TP/s ",
 		((float)written) /  (tv_elapsed.tv_sec + (tv_elapsed.tv_usec / 1000000.0)));
-	printf ("%7.3f MB/s.\n", 
+	printf ("%7.3f MB/s.\n",
 		((float)written) * ((float)write_size) /  ((tv_elapsed.tv_sec + (tv_elapsed.tv_usec / 1000000.0)) * 1000000.0));
 }
 
@@ -273,7 +273,7 @@ SaNameT checkpointName;
 
 #define CHECKPOINT_THREADS_START 25
 #define CHECKPOINT_THREADS_MAX 500
- 
+
 void sigalrm_handler (int num)
 {
 	alarm_notice = 1;
@@ -286,8 +286,8 @@ int main (void) {
 	SaAisErrorT error;
 	int size;
 	int i, j;
-	
-	signal (SIGALRM, sigalrm_handler); 
+
+	signal (SIGALRM, sigalrm_handler);
 
 	printf ("Creating (%d) checkpoints.\n", CHECKPOINT_THREADS_MAX);
 	/*

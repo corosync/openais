@@ -8,7 +8,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -134,7 +134,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer1,
 		sizeof (readBuffer1),
-		0, 
+		0,
 		0
 	},
 	{
@@ -144,7 +144,7 @@ SaCkptIOVectorElementT ReadVectorElements[] = {
 		},
 		readBuffer2,
 		sizeof (readBuffer2),
-		0, 
+		0,
 		0
 	}
 };
@@ -161,7 +161,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data, /*"written data #1, this should extend past end of old section data", */
 		DATASIZE, /*sizeof ("data #1, this should extend past end of old section data") + 1, */
-		0, //5, 
+		0, //5,
 		0
 	}
 #ifdef COMPILE_OUT
@@ -172,7 +172,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 		},
 		data, /*"written data #2, this should extend past end of old section data" */
 		DATASIZE, /*sizeof ("written data #2, this should extend past end of old section data") + 1, */
-		0, //3, 
+		0, //3,
 		0
 	}
 #endif
@@ -211,11 +211,11 @@ retry:
 
 	printf ("%5d Writes ", write_count);
 	printf ("%5d bytes per write ", write_size);
-	printf ("%7.3f Seconds runtime ", 
+	printf ("%7.3f Seconds runtime ",
 		(tv_elapsed.tv_sec + (tv_elapsed.tv_usec / 1000000.0)));
 	printf ("%9.3f TP/s ",
 		((float)write_count) /  (tv_elapsed.tv_sec + (tv_elapsed.tv_usec / 1000000.0)));
-	printf ("%7.3f MB/s.\n", 
+	printf ("%7.3f MB/s.\n",
 		((float)write_count) * ((float)write_size) /  ((tv_elapsed.tv_sec + (tv_elapsed.tv_usec / 1000000.0)) * 1000000.0));
 }
 
@@ -230,12 +230,12 @@ int main (void) {
 	SaAisErrorT error;
 	int size;
 	int i;
-	
+
 	signal (SIGALRM, sigalrm_handler);
 
     error = saCkptInitialize (&ckptHandle, &callbacks, &version);
 	fail_on_error(error, "saCkptInitialize");
-	
+
 	error = saCkptCheckpointOpen (ckptHandle,
 		&checkpointName,
 		&checkpointCreationAttributes,

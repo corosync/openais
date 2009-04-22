@@ -6,7 +6,7 @@
  * Author: Steven Dake (sdake@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -185,7 +185,7 @@ int main (void) {
 		&resource_name_async,
 		SA_LCK_RESOURCE_CREATE);
 	printf ("saLckResourceOpenAsync %d (should be 1)\n", result);
-		
+
 	result = saLckResourceLock (
 		resource_handle,
 		&pr_lock_id,
@@ -223,7 +223,7 @@ int main (void) {
 		&status);
 	printf ("saLckResourceLock EX %d (should be 1)\n", result);
 	printf ("status %d\n", status);
-		
+
 	result = saLckResourceLockAsync (
 		resource_handle_async,
 		0x56,
@@ -242,14 +242,14 @@ int main (void) {
 			break;
 		}
 	} while (result);
-	
+
 	printf ("Starting saLckResourceUnlock\n");
 	result = saLckResourceUnlock (
 		ex_lock_id,
 		SA_TIME_END);
 	printf ("saLckResourceUnlock result %d (should be 1)\n",
 		result);
-	
+
 	result = saLckResourceClose (resource_handle);
 	printf ("saLckResourceClose result %d (should be 1)\n", result);
 
