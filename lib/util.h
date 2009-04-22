@@ -54,5 +54,9 @@ saVersionVerify (
 
 SaTimeT clustTimeNow(void);
 
+#define IPC_REQUEST_SIZE	8192*128
+#define IPC_RESPONSE_SIZE	8192*128
+#define IPC_DISPATCH_SIZE	8192*128
+
 #endif /* AIS_UTIL_H_DEFINED */
 

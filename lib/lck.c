@@ -238,7 +238,13 @@ saLckInitialize (
 		goto error_destroy;
 	}
 
-	error = coroipcc_service_connect (IPC_SOCKET_NAME, LCK_SERVICE, &lckInstance->ipc_ctx);
+	error = coroipcc_service_connect (
+		IPC_SOCKET_NAME,
+		LCK_SERVICE,
+		IPC_REQUEST_SIZE,
+		IPC_RESPONSE_SIZE,
+		IPC_DISPATCH_SIZE,
+		&lckInstance->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -826,7 +832,13 @@ saLckResourceLock (
 		goto error_destroy;
 	}
 
-	error = coroipcc_service_connect (IPC_SOCKET_NAME, LCK_SERVICE, &lock_ctx);
+	error = coroipcc_service_connect (
+		IPC_SOCKET_NAME,
+		LCK_SERVICE,
+		IPC_REQUEST_SIZE,
+		IPC_RESPONSE_SIZE,
+		IPC_DISPATCH_SIZE,
+		&lock_ctx);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}
@@ -919,7 +931,13 @@ saLckResourceLockAsync (
 		goto error_destroy;
 	}
 
-	error = coroipcc_service_connect (IPC_SOCKET_NAME, LCK_SERVICE, &lock_ctx);
+	error = coroipcc_service_connect (
+		IPC_SOCKET_NAME,
+		LCK_SERVICE,
+		IPC_REQUEST_SIZE,
+		IPC_RESPONSE_SIZE,
+		IPC_DISPATCH_SIZE,
+		&lock_ctx);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}

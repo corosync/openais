@@ -360,7 +360,13 @@ saEvtInitialize(
 	/*
 	 * Set up communication with the event server
 	 */
-	error = coroipcc_service_connect (IPC_SOCKET_NAME, EVT_SERVICE, &evti->ipc_ctx);
+	error = coroipcc_service_connect (
+		IPC_SOCKET_NAME,
+		EVT_SERVICE,
+		IPC_REQUEST_SIZE,
+		IPC_RESPONSE_SIZE,
+		IPC_DISPATCH_SIZE,
+		&evti->ipc_ctx);
 	if (error != SA_AIS_OK) {
 		goto error_handle_put;
 	}
