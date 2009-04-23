@@ -1929,7 +1929,7 @@ static void message_handler_req_lib_amf_pmstart (
 	struct amf_comp *comp;
 	SaAisErrorT error = SA_AIS_OK;
 
-	TRACE2("PmStart msg: '%s', %llu %d %d %d",
+	TRACE2("PmStart msg: '%s', %"PRIu64" %d %d %d",
 				req_lib->compName.value,
 				req_lib->processId,
 				req_lib->descendentsTreeDepth,
@@ -1968,7 +1968,7 @@ static void message_handler_req_lib_amf_pmstop (
 	struct amf_comp *comp;
 	SaAisErrorT error = SA_AIS_OK;
 
-	TRACE2 ("PmStop msg: '%s', %llu %d %d",
+	TRACE2 ("PmStop msg: '%s', %"PRIu64" %d %d",
 			req_lib->compName.value,
 			req_lib->processId,
 			req_lib->stopQualifier,

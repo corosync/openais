@@ -4098,11 +4098,11 @@ static void ckpt_dump_fn (void)
 			log_printf (LOGSYS_LEVEL_NOTICE, "   Section %s (%d)",
 				section->section_descriptor.section_id.id,
 				section->section_descriptor.section_id.id_len);
-			log_printf (LOGSYS_LEVEL_NOTICE, "      size:     %llu",
+			log_printf (LOGSYS_LEVEL_NOTICE, "      size:     %"PRIu64,
 				section->section_descriptor.section_size);
 			log_printf (LOGSYS_LEVEL_NOTICE, "      state:    %u",
 				section->section_descriptor.section_state);
-			log_printf (LOGSYS_LEVEL_NOTICE, "      exp time: %llu",
+			log_printf (LOGSYS_LEVEL_NOTICE, "      exp time: %"PRIu64,
 				section->section_descriptor.expiration_time);
 		}
 	}

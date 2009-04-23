@@ -49,6 +49,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <corosync/corotypes.h>
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
@@ -2919,7 +2921,7 @@ static void evt_conf_change(
 {
 	log_printf(RECOVERY_DEBUG, "Evt conf change %d\n",
 			configuration_type);
-	log_printf(RECOVERY_DEBUG, "m %d, j %d, l %d\n",
+	log_printf(RECOVERY_DEBUG, "m %"PRIu64", j %"PRIu64" l %"PRIu64,
 					member_list_entries,
 					joined_list_entries,
 					left_list_entries);

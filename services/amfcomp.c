@@ -1494,7 +1494,7 @@ static void timer_function_pm_fn (void *data)
 			free(pm);
 			continue;
 		}
-		sprintf(f,"/proc/%llu/stat", pm->pid);
+		sprintf(f,"/proc/%"PRIu64"/stat", pm->pid);
 		if (access( f, R_OK) != 0) {
 			if ((comp->su->restart_control_state != SU_RC_RESTART_SU_DEACTIVATING) &&
 				(comp->su->restart_control_state != SU_RC_RESTART_SU_TERMINATING) &&
@@ -1558,7 +1558,7 @@ static void amf_comp_find_and_add_child_pids(
 		if (p == NULL)
 			continue;
 
-		res = fscanf(p, "%llu %*s %*c %llu", &p_id, &parent);
+		res = fscanf(p, "%"PRIu64" %*s %*c %"PRIu64, &p_id, &parent);
 
 		if ((res == 2) && (parent == ppid)) {
 
@@ -1568,7 +1568,7 @@ static void amf_comp_find_and_add_child_pids(
 				return;
 			}
 
-			TRACE2 ("add child (pid=%llu) for comp pid=%llu (%s)\n", p_id, ppid, comp->name.value);
+			TRACE2 ("add child (pid=%"PRIu64") for comp pid=%"PRIu64" (%s)\n", p_id, ppid, comp->name.value);
 
 			pm->pid = p_id;
 			pm->errors = pmErrors;
