@@ -65,7 +65,7 @@ openais_clm_services_api_reference (
 
 static int inline openais_clm_services_api_release (
 	struct corosync_api_v1 *coroapi,
-	unsigned int handle)
+	hdb_handle_t handle)
 {
 	unsigned int res;
 
