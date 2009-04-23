@@ -3444,7 +3444,7 @@ error_exit:
 			&res_lib_msg_messagesend,
 			sizeof (struct res_lib_msg_messagesend));
 
-		if ((queue->open_flags & SA_MSG_QUEUE_RECEIVE_CALLBACK) && (error == SA_AIS_OK))
+		if ((error == SA_AIS_OK) && (queue->open_flags & SA_MSG_QUEUE_RECEIVE_CALLBACK))
 		{
 			res_lib_msg_messagereceived_callback.header.size =
 				sizeof (struct res_lib_msg_messagereceived_callback);
