@@ -81,7 +81,9 @@ struct lckResourceInstance {
 	SaLckResourceOpenFlagsT resourceOpenFlags;
 	SaNameT lockResourceName;
 	struct list_head list;
-	mar_message_source_t source;
+/* TODO
+ *this should be a handle from a handle database	mar_message_source_t source;
+ */
 	pthread_mutex_t *response_mutex;
 };
 
@@ -422,9 +424,12 @@ saLckDispatch (
 					res_lib_lck_resourceopenasync->invocation,
 					res_lib_lck_resourceopenasync->resourceHandle,
 					res_lib_lck_resourceopenasync->header.error);
+/*
+ * Should be a handle from a handle database in the server
 				memcpy (&lckResourceInstance->source,
 						&res_lib_lck_resourceopenasync->source,
 						sizeof (mar_message_source_t));
+ */
 				hdb_handle_put (&lckResourceHandleDatabase,
 					res_lib_lck_resourceopenasync->resourceHandle);
 			} else {
@@ -650,9 +655,12 @@ saLckResourceOpen (
 		goto error_put_destroy;
 	}
 
+/*
+ * Should be a handle from a handle database in the server
 	memcpy (&lckResourceInstance->source,
 		&res_lib_lck_resourceopen.source,
 		sizeof (mar_message_source_t));
+*/
 
 	hdb_handle_put (&lckResourceHandleDatabase, *lckResourceHandle);
 
@@ -863,9 +871,12 @@ saLckResourceLock (
 	req_lib_lck_resourcelock.invocation = 0;
 	req_lib_lck_resourcelock.resourceHandle = lckResourceHandle;
 
+/*
+ * Should be a handle from a handle database in the server
 	memcpy (&req_lib_lck_resourcelock.source,
 		&lckResourceInstance->source,
 		sizeof (mar_message_source_t));
+*/
 
 	iov.iov_base = &req_lib_lck_resourcelock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
@@ -962,9 +973,11 @@ saLckResourceLockAsync (
 	req_lib_lck_resourcelock.invocation = invocation;
 	req_lib_lck_resourcelock.resourceHandle = lckResourceHandle;
 
+/* Should be a handle from a handle  database in the server 
 	memcpy (&req_lib_lck_resourcelock.source,
 		&lckResourceInstance->source,
 		sizeof (mar_message_source_t));
+*/
 
 	iov.iov_base = &req_lib_lck_resourcelock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);

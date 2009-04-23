@@ -75,14 +75,14 @@ struct req_lib_lck_resourceopen {
 struct res_lib_lck_resourceopen {
 	coroipc_response_header_t header;
 	SaLckResourceHandleT resourceHandle;
-	mar_message_source_t source;
+/* TODO should be a handle from a handle database in the server	mar_message_source_t source;*/
 };
 
 struct res_lib_lck_resourceopenasync {
 	coroipc_response_header_t header;
 	SaInvocationT invocation;
 	SaLckResourceHandleT resourceHandle;
-	mar_message_source_t source;
+/* TODO should be a hnadle from a handle database in the server 	mar_message_source_t source; */
 };
 
 struct req_lib_lck_resourceclose {
@@ -105,7 +105,7 @@ struct req_lib_lck_resourcelock {
 	SaTimeT timeout;
 	SaLckLockIdT lockId;
 	int async_call;
-	mar_message_source_t source;
+/* TODO should be a handle from a handle database in the server  mar_message_source_t source; */
 	SaLckResourceHandleT resourceHandle;
 };
 
@@ -121,7 +121,7 @@ static inline void swab_req_lib_lck_resourcelock (
 	to_swab->timeout = swab64 (to_swab->timeout);
 	to_swab->lockId = swab64 (to_swab->lockId);
 	to_swab->async_call = swab32 (to_swab->async_call);
-	swab_mar_message_source_t (&to_swab->source);
+/* TODO should swap a handle from a handle database in the server swab_mar_message_source_t (&to_swab->source); */
 	to_swab->resourceHandle = swab64 (to_swab->resourceHandle);
 }
 

@@ -1392,9 +1392,11 @@ error_exit:
 			res_lib_lck_resourceopenasync.header.error = error;
 			res_lib_lck_resourceopenasync.resourceHandle = req_exec_lck_resourceopen->resource_handle;
 			res_lib_lck_resourceopenasync.invocation = req_exec_lck_resourceopen->invocation;
+/* TODO should be a handle database entry
 			memcpy (&res_lib_lck_resourceopenasync.source,
 				&req_exec_lck_resourceopen->source,
 				sizeof (mar_message_source_t));
+*/
 
 			api->ipc_response_send (
 				req_exec_lck_resourceopen->source.conn,
@@ -1408,9 +1410,11 @@ error_exit:
 			res_lib_lck_resourceopen.header.size = sizeof (struct res_lib_lck_resourceopen);
 			res_lib_lck_resourceopen.header.id = MESSAGE_RES_LCK_RESOURCEOPEN;
 			res_lib_lck_resourceopen.header.error = error;
+/* TODO should be a handle database entry
 			memcpy (&res_lib_lck_resourceopen.source,
 				&req_exec_lck_resourceopen->source,
 				sizeof (mar_message_source_t));
+*/
 
 			api->ipc_response_send (req_exec_lck_resourceopen->source.conn,
 				&res_lib_lck_resourceopen,
@@ -1783,9 +1787,11 @@ static void message_handler_req_exec_lck_resourcelock (
 	/*
 	 * Waiter callback source
 	 */
+/* TODO should be a handle database entry 
 	memcpy (&resource_lock->callback_source,
 		&req_exec_lck_resourcelock->req_lib_lck_resourcelock.source,
 		sizeof (mar_message_source_t));
+*/
 
 	lock_algorithm (resource, resource_lock);
 
