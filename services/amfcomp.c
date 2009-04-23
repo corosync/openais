@@ -134,6 +134,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <inttypes.h>
 
 #include "amf.h"
 #include <netinet/in.h>

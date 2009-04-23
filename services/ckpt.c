@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2003-2006 MontaVista Software, Inc.
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006-2007, 2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -46,6 +46,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 
 #include <corosync/corotypes.h>
 #include <corosync/coroipc_types.h>

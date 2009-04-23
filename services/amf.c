@@ -139,6 +139,7 @@
 #include <assert.h>
 #include <netdb.h>
 #include <sys/stat.h>
+#include <inttypes.h>
 
 #include <corosync/corotypes.h>
 #include <corosync/coroipc_types.h>
