@@ -296,7 +296,6 @@ static void my_cluster_node_load (void)
 	char **status;
 	const char *iface_string;
 
-printf ("nodeid get %d\n", api->totem_nodeid_get());
 	api->totem_ifaces_get (
 		api->totem_nodeid_get (),
 		interfaces,
