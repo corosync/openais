@@ -29,7 +29,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-EXTRA_DIST              = autogen.sh conf/openais.conf conf/amf.conf
+EXTRA_DIST              = autogen.sh \
+			  conf/openais.conf.example \
+			  conf/amf.conf.example
+
 AUTOMAKE_OPTIONS	= foreign
 
 MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
@@ -38,7 +41,8 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
 
 dist_doc_DATA		= LICENSE README.amf AUTHORS
 
-sysconf_DATA		= conf/openais.conf conf/amf.conf
+sysconf_DATA		= conf/openais.conf.example \
+			  conf/amf.conf.example
 
 SUBDIRS	= include lib services test pkgconfig man
 # init
