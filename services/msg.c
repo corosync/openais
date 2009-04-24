@@ -95,12 +95,13 @@ enum msg_exec_message_req_types {
 	MESSAGE_REQ_EXEC_MSG_QUEUECAPACITYTHRESHOLDGET = 22,
 	MESSAGE_REQ_EXEC_MSG_METADATASIZEGET = 23,
 	MESSAGE_REQ_EXEC_MSG_LIMITGET = 24,
-	MESSAGE_REQ_EXEC_MSG_QUEUE_TIMEOUT = 25,
-	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE = 26,
-	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_MESSAGE = 27,
-	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_REFCOUNT = 28,
-	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP = 29,
-	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP_MEMBER = 30
+	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE = 25,
+	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_MESSAGE = 26,
+	MESSAGE_REQ_EXEC_MSG_SYNC_QUEUE_REFCOUNT = 27,
+	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP = 28,
+	MESSAGE_REQ_EXEC_MSG_SYNC_GROUP_MEMBER = 29,
+	MESSAGE_REQ_EXEC_MSG_QUEUE_TIMEOUT = 30,
+	MESSAGE_REQ_EXEC_MSG_PENDING_TIMEOUT = 31,
 };
 
 enum msg_sync_state {
@@ -154,6 +155,8 @@ struct priority_area {
 
 struct pending_entry {
 	mar_message_source_t source;
+	corosync_timer_handle_t timer_handle;
+	SaNameT queue_name;
 	struct list_head list;
 };
 
@@ -166,6 +169,7 @@ struct queue_entry {
 	SaMsgQueueOpenFlagsT open_flags;
 	SaMsgQueueGroupChangesT change_flag;
 	SaMsgQueueCreationAttributesT create_attrs;
+	corosync_timer_handle_t timer_handle;
 	struct group_entry *group;
 	struct list_head queue_list;
 	struct list_head group_list;
@@ -173,7 +177,6 @@ struct queue_entry {
 	struct list_head pending_head;
 	struct priority_area priority[SA_MSG_MESSAGE_LOWEST_PRIORITY+1];
 	struct refcount_set refcount_set[PROCESSOR_COUNT_MAX];
-	corosync_timer_handle_t timer_handle;
 };
 
 struct group_entry {
@@ -320,10 +323,6 @@ static void message_handler_req_exec_msg_limitget (
 	const void *message,
 	unsigned int nodeid);
 
-static void message_handler_req_exec_msg_queue_timeout (
-	const void *message,
-	unsigned int nodeid);
-
 static void message_handler_req_exec_msg_sync_queue (
 	const void *message,
 	unsigned int nodeid);
@@ -341,6 +340,14 @@ static void message_handler_req_exec_msg_sync_group (
 	unsigned int nodeid);
 
 static void message_handler_req_exec_msg_sync_group_member (
+	const void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_queue_timeout (
+	const void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_msg_pending_timeout (
 	const void *message,
 	unsigned int nodeid);
 
@@ -467,6 +474,7 @@ static void msg_sync_refcount_calculate (
 static unsigned int msg_member_list[PROCESSOR_COUNT_MAX];
 static unsigned int msg_member_list_entries = 0;
 static unsigned int lowest_nodeid = 0;
+
 static struct memb_ring_id saved_ring_id;
 
 static int msg_find_member_nodeid (unsigned int nodeid);
@@ -481,6 +489,7 @@ static void msg_confchg_fn (
 struct msg_pd {
 	struct list_head queue_list;
 	struct list_head queue_cleanup_list;
+	/* struct queue_entry *pending_queue; */
 };
 
 struct corosync_lib_handler msg_lib_engine[] =
@@ -715,9 +724,6 @@ static struct corosync_exec_handler msg_exec_engine[] =
 		.exec_handler_fn	= message_handler_req_exec_msg_limitget,
 	},
 	{
-		.exec_handler_fn	= message_handler_req_exec_msg_queue_timeout,
-	},
-	{
 		.exec_handler_fn	= message_handler_req_exec_msg_sync_queue,
 	},
 	{
@@ -731,7 +737,13 @@ static struct corosync_exec_handler msg_exec_engine[] =
 	},
 	{
 		.exec_handler_fn	= message_handler_req_exec_msg_sync_group_member,
-	}
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_queue_timeout,
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_msg_pending_timeout,
+	},
 };
 
 struct corosync_service_engine msg_service_engine = {
@@ -970,11 +982,6 @@ struct req_exec_msg_limitget {
 	SaMsgLimitIdT limit_id;
 };
 
-struct req_exec_msg_queue_timeout {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-};
-
 struct req_exec_msg_sync_queue {
 	coroipc_request_header_t header;
 	struct memb_ring_id ring_id;
@@ -1018,6 +1025,17 @@ struct req_exec_msg_sync_group_member {
 	SaNameT group_name;
 	SaNameT queue_name;
 	SaUint32T queue_id;
+};
+
+struct req_exec_msg_queue_timeout {
+	coroipc_request_header_t header;
+	SaNameT queue_name;
+};
+
+struct req_exec_msg_pending_timeout {
+	coroipc_request_header_t header;
+	mar_message_source_t source;
+	SaNameT queue_name;
 };
 
 static int msg_find_member_nodeid (
@@ -1557,6 +1575,35 @@ static int msg_close_queue (
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
 }
 
+static void msg_release_pending (
+	struct queue_entry *queue,
+	unsigned int nodeid,
+	void *conn)
+{
+	struct pending_entry *pending;
+	struct list_head *pending_list;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg_release_pending ( %s )\n",
+		    (char *)(queue->queue_name.value));
+
+	pending_list = queue->pending_head.next;
+
+	while (pending_list != &queue->pending_head) {
+		pending = list_entry (pending_list, struct pending_entry, list);
+		pending_list = pending_list->next;
+
+		if ((nodeid == pending->source.nodeid) &&
+		    (conn == pending->source.conn))
+		{
+			list_del (&pending->list);
+			list_init (&pending->list);
+
+			free (pending);
+		}
+	}
+}
+
 static void msg_release_queue_message (
 	struct queue_entry *queue)
 {
@@ -1718,6 +1765,35 @@ static void msg_release_group (
 	global_group_count -= 1;
 
 	free (group);
+
+	return;
+}
+
+static void msg_expire_pending (void *data)
+{
+	struct req_exec_msg_pending_timeout req_exec_msg_pending_timeout;
+	struct iovec iovec;
+
+	struct pending_entry *pending = (struct pending_entry *)data;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_expire_pending { %p }\n", data);
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t queue = %s\n", (char *)(pending->queue_name.value));
+
+	req_exec_msg_pending_timeout.header.size =
+		sizeof (struct req_exec_msg_pending_timeout);
+	req_exec_msg_pending_timeout.header.id =
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_PENDING_TIMEOUT);
+
+	memcpy (&req_exec_msg_pending_timeout.queue_name,
+		&pending->queue_name, sizeof (SaNameT));
+	memcpy (&req_exec_msg_pending_timeout.source,
+		&pending->source, sizeof (mar_message_source_t));
+
+	iovec.iov_base = (char *)&req_exec_msg_pending_timeout;
+	iovec.iov_len = sizeof (struct req_exec_msg_pending_timeout);
+
+	api->totem_mcast (&iovec, 1, TOTEM_AGREED);
 
 	return;
 }
@@ -2143,7 +2219,7 @@ static int msg_sync_process (void)
 		iterate_finish = 1;
 		continue_process = 1;
 
-		if (lowest_nodeid == api->totem_nodeid_get ()) {
+		if (lowest_nodeid == api->totem_nodeid_get()) {
 			TRACE1 ("transmit queues because lowest member in old configuration.\n");
 
 			iterate_result = msg_sync_queue_iterate ();
@@ -2162,7 +2238,7 @@ static int msg_sync_process (void)
 		iterate_finish = 1;
 		continue_process = 1;
 
-		if (lowest_nodeid == api->totem_nodeid_get ()) {
+		if (lowest_nodeid == api->totem_nodeid_get()) {
 			TRACE1 ("transmit groups because lowest member in old configuration.\n");
 
 			iterate_result = msg_sync_group_iterate ();
@@ -2250,6 +2326,8 @@ static int msg_lib_init_fn (void *conn)
 
 	list_init (&msg_pd->queue_list);
 	list_init (&msg_pd->queue_cleanup_list);
+
+	/* msg_pd->pending_queue = NULL; */
 
 	return (0);
 }
@@ -2665,9 +2743,8 @@ static void message_handler_req_exec_msg_queueclose (
 		    (lowest_nodeid == api->totem_nodeid_get()))
 		{
 			api->timer_add_duration (
-				queue->create_attrs.retentionTime,
-				(void *)(queue), msg_expire_queue,
-				&queue->timer_handle);
+				queue->create_attrs.retentionTime, (void *)(queue),
+				msg_expire_queue, &queue->timer_handle);
 		}
 	}
 
@@ -3416,12 +3493,13 @@ static void message_handler_req_exec_msg_messagesend (
 			goto error_exit;
 		}
 
-		list_del (&get->list);
-		list_init (&get->list);
-
 		if (api->ipc_source_is_local (&get->source)) {
+			api->timer_delete (get->timer_handle);
 			msg_deliver_pending_message (get->source.conn, msg);
 		}
+
+		list_del (&get->list);
+		list_init (&get->list);
 
 		free (get);
 	}
@@ -3571,12 +3649,13 @@ static void message_handler_req_exec_msg_messagesendasync (
 			goto error_exit;
 		}
 
-		list_del (&get->list);
-		list_init (&get->list);
-
 		if (api->ipc_source_is_local (&get->source)) {
+			api->timer_delete (get->timer_handle);
 			msg_deliver_pending_message (get->source.conn, msg);
 		}
+
+		list_del (&get->list);
+		list_init (&get->list);
 
 		free (get);
 	}
@@ -3681,10 +3760,17 @@ static void message_handler_req_exec_msg_messageget (
 		memcpy (&get->source,
 			&req_exec_msg_messageget->source,
 			sizeof (mar_message_source_t));
+		memcpy (&get->queue_name,
+			&req_exec_msg_messageget->queue_name,
+			sizeof (SaNameT));
 
 		list_add_tail (&get->list, &queue->pending_head);
 
-		/* start timer */
+		if (api->ipc_source_is_local (&req_exec_msg_messageget->source)) {
+			api->timer_add_duration (
+				req_exec_msg_messageget->timeout, (void *)(get),
+				msg_expire_pending, &get->timer_handle);
+		}
 
 		return;
 	}
@@ -3699,6 +3785,12 @@ static void message_handler_req_exec_msg_messageget (
 
 	queue->priority[msg->message.priority].queue_used -= msg->message.size;
 	queue->priority[msg->message.priority].message_count -= 1;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+		    (char *)(queue->queue_name.value),
+		    (unsigned int)(msg->message.priority),
+		    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_msg_messageget->source))
@@ -4171,6 +4263,48 @@ static void message_handler_req_exec_msg_queue_timeout (
 		    (char *)(queue->queue_name.value));
 
 	msg_release_queue (queue);
+
+	return;
+}
+
+static void message_handler_req_exec_msg_pending_timeout (
+	const void *message,
+	unsigned int nodeid)
+{
+	const struct req_exec_msg_pending_timeout *req_exec_msg_pending_timeout =
+		message;
+	struct queue_entry *queue = NULL;
+
+	struct res_lib_msg_messageget res_lib_msg_messageget;
+	struct iovec iov;
+
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_pending_timeout->queue_name);
+
+	assert (queue != NULL);
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: pending timeout { queue = %s }\n",
+		    (char *)(queue->queue_name.value));
+
+	if (api->ipc_source_is_local (&req_exec_msg_pending_timeout->source))
+	{
+		res_lib_msg_messageget.header.size =
+			sizeof (struct res_lib_msg_messageget);
+		res_lib_msg_messageget.header.id =
+			MESSAGE_RES_MSG_MESSAGEGET;
+		res_lib_msg_messageget.header.error = SA_AIS_ERR_TIMEOUT;
+
+		iov.iov_base = &res_lib_msg_messageget;
+		iov.iov_len = sizeof (struct res_lib_msg_messageget);
+
+		api->ipc_response_iov_send (
+			req_exec_msg_pending_timeout->source.conn, &iov, 1);
+	}
+
+	msg_release_pending (queue,
+		req_exec_msg_pending_timeout->source.nodeid,
+		req_exec_msg_pending_timeout->source.conn);
 
 	return;
 }
