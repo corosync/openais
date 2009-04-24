@@ -3697,6 +3697,7 @@ static void message_handler_req_exec_msg_messageget (
 	list_del (&msg->list);
 	list_del (&msg->queue_list);
 
+	queue->priority[msg->message.priority].queue_used -= msg->message.size;
 	queue->priority[msg->message.priority].message_count -= 1;
 
 error_exit:
