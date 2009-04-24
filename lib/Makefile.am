@@ -33,7 +33,7 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
 AM_CFLAGS		= -fPIC $(coroipcc_CFLAGS) $(corosync_CFLAGS)
-AM_LDFLAGS		=
+AM_LDFLAGS		= -lpthread
 
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
@@ -59,25 +59,25 @@ noinst_HEADERS		= util.h libSaAmf.versions libSaCkpt.versions \
 if BUILD_DARWIN
 
 libSaAmf.so.$(SONAME): util.o amf.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaCkpt.so.$(SONAME): util.o ckpt.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaEvt.so.$(SONAME): util.o evt.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaLck.so.$(SONAME): util.o lck.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaMsg.so.$(SONAME): util.o msg.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaAmf.so.$(SONAME): util.o amf.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaTmr.so.$(SONAME): util.o tmr.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 else
 
@@ -85,7 +85,7 @@ libSaAmf.so.$(SONAME): util.o amf.o
 	$(CC) -shared -o $@ \
 		-Wl,-soname=libSaAmf.so.$(SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaAmf.versions \
-		$^ $(LDFLAGS) $(coroipcc_LIBS)
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaAmf.so.$(SONAME) libSaAmf.so
 	ln -sf libSaAmf.so.$(SONAME) libSaAmf.so.$(SOMAJOR)
 
@@ -93,7 +93,7 @@ libSaCkpt.so.$(SONAME): util.o ckpt.o
 	$(CC) -shared -o $@ \
 		-Wl,-soname=libSaCkpt.so.$(SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaCkpt.versions \
-		$^ $(LDFLAGS) $(coroipcc_LIBS)
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaCkpt.so.$(SONAME) libSaCkpt.so
 	ln -sf libSaCkpt.so.$(SONAME) libSaCkpt.so.$(SOMAJOR)
 
@@ -101,7 +101,7 @@ libSaClm.so.$(SONAME): util.o clm.o
 	$(CC) -shared -o $@ \
 		-Wl,-soname=libSaClm.so.$(SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaClm.versions \
-		$^ $(LDFLAGS) $(coroipcc_LIBS)
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaClm.so.$(SONAME) libSaClm.so
 	ln -sf libSaClm.so.$(SONAME) libSaClm.so.$(SOMAJOR)
 
@@ -109,7 +109,7 @@ libSaEvt.so.$(SONAME): util.o evt.o
 	$(CC) -shared -o $@ \
 		-Wl,-soname=libSaEvt.so.$(SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaEvt.versions \
-		$^ $(LDFLAGS) $(coroipcc_LIBS)
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaEvt.so.$(SONAME) libSaEvt.so
 	ln -sf libSaEvt.so.$(SONAME) libSaEvt.so.$(SOMAJOR)
 
@@ -117,7 +117,7 @@ libSaLck.so.$(SONAME): util.o lck.o
 	$(CC) -shared -o $@ \
 		-Wl,-soname=libSaLck.so.$(SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaLck.versions \
-		$^ $(LDFLAGS) $(coroipcc_LIBS)
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaLck.so.$(SONAME) libSaLck.so
 	ln -sf libSaLck.so.$(SONAME) libSaLck.so.$(SOMAJOR)
 
@@ -125,7 +125,7 @@ libSaMsg.so.$(SONAME): util.o msg.o
 	$(CC) -shared -o $@ \
 		-Wl,-soname=libSaMsg.so.$(SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaMsg.versions \
-		$^ $(LDFLAGS) $(coroipcc_LIBS)
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaMsg.so.$(SONAME) libSaMsg.so
 	ln -sf libSaMsg.so.$(SONAME) libSaMsg.so.$(SOMAJOR)
 
@@ -133,7 +133,7 @@ libSaTmr.so.$(SONAME): util.o tmr.o
 	$(CC) $(LDFLAGS) -shared -o $@ \
 		-Wl,-soname=libSaTmr.so.$(SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaTmr.versions \
-		$^ $(LDFLAGS) $(coroipcc_LIBS)
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaTmr.so.$(SONAME) libSaTmr.so
 	ln -sf libSaTmr.so.$(SONAME) libSaTmr.so.$(SOMAJOR)
 
