@@ -32,7 +32,7 @@
 
 MAINTAINERCLEANFILES    = Makefile.in
 
-AM_CFLAGS		= -fPIC $(coroipcc_CFLAGS)
+AM_CFLAGS		= -fPIC $(coroipcc_CFLAGS) $(corosync_CFLAGS)
 AM_LDFLAGS		=
 
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
