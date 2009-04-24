@@ -2418,7 +2418,7 @@ static void lib_evt_close_channel(void *conn, const void *message)
 	 * look up the channel handle
 	 */
 	ret = hdb_handle_get(&esip->esi_hdb,
-					req->icc_channel_handle, &ptr);
+					hdb_nocheck_convert(req->icc_channel_handle), &ptr);
 	if (ret != 0) {
 		goto chan_close_done;
 	}
@@ -2426,8 +2426,8 @@ static void lib_evt_close_channel(void *conn, const void *message)
 
 printf ("close1\n");
 	common_chan_close(eco, esip, conn);
-	hdb_handle_destroy(&esip->esi_hdb, req->icc_channel_handle);
-	hdb_handle_put(&esip->esi_hdb, req->icc_channel_handle);
+	hdb_handle_destroy(&esip->esi_hdb, hdb_nocheck_convert(req->icc_channel_handle));
+	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->icc_channel_handle));
 
 chan_close_done:
 	res.icc_head.size = sizeof(res);
@@ -2553,7 +2553,7 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 	/*
 	 * look up the channel handle
 	 */
-	ret = hdb_handle_get(&esip->esi_hdb, req->ics_channel_handle, &ptr);
+	ret = hdb_handle_get(&esip->esi_hdb, hdb_nocheck_convert(req->ics_channel_handle), &ptr);
 	if (ret != 0) {
 		error = SA_AIS_ERR_BAD_HANDLE;
 		goto subr_done;
@@ -2629,11 +2629,11 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 			}
 		}
 	}
-	hdb_handle_put(&esip->esi_hdb, req->ics_channel_handle);
+	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->ics_channel_handle));
 	return;
 
 subr_put:
-	hdb_handle_put(&esip->esi_hdb, req->ics_channel_handle);
+	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->ics_channel_handle));
 subr_done:
 	res.ics_head.size = sizeof(res);
 	res.ics_head.id = MESSAGE_RES_EVT_SUBSCRIBE;
@@ -2668,7 +2668,7 @@ static void lib_evt_event_unsubscribe(void *conn, const void *message)
 	 * data.
 	 */
 	ret = hdb_handle_get(&esip->esi_hdb,
-						req->icu_channel_handle, &ptr);
+						hdb_nocheck_convert(req->icu_channel_handle), &ptr);
 	if (ret != 0) {
 		error = SA_AIS_ERR_BAD_HANDLE;
 		goto unsubr_done;
@@ -2698,7 +2698,7 @@ static void lib_evt_event_unsubscribe(void *conn, const void *message)
 	free(ecs);
 
 unsubr_put:
-	hdb_handle_put(&esip->esi_hdb, req->icu_channel_handle);
+	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->icu_channel_handle));
 unsubr_done:
 	res.icu_head.size = sizeof(res);
 	res.icu_head.id = MESSAGE_RES_EVT_UNSUBSCRIBE;
@@ -2734,7 +2734,7 @@ static void lib_evt_event_publish(void *conn, void *message)
 	 * look up and validate open channel info
 	 */
 	ret = hdb_handle_get(&esip->esi_hdb,
-				    req->led_svr_channel_handle, &ptr);
+				    hdb_nocheck_convert(req->led_svr_channel_handle), &ptr);
 	if (ret != 0) {
 		error = SA_AIS_ERR_BAD_HANDLE;
 		goto pub_done;
@@ -2766,7 +2766,7 @@ static void lib_evt_event_publish(void *conn, void *message)
 			error = SA_AIS_ERR_LIBRARY;
 	}
 
-	hdb_handle_put(&esip->esi_hdb, req->led_svr_channel_handle);
+	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->led_svr_channel_handle));
 pub_done:
 	res.iep_head.size = sizeof(res);
 	res.iep_head.id = MESSAGE_RES_EVT_PUBLISH;
@@ -3055,7 +3055,7 @@ printf ("lib_exit (%p)\n", conn);
 printf ("close2\n");
 		common_chan_close(eco, esip, conn);
 printf ("handle destroy %p %d\n", &esip->esi_hdb, eco->eco_my_handle);
-		hdb_handle_destroy(&esip->esi_hdb, eco->eco_my_handle);
+		hdb_handle_destroy(&esip->esi_hdb, hdb_nocheck_convert(eco->eco_my_handle));
 	}
 
 	/*
