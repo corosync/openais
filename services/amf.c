@@ -246,86 +246,58 @@ static struct corosync_lib_handler amf_lib_engine[] =
 {
 	{ /* 0 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componentregister,
-		.response_size		= sizeof (struct res_lib_amf_componentregister),
-		.response_id		= MESSAGE_RES_AMF_COMPONENTREGISTER,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 1 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componentunregister,
-		.response_size		= sizeof (struct res_lib_amf_componentunregister),
-		.response_id		= MESSAGE_RES_AMF_COMPONENTUNREGISTER,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 2 */
 		.lib_handler_fn		= message_handler_req_lib_amf_pmstart,
-		.response_size		= sizeof (struct res_lib_amf_pmstart),
-		.response_id		= MESSAGE_RES_AMF_PMSTART,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 3 */
 		.lib_handler_fn		= message_handler_req_lib_amf_pmstop,
-		.response_size		= sizeof (struct res_lib_amf_pmstop),
-		.response_id		= MESSAGE_RES_AMF_PMSTOP,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 4 */
 		.lib_handler_fn		= message_handler_req_lib_amf_healthcheckstart,
-		.response_size		= sizeof (struct res_lib_amf_healthcheckstart),
-		.response_id		= MESSAGE_RES_AMF_HEALTHCHECKSTART,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 5 */
 		.lib_handler_fn		= message_handler_req_lib_amf_healthcheckconfirm,
-		.response_size		= sizeof (struct res_lib_amf_healthcheckconfirm),
-		.response_id		= MESSAGE_RES_AMF_HEALTHCHECKCONFIRM,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 6 */
 		.lib_handler_fn		= message_handler_req_lib_amf_healthcheckstop,
-		.response_size		= sizeof (struct res_lib_amf_healthcheckstop),
-		.response_id		= MESSAGE_RES_AMF_HEALTHCHECKSTOP,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 7 */
 		.lib_handler_fn		= message_handler_req_lib_amf_hastateget,
-		.response_size		= sizeof (struct res_lib_amf_hastateget),
-		.response_id		= MESSAGE_RES_AMF_HASTATEGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 8 */
 		.lib_handler_fn		= message_handler_req_lib_amf_csiquiescingcomplete,
-		.response_size		= sizeof (struct res_lib_amf_csiquiescingcomplete),
-		.response_id		= MESSAGE_RES_AMF_CSIQUIESCINGCOMPLETE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 9 */
 		.lib_handler_fn		= message_handler_req_lib_amf_protectiongrouptrack,
-		.response_size		= sizeof (struct res_lib_amf_protectiongrouptrack),
-		.response_id		= MESSAGE_RES_AMF_PROTECTIONGROUPTRACK,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 10 */
 		.lib_handler_fn		= message_handler_req_lib_amf_protectiongrouptrackstop,
-		.response_size		= sizeof (struct res_lib_amf_protectiongrouptrackstop),
-		.response_id		= MESSAGE_RES_AMF_PROTECTIONGROUPTRACKSTOP,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 11 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componenterrorreport,
-		.response_size		= sizeof (struct res_lib_amf_componenterrorreport),
-		.response_id		= MESSAGE_RES_AMF_COMPONENTERRORREPORT,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 12 */
 		.lib_handler_fn		= message_handler_req_lib_amf_componenterrorclear,
-		.response_size		= sizeof (struct res_lib_amf_componenterrorclear),
-		.response_id		= MESSAGE_RES_AMF_COMPONENTERRORCLEAR,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 13 */
 		.lib_handler_fn		= message_handler_req_lib_amf_response,
-		.response_size		= sizeof (struct res_lib_amf_response),
-		.response_id		= MESSAGE_RES_AMF_RESPONSE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 };

@@ -145,56 +145,38 @@ static hdb_handle_t clm_services_api_handle;
 static struct corosync_lib_handler evt_lib_engine[] = {
 	{
 	.lib_handler_fn =		lib_evt_open_channel,
-	.response_size =		sizeof(struct res_evt_channel_open),
-	.response_id =			MESSAGE_RES_EVT_OPEN_CHANNEL,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_open_channel_async,
-	.response_size =		sizeof(struct res_evt_channel_open),
-	.response_id =			MESSAGE_RES_EVT_OPEN_CHANNEL,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_close_channel,
-	.response_size =		sizeof(struct res_evt_channel_close),
-	.response_id =			MESSAGE_RES_EVT_CLOSE_CHANNEL,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_unlink_channel,
-	.response_size =		sizeof(struct res_evt_channel_unlink),
-	.response_id =			MESSAGE_RES_EVT_UNLINK_CHANNEL,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_event_subscribe,
-	.response_size =		sizeof(struct res_evt_event_subscribe),
-	.response_id =			MESSAGE_RES_EVT_SUBSCRIBE,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_event_unsubscribe,
-	.response_size =		sizeof(struct res_evt_event_unsubscribe),
-	.response_id =			MESSAGE_RES_EVT_UNSUBSCRIBE,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_event_publish,
-	.response_size =		sizeof(struct res_evt_event_publish),
-	.response_id =			MESSAGE_RES_EVT_PUBLISH,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_event_clear_retentiontime,
-	.response_size =		sizeof(struct res_evt_event_clear_retentiontime),
-	.response_id =			MESSAGE_RES_EVT_CLEAR_RETENTIONTIME,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 	.lib_handler_fn =		lib_evt_event_data_get,
-	.response_size =		sizeof(struct lib_event_data),
-	.response_id =			MESSAGE_RES_EVT_EVENT_DATA,
 	.flow_control =			COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 };

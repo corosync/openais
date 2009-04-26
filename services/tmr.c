@@ -130,50 +130,34 @@ static struct corosync_lib_handler tmr_lib_engine[] =
 {
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_timerstart,
-		.response_size		= sizeof (struct req_lib_tmr_timerstart),
-		.response_id		= MESSAGE_RES_TMR_TIMERSTART,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_timerreschedule,
-		.response_size		= sizeof (struct req_lib_tmr_timerreschedule),
-		.response_id		= MESSAGE_RES_TMR_TIMERRESCHEDULE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_timercancel,
-		.response_size		= sizeof (struct req_lib_tmr_timercancel),
-		.response_id		= MESSAGE_RES_TMR_TIMERCANCEL,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_periodictimerskip,
-		.response_size		= sizeof (struct req_lib_tmr_periodictimerskip),
-		.response_id		= MESSAGE_RES_TMR_PERIODICTIMERSKIP,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_timerremainingtimeget,
-		.response_size		= sizeof (struct req_lib_tmr_timerremainingtimeget),
-		.response_id		= MESSAGE_RES_TMR_TIMERREMAININGTIMEGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_timerattributesget,
-		.response_size		= sizeof (struct req_lib_tmr_timerattributesget),
-		.response_id		= MESSAGE_RES_TMR_TIMERATTRIBUTESGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_timeget,
-		.response_size		= sizeof (struct req_lib_tmr_timeget),
-		.response_id		= MESSAGE_RES_TMR_TIMEGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_tmr_clocktickget,
-		.response_size		= sizeof (struct req_lib_tmr_clocktickget),
-		.response_id		= MESSAGE_RES_TMR_CLOCKTICKGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 };

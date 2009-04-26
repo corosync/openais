@@ -271,50 +271,34 @@ static struct corosync_lib_handler lck_lib_engine[] =
 {
 	{ /* 0 */
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceopen,
-		.response_size		= sizeof (struct res_lib_lck_resourceopen),
-		.response_id		= MESSAGE_RES_LCK_RESOURCEOPEN,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 1 */
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceopenasync,
-		.response_size		= sizeof (struct res_lib_lck_resourceopenasync),
-		.response_id		= MESSAGE_RES_LCK_RESOURCEOPENASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 2 */
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceclose,
-		.response_size		= sizeof (struct res_lib_lck_resourceclose),
-		.response_id		= MESSAGE_RES_LCK_RESOURCECLOSE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 3 */
 		.lib_handler_fn		= message_handler_req_lib_lck_resourcelock,
-		.response_size		= sizeof (struct res_lib_lck_resourcelock),
-		.response_id		= MESSAGE_RES_LCK_RESOURCELOCK,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 4 */
 		.lib_handler_fn		= message_handler_req_lib_lck_resourcelockasync,
-		.response_size		= sizeof (struct res_lib_lck_resourcelockasync),
-		.response_id		= MESSAGE_RES_LCK_RESOURCELOCKASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 5 */
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceunlock,
-		.response_size		= sizeof (struct res_lib_lck_resourceunlock),
-		.response_id		= MESSAGE_RES_LCK_RESOURCELOCK,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 6 */
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceunlockasync,
-		.response_size		= sizeof (struct res_lib_lck_resourceunlock),
-		.response_id		= MESSAGE_RES_LCK_RESOURCEUNLOCKASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 7 */
 		.lib_handler_fn		= message_handler_req_lib_lck_lockpurge,
-		.response_size		= sizeof (struct res_lib_lck_lockpurge),
-		.response_id		= MESSAGE_RES_LCK_LOCKPURGE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	}
 };

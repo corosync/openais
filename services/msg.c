@@ -496,152 +496,102 @@ struct corosync_lib_handler msg_lib_engine[] =
 {
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueopen,
-		.response_size		= sizeof (struct res_lib_msg_queueopen),
-		.response_id		= MESSAGE_RES_MSG_QUEUEOPEN,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueopenasync,
-		.response_size		= sizeof (struct res_lib_msg_queueopenasync),
-		.response_id		= MESSAGE_RES_MSG_QUEUEOPENASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueclose,
-		.response_size		= sizeof (struct res_lib_msg_queueclose),
-		.response_id		= MESSAGE_RES_MSG_QUEUECLOSE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuestatusget,
-		.response_size		= sizeof (struct res_lib_msg_queuestatusget),
-		.response_id		= MESSAGE_RES_MSG_QUEUESTATUSGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueretentiontimeset,
-		.response_size		= sizeof (struct res_lib_msg_queueretentiontimeset),
-		.response_id		= MESSAGE_RES_MSG_QUEUERETENTIONTIMESET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queueunlink,
-		.response_size		= sizeof (struct res_lib_msg_queueunlink),
-		.response_id		= MESSAGE_RES_MSG_QUEUEUNLINK,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupcreate,
-		.response_size		= sizeof (struct res_lib_msg_queuegroupcreate),
-		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPCREATE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupinsert,
-		.response_size		= sizeof (struct res_lib_msg_queuegroupinsert),
-		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPINSERT,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupremove,
-		.response_size		= sizeof (struct res_lib_msg_queuegroupremove),
-		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPREMOVE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupdelete,
-		.response_size		= sizeof (struct res_lib_msg_queuegroupdelete),
-		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPDELETE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegrouptrack,
-		.response_size		= sizeof (struct res_lib_msg_queuegrouptrack),
-		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPTRACK,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegrouptrackstop,
-		.response_size		= sizeof (struct res_lib_msg_queuegrouptrackstop),
-		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPTRACKSTOP,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuegroupnotificationfree,
-		.response_size		= sizeof (struct res_lib_msg_queuegroupnotificationfree),
-		.response_id		= MESSAGE_RES_MSG_QUEUEGROUPNOTIFICATIONFREE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagesend,
-		.response_size		= sizeof (struct res_lib_msg_messagesend),
-		.response_id		= MESSAGE_RES_MSG_MESSAGESEND,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagesendasync,
-		.response_size		= sizeof (struct res_lib_msg_messagesendasync),
-		.response_id		= MESSAGE_RES_MSG_MESSAGESENDASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messageget,
-		.response_size		= sizeof (struct res_lib_msg_messageget),
-		.response_id		= MESSAGE_RES_MSG_MESSAGEGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagedatafree,
-		.response_size		= sizeof (struct res_lib_msg_messagedatafree),
-		.response_id		= MESSAGE_RES_MSG_MESSAGEDATAFREE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagecancel,
-		.response_size		= sizeof (struct res_lib_msg_messagecancel),
-		.response_id		= MESSAGE_RES_MSG_MESSAGECANCEL,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagesendreceive,
-		.response_size		= sizeof (struct res_lib_msg_messagesendreceive),
-		.response_id		= MESSAGE_RES_MSG_MESSAGESENDRECEIVE,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagereply,
-		.response_size		= sizeof (struct res_lib_msg_messagereply),
-		.response_id		= MESSAGE_RES_MSG_MESSAGEREPLY,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_messagereplyasync,
-		.response_size		= sizeof (struct res_lib_msg_messagereplyasync),
-		.response_id		= MESSAGE_RES_MSG_MESSAGEREPLYASYNC,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuecapacitythresholdset,
-		.response_size		= sizeof (struct res_lib_msg_queuecapacitythresholdset),
-		.response_id		= MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDSET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_queuecapacitythresholdget,
-		.response_size		= sizeof (struct res_lib_msg_queuecapacitythresholdget),
-		.response_id		= MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_metadatasizeget,
-		.response_size		= sizeof (struct res_lib_msg_metadatasizeget),
-		.response_id		= MESSAGE_RES_MSG_METADATASIZEGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{
 		.lib_handler_fn		= message_handler_req_lib_msg_limitget,
-		.response_size		= sizeof (struct res_lib_msg_limitget),
-		.response_id		= MESSAGE_RES_MSG_LIMITGET,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 };

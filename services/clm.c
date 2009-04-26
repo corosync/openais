@@ -176,26 +176,18 @@ static struct corosync_lib_handler clm_lib_engine[] =
 {
 	{ /* 0 */
 		.lib_handler_fn				= message_handler_req_lib_clm_clustertrack,
-		.response_size				= sizeof (struct res_lib_clm_clustertrack),
-		.response_id				= MESSAGE_RES_CLM_TRACKSTART, // TODO RESPONSE
 		.flow_control				= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 1 */
 		.lib_handler_fn				= message_handler_req_lib_clm_trackstop,
-		.response_size				= sizeof (struct res_lib_clm_trackstop),
-		.response_id				= MESSAGE_RES_CLM_TRACKSTOP, // TODO RESPONSE
 		.flow_control				= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 2 */
 		.lib_handler_fn				= message_handler_req_lib_clm_nodeget,
-		.response_size				= sizeof (struct res_clm_nodeget),
-		.response_id				= MESSAGE_RES_CLM_NODEGET, // TODO RESPONSE
 		.flow_control				= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	},
 	{ /* 3 */
 		.lib_handler_fn				= message_handler_req_lib_clm_nodegetasync,
-		.response_size				= sizeof (struct res_clm_nodegetasync),
-		.response_id				= MESSAGE_RES_CLM_NODEGETCALLBACK, // TODO RESPONSE
 		.flow_control				= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
 	}
 };
