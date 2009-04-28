@@ -4302,7 +4302,10 @@ static void message_handler_req_exec_msg_sync_queue (
 		sizeof (SaMsgQueueCreationAttributesT));
 
 	queue->queue_id = req_exec_msg_sync_queue->queue_id;
+	queue->close_time = req_exec_msg_sync_queue->close_time;
+	queue->unlink_flag = req_exec_msg_sync_queue->unlink_flag;
 	queue->open_flags = req_exec_msg_sync_queue->open_flags;
+	queue->change_flag = req_exec_msg_sync_queue->change_flag;
 
 	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 		queue->priority[i].queue_size = queue->create_attrs.size[i];
