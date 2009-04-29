@@ -2317,7 +2317,7 @@ static int msg_exec_init_fn (struct corosync_api_v1 *corosync_api)
 
 static int msg_lib_init_fn (void *conn)
 {
-	struct msg_pd *msg_pd = (struct msg_pd *)(api->ipc_private_data_get (conn));
+	struct msg_pd *msg_pd = (struct msg_pd *)(api->ipc_private_data_get(conn));
 
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_lib_init_fn\n");
@@ -2325,19 +2325,18 @@ static int msg_lib_init_fn (void *conn)
 	list_init (&msg_pd->queue_list);
 	list_init (&msg_pd->queue_cleanup_list);
 
-	/* msg_pd->pending_queue = NULL; */
-
 	return (0);
 }
 
 static int msg_lib_exit_fn (void *conn)
 {
 	struct queue_cleanup *cleanup;
-	struct group_track *track;
 	struct list_head *cleanup_list;
+
+	struct group_track *track;
 	struct list_head *track_list;
 
-	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get(conn);
+	struct msg_pd *msg_pd = (struct msg_pd *)(api->ipc_private_data_get(conn));
 
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_lib_exit_fn\n");
@@ -2348,9 +2347,9 @@ static int msg_lib_exit_fn (void *conn)
 
 	cleanup_list = msg_pd->queue_cleanup_list.next;
 
-	while (!list_empty (&msg_pd->queue_cleanup_list))
-	{
+	while (!list_empty (&msg_pd->queue_cleanup_list)) {
 		cleanup = list_entry (cleanup_list, struct queue_cleanup, list);
+		cleanup_list = cleanup_list->next;
 
 		/* DEBUG */
 		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: cleanup queue=%s id=%u handle=0x%04x\n",
@@ -2358,29 +2357,27 @@ static int msg_lib_exit_fn (void *conn)
 			    (unsigned int)(cleanup->queue_id),
 			    (unsigned int)(cleanup->queue_handle));
 
+		/*
+		 * Send MESSAGE_REQ_EXEC_MSG_QUEUECLOSE request to all nodes
+		 * in order to update the refcount for this queue.
+		 */
 		msg_close_queue (&cleanup->queue_name, cleanup->queue_id);
 
 		list_del (&cleanup->list);
-		list_init (&cleanup->list);
-
 		free (cleanup);
-
-		cleanup_list = msg_pd->queue_cleanup_list.next;
 	}
 
-	for (track_list = track_list_head.next;
-	     track_list != &track_list_head;
-	     track_list = track_list->next)
-	{
+	track_list = track_list_head.next;
+
+	while (track_list != &track_list_head) {
 		track = list_entry (track_list, struct group_track, list);
+		track_list = track_list->next;
 
 		/* DEBUG */
 		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: cleanup track conn=0x%p group=%s\n",
 			    (void *)(track->conn), (char *)(track->group_name.value));
 
 		list_del (&track->list);
-		/* list_init (&track->list); */
-
 		free (track);
 	}
 
