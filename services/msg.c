@@ -1061,7 +1061,7 @@ static void msg_confchg_fn (
 {
 	unsigned int i;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_confchg_fn\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_confchg_fn\n");
 
 	memcpy (&saved_ring_id, ring_id,
 		sizeof (struct memb_ring_id));
@@ -1113,7 +1113,7 @@ static void msg_print_queue_cleanup_list (
 		cleanup = list_entry (list, struct queue_cleanup, list);
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: cleanup queue=%s id=%u handle=0x%04x\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: cleanup queue=%s id=%u handle=0x%04x\n",
 			    (char *)(cleanup->queue_name.value),
 			    (unsigned int)(cleanup->queue_id),
 			    (unsigned int)(cleanup->queue_handle));
@@ -1134,7 +1134,7 @@ static void msg_print_queue_priority_list (
 		msg = list_entry (list, struct message_entry, list);
 
 		/* DEBUG */
-		/* log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t message = %s\n",
+		/* log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t message = %s\n",
 		   (char *)(msg->message.data)); */
 	}
 	return;
@@ -1153,7 +1153,7 @@ static void msg_print_queue_message_list (
 		msg = list_entry (list, struct message_entry, queue_list);
 
 		/* DEBUG */
-		/* log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t message = %s\n",
+		/* log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t message = %s\n",
 		   (char *)(msg->message.data)); */
 	}
 	return;
@@ -1172,7 +1172,7 @@ static void msg_print_group_member_list (
 		queue = list_entry (list, struct queue_entry, group_list);
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t queue = %s\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t queue = %s\n",
 			    (char *)(queue->queue_name.value));
 	}
 	return;
@@ -1192,7 +1192,7 @@ static void msg_print_queue_list (
 		queue = list_entry (list, struct queue_entry, queue_list);
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: queue = %s (refcount=%u)\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: queue = %s (refcount=%u)\n",
 			    (char *)(queue->queue_name.value),
 			    (unsigned int)(queue->refcount));
 
@@ -1200,7 +1200,7 @@ static void msg_print_queue_list (
 
 		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 			/* DEBUG */
-			log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t priority = %d ( %u )\n",
+			log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t priority = %d ( %u )\n",
 				    i, (unsigned int)(queue->priority[i].message_count));
 
 			msg_print_queue_priority_list (&queue->priority[i].message_head);
@@ -1222,7 +1222,7 @@ static void msg_print_group_list (
 		group = list_entry (list, struct group_entry, group_list);
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: group = %s\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: group = %s\n",
 			    (char *)(group->group_name.value));
 
 		msg_print_group_member_list (&group->queue_head);
@@ -1534,7 +1534,7 @@ static void msg_release_pending (
 	struct list_head *pending_list;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg_release_pending ( %s )\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_release_pending ( %s )\n",
 		    (char *)(queue->queue_name.value));
 
 	pending_list = queue->pending_head.next;
@@ -1562,7 +1562,7 @@ static void msg_release_queue_message (
 	int i;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg_release_queue_message ( %s )\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_release_queue_message ( %s )\n",
 		    (char *)(queue->queue_name.value));
 
 	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
@@ -1573,7 +1573,7 @@ static void msg_release_queue_message (
 			msg = list_entry (list, struct message_entry, list);
 
 			/* DEBUG */
-			log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg = %s ( %d )\n",
+			log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg = %s ( %d )\n",
 				    (char *)(msg->message.data), (int)(i));
 
 			list_del (&msg->list);
@@ -1603,7 +1603,7 @@ static void msg_release_queue_cleanup (
 	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get (conn);
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg_release_queue_cleanup ( %s )\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_release_queue_cleanup ( %s )\n",
 		    (char *)(queue_name->value));
 
 	for (list = msg_pd->queue_cleanup_list.next;
@@ -1631,7 +1631,7 @@ static void msg_release_queue (
 	int i;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg_release_queue ( %s )\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_release_queue ( %s )\n",
 		    (char *)(queue->queue_name.value));
 
 	list_del (&queue->queue_list);
@@ -1681,7 +1681,7 @@ static void msg_release_group (
 	struct group_track *track;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t msg_release_group ( %s )\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_release_group ( %s )\n",
 		    (char *)(group->group_name.value));
 
 	queue_list = group->queue_head.next;
@@ -1727,8 +1727,8 @@ static void msg_expire_pending (void *data)
 	struct pending_entry *pending = (struct pending_entry *)data;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_expire_pending { %p }\n", data);
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t queue = %s\n", (char *)(pending->queue_name.value));
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_expire_pending { %p }\n", data);
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t queue = %s\n", (char *)(pending->queue_name.value));
 
 	req_exec_msg_pending_timeout.header.size =
 		sizeof (struct req_exec_msg_pending_timeout);
@@ -1778,7 +1778,7 @@ static inline void msg_sync_queue_timer (
 	struct list_head *list;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_timer\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_timer\n");
 
 	list = queue_head->next;
 
@@ -1804,7 +1804,7 @@ static inline void msg_sync_queue_free (
 	struct list_head *list;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_free\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_free\n");
 
 	list = queue_head->next;
 
@@ -1825,7 +1825,7 @@ static inline void msg_sync_group_free (
 	struct list_head *list;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_free\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_group_free\n");
 
 	list = group_head->next;
 
@@ -1846,7 +1846,7 @@ static int msg_sync_queue_transmit (
 	struct iovec iov;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_transmit { queue=%s id=%u }\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_transmit { queue=%s id=%u }\n",
 		    (char *)(queue->queue_name.value),
 		    (unsigned int)(queue->queue_id));
 
@@ -1885,7 +1885,7 @@ static int msg_sync_queue_message_transmit (
 	struct iovec iov[2];
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_message_transmit { queue=%s id=%u}\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_message_transmit { queue=%s id=%u}\n",
 		    (char *)(queue->queue_name.value),
 		    (unsigned int)(queue->queue_id));
 
@@ -1925,7 +1925,7 @@ static int msg_sync_queue_refcount_transmit (
 	int i;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_refcount_transmit { queue=%s id=%u }\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_refcount_transmit { queue=%s id=%u }\n",
 		    (char *)(queue->queue_name.value),
 		    (unsigned int)(queue->queue_id));
 
@@ -1964,7 +1964,7 @@ static int msg_sync_group_transmit (
 	struct iovec iov;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_transmit { group=%s }\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_group_transmit { group=%s }\n",
 		    (char *)(group->group_name.value));
 
 	memset (&req_exec_msg_sync_group, 0,
@@ -1996,7 +1996,7 @@ static int msg_sync_group_member_transmit (
 	struct iovec iov;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_member_transmit { group=%s queue=%s }\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_group_member_transmit { group=%s queue=%s }\n",
 		    (char *)(group->group_name.value),
 		    (char *)(queue->queue_name.value));
 
@@ -2034,7 +2034,7 @@ static int msg_sync_queue_iterate (void)
 	int result;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_iterate\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_iterate\n");
 
 	for (queue_list = msg_sync_iteration_queue;
 	     queue_list != &queue_list_head;
@@ -2105,7 +2105,7 @@ static int msg_sync_group_iterate (void)
 	int result;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_iterate\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_group_iterate\n");
 
 	for (group_list = msg_sync_iteration_group;
 	     group_list != &group_list_head;
@@ -2151,7 +2151,7 @@ static void msg_sync_queue_enter (void)
 	struct queue_entry *queue;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_enter\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_enter\n");
 
 	queue = list_entry (queue_list_head.next, struct queue_entry, queue_list);
 
@@ -2167,7 +2167,7 @@ static void msg_sync_group_enter (void)
 	struct group_entry *group;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_group_enter\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_group_enter\n");
 
 	group = list_entry (group_list_head.next, struct group_entry, group_list);
 
@@ -2181,7 +2181,7 @@ static void msg_sync_group_enter (void)
 static void msg_sync_init (void)
 {
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_init\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_init\n");
 
 	msg_sync_queue_enter ();
 
@@ -2199,7 +2199,7 @@ static int msg_sync_process (void)
 	int iterate_finish;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_process\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_process\n");
 
 	switch (msg_sync_state)
 	{
@@ -2248,7 +2248,7 @@ static int msg_sync_process (void)
 static void msg_sync_activate (void)
 {
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_activate\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_activate\n");
 
 	msg_sync_queue_free (&queue_list_head);
 	msg_sync_group_free (&group_list_head);
@@ -2283,7 +2283,7 @@ static void msg_sync_activate (void)
 static void msg_sync_abort (void)
 {
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_abort\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_abort\n");
 
 	msg_sync_queue_free (&sync_queue_list_head);
 	msg_sync_group_free (&sync_group_list_head);
@@ -2297,7 +2297,7 @@ static void msg_sync_abort (void)
 static void msg_exec_dump_fn (void)
 {
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_exec_dump_fn\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_exec_dump_fn\n");
 
 	return;
 }
@@ -2305,7 +2305,7 @@ static void msg_exec_dump_fn (void)
 static int msg_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_exec_init_fn\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_exec_init_fn\n");
 
 	api = corosync_api;
 
@@ -2317,7 +2317,7 @@ static int msg_lib_init_fn (void *conn)
 	struct msg_pd *msg_pd = (struct msg_pd *)(api->ipc_private_data_get (conn));
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_lib_init_fn\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_lib_init_fn\n");
 
 	list_init (&msg_pd->queue_list);
 	list_init (&msg_pd->queue_cleanup_list);
@@ -2337,7 +2337,7 @@ static int msg_lib_exit_fn (void *conn)
 	struct msg_pd *msg_pd = (struct msg_pd *)api->ipc_private_data_get(conn);
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_lib_exit_fn\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_lib_exit_fn\n");
 
 	/* DEBUG */
 	/* msg_print_queue_list (&queue_list_head);
@@ -2350,7 +2350,7 @@ static int msg_lib_exit_fn (void *conn)
 		cleanup = list_entry (cleanup_list, struct queue_cleanup, list);
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: cleanup queue=%s id=%u handle=0x%04x\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: cleanup queue=%s id=%u handle=0x%04x\n",
 			    (char *)(cleanup->queue_name.value),
 			    (unsigned int)(cleanup->queue_id),
 			    (unsigned int)(cleanup->queue_handle));
@@ -2372,7 +2372,7 @@ static int msg_lib_exit_fn (void *conn)
 		track = list_entry (track_list, struct group_track, list);
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: cleanup track conn=0x%p group=%s\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: cleanup track conn=0x%p group=%s\n",
 			    (void *)(track->conn), (char *)(track->group_name.value));
 
 		list_del (&track->list);
@@ -2399,12 +2399,12 @@ static void message_handler_req_exec_msg_queueopen (
 
 	int i;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueOpen\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueOpen\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t handle = 0x%04x\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t handle = 0x%04x\n",
 		    (unsigned int)(req_exec_msg_queueopen->queue_handle));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queueopen->queue_name.value));
 
 	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
@@ -2479,7 +2479,7 @@ static void message_handler_req_exec_msg_queueopen (
 		}
 		if (req_exec_msg_queueopen->open_flags & SA_MSG_QUEUE_EMPTY) {
 			/* DEBUG */
-			log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t empty queue = %s\n",
+			log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t empty queue = %s\n",
 				    (char *)(req_exec_msg_queueopen->queue_name.value));
 
 			/*
@@ -2498,7 +2498,7 @@ static void message_handler_req_exec_msg_queueopen (
 	msg_sync_refcount_calculate (queue);
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t refcount = %u\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t refcount = %u\n",
 		    (unsigned int)(queue->refcount));
 
 error_exit:
@@ -2546,12 +2546,12 @@ static void message_handler_req_exec_msg_queueopenasync (
 
 	int i;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueOpenAsync\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueOpenAsync\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t handle = 0x%04x\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t handle = 0x%04x\n",
 		    (unsigned int)(req_exec_msg_queueopenasync->queue_handle));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queueopenasync->queue_name.value));
 
 	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
@@ -2626,7 +2626,7 @@ static void message_handler_req_exec_msg_queueopenasync (
 		}
 		if (req_exec_msg_queueopenasync->open_flags & SA_MSG_QUEUE_EMPTY) {
 			/* DEBUG */
-			log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t empty queue = %s\n",
+			log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t empty queue = %s\n",
 				    (char *)(req_exec_msg_queueopenasync->queue_name.value));
 
 			/*
@@ -2645,7 +2645,7 @@ static void message_handler_req_exec_msg_queueopenasync (
 	msg_sync_refcount_calculate (queue);
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t refcount = %u\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t refcount = %u\n",
 		    (unsigned int)(queue->refcount));
 
 error_exit:
@@ -2703,10 +2703,10 @@ static void message_handler_req_exec_msg_queueclose (
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueClose\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueClose\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(req_exec_msg_queueclose->queue_name.value),
 		    (unsigned int)(req_exec_msg_queueclose->queue_id));
 
@@ -2721,7 +2721,7 @@ static void message_handler_req_exec_msg_queueclose (
 	msg_sync_refcount_calculate (queue);
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t refcount = %u\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t refcount = %u\n",
 		    (unsigned int)(queue->refcount));
 
 	if (queue->refcount == 0)
@@ -2771,10 +2771,10 @@ static void message_handler_req_exec_msg_queuestatusget (
 
 	int i;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueStatusGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueStatusGet\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queuestatusget->queue_name.value));
 
 	queue = msg_find_queue (&queue_list_head,
@@ -2801,9 +2801,9 @@ static void message_handler_req_exec_msg_queuestatusget (
 	}
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t close_time = %llu\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t close_time = %llu\n",
 		    (unsigned long long)(queue->close_time));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t retention_time = %llu\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t retention_time = %llu\n",
 		    (unsigned long long)(queue->create_attrs.retentionTime));
 
 error_exit:
@@ -2832,10 +2832,10 @@ static void message_handler_req_exec_msg_queueretentiontimeset (
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueRetentionTimeSet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueRetentionTimeSet\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(req_exec_msg_queueretentiontimeset->queue_name.value),
 		    (unsigned int)(req_exec_msg_queueretentiontimeset->queue_id));
 
@@ -2887,10 +2887,10 @@ static void message_handler_req_exec_msg_queueunlink (
 	SaAisErrorT error = SA_AIS_OK;
 	struct queue_entry *queue = NULL;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueUnlink\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueUnlink\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queueunlink->queue_name.value));
 
 	queue = msg_find_queue (&queue_list_head,
@@ -2934,10 +2934,10 @@ static void message_handler_req_exec_msg_queuegroupcreate (
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupCreate\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueGroupCreate\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t group = %s\n",
 		    (char *)(req_exec_msg_queuegroupcreate->group_name.value));
 
 	if ((global_group_count + 1) > MAX_NUM_QUEUE_GROUPS) {
@@ -3005,12 +3005,12 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 	struct iovec iov[2];
 	unsigned int count = 0;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupInsert\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueGroupInsert\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t group = %s\n",
 		    (char *)(req_exec_msg_queuegroupinsert->group_name.value));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queuegroupinsert->queue_name.value));
 
 	group = msg_find_group (&group_list_head,
@@ -3141,12 +3141,12 @@ static void message_handler_req_exec_msg_queuegroupremove (
 	struct iovec iov[2];
 	unsigned int count = 0;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupRemove\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueGroupRemove\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t group = %s\n",
 		    (char *)(req_exec_msg_queuegroupremove->group_name.value));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queuegroupremove->queue_name.value));
 
 	group = msg_find_group (&group_list_head,
@@ -3261,10 +3261,10 @@ static void message_handler_req_exec_msg_queuegroupdelete (
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupDelete\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueGroupDelete\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t group = %s\n",
 		    (char *)(req_exec_msg_queuegroupdelete->group_name.value));
 
 	group = msg_find_group (&group_list_head,
@@ -3302,7 +3302,7 @@ static void message_handler_req_exec_msg_queuegrouptrack (
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrack\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueGroupTrack\n");
 
 	group = msg_find_group (&group_list_head,
 		&req_exec_msg_queuegrouptrack->group_name);
@@ -3337,7 +3337,7 @@ static void message_handler_req_exec_msg_queuegrouptrackstop (
 	SaAisErrorT error = SA_AIS_OK;
 	struct group_entry *group = NULL;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupTrackStop\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueGroupTrackStop\n");
 
 	group = msg_find_group (&group_list_head,
 		&req_exec_msg_queuegrouptrackstop->group_name);
@@ -3371,7 +3371,7 @@ static void message_handler_req_exec_msg_queuegroupnotificationfree (
 	struct res_lib_msg_queuegroupnotificationfree res_lib_msg_queuegroupnotificationfree;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueGroupNotificationFree\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueGroupNotificationFree\n");
 
 /* error_exit: */
 	if (api->ipc_source_is_local (&req_exec_msg_queuegroupnotificationfree->source))
@@ -3409,12 +3409,12 @@ static void message_handler_req_exec_msg_messagesend (
 	char *data = ((char *)(req_exec_msg_messagesend) +
 		      sizeof (struct req_exec_msg_messagesend));
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageSend\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageSend\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t destination = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t destination = %s\n",
 		    (char *)(req_exec_msg_messagesend->destination.value));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t data = %s\n", (char *)(data));
 
 	group = msg_find_group (&group_list_head,
 		&req_exec_msg_messagesend->destination);
@@ -3476,7 +3476,7 @@ static void message_handler_req_exec_msg_messagesend (
 		queue->priority[(msg->message.priority)].message_count += 1;
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
 			    (char *)(queue->queue_name.value),
 			    (unsigned int)(msg->message.priority),
 			    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
@@ -3566,12 +3566,12 @@ static void message_handler_req_exec_msg_messagesendasync (
 	char *data = ((char *)(req_exec_msg_messagesendasync) +
 		      sizeof (struct req_exec_msg_messagesendasync));
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageSendAsync\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageSendAsync\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t destination = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t destination = %s\n",
 		    (char *)(req_exec_msg_messagesendasync->destination.value));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t data = %s\n", (char *)(data));
 
 	group = msg_find_group (&group_list_head,
 		&req_exec_msg_messagesendasync->destination);
@@ -3632,7 +3632,7 @@ static void message_handler_req_exec_msg_messagesendasync (
 		queue->priority[(msg->message.priority)].message_count += 1;
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
 			    (char *)(queue->queue_name.value),
 			    (unsigned int)(msg->message.priority),
 			    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
@@ -3728,10 +3728,10 @@ static void message_handler_req_exec_msg_messageget (
 	struct pending_entry *get = NULL;
 	struct iovec iov[2];
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageGet\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(req_exec_msg_messageget->queue_name.value),
 		    (unsigned int)(req_exec_msg_messageget->queue_id));
 
@@ -3782,7 +3782,7 @@ static void message_handler_req_exec_msg_messageget (
 	queue->priority[msg->message.priority].message_count -= 1;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
 		    (char *)(queue->queue_name.value),
 		    (unsigned int)(msg->message.priority),
 		    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
@@ -3825,7 +3825,7 @@ static void message_handler_req_exec_msg_messagedatafree (
 	struct res_lib_msg_messagedatafree res_lib_msg_messagedatafree;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageDataFree\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageDataFree\n");
 
 /* error_exit: */
 	if (api->ipc_source_is_local (&req_exec_msg_messagedatafree->source))
@@ -3852,10 +3852,10 @@ static void message_handler_req_exec_msg_messagecancel (
 	struct res_lib_msg_messagecancel res_lib_msg_messagecancel;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageCancel\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageCancel\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(req_exec_msg_messagecancel->queue_name.value),
 		    (unsigned int)(req_exec_msg_messagecancel->queue_id));
 
@@ -3893,12 +3893,12 @@ static void message_handler_req_exec_msg_messagesendreceive (
 	char *data = ((char *)(req_exec_msg_messagesendreceive) +
 		      sizeof (struct req_exec_msg_messagesendreceive));
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageSendReceive\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageSendReceive\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t destination = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t destination = %s\n",
 		    (char *)(req_exec_msg_messagesendreceive->destination.value));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t data = %s\n", (char *)(data));
 
 	group = msg_find_group (&group_list_head,
 		&req_exec_msg_messagesendreceive->destination);
@@ -3960,7 +3960,7 @@ static void message_handler_req_exec_msg_messagesendreceive (
 		queue->priority[(msg->message.priority)].message_count += 1;
 
 		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: queue=%s priority=%u queue_used=%llu\n",
 			    (char *)(queue->queue_name.value),
 			    (unsigned int)(msg->message.priority),
 			    (unsigned long long)(queue->priority[(msg->message.priority)].queue_used));
@@ -4020,12 +4020,12 @@ static void message_handler_req_exec_msg_messagereply (
 	char *data = ((char *)(req_exec_msg_messagereply) +
 		      sizeof (struct req_exec_msg_messagereply));
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageReply\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageReply\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t sender_id = 0x%04x\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t sender_id = 0x%04x\n",
 		    (unsigned int)(req_exec_msg_messagereply->sender_id));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t data = %s\n", (char *)(data));
 
 	if (req_exec_msg_messagereply->reply_message.size > MAX_REPLY_SIZE) {
 		error = SA_AIS_ERR_TOO_BIG;
@@ -4060,12 +4060,12 @@ static void message_handler_req_exec_msg_messagereplyasync (
 	char *data = ((char *)(req_exec_msg_messagereplyasync) +
 		      sizeof (struct req_exec_msg_messagereplyasync));
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMessageReplyAsync\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageReplyAsync\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t sender_id = 0x%04x\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t sender_id = 0x%04x\n",
 		    (unsigned int)(req_exec_msg_messagereplyasync->sender_id));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t data = %s\n", (char *)(data));
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t data = %s\n", (char *)(data));
 
 	if (req_exec_msg_messagereplyasync->reply_message.size > MAX_REPLY_SIZE) {
 		error = SA_AIS_ERR_TOO_BIG;
@@ -4097,10 +4097,10 @@ static void message_handler_req_exec_msg_queuecapacitythresholdset (
 	struct res_lib_msg_queuecapacitythresholdset res_lib_msg_queuecapacitythresholdset;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueCapacityThresholdSet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueCapacityThresholdSet\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(req_exec_msg_queuecapacitythresholdset->queue_name.value),
 		    (unsigned int)(req_exec_msg_queuecapacitythresholdset->queue_id));
 
@@ -4129,10 +4129,10 @@ static void message_handler_req_exec_msg_queuecapacitythresholdget (
 	struct res_lib_msg_queuecapacitythresholdget res_lib_msg_queuecapacitythresholdget;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgQueueCapacityThresholdGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueCapacityThresholdGet\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(req_exec_msg_queuecapacitythresholdget->queue_name.value),
 		    (unsigned int)(req_exec_msg_queuecapacitythresholdget->queue_id));
 
@@ -4161,7 +4161,7 @@ static void message_handler_req_exec_msg_metadatasizeget (
 	struct res_lib_msg_metadatasizeget res_lib_msg_metadatasizeget;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgMetadataSizeGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMetadataSizeGet\n");
 
 /* error_exit: */
 	if (api->ipc_source_is_local (&req_exec_msg_metadatasizeget->source))
@@ -4189,10 +4189,10 @@ static void message_handler_req_exec_msg_limitget (
 	SaAisErrorT error = SA_AIS_OK;
 	SaUint64T value = 0;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saMsgLimitGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgLimitGet\n");
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t limit_id = %u\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t limit_id = %u\n",
 		    (unsigned int)(req_exec_msg_limitget->limit_id));
 
 	switch (req_exec_msg_limitget->limit_id)
@@ -4254,7 +4254,7 @@ static void message_handler_req_exec_msg_queue_timeout (
 	assert (queue != NULL);	/* ? */
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: retention timeout { queue = %s }\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: retention timeout { queue = %s }\n",
 		    (char *)(queue->queue_name.value));
 
 	msg_release_queue (queue);
@@ -4279,7 +4279,7 @@ static void message_handler_req_exec_msg_pending_timeout (
 	assert (queue != NULL);
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: pending timeout { queue = %s }\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: pending timeout { queue = %s }\n",
 		    (char *)(queue->queue_name.value));
 
 	if (api->ipc_source_is_local (&req_exec_msg_pending_timeout->source))
@@ -4315,8 +4315,8 @@ static void message_handler_req_exec_msg_sync_queue (
 	int i;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync queue\n");
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync queue\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(&req_exec_msg_sync_queue->queue_name.value),
 		    (unsigned int)(req_exec_msg_sync_queue->queue_id));
 
@@ -4386,8 +4386,8 @@ static void message_handler_req_exec_msg_sync_queue_message (
 		      sizeof (struct req_exec_msg_sync_queue_message));
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync queue message\n");
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%s)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync queue message\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%s)\n",
 		    (char *)(&req_exec_msg_sync_queue_message->queue_name.value),
 		    (char *)(data));
 
@@ -4441,7 +4441,7 @@ static void message_handler_req_exec_msg_sync_queue_refcount (
 	unsigned int j;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync refcount\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync refcount\n");
 
 	if (memcmp (&req_exec_msg_sync_queue_refcount->ring_id,
 		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
@@ -4488,7 +4488,7 @@ static void message_handler_req_exec_msg_sync_queue_refcount (
 	msg_sync_refcount_calculate (queue);
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue=%s refcount=%u\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue=%s refcount=%u\n",
 		    (char *)(queue->queue_name.value),
 		    (unsigned int)(queue->queue_id));
 
@@ -4504,8 +4504,8 @@ static void message_handler_req_exec_msg_sync_group (
 	struct group_entry *group = NULL;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync group\n");
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s \n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync group\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t group = %s \n",
 		    (char *)(&req_exec_msg_sync_group->group_name.value));
 
 	if (memcmp (&req_exec_msg_sync_group->ring_id,
@@ -4553,10 +4553,10 @@ static void message_handler_req_exec_msg_sync_group_member (
 	struct queue_entry *queue = NULL;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync group member\n");
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t group = %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync group member\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t group = %s\n",
 		    (char *)(&req_exec_msg_sync_group_member->group_name.value));
-	log_printf (LOGSYS_LEVEL_NOTICE, "\t queue = %s (%u)\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s (%u)\n",
 		    (char *)(&req_exec_msg_sync_group_member->queue_name.value),
 		    (unsigned int)(req_exec_msg_sync_group_member->queue_id));
 
@@ -4596,7 +4596,7 @@ static void message_handler_req_lib_msg_queueopen (
 	struct req_exec_msg_queueopen req_exec_msg_queueopen;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueOpen\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueOpen\n");
 
 	req_exec_msg_queueopen.header.size =
 		sizeof (struct req_exec_msg_queueopen);
@@ -4633,7 +4633,7 @@ static void message_handler_req_lib_msg_queueopenasync (
 	struct req_exec_msg_queueopenasync req_exec_msg_queueopenasync;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueOpenAsync\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueOpenAsync\n");
 
 	req_exec_msg_queueopenasync.header.size =
 		sizeof (struct req_exec_msg_queueopenasync);
@@ -4670,7 +4670,7 @@ static void message_handler_req_lib_msg_queueclose (
 	struct req_exec_msg_queueclose req_exec_msg_queueclose;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueClose\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueClose\n");
 
 	req_exec_msg_queueclose.header.size =
 		sizeof (struct req_exec_msg_queueclose);
@@ -4703,7 +4703,7 @@ static void message_handler_req_lib_msg_queuestatusget (
 	struct req_exec_msg_queuestatusget req_exec_msg_queuestatusget;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueStatusGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueStatusGet\n");
 
 	req_exec_msg_queuestatusget.header.size =
 		sizeof (struct req_exec_msg_queuestatusget);
@@ -4729,7 +4729,7 @@ static void message_handler_req_lib_msg_queueretentiontimeset (
 	struct req_exec_msg_queueretentiontimeset req_exec_msg_queueretentiontimeset;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueRetentionTimeSet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueRetentionTimeSet\n");
 
 	req_exec_msg_queueretentiontimeset.header.size =
 		sizeof (struct req_exec_msg_queueretentiontimeset);
@@ -4760,7 +4760,7 @@ static void message_handler_req_lib_msg_queueunlink (
 	struct req_exec_msg_queueunlink req_exec_msg_queueunlink;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueUnlink\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueUnlink\n");
 
 	req_exec_msg_queueunlink.header.size =
 		sizeof (struct req_exec_msg_queueunlink);
@@ -4786,7 +4786,7 @@ static void message_handler_req_lib_msg_queuegroupcreate (
 	struct req_exec_msg_queuegroupcreate req_exec_msg_queuegroupcreate;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupCreate\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueGroupCreate\n");
 
 	req_exec_msg_queuegroupcreate.header.size =
 		sizeof (struct req_exec_msg_queuegroupcreate);
@@ -4815,7 +4815,7 @@ static void message_handler_req_lib_msg_queuegroupinsert (
 	struct req_exec_msg_queuegroupinsert req_exec_msg_queuegroupinsert;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupInsert\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueGroupInsert\n");
 
 	req_exec_msg_queuegroupinsert.header.size =
 		sizeof (struct req_exec_msg_queuegroupinsert);
@@ -4843,7 +4843,7 @@ static void message_handler_req_lib_msg_queuegroupremove (
 	struct req_exec_msg_queuegroupremove req_exec_msg_queuegroupremove;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupRemove\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueGroupRemove\n");
 
 	req_exec_msg_queuegroupremove.header.size =
 		sizeof (struct req_exec_msg_queuegroupremove);
@@ -4871,7 +4871,7 @@ static void message_handler_req_lib_msg_queuegroupdelete (
 	struct req_exec_msg_queuegroupdelete req_exec_msg_queuegroupdelete;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupDelete\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueGroupDelete\n");
 
 	req_exec_msg_queuegroupdelete.header.size =
 		sizeof (struct req_exec_msg_queuegroupdelete);
@@ -4904,7 +4904,7 @@ static void message_handler_req_lib_msg_queuegrouptrack (
 	struct iovec iov[2];
 	unsigned int count = 0;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrack\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueGroupTrack\n");
 
 	group = msg_find_group (&group_list_head,
 		&req_lib_msg_queuegrouptrack->group_name);
@@ -5008,7 +5008,7 @@ static void message_handler_req_lib_msg_queuegrouptrackstop (
 	struct group_track *track = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupTrackstopStop\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueGroupTrackstopStop\n");
 
 	group = msg_find_group (&group_list_head,
 		&req_lib_msg_queuegrouptrackstop->group_name);
@@ -5047,7 +5047,7 @@ static void message_handler_req_lib_msg_queuegroupnotificationfree (
 	struct req_exec_msg_queuegroupnotificationfree req_exec_msg_queuegroupnotificationfree;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueGroupNotificationFree\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueGroupNotificationFree\n");
 
 	req_exec_msg_queuegroupnotificationfree.header.size =
 		sizeof (struct req_exec_msg_queuegroupnotificationfree);
@@ -5070,7 +5070,7 @@ static void message_handler_req_lib_msg_messagesend (
 	struct req_exec_msg_messagesend req_exec_msg_messagesend;
 	struct iovec iovec[2];
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageSend\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageSend\n");
 
 	req_exec_msg_messagesend.header.size =
 		sizeof (struct req_exec_msg_messagesend);
@@ -5112,7 +5112,7 @@ static void message_handler_req_lib_msg_messagesendasync (
 	struct req_exec_msg_messagesendasync req_exec_msg_messagesendasync;
 	struct iovec iovec[2];
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageSendAsync\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageSendAsync\n");
 
 	req_exec_msg_messagesendasync.header.size =
 		sizeof (struct req_exec_msg_messagesendasync);
@@ -5154,7 +5154,7 @@ static void message_handler_req_lib_msg_messageget (
 	struct req_exec_msg_messageget req_exec_msg_messageget;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageGet\n");
 
 	req_exec_msg_messageget.header.size =
 		sizeof (struct req_exec_msg_messageget);
@@ -5184,7 +5184,7 @@ static void message_handler_req_lib_msg_messagedatafree (
 	struct req_exec_msg_messagedatafree req_exec_msg_messagedatafree;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageDataFree\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageDataFree\n");
 
 	req_exec_msg_messagedatafree.header.size =
 		sizeof (struct req_exec_msg_messagedatafree);
@@ -5207,7 +5207,7 @@ static void message_handler_req_lib_msg_messagecancel (
 	struct req_exec_msg_messagecancel req_exec_msg_messagecancel;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageCancel\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageCancel\n");
 
 	req_exec_msg_messagecancel.header.size =
 		sizeof (struct req_exec_msg_messagecancel);
@@ -5236,7 +5236,7 @@ static void message_handler_req_lib_msg_messagesendreceive (
 	struct req_exec_msg_messagesendreceive req_exec_msg_messagesendreceive;
 	struct iovec iovec[2];
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageSendReceive\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageSendReceive\n");
 
 	req_exec_msg_messagesendreceive.header.size =
 		sizeof (struct req_exec_msg_messagesendreceive);
@@ -5281,7 +5281,7 @@ static void message_handler_req_lib_msg_messagereply (
 	struct req_exec_msg_messagereply req_exec_msg_messagereply;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageReply\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageReply\n");
 
 	req_exec_msg_messagereply.header.size =
 		sizeof (struct req_exec_msg_messagereply);
@@ -5312,7 +5312,7 @@ static void message_handler_req_lib_msg_messagereplyasync (
 	struct req_exec_msg_messagereplyasync req_exec_msg_messagereplyasync;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMessageReplyAsync\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMessageReplyAsync\n");
 
 	req_exec_msg_messagereplyasync.header.size =
 		sizeof (struct req_exec_msg_messagereplyasync);
@@ -5343,7 +5343,7 @@ static void message_handler_req_lib_msg_queuecapacitythresholdset (
 	struct req_exec_msg_queuecapacitythresholdget req_exec_msg_queuecapacitythresholdset;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueCapacityThresholdSet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueCapacityThresholdSet\n");
 
 	req_exec_msg_queuecapacitythresholdset.header.size =
 		sizeof (struct req_exec_msg_queuecapacitythresholdset);
@@ -5372,7 +5372,7 @@ static void message_handler_req_lib_msg_queuecapacitythresholdget (
 	struct req_exec_msg_queuecapacitythresholdget req_exec_msg_queuecapacitythresholdget;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgQueueCapacityThresholdGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueCapacityThresholdGet\n");
 
 	req_exec_msg_queuecapacitythresholdget.header.size =
 		sizeof (struct req_exec_msg_queuecapacitythresholdget);
@@ -5400,7 +5400,7 @@ static void message_handler_req_lib_msg_metadatasizeget (
 	struct req_exec_msg_metadatasizeget req_exec_msg_metadatasizeget;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgMetadataSizeGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgMetadataSizeGet\n");
 
 	req_exec_msg_metadatasizeget.header.size =
 		sizeof (struct req_exec_msg_metadatasizeget);
@@ -5423,7 +5423,7 @@ static void message_handler_req_lib_msg_limitget (
 	struct req_exec_msg_limitget req_exec_msg_limitget;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saMsgLimitGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgLimitGet\n");
 
 	req_exec_msg_limitget.header.size =
 		sizeof (struct req_exec_msg_limitget);
