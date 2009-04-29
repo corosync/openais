@@ -67,50 +67,42 @@
  * Data structure for instance data
  */
 struct ckptInstance {
-	void *ipc_ctx;
+	hdb_handle_t handle;
 	SaCkptCallbacksT callbacks;
 	int finalize;
 	SaCkptHandleT ckptHandle;
-	pthread_mutex_t response_mutex;
-	pthread_mutex_t dispatch_mutex;
 	struct list_head checkpoint_list;
 };
 
 struct ckptCheckpointInstance {
-	void *ipc_ctx;
+	hdb_handle_t handle;
 	SaCkptHandleT ckptHandle;
 	SaCkptCheckpointHandleT checkpointHandle;
 	SaCkptCheckpointOpenFlagsT checkpointOpenFlags;
 	SaNameT checkpointName;
 	unsigned int checkpointId;
-	pthread_mutex_t response_mutex;
 	struct list_head list;
 	struct list_head section_iteration_list_head;
 };
 
 struct ckptSectionIterationInstance {
-	void *ipc_ctx;
+	hdb_handle_t handle;
 	SaCkptSectionIterationHandleT sectionIterationHandle;
 	SaNameT checkpointName;
         SaSizeT maxSectionIdSize;
 	struct list_head sectionIdListHead;
-	pthread_mutex_t response_mutex;
 	hdb_handle_t executive_iteration_handle;
 	struct list_head list;
 };
 
-void ckptHandleInstanceDestructor (void *instance);
-void checkpointHandleInstanceDestructor (void *instance);
-void ckptSectionIterationHandleInstanceDestructor (void *instance);
-
 /*
  * All CKPT instances in this database
  */
-DECLARE_HDB_DATABASE(ckptHandleDatabase,ckptHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(ckptHandleDatabase,NULL);
 
-DECLARE_HDB_DATABASE(checkpointHandleDatabase,checkpointHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(checkpointHandleDatabase,NULL);
 
-DECLARE_HDB_DATABASE(ckptSectionIterationHandleDatabase, ckptSectionIterationHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(ckptSectionIterationHandleDatabase,NULL);
 
 /*
  * Versions supported
@@ -133,27 +125,6 @@ struct iteratorSectionIdListEntry {
 /*
  * Implementation
  */
-void ckptHandleInstanceDestructor (void *instance)
-{
-	struct ckptInstance *ckptInstance = instance;
-
-	pthread_mutex_destroy (&ckptInstance->response_mutex);
-	pthread_mutex_destroy (&ckptInstance->dispatch_mutex);
-}
-
-void checkpointHandleInstanceDestructor (void *instance)
-{
-	struct ckptCheckpointInstance *checkpointInstance = instance;
-
-	pthread_mutex_destroy (&checkpointInstance->response_mutex);
-}
-
-void ckptSectionIterationHandleInstanceDestructor (void *instance)
-{
-	struct ckptSectionIterationInstance *iterationInstance = instance;
-
-	pthread_mutex_destroy (&iterationInstance->response_mutex);
-}
 
 static void ckptSectionIterationInstanceFinalize (struct ckptSectionIterationInstance *ckptSectionIterationInstance)
 {
@@ -269,7 +240,7 @@ saCkptInitialize (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&ckptInstance->ipc_ctx);
+		&ckptInstance->handle);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -283,8 +254,6 @@ saCkptInitialize (
 	list_init (&ckptInstance->checkpoint_list);
 
 	ckptInstance->ckptHandle = *ckptHandle;
-
-	pthread_mutex_init (&ckptInstance->response_mutex, NULL);
 
 	hdb_handle_put (&ckptHandleDatabase, *ckptHandle);
 
@@ -305,6 +274,7 @@ saCkptSelectionObjectGet (
 {
 	struct ckptInstance *ckptInstance;
 	SaAisErrorT error;
+	int fd;
 
 	if (selectionObject == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -314,11 +284,12 @@ saCkptSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = coroipcc_fd_get (ckptInstance->ipc_ctx);
+	error = coroipcc_fd_get (ckptInstance->handle, &fd);
+	*selectionObject = fd;
 
 	hdb_handle_put (&ckptHandleDatabase, ckptHandle);
 
-	return (SA_AIS_OK);
+	return (error);
 }
 
 SaAisErrorT
@@ -329,7 +300,6 @@ saCkptDispatch (
 	int timeout = -1;
 	SaCkptCallbacksT callbacks;
 	SaAisErrorT error;
-	int dispatch_avail;
 	struct ckptInstance *ckptInstance;
 	int cont = 1; /* always continue do loop except when set to 0 */
 	coroipc_response_header_t *dispatch_data;
@@ -359,28 +329,21 @@ saCkptDispatch (
 	}
 
 	do {
-		pthread_mutex_lock (&ckptInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_get (
-			ckptInstance->ipc_ctx,
+		error = coroipcc_dispatch_get (
+			ckptInstance->handle,
 			(void **)&dispatch_data,
 			timeout);
-
-		pthread_mutex_unlock (&ckptInstance->dispatch_mutex);
-
-		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			break; /* exit do while cont is 1 loop */
-		} else
-		if (dispatch_avail == 0) {
-			continue;
-		}
-		if (dispatch_avail == -1) {
-			if (ckptInstance->finalize == 1) {
-				error = SA_AIS_OK;
-			} else {
-				error = SA_AIS_ERR_LIBRARY;
-			}
+		if (error != CS_OK) {
 			goto error_put;
+		}
+
+		if (dispatch_data == NULL) {
+			if (dispatchFlags == CPG_DISPATCH_ALL) {
+				break; /* exit do while cont is 1 loop */
+			} else {
+				continue; /* next poll */
+			}
 		}
 
 		/*
@@ -454,7 +417,7 @@ saCkptDispatch (
 		default:
 			break;
 		}
-		coroipcc_dispatch_put (ckptInstance->ipc_ctx);
+		coroipcc_dispatch_put (ckptInstance->handle);
 
 		/*
 		 * Determine if more messages should be processed
@@ -489,22 +452,17 @@ saCkptFinalize (
 		return (error);
 	}
 
-	pthread_mutex_lock (&ckptInstance->response_mutex);
-
 	/*
 	 * Another thread has already started finalizing
 	 */
 	if (ckptInstance->finalize) {
-		pthread_mutex_unlock (&ckptInstance->response_mutex);
 		hdb_handle_put (&ckptHandleDatabase, ckptHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
 	ckptInstance->finalize = 1;
 
-	coroipcc_service_disconnect (ckptInstance->ipc_ctx);
-
-	pthread_mutex_unlock (&ckptInstance->response_mutex);
+	coroipcc_service_disconnect (ckptInstance->handle);
 
 	ckptInstanceFinalize (ckptInstance);
 
@@ -578,7 +536,7 @@ saCkptCheckpointOpen (
 		goto error_destroy;
 	}
 
-	ckptCheckpointInstance->ipc_ctx = ckptInstance->ipc_ctx;
+	ckptCheckpointInstance->handle = ckptInstance->handle;
 
 	ckptCheckpointInstance->ckptHandle = ckptHandle;
 	ckptCheckpointInstance->checkpointHandle = *checkpointHandle;
@@ -605,16 +563,12 @@ saCkptCheckpointOpen (
 	iov.iov_base = &req_lib_ckpt_checkpointopen;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
 
-	pthread_mutex_lock (&ckptInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptInstance->ipc_ctx,
+		ckptInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointopen,
 		sizeof (struct res_lib_ckpt_checkpointopen));
-
-	pthread_mutex_unlock (&ckptInstance->response_mutex);
 
 	if (res_lib_ckpt_checkpointopen.header.error != SA_AIS_OK) {
 		error = res_lib_ckpt_checkpointopen.header.error;
@@ -622,8 +576,6 @@ saCkptCheckpointOpen (
 	}
 	ckptCheckpointInstance->checkpointId =
 		res_lib_ckpt_checkpointopen.ckpt_id;
-
-	pthread_mutex_init (&ckptCheckpointInstance->response_mutex, NULL);
 
 	hdb_handle_put (&checkpointHandleDatabase, *checkpointHandle);
 
@@ -708,7 +660,7 @@ saCkptCheckpointOpenAsync (
 		goto error_destroy;
 	}
 
-	ckptCheckpointInstance->ipc_ctx = ckptInstance->ipc_ctx;
+	ckptCheckpointInstance->handle = ckptInstance->handle;
 	ckptCheckpointInstance->ckptHandle = ckptHandle;
 	ckptCheckpointInstance->checkpointHandle = checkpointHandle;
 	ckptCheckpointInstance->checkpointOpenFlags = checkpointOpenFlags;
@@ -738,16 +690,12 @@ saCkptCheckpointOpenAsync (
 	iov.iov_base = &req_lib_ckpt_checkpointopen;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
 
-	pthread_mutex_lock (&ckptInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptInstance->ipc_ctx,
+		ckptInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointopenasync,
 		sizeof (struct res_lib_ckpt_checkpointopenasync));
-
-	pthread_mutex_unlock (&ckptInstance->response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
@@ -757,8 +705,6 @@ saCkptCheckpointOpenAsync (
 		error = res_lib_ckpt_checkpointopenasync.header.error;
 		goto error_put_destroy;
 	}
-
-	pthread_mutex_init (&ckptCheckpointInstance->response_mutex, NULL);
 
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
 
@@ -802,16 +748,12 @@ saCkptCheckpointClose (
 	iov.iov_base = &req_lib_ckpt_checkpointclose;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointclose);
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptCheckpointInstance->ipc_ctx,
+		ckptCheckpointInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointclose,
 		sizeof (struct res_lib_ckpt_checkpointclose));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 	if (error == SA_AIS_OK) {
 		error = res_lib_ckpt_checkpointclose.header.error;
@@ -853,16 +795,12 @@ saCkptCheckpointUnlink (
 	iov.iov_base = &req_lib_ckpt_checkpointunlink;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointunlink);
 
-	pthread_mutex_lock (&ckptInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptInstance->ipc_ctx,
+		ckptInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointunlink,
 		sizeof (struct res_lib_ckpt_checkpointunlink));
-
-	pthread_mutex_unlock (&ckptInstance->response_mutex);
 
 	hdb_handle_put (&ckptHandleDatabase, ckptHandle);
 
@@ -899,16 +837,12 @@ saCkptCheckpointRetentionDurationSet (
 	iov.iov_base = &req_lib_ckpt_checkpointretentiondurationset;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointretentiondurationset);
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptCheckpointInstance->ipc_ctx,
+		ckptCheckpointInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointretentiondurationset,
 		sizeof (struct res_lib_ckpt_checkpointretentiondurationset));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
 	return (error == SA_AIS_OK ? res_lib_ckpt_checkpointretentiondurationset.header.error : error);
@@ -945,16 +879,12 @@ saCkptActiveReplicaSet (
 	iov.iov_base = &req_lib_ckpt_activereplicaset;
 	iov.iov_len = sizeof (struct req_lib_ckpt_activereplicaset);
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptCheckpointInstance->ipc_ctx,
+		ckptCheckpointInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_activereplicaset,
 		sizeof (struct res_lib_ckpt_activereplicaset));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_put:
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
@@ -993,15 +923,11 @@ saCkptCheckpointStatusGet (
 	iov.iov_base = &req_lib_ckpt_checkpointstatusget;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointstatusget);
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointstatusget,
 		sizeof (struct res_lib_ckpt_checkpointstatusget));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 	marshall_from_mar_ckpt_checkpoint_descriptor_t (
 		checkpointStatus,
@@ -1075,16 +1001,12 @@ saCkptSectionCreate (
 		iov_len++;
 	}
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptCheckpointInstance->ipc_ctx,
+		ckptCheckpointInstance->handle,
 		iov,
 		iov_len,
 		&res_lib_ckpt_sectioncreate,
 		sizeof (struct res_lib_ckpt_sectioncreate));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_exit:
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
@@ -1139,15 +1061,11 @@ saCkptSectionDelete (
 		iov_len = 2;
 	}
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->handle,
 		iov,
 		iov_len,
 		&res_lib_ckpt_sectiondelete,
 		sizeof (struct res_lib_ckpt_sectiondelete));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_put:
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
@@ -1202,16 +1120,12 @@ saCkptSectionExpirationTimeSet (
 		iov_len = 2;
 	}
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptCheckpointInstance->ipc_ctx,
+		ckptCheckpointInstance->handle,
 		iov,
 		iov_len,
 		&res_lib_ckpt_sectionexpirationtimeset,
 		sizeof (struct res_lib_ckpt_sectionexpirationtimeset));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_put:
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
@@ -1263,7 +1177,7 @@ saCkptSectionIterationInitialize (
 		goto error_destroy;
 	}
 
-	ckptSectionIterationInstance->ipc_ctx = ckptCheckpointInstance->ipc_ctx;
+	ckptSectionIterationInstance->handle = ckptCheckpointInstance->handle;
 	ckptSectionIterationInstance->sectionIterationHandle = *sectionIterationHandle;
 
 	memcpy (&ckptSectionIterationInstance->checkpointName,
@@ -1273,8 +1187,6 @@ saCkptSectionIterationInitialize (
 
 	list_add (&ckptSectionIterationInstance->list,
 		&ckptCheckpointInstance->section_iteration_list_head);
-
-	pthread_mutex_init (&ckptSectionIterationInstance->response_mutex, NULL);
 
 	/*
 	 * Setup section id list for iterator next
@@ -1294,15 +1206,11 @@ saCkptSectionIterationInitialize (
 	iov.iov_base = &req_lib_ckpt_sectioniterationinitialize;
 	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationinitialize);
 
-	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_sectioniterationinitialize,
 		sizeof (struct res_lib_ckpt_sectioniterationinitialize));
-
-	pthread_mutex_unlock (&ckptSectionIterationInstance->response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
@@ -1366,10 +1274,8 @@ saCkptSectionIterationNext (
 	iov.iov_base = &req_lib_ckpt_sectioniterationnext;
 	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationnext);
 
-	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive_in_buf (
-		ckptSectionIterationInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive_in_buf_get (
+		ckptSectionIterationInstance->handle,
 		&iov,
 		1,
 		&return_address);
@@ -1394,6 +1300,9 @@ saCkptSectionIterationNext (
 
 	error = (error == SA_AIS_OK ? res_lib_ckpt_sectioniterationnext->header.error : error);
 
+	coroipcc_msg_send_reply_receive_in_buf_put (
+		ckptSectionIterationInstance->handle);
+
 	/*
 	 * Add to persistent memory list for this sectioniterator
 	 */
@@ -1403,7 +1312,6 @@ saCkptSectionIterationNext (
 	}
 
 error_put_unlock:
-	pthread_mutex_unlock (&ckptSectionIterationInstance->response_mutex);
 	if (error != SA_AIS_OK) {
 		free (iteratorSectionIdListEntry);
 	}
@@ -1438,15 +1346,11 @@ saCkptSectionIterationFinalize (
 	iov.iov_base = &req_lib_ckpt_sectioniterationfinalize;
 	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationfinalize);
 
-	pthread_mutex_lock (&ckptSectionIterationInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_sectioniterationfinalize,
 		sizeof (struct res_lib_ckpt_sectioniterationfinalize));
-
-	pthread_mutex_unlock (&ckptSectionIterationInstance->response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto error_put;
@@ -1459,8 +1363,6 @@ saCkptSectionIterationFinalize (
 	return (res_lib_ckpt_sectioniterationfinalize.header.error);
 
 error_put:
-	pthread_mutex_unlock (&ckptSectionIterationInstance->response_mutex);
-
 	hdb_handle_put (&ckptSectionIterationHandleDatabase, sectionIterationHandle);
 error_exit:
 	return (error);
@@ -1514,8 +1416,6 @@ saCkptCheckpointWrite (
 		}
 	}
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	for (i = 0; i < numberOfElements; i++) {
 
 		req_lib_ckpt_sectionwrite.header.size = sizeof (struct req_lib_ckpt_sectionwrite) + ioVector[i].sectionId.idLen + ioVector[i].dataSize;
@@ -1544,7 +1444,7 @@ saCkptCheckpointWrite (
 		iov_idx++;
 
 		error = coroipcc_msg_send_reply_receive (
-			ckptCheckpointInstance->ipc_ctx,
+			ckptCheckpointInstance->handle,
 			iov,
 			iov_idx,
 			&res_lib_ckpt_sectionwrite,
@@ -1566,8 +1466,6 @@ saCkptCheckpointWrite (
 	}
 
 error_exit:
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
-
 error_put:
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
 
@@ -1632,15 +1530,11 @@ saCkptSectionOverwrite (
 		iov_idx += 1;
 	}
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->handle,
 		iov,
 		iov_idx,
 		&res_lib_ckpt_sectionoverwrite,
 		sizeof (struct res_lib_ckpt_sectionoverwrite));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
 
@@ -1681,8 +1575,6 @@ saCkptCheckpointRead (
 
 	req_lib_ckpt_sectionread.header.id = MESSAGE_REQ_CKPT_CHECKPOINT_SECTIONREAD;
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	for (i = 0; i < numberOfElements; i++) {
 		req_lib_ckpt_sectionread.header.size =
 			sizeof (struct req_lib_ckpt_sectionread) +
@@ -1702,8 +1594,8 @@ saCkptCheckpointRead (
 		iov[1].iov_base = (char *)ioVector[i].sectionId.id;
 		iov[1].iov_len = ioVector[i].sectionId.idLen;
 
-		coroipcc_msg_send_reply_receive_in_buf (
-			ckptCheckpointInstance->ipc_ctx,
+		coroipcc_msg_send_reply_receive_in_buf_get (
+			ckptCheckpointInstance->handle,
 			iov,
 			2,
 			&return_address);
@@ -1745,11 +1637,11 @@ saCkptCheckpointRead (
 		 * Report back bytes of data read
 		 */
 		ioVector[i].readSize = copy_bytes;
+		coroipcc_msg_send_reply_receive_in_buf_put (
+			ckptCheckpointInstance->handle);
 	}
 
 error_exit:
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
-
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
 
 	if (error != SA_AIS_OK && erroneousVectorIndex) {
@@ -1798,16 +1690,12 @@ saCkptCheckpointSynchronize (
 	iov.iov_base = &req_lib_ckpt_checkpointsynchronize;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointsynchronize);
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptCheckpointInstance->ipc_ctx,
+		ckptCheckpointInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointsynchronize,
 		sizeof (struct res_lib_ckpt_checkpointsynchronize));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_put:
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);
@@ -1864,16 +1752,12 @@ saCkptCheckpointSynchronizeAsync (
 	iov.iov_base = &req_lib_ckpt_checkpointsynchronizeasync;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointsynchronizeasync);
 
-	pthread_mutex_lock (&ckptCheckpointInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		ckptCheckpointInstance->ipc_ctx,
+		ckptCheckpointInstance->handle,
 		&iov,
 		1,
 		&res_lib_ckpt_checkpointsynchronizeasync,
 		sizeof (struct res_lib_ckpt_checkpointsynchronizeasync));
-
-	pthread_mutex_unlock (&ckptCheckpointInstance->response_mutex);
 
 error_put:
 	hdb_handle_put (&checkpointHandleDatabase, checkpointHandle);

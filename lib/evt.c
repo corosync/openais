@@ -88,14 +88,11 @@ struct handle_list {
  * data required to support events for a given initialization
  *
  * ei_dispatch_fd:	fd used for getting callback data e.g. async event data
- * ipc_ctx:	fd used for everything else (i.e. evt sync api commands).
+ * ipc_handle:	fd used for everything else (i.e. evt sync api commands).
  * ei_callback:		callback function.
  * ei_version:		version sent to the evtInitialize call.
  * ei_node_id:		our node id.
  * ei_node_name:	our node name.
- * ei_dispatch_mutex:	mutex for dispatch fd.  This lock also ensures that
- *                      only one thread is using ei_dispatch_data.
- * ei_response_mutex:	mutex for response fd
  * ei_channel_list:		list of associated channels (struct handle_list)
  * ei_dispatch_data:	event buffer for evtDispatch
  * ei_finalize:		instance in finalize flag
@@ -106,13 +103,11 @@ struct handle_list {
  *
  */
 struct event_instance {
-	void				*ipc_ctx;
+	hdb_handle_t			ipc_handle;
 	SaEvtCallbacksT			ei_callback;
 	SaVersionT				ei_version;
 	SaClmNodeIdT			ei_node_id;
 	SaNameT					ei_node_name;
-	pthread_mutex_t			ei_dispatch_mutex;
-	pthread_mutex_t			ei_response_mutex;
 	struct list_head 		ei_channel_list;
 	unsigned int			ei_finalize:1;
 	unsigned int			ei_data_available:1;
@@ -126,7 +121,6 @@ struct event_instance {
  * eci_open_flags:			channel open flags
  * eci_svr_channel_handle:	channel handle returned from server
  * eci_closing:				channel in process of being closed
- * eci_mutex:				channel mutex
  * eci_event_list:			events associated with this
  * 							channel (struct handle_list)
  * eci_hl:					pointer to event instance handle struct
@@ -139,7 +133,6 @@ struct event_channel_instance {
 	uint32_t				eci_svr_channel_handle;
 	SaEvtHandleT			eci_instance_handle;
 	int						eci_closing;
-	pthread_mutex_t			eci_mutex;
 	struct list_head		eci_event_list;
 	struct handle_list		*eci_hl;
 
@@ -162,7 +155,6 @@ struct event_channel_instance {
  * edi_event_data:		event's data
  * edi_event_data_size:	size of edi_event_data
  * edi_freeing:			event is being freed
- * edi_mutex:			event data mutex
  * edi_hl:				pointer to channel's handle
  * 						struct for this event.
  * edi_ro:				read only flag
@@ -179,7 +171,6 @@ struct event_data_instance {
 	void					*edi_event_data;
 	SaSizeT					edi_event_data_size;
 	int						edi_freeing;
-	pthread_mutex_t			edi_mutex;
 	struct handle_list		*edi_hl;
 	int 					edi_ro;
 };
@@ -230,8 +221,6 @@ static void evtHandleInstanceDestructor(void *instance)
 		hdb_handle_put(&channel_handle_db, handle);
 	}
 
-	pthread_mutex_destroy(&evti->ei_dispatch_mutex);
-	pthread_mutex_destroy(&evti->ei_response_mutex);
 }
 
 /*
@@ -259,7 +248,6 @@ static void chanHandleInstanceDestructor(void *instance)
 		saEvtEventFree(handle);
 	}
 
-	pthread_mutex_destroy(&eci->eci_mutex);
 }
 
 /*
@@ -282,11 +270,9 @@ static void eventHandleInstanceDestructor(void *instance)
 		free(edi->edi_patterns.patterns);
 	}
 	free(edi->edi_event_data);
-
-	pthread_mutex_destroy(&edi->edi_mutex);
 }
 
-static void evt_recv_event(void *ipc_ctx, struct lib_event_data **msg)
+static void evt_recv_event_get(hdb_handle_t ipc_handle, struct lib_event_data **msg)
 {
 	struct res_evt_event_data req;
 	struct lib_event_data res;
@@ -298,11 +284,17 @@ static void evt_recv_event(void *ipc_ctx, struct lib_event_data **msg)
 	iov.iov_base = &req;
 	iov.iov_len = sizeof (struct res_evt_event_data);
 
-	coroipcc_msg_send_reply_receive_in_buf (
-		ipc_ctx,
+	coroipcc_msg_send_reply_receive_in_buf_get (
+		ipc_handle,
 		&iov,
 		1,
 		(void **)msg);
+}
+
+static void evt_recv_event_put (hdb_handle_t ipc_handle)
+{
+	coroipcc_msg_send_reply_receive_in_buf_put (
+		ipc_handle);
 }
 
 /*
@@ -370,7 +362,7 @@ saEvtInitialize(
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&evti->ipc_ctx);
+		&evti->ipc_handle);
 	if (error != SA_AIS_OK) {
 		goto error_handle_put;
 	}
@@ -384,8 +376,6 @@ saEvtInitialize(
 				sizeof(evti->ei_callback));
 	}
 
- 	pthread_mutex_init(&evti->ei_dispatch_mutex, NULL);
- 	pthread_mutex_init(&evti->ei_response_mutex, NULL);
 	hdb_handle_put(&evt_instance_handle_db, *evtHandle);
 
 	return SA_AIS_OK;
@@ -414,6 +404,7 @@ saEvtSelectionObjectGet(
 {
 	struct event_instance *evti;
 	SaAisErrorT error;
+	int fd;
 
 	if (!selectionObject) {
 		return SA_AIS_ERR_INVALID_PARAM;
@@ -426,11 +417,12 @@ saEvtSelectionObjectGet(
 		return error;
 	}
 
-	*selectionObject = coroipcc_fd_get (evti->ipc_ctx);
+	coroipcc_fd_get (evti->ipc_handle, &fd);
+	*selectionObject = fd;
 
 	hdb_handle_put(&evt_instance_handle_db, evtHandle);
 
-	return SA_AIS_OK;
+	return (error);
 }
 
 
@@ -473,7 +465,6 @@ static SaAisErrorT make_event(SaEvtEventHandleT *event_handle,
 		goto make_evt_done_put;
 	}
 
-	pthread_mutex_init(&edi->edi_mutex, NULL);
 	edi->edi_ro = 1;
 	edi->edi_freeing = 0;
 	edi->edi_channel_handle = evt->led_lib_channel_handle;
@@ -574,7 +565,6 @@ saEvtDispatch(
 {
 	int timeout = -1;
 	SaAisErrorT error;
-	int dispatch_avail;
 	struct event_instance *evti;
 	SaEvtEventHandleT event_handle;
 	SaEvtCallbacksT callbacks;
@@ -604,30 +594,21 @@ saEvtDispatch(
 	}
 
 	do {
-		pthread_mutex_lock (&evti->ei_dispatch_mutex);
-
-		dispatch_avail = coroipcc_dispatch_get (
-			evti->ipc_ctx,
+		error = coroipcc_dispatch_get (
+			evti->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
-
-		pthread_mutex_unlock (&evti->ei_dispatch_mutex);
-
-		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			break; /* exit do while cont is 1 loop */
-		} else
-		if (dispatch_avail == 0) {
-			continue;
-		}
-		if (dispatch_avail == -1) {
-			if (evti->ei_finalize == 1) {
-				error = SA_AIS_OK;
-			} else {
-				error = SA_AIS_ERR_LIBRARY;
-			}
+		if (error != CS_OK) {
 			goto error_put;
 		}
 
+		if (dispatch_data == NULL) {
+			if (dispatchFlags == CPG_DISPATCH_ALL) {
+				break; /* exit do while cont is 1 loop */
+			} else {
+				continue; /* next poll */
+			}
+		}
 
 		/*
 		 * Make copy of callbacks, message data, unlock instance,
@@ -645,9 +626,7 @@ saEvtDispatch(
 		case MESSAGE_RES_EVT_AVAILABLE:
 			evti->ei_data_available = 0;
 
- 			pthread_mutex_lock(&evti->ei_response_mutex);
-			evt_recv_event(evti->ipc_ctx, &evt);
- 			pthread_mutex_unlock(&evti->ei_response_mutex);
+			evt_recv_event_get(evti->ipc_handle, &evt);
 
 			if (evt->led_head.error == SA_AIS_ERR_NOT_EXIST) {
 				error = SA_AIS_OK;
@@ -681,6 +660,7 @@ saEvtDispatch(
 				callbacks.saEvtEventDeliverCallback(evt->led_sub_id,
 						event_handle, evt->led_user_data_size);
 			}
+			evt_recv_event_put(evti->ipc_handle);
 			break;
 
 		case MESSAGE_RES_EVT_CHAN_OPEN_CALLBACK:
@@ -719,11 +699,11 @@ saEvtDispatch(
 			break;
 
 		default:
-			coroipcc_dispatch_put (evti->ipc_ctx);
+			coroipcc_dispatch_put (evti->ipc_handle);
 			error = SA_AIS_ERR_LIBRARY;
 			goto error_put;
 		}
-		coroipcc_dispatch_put (evti->ipc_ctx);
+		coroipcc_dispatch_put (evti->ipc_handle);
 
 		/*
 		 * Determine if more messages should be processed
@@ -767,22 +747,17 @@ saEvtFinalize(SaEvtHandleT evtHandle)
 		return error;
 	}
 
-       pthread_mutex_lock(&evti->ei_response_mutex);
-
 	/*
 	 * Another thread has already started finalizing
 	 */
 	if (evti->ei_finalize) {
-		pthread_mutex_unlock(&evti->ei_response_mutex);
 		hdb_handle_put(&evt_instance_handle_db, evtHandle);
 		return SA_AIS_ERR_BAD_HANDLE;
 	}
 
 	evti->ei_finalize = 1;
 
-	coroipcc_service_disconnect (evti->ipc_ctx);
-
-	pthread_mutex_unlock(&evti->ei_response_mutex);
+	coroipcc_service_disconnect (evti->ipc_handle);
 
 	hdb_handle_destroy(&evt_instance_handle_db, evtHandle);
 
@@ -870,12 +845,8 @@ saEvtChannelOpen(
 	iov.iov_base = (char *)&req;
 	iov.iov_len = sizeof(req);
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
-
-	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
 		&res, sizeof(res));
-
-	pthread_mutex_unlock (&evti->ei_response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto chan_open_free;
@@ -906,7 +877,6 @@ saEvtChannelOpen(
 	list_init(&hl->hl_entry);
 	list_add(&hl->hl_entry, &evti->ei_channel_list);
 
-	pthread_mutex_init(&eci->eci_mutex, NULL);
 	hdb_handle_put (&evt_instance_handle_db, evtHandle);
 	hdb_handle_put (&channel_handle_db, *channelHandle);
 
@@ -954,14 +924,11 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	/*
 	 * Make sure that the channel isn't being closed elsewhere
 	 */
-	pthread_mutex_lock(&eci->eci_mutex);
 	if (eci->eci_closing) {
-		pthread_mutex_unlock(&eci->eci_mutex);
 		hdb_handle_put(&channel_handle_db, channelHandle);
 		return SA_AIS_ERR_BAD_HANDLE;
 	}
 	eci->eci_closing = 1;
-	pthread_mutex_unlock(&eci->eci_mutex);
 
 
 	/*
@@ -974,12 +941,8 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	iov.iov_base = (char *)&req;
 	iov.iov_len = sizeof (req);
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive (evti->ipc_handle, &iov, 1,
 		&res, sizeof (res));
-
-	pthread_mutex_unlock(&evti->ei_response_mutex);
 
 	if (error != SA_AIS_OK) {
 		eci->eci_closing = 0;
@@ -993,9 +956,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 
 	error = res.icc_head.error;
 	if (error == SA_AIS_ERR_TRY_AGAIN) {
-		pthread_mutex_lock(&eci->eci_mutex);
 		eci->eci_closing = 0;
-		pthread_mutex_unlock(&eci->eci_mutex);
 		goto chan_close_put2;
 	}
 
@@ -1096,12 +1057,8 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 	iov.iov_len = sizeof(req);
 
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive (evti->ipc_handle, &iov, 1,
 		&res, sizeof (res));
-
-	pthread_mutex_unlock(&evti->ei_response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto chan_open_free;
@@ -1133,7 +1090,6 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 	list_init(&hl->hl_entry);
 	list_add(&hl->hl_entry, &evti->ei_channel_list);
 
-	pthread_mutex_init(&eci->eci_mutex, NULL);
 	hdb_handle_put (&evt_instance_handle_db, evtHandle);
 	hdb_handle_put (&channel_handle_db, channel_handle);
 
@@ -1197,12 +1153,8 @@ saEvtChannelUnlink(
 	iov.iov_len = sizeof(req);
 
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive (evti->ipc_handle, &iov, 1,
 		&res, sizeof (res));
-
-	pthread_mutex_unlock(&evti->ei_response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto chan_unlink_put;
@@ -1271,7 +1223,6 @@ saEvtEventAllocate(
 		goto alloc_put2;
 	}
 
-	pthread_mutex_init(&edi->edi_mutex, NULL);
 	edi->edi_ro = 0;
 	edi->edi_freeing = 0;
 	edi->edi_channel_handle = channelHandle;
@@ -1323,15 +1274,12 @@ saEvtEventFree(SaEvtEventHandleT eventHandle)
 	/*
 	 * Make sure that the event isn't being freed elsewhere
 	 */
-	pthread_mutex_lock(&edi->edi_mutex);
 	if (edi->edi_freeing) {
-		pthread_mutex_unlock(&edi->edi_mutex);
 		hdb_handle_put(&event_handle_db, eventHandle);
 		return SA_AIS_ERR_BAD_HANDLE;
 	}
 	edi->edi_freeing = 1;
 
-	pthread_mutex_unlock(&edi->edi_mutex);
 	hdb_handle_destroy(&event_handle_db, eventHandle);
 	hdb_handle_put(&event_handle_db, eventHandle);
 
@@ -1369,7 +1317,6 @@ saEvtEventAttributesSet(
 	if (error != SA_AIS_OK) {
 		goto attr_set_done;
 	}
-	pthread_mutex_lock(&edi->edi_mutex);
 
 	/*
 	 * Cannot modify an event returned via callback.
@@ -1442,7 +1389,6 @@ attr_set_done_reset:
 	edi->edi_patterns.patterns = oldpatterns;
 	edi->edi_patterns.patternsNumber = oldnumber;
 attr_set_unlock:
-	pthread_mutex_unlock(&edi->edi_mutex);
 	hdb_handle_put(&event_handle_db, eventHandle);
 attr_set_done:
 	return error;
@@ -1481,7 +1427,6 @@ saEvtEventAttributesGet(
 	if (error != SA_AIS_OK) {
 		goto attr_get_done;
 	}
-	pthread_mutex_lock(&edi->edi_mutex);
 
 	/*
 	 * Go through the args and send back information if the pointer
@@ -1588,7 +1533,6 @@ saEvtEventAttributesGet(
 	}
 
 attr_get_unlock:
-	pthread_mutex_unlock(&edi->edi_mutex);
 	hdb_handle_put(&event_handle_db, eventHandle);
 attr_get_done:
 	return error;
@@ -1618,7 +1562,6 @@ saEvtEventDataGet(
 	if (error != SA_AIS_OK) {
 		goto data_get_done;
 	}
-	pthread_mutex_lock(&edi->edi_mutex);
 
 	/*
 	 * If no buffer was supplied, then just tell the caller
@@ -1651,7 +1594,6 @@ saEvtEventDataGet(
 	}
 
 unlock_put:
-	pthread_mutex_unlock(&edi->edi_mutex);
 	hdb_handle_put(&event_handle_db, eventHandle);
 data_get_done:
 	return error;
@@ -1807,7 +1749,6 @@ saEvtEventPublish(
 	if (error != SA_AIS_OK) {
 		goto pub_done;
 	}
-	pthread_mutex_lock(&edi->edi_mutex);
 
 	error = hdb_error_to_sa(hdb_handle_get(&channel_handle_db, edi->edi_channel_handle,
 			(void*)&eci));
@@ -1870,15 +1811,11 @@ saEvtEventPublish(
 	iov.iov_base = (char *)req;
 	iov.iov_len = req->led_head.size;
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
-
-	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1, &res,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1, &res,
 		sizeof(res));
 
-	pthread_mutex_unlock (&evti->ei_response_mutex);
 	free(req);
 	if (error != SA_AIS_OK) {
-		pthread_mutex_unlock (&evti->ei_response_mutex);
 		goto pub_put3;
 	}
 
@@ -1892,7 +1829,6 @@ pub_put3:
 pub_put2:
 	hdb_handle_put (&channel_handle_db, edi->edi_channel_handle);
 pub_put1:
-	pthread_mutex_unlock(&edi->edi_mutex);
 	hdb_handle_put(&event_handle_db, eventHandle);
 pub_done:
 	return error;
@@ -1988,10 +1924,8 @@ saEvtEventSubscribe(
 	iov.iov_base = (char *)req;
 	iov.iov_len = req->ics_head.size;
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
-	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
 		&res, sizeof(res));
-	pthread_mutex_unlock (&evti->ei_response_mutex);
 	free(req);
 
 	if (res.ics_head.id != MESSAGE_RES_EVT_SUBSCRIBE) {
@@ -2051,10 +1985,8 @@ saEvtEventUnsubscribe(
 	iov.iov_base = (char *)&req;
 	iov.iov_len = sizeof(req);
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
- 	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+ 	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
  		&res, sizeof(res));
- 	pthread_mutex_unlock (&evti->ei_response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto unsubscribe_put2;
@@ -2122,10 +2054,8 @@ saEvtEventRetentionTimeClear(
 	iov.iov_base = (char *)&req;
 	iov.iov_len = sizeof(req);
 
-	pthread_mutex_lock(&evti->ei_response_mutex);
-	error = coroipcc_msg_send_reply_receive(evti->ipc_ctx, &iov, 1,
+	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
 		&res, sizeof(res));
-	pthread_mutex_unlock (&evti->ei_response_mutex);
 
 	if (error != SA_AIS_OK) {
 		goto ret_time_put2;

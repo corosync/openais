@@ -63,16 +63,12 @@
 #include "util.h"
 
 struct clmInstance {
-	void *ipc_ctx;
+	hdb_handle_t ipc_handle;
 	SaClmCallbacksT callbacks;
 	int finalize;
-	pthread_mutex_t response_mutex;
-	pthread_mutex_t dispatch_mutex;
 };
 
-static void clmHandleInstanceDestructor (void *);
-
-DECLARE_HDB_DATABASE(clmHandleDatabase,clmHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(clmHandleDatabase,NULL);
 
 /*
  * Versions supported
@@ -85,15 +81,6 @@ static struct saVersionDatabase clmVersionDatabase = {
 	sizeof (clmVersionsSupported) / sizeof (SaVersionT),
 	clmVersionsSupported
 };
-
-void clmHandleInstanceDestructor (void *instance)
-{
-	struct clmInstance *clmInstance = instance;
-
-	pthread_mutex_destroy (&clmInstance->response_mutex);
-	pthread_mutex_destroy (&clmInstance->dispatch_mutex);
-}
-
 
 /**
  * @defgroup saClm SAF AIS Cluster Membership API
@@ -172,7 +159,7 @@ saClmInitialize (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&clmInstance->ipc_ctx);
+		&clmInstance->ipc_handle);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -182,10 +169,6 @@ saClmInitialize (
 	} else {
 		memset (&clmInstance->callbacks, 0, sizeof (SaClmCallbacksT));
 	}
-
-	pthread_mutex_init (&clmInstance->response_mutex, NULL);
-
-	pthread_mutex_init (&clmInstance->dispatch_mutex, NULL);
 
 	hdb_handle_put (&clmHandleDatabase, *clmHandle);
 
@@ -228,6 +211,7 @@ saClmSelectionObjectGet (
 {
 	struct clmInstance *clmInstance;
 	SaAisErrorT error;
+	int fd;
 
 	if (selectionObject == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -238,10 +222,11 @@ saClmSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = coroipcc_fd_get (clmInstance->ipc_ctx);
+	error = coroipcc_fd_get (clmInstance->ipc_handle, &fd);
+	*selectionObject = fd;
 
 	hdb_handle_put (&clmHandleDatabase, clmHandle);
-	return (SA_AIS_OK);
+	return (error);
 }
 
 /**
@@ -268,7 +253,6 @@ saClmDispatch (
 	int timeout = -1;
 	SaAisErrorT error;
 	int cont = 1; /* always continue do loop except when set to 0 */
-	int dispatch_avail;
 	struct clmInstance *clmInstance;
 	struct res_lib_clm_clustertrack *res_lib_clm_clustertrack;
 	struct res_clm_nodegetcallback *res_clm_nodegetcallback;
@@ -302,29 +286,20 @@ saClmDispatch (
 	}
 
 	do {
-		pthread_mutex_lock (&clmInstance->dispatch_mutex);
-
-		dispatch_avail = coroipcc_dispatch_get (
-			clmInstance->ipc_ctx,
+		error = coroipcc_dispatch_get (
+			clmInstance->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
-
-		pthread_mutex_unlock (&clmInstance->dispatch_mutex);
-
-		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			break; /* exit do while cont is 1 loop */
-		} else
-		if (dispatch_avail == 0) {
-			continue; /* next poll */
+		if (error != CS_OK) {
+			goto error_put;
 		}
 
-		if (dispatch_avail == -1) {
-			if (clmInstance->finalize == 1) {
-				error = SA_AIS_OK;
+		if (dispatch_data == NULL) {
+			if (dispatchFlags == CPG_DISPATCH_ALL) {
+				break; /* exit do while cont is 1 loop */
 			} else {
-				error = SA_AIS_ERR_LIBRARY;
+				continue; /* next poll */
 			}
-			goto error_put;
 		}
 
 		/*
@@ -386,12 +361,12 @@ saClmDispatch (
 			break;
 
 		default:
-			coroipcc_dispatch_put (clmInstance->ipc_ctx);
+			coroipcc_dispatch_put (clmInstance->ipc_handle);
 			error = SA_AIS_ERR_LIBRARY;
 			goto error_put;
 			break;
 		}
-		coroipcc_dispatch_put (clmInstance->ipc_ctx);
+		coroipcc_dispatch_put (clmInstance->ipc_handle);
 
 		/*
 		 * Determine if more messages should be processed
@@ -451,22 +426,17 @@ saClmFinalize (
 		return (error);
 	}
 
-       pthread_mutex_lock (&clmInstance->response_mutex);
-
 	/*
 	 * Another thread has already started finalizing
 	 */
 	if (clmInstance->finalize) {
-		pthread_mutex_unlock (&clmInstance->response_mutex);
 		hdb_handle_put (&clmHandleDatabase, clmHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
 	clmInstance->finalize = 1;
 
-	coroipcc_service_disconnect (clmInstance->ipc_ctx);
-
-	pthread_mutex_unlock (&clmInstance->response_mutex);
+	coroipcc_service_disconnect (clmInstance->ipc_handle);
 
 	hdb_handle_destroy (&clmHandleDatabase, clmHandle);
 
@@ -524,8 +494,6 @@ saClmClusterTrack (
 	iov.iov_base = &req_lib_clm_clustertrack;
 	iov.iov_len = sizeof (req_lib_clm_clustertrack);;
 
-	pthread_mutex_lock (&clmInstance->response_mutex);
-
 	if ((clmInstance->callbacks.saClmClusterTrackCallback == 0) &&
 		((notificationBuffer == NULL) ||
 		(trackFlags & (SA_TRACK_CHANGES | SA_TRACK_CHANGES_ONLY)))) {
@@ -534,7 +502,7 @@ saClmClusterTrack (
 		goto error_exit;
 	}
 
-	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_clm_clustertrack,
@@ -568,7 +536,6 @@ saClmClusterTrack (
 	}
 
 error_exit:
-	pthread_mutex_unlock (&clmInstance->response_mutex);
 
 error_nounlock:
 	hdb_handle_put (&clmHandleDatabase, clmHandle);
@@ -597,15 +564,11 @@ saClmClusterTrackStop (
 	iov.iov_base = &req_lib_clm_trackstop;
 	iov.iov_len = sizeof (struct req_lib_clm_trackstop);
 
-	pthread_mutex_lock (&clmInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_clm_trackstop,
 		sizeof (struct res_lib_clm_trackstop));
-
-	pthread_mutex_unlock (&clmInstance->response_mutex);
 
 	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
@@ -642,8 +605,6 @@ saClmClusterNodeGet (
 	iov.iov_base = &req_lib_clm_nodeget,
 	iov.iov_len = sizeof (struct req_lib_clm_nodeget),
 
-	pthread_mutex_lock (&clmInstance->response_mutex);
-
 	/*
 	 * Send request message
 	 */
@@ -651,7 +612,7 @@ saClmClusterNodeGet (
 	req_lib_clm_nodeget.header.id = MESSAGE_REQ_CLM_NODEGET;
 	req_lib_clm_nodeget.node_id = nodeId;
 
-	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_handle,
 		&iov,
 		1,
 		&res_clm_nodeget,
@@ -666,8 +627,6 @@ saClmClusterNodeGet (
 		&res_clm_nodeget.cluster_node);
 
 error_exit:
-	pthread_mutex_unlock (&clmInstance->response_mutex);
-
 	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
 	return (error);
@@ -696,8 +655,6 @@ saClmClusterNodeGetAsync (
 		return (error);
 	}
 
-	pthread_mutex_lock (&clmInstance->response_mutex);
-
 	if (clmInstance->callbacks.saClmClusterNodeGetCallback == NULL) {
 		error = SA_AIS_ERR_INIT;
 		goto error_exit;
@@ -707,7 +664,7 @@ saClmClusterNodeGetAsync (
 	iov.iov_len = sizeof (req_lib_clm_nodegetasync);
 
 	error = coroipcc_msg_send_reply_receive (
-		clmInstance->ipc_ctx,
+		clmInstance->ipc_handle,
 		&iov,
 		1,
 		&res_clm_nodegetasync,
@@ -719,8 +676,6 @@ saClmClusterNodeGetAsync (
 	error = res_clm_nodegetasync.header.error;
 
 error_exit:
-	pthread_mutex_unlock (&clmInstance->response_mutex);
-
 	hdb_handle_put (&clmHandleDatabase, clmHandle);
 
 	return (error);

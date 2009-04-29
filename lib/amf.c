@@ -62,21 +62,17 @@
  * Data structure for instance data
  */
 struct amfInstance {
-	void *ipc_ctx;
+	hdb_handle_t handle;
 	SaAmfCallbacksT callbacks;
 	SaNameT compName;
 	int compRegistered;
 	int finalize;
-	pthread_mutex_t response_mutex;
-	pthread_mutex_t dispatch_mutex;
 };
-
-static void amfHandleInstanceDestructor (void *);
 
 /*
  * All instances in one database
  */
-DECLARE_HDB_DATABASE(amfHandleDatabase,amfHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(amfHandleDatabase,NULL);
 
 /*
  * Versions supported
@@ -93,14 +89,6 @@ static struct saVersionDatabase amfVersionDatabase = {
 /*
  * Implementation
  */
-
-void amfHandleInstanceDestructor (void *instance)
-{
-	struct amfInstance *amfInstance = instance;
-
-	pthread_mutex_destroy (&amfInstance->response_mutex);
-	pthread_mutex_destroy (&amfInstance->dispatch_mutex);
-}
 
 SaAisErrorT
 saAmfInitialize (
@@ -132,16 +120,12 @@ saAmfInitialize (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&amfInstance->ipc_ctx);
+		&amfInstance->handle);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
 
 	memcpy (&amfInstance->callbacks, amfCallbacks, sizeof (SaAmfCallbacksT));
-
-	pthread_mutex_init (&amfInstance->response_mutex, NULL);
-
-	pthread_mutex_init (&amfInstance->dispatch_mutex, NULL);
 
 	hdb_handle_put (&amfHandleDatabase, *amfHandle);
 
@@ -162,16 +146,18 @@ saAmfSelectionObjectGet (
 {
 	struct amfInstance *amfInstance;
 	SaAisErrorT error;
+	int fd;
 
 	error = hdb_error_to_sa(hdb_handle_get (&amfHandleDatabase, amfHandle, (void *)&amfInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
-	*selectionObject = coroipcc_fd_get (amfInstance->ipc_ctx);
+	error = coroipcc_fd_get (amfInstance->handle, &fd);
+	*selectionObject = fd;
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
-	return (SA_AIS_OK);
+	return (error);
 }
 
 
@@ -183,7 +169,6 @@ saAmfDispatch (
 	int timeout = -1;
 	SaAisErrorT error;
 	int cont = 1; /* always continue do loop except when set to 0 */
-	int dispatch_avail;
 	struct amfInstance *amfInstance;
 	struct res_lib_amf_csisetcallback *res_lib_amf_csisetcallback;
 
@@ -215,28 +200,21 @@ saAmfDispatch (
 	}
 
 	do {
-		pthread_mutex_lock (&amfInstance->dispatch_mutex);
-
-		dispatch_avail = coroipcc_dispatch_get (
-			amfInstance->ipc_ctx,
+		error = coroipcc_dispatch_get (
+			amfInstance->handle,
 			(void **)&dispatch_data,
 			timeout);
-
-		pthread_mutex_unlock (&amfInstance->dispatch_mutex);
-
-		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			break; /* exit do while cont is 1 loop */
-		} else
-		if (dispatch_avail == 0) {
-			continue;
-		}
-		if (dispatch_avail == -1) {
-			if (amfInstance->finalize == 1) {
-				error = SA_AIS_OK;
-			} else {
-				error = SA_AIS_ERR_LIBRARY;
-			}
+		if (error != CS_OK) {
 			goto error_put;
+		}
+
+
+		if (dispatch_data == NULL) {
+			if (dispatchFlags == CPG_DISPATCH_ALL) {
+				break; /* exit do while cont is 1 loop */
+			} else {
+				continue; /* next poll */
+			}
 		}
 
 		/*
@@ -337,12 +315,12 @@ saAmfDispatch (
 #endif
 			break;
 		default:
-			coroipcc_dispatch_put (amfInstance->ipc_ctx);
+			coroipcc_dispatch_put (amfInstance->handle);
 			error = SA_AIS_ERR_LIBRARY;
 			goto error_put;
 			break;
 		}
-		coroipcc_dispatch_put (amfInstance->ipc_ctx);
+		coroipcc_dispatch_put (amfInstance->handle);
 
 		/*
 		 * Determine if more messages should be processed
@@ -376,27 +354,17 @@ saAmfFinalize (
 		return (error);
 	}
 
-	pthread_mutex_lock (&amfInstance->dispatch_mutex);
-
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
 	/*
 	 * Another thread has already started finalizing
 	 */
 	if (amfInstance->finalize) {
-		pthread_mutex_unlock (&amfInstance->response_mutex);
-		pthread_mutex_unlock (&amfInstance->dispatch_mutex);
 		hdb_handle_put (&amfHandleDatabase, amfHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
 	amfInstance->finalize = 1;
 
-	coroipcc_service_disconnect (amfInstance->ipc_ctx);
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
-
-	pthread_mutex_unlock (&amfInstance->dispatch_mutex);
+	coroipcc_service_disconnect (amfInstance->handle);
 
 	hdb_handle_destroy (&amfHandleDatabase, amfHandle);
 
@@ -437,15 +405,12 @@ saAmfComponentRegister (
 
 	iov.iov_base = &req_lib_amf_componentregister;
 	iov.iov_len = sizeof (struct req_lib_amf_componentregister);
-	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_componentregister,
 		sizeof (struct res_lib_amf_componentregister));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -489,15 +454,11 @@ saAmfComponentUnregister (
 	iov.iov_base = &req_lib_amf_componentunregister;
 	iov.iov_len = sizeof (struct req_lib_amf_componentunregister);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_componentunregister,
 		sizeof (struct res_lib_amf_componentunregister));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -519,8 +480,6 @@ saAmfComponentNameGet (
 		return (error);
 	}
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
 	error = SA_AIS_OK;
 
 	env_value = getenv ("SA_AMF_COMPONENT_NAME");
@@ -534,8 +493,6 @@ saAmfComponentNameGet (
 	compName->length = strlen (env_value);
 
 error_exit:
-	pthread_mutex_unlock (&amfInstance->response_mutex);
-
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
 	return (error);
@@ -574,15 +531,11 @@ saAmfPmStart (
 	iov.iov_base = &req_lib_amf_pmstart;
 	iov.iov_len = sizeof (struct req_lib_amf_pmstart);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_pmstart,
 		sizeof (struct res_lib_amf_pmstart));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -619,15 +572,11 @@ saAmfPmStop (
 	iov.iov_base = &req_lib_amf_pmstop;
 	iov.iov_len = sizeof (struct req_lib_amf_pmstop);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_pmstop,
 		sizeof (struct res_lib_amf_pmstop));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -667,15 +616,11 @@ saAmfHealthcheckStart (
 	iov.iov_base = &req_lib_amf_healthcheckstart;
 	iov.iov_len = sizeof (struct req_lib_amf_healthcheckstart);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_healthcheckstart,
 		sizeof (struct res_lib_amf_healthcheckstart));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -712,15 +657,11 @@ saAmfHealthcheckConfirm (
 	iov.iov_base = &req_lib_amf_healthcheckconfirm;
 	iov.iov_len = sizeof (struct req_lib_amf_healthcheckconfirm);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_healthcheckconfirm,
 		sizeof (struct res_lib_amf_healthcheckconfirm));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -755,15 +696,11 @@ saAmfHealthcheckStop (
 	iov.iov_base = &req_lib_amf_healthcheckstop;
 	iov.iov_len = sizeof (struct req_lib_amf_healthcheckstop);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_healthcheckstop,
 		sizeof (struct res_lib_amf_healthcheckstop));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -793,20 +730,16 @@ saAmfHAStateGet (
 	iov.iov_base = &req_lib_amf_hastateget,
 	iov.iov_len = sizeof (struct req_lib_amf_hastateget),
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
 	req_lib_amf_hastateget.header.id = MESSAGE_REQ_AMF_HASTATEGET;
 	req_lib_amf_hastateget.header.size = sizeof (struct req_lib_amf_hastateget);
 	memcpy (&req_lib_amf_hastateget.compName, compName, sizeof (SaNameT));
 	memcpy (&req_lib_amf_hastateget.csiName, csiName, sizeof (SaNameT));
 
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_hastateget,
 		sizeof (struct res_lib_amf_hastateget));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -843,15 +776,11 @@ saAmfCSIQuiescingComplete (
 	iov.iov_base = &req_lib_amf_csiquiescingcomplete;
 	iov.iov_len = sizeof (struct req_lib_amf_csiquiescingcomplete);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	errorResult = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	errorResult = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_csiquiescingcomplete,
 		sizeof (struct res_lib_amf_csiquiescingcomplete));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -887,15 +816,11 @@ saAmfProtectionGroupTrack (
 	iov.iov_base = &req_lib_amf_protectiongrouptrack;
 	iov.iov_len = sizeof (struct req_lib_amf_protectiongrouptrack);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_protectiongrouptrack,
 		sizeof (struct res_lib_amf_protectiongrouptrack));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -925,15 +850,12 @@ saAmfProtectionGroupTrackStop (
 
 	iov.iov_base = &req_lib_amf_protectiongrouptrackstop,
 	iov.iov_len = sizeof (struct req_lib_amf_protectiongrouptrackstop),
-	pthread_mutex_lock (&amfInstance->response_mutex);
 
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_protectiongrouptrackstop,
 		sizeof (struct res_lib_amf_protectiongrouptrackstop));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -970,7 +892,7 @@ saAmfComponentErrorReport (
 	iov.iov_base = &req_lib_amf_componenterrorreport;
 	iov.iov_len = sizeof (struct req_lib_amf_componenterrorreport);
 
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_componenterrorreport,
@@ -978,8 +900,6 @@ saAmfComponentErrorReport (
 
 
 	error = res_lib_amf_componenterrorreport.header.error;
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -1011,15 +931,11 @@ saAmfComponentErrorClear (
 	iov.iov_base = &req_lib_amf_componenterrorclear;
 	iov.iov_len = sizeof (struct req_lib_amf_componenterrorclear);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_componenterrorclear,
 		sizeof (struct res_lib_amf_componenterrorclear));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 
@@ -1052,15 +968,12 @@ saAmfResponse (
 	iov.iov_base = &req_lib_amf_response;
 	iov.iov_len = sizeof (struct req_lib_amf_response);
 
-	pthread_mutex_lock (&amfInstance->response_mutex);
-
-	errorResult = coroipcc_msg_send_reply_receive (amfInstance->ipc_ctx,
+	errorResult = coroipcc_msg_send_reply_receive (
+		amfInstance->handle,
 		&iov,
 		1,
 		&res_lib_amf_response,
 		sizeof (struct res_lib_amf_response));
-
-	pthread_mutex_unlock (&amfInstance->response_mutex);
 
 	hdb_handle_put (&amfHandleDatabase, amfHandle);
 

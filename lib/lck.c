@@ -65,17 +65,15 @@
  * Data structure for instance data
  */
 struct lckInstance {
-	void *ipc_ctx;
+	hdb_handle_t ipc_handle;
 	SaLckCallbacksT callbacks;
 	int finalize;
 	SaLckHandleT lckHandle;
 	struct list_head resource_list;
-	pthread_mutex_t response_mutex;
-	pthread_mutex_t dispatch_mutex;
 };
 
 struct lckResourceInstance {
-	void *ipc_ctx;
+	hdb_handle_t ipc_handle;
 	SaLckHandleT lckHandle;
 	SaLckResourceHandleT lckResourceHandle;
 	SaLckResourceOpenFlagsT resourceOpenFlags;
@@ -84,29 +82,23 @@ struct lckResourceInstance {
 /* TODO
  *this should be a handle from a handle database	mar_message_source_t source;
  */
-	pthread_mutex_t *response_mutex;
 };
 
 struct lckLockIdInstance {
-	void *ipc_ctx;
+	hdb_handle_t ipc_handle;
 	SaLckResourceHandleT lckResourceHandle;
 	struct list_head list;
 	void *resource_lock;
-	pthread_mutex_t *response_mutex;
 };
-
-void lckHandleInstanceDestructor (void *instance);
-void lckResourceHandleInstanceDestructor (void *instance);
-void lckResourceHandleLockIdInstanceDestructor (void *instance);
 
 /*
  * All LCK instances in this database
  */
-DECLARE_HDB_DATABASE(lckHandleDatabase,lckHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(lckHandleDatabase,NULL);
 
-DECLARE_HDB_DATABASE(lckResourceHandleDatabase,lckResourceHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(lckResourceHandleDatabase,NULL);
 
-DECLARE_HDB_DATABASE(lckLockIdHandleDatabase,lckResourceHandleLockIdInstanceDestructor);
+DECLARE_HDB_DATABASE(lckLockIdHandleDatabase,NULL);
 
 /*
  * Versions supported
@@ -124,21 +116,6 @@ static struct saVersionDatabase lckVersionDatabase = {
 /*
  * Implementation
  */
-void lckHandleInstanceDestructor (void *instance)
-{
-	struct lckInstance *lckInstance = instance;
-
-	pthread_mutex_destroy (&lckInstance->response_mutex);
-	pthread_mutex_destroy (&lckInstance->dispatch_mutex);
-}
-
-void lckResourceHandleInstanceDestructor (void *instance)
-{
-}
-
-void lckResourceHandleLockIdInstanceDestructor (void *instance)
-{
-}
 
 #ifdef NOT_DONE
 static void lckSectionIterationInstanceFinalize (struct lckSectionIterationInstance *lckSectionIterationInstance)
@@ -250,7 +227,7 @@ saLckInitialize (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&lckInstance->ipc_ctx);
+		&lckInstance->ipc_handle);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -264,8 +241,6 @@ saLckInitialize (
 	list_init (&lckInstance->resource_list);
 
 	lckInstance->lckHandle = *lckHandle;
-
-	pthread_mutex_init (&lckInstance->response_mutex, NULL);
 
 	hdb_handle_put (&lckHandleDatabase, *lckHandle);
 
@@ -286,6 +261,7 @@ saLckSelectionObjectGet (
 {
 	struct lckInstance *lckInstance;
 	SaAisErrorT error;
+	int fd;
 
 	if (selectionObject == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -295,11 +271,12 @@ saLckSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = coroipcc_fd_get (lckInstance->ipc_ctx);
+	error = coroipcc_fd_get (lckInstance->ipc_handle, &fd);
+	*selectionObject = fd;
 
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
-	return (SA_AIS_OK);
+	return (error);
 }
 
 SaAisErrorT
@@ -318,7 +295,6 @@ saLckDispatch (
 	int timeout = 1;
 	SaLckCallbacksT callbacks;
 	SaAisErrorT error;
-	int dispatch_avail;
 	struct lckInstance *lckInstance;
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
@@ -351,30 +327,21 @@ saLckDispatch (
 	}
 
 	do {
-		pthread_mutex_lock(&lckInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_get (
-			lckInstance->ipc_ctx,
+		error = coroipcc_dispatch_get (
+			lckInstance->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
-
-		pthread_mutex_unlock(&lckInstance->dispatch_mutex);
-
-		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			pthread_mutex_unlock(&lckInstance->dispatch_mutex);
-			break; /* exit do while cont is 1 loop */
-		} else
-		if (dispatch_avail == 0) {
-			pthread_mutex_unlock(&lckInstance->dispatch_mutex);
-			continue;
-		}
-		if (dispatch_avail == -1) {
-			if (lckInstance->finalize == 1) {
-				error = SA_AIS_OK;
-			} else {
-				error = SA_AIS_ERR_LIBRARY;
-			}
+		if (error != CS_OK) {
 			goto error_put;
+		}
+
+		if (dispatch_data == NULL) {
+			if (dispatchFlags == CPG_DISPATCH_ALL) {
+				break; /* exit do while cont is 1 loop */
+			} else {
+				continue; /* next poll */
+			}
 		}
 
 		/*
@@ -520,7 +487,7 @@ saLckDispatch (
 			break;
 		}
 
-		coroipcc_dispatch_put (lckInstance->ipc_ctx);
+		coroipcc_dispatch_put (lckInstance->ipc_handle);
 
 		/*
 		 * Determine if more messages should be processed
@@ -555,22 +522,17 @@ saLckFinalize (
 		return (error);
 	}
 
-	pthread_mutex_lock (&lckInstance->response_mutex);
-
 	/*
 	 * Another thread has already started finalizing
 	 */
 	if (lckInstance->finalize) {
-		pthread_mutex_unlock (&lckInstance->response_mutex);
 		hdb_handle_put (&lckHandleDatabase, lckHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
 	lckInstance->finalize = 1;
 
-	coroipcc_service_disconnect (lckInstance->ipc_ctx);
-
-	pthread_mutex_unlock (&lckInstance->response_mutex);
+	coroipcc_service_disconnect (lckInstance->ipc_handle);
 
 // TODO	lckInstanceFinalize (lckInstance);
 
@@ -620,11 +582,10 @@ saLckResourceOpen (
 		goto error_destroy;
 	}
 
-	lckResourceInstance->ipc_ctx = lckInstance->ipc_ctx;
+	lckResourceInstance->ipc_handle = lckInstance->ipc_handle;
 
 	lckResourceInstance->lckHandle = lckHandle;
 	lckResourceInstance->lckResourceHandle = *lckResourceHandle;
-	lckResourceInstance->response_mutex = &lckInstance->response_mutex;
 
 	req_lib_lck_resourceopen.header.size = sizeof (struct req_lib_lck_resourceopen);
 	req_lib_lck_resourceopen.header.id = MESSAGE_REQ_LCK_RESOURCEOPEN;
@@ -639,16 +600,12 @@ saLckResourceOpen (
 	iov.iov_base = &req_lib_lck_resourceopen;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceopen);
 
-	pthread_mutex_lock (&lckInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		lckResourceInstance->ipc_ctx,
+		lckResourceInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourceopen,
 		sizeof (struct res_lib_lck_resourceopen));
-
-	pthread_mutex_unlock (&lckInstance->response_mutex);
 
 	if (res_lib_lck_resourceopen.header.error != SA_AIS_OK) {
 		error = res_lib_lck_resourceopen.header.error;
@@ -719,8 +676,7 @@ saLckResourceOpenAsync (
 		goto error_destroy;
 	}
 
-	lckResourceInstance->ipc_ctx = lckInstance->ipc_ctx;
-	lckResourceInstance->response_mutex = &lckInstance->response_mutex;
+	lckResourceInstance->ipc_handle = lckInstance->ipc_handle;
 	lckResourceInstance->lckHandle = lckHandle;
 	lckResourceInstance->lckResourceHandle = lckResourceHandle;
 	lckResourceInstance->resourceOpenFlags = resourceOpenFlags;
@@ -738,16 +694,12 @@ saLckResourceOpenAsync (
 	iov.iov_base = &req_lib_lck_resourceopen;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceopen);
 
-	pthread_mutex_lock (&lckInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		lckResourceInstance->ipc_ctx,
+		lckResourceInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourceopenasync,
 		sizeof (struct res_lib_lck_resourceopenasync));
-
-	pthread_mutex_unlock (&lckInstance->response_mutex);
 
 	if (error == SA_AIS_OK) {
 		hdb_error_to_sa(hdb_handle_put (&lckResourceHandleDatabase,
@@ -790,16 +742,12 @@ saLckResourceClose (
 	iov.iov_base = &req_lib_lck_resourceclose;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceclose);
 
-	pthread_mutex_lock (lckResourceInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		lckResourceInstance->ipc_ctx,
+		lckResourceInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourceclose,
 		sizeof (struct res_lib_lck_resourceclose));
-
-	pthread_mutex_unlock (lckResourceInstance->response_mutex);
 
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 
@@ -824,7 +772,7 @@ saLckResourceLock (
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
-	void *lock_ctx;
+	hdb_handle_t lock_handle;
 
 	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
 		(void *)&lckResourceInstance));
@@ -850,13 +798,12 @@ saLckResourceLock (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&lock_ctx);
+		&lock_handle);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}
 
-	lckLockIdInstance->response_mutex = lckResourceInstance->response_mutex;
-	lckLockIdInstance->ipc_ctx = lckResourceInstance->ipc_ctx;
+	lckLockIdInstance->ipc_handle = lckResourceInstance->ipc_handle;
 	lckLockIdInstance->lckResourceHandle = lckResourceHandle;
 
 	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
@@ -881,10 +828,7 @@ saLckResourceLock (
 	iov.iov_base = &req_lib_lck_resourcelock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
 
-	/*
-	 * no mutex needed here since its a new connection
-	 */
-	error = coroipcc_msg_send_reply_receive (lock_ctx,
+	error = coroipcc_msg_send_reply_receive (lock_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourcelock,
@@ -926,7 +870,7 @@ saLckResourceLockAsync (
 	SaAisErrorT error;
 	struct lckResourceInstance *lckResourceInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
-	void *lock_ctx;
+	hdb_handle_t lock_handle;
 
 	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
 		(void *)&lckResourceInstance));
@@ -952,13 +896,12 @@ saLckResourceLockAsync (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&lock_ctx);
+		&lock_handle);
 	if (error != SA_AIS_OK) { // TODO error handling
 		goto error_destroy;
 	}
 
-	lckLockIdInstance->response_mutex = lckResourceInstance->response_mutex;
-	lckLockIdInstance->ipc_ctx = lckResourceInstance->ipc_ctx;
+	lckLockIdInstance->ipc_handle = lckResourceInstance->ipc_handle;
 	lckLockIdInstance->lckResourceHandle = lckResourceHandle;
 
 	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
@@ -982,11 +925,8 @@ saLckResourceLockAsync (
 	iov.iov_base = &req_lib_lck_resourcelock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
 
-	/*
-	 * no mutex needed here since its a new connection
-	 */
 	error = coroipcc_msg_send_reply_receive (
-		lock_ctx,
+		lock_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourcelockasync,
@@ -1054,16 +994,12 @@ saLckResourceUnlock (
 	iov.iov_base = &req_lib_lck_resourceunlock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceunlock);
 
-	pthread_mutex_lock (lckLockIdInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		lckLockIdInstance->ipc_ctx,
+		lckLockIdInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourceunlock,
 		sizeof (struct res_lib_lck_resourceunlock));
-
-	pthread_mutex_unlock (lckLockIdInstance->response_mutex);
 
 	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
 
@@ -1119,15 +1055,11 @@ saLckResourceUnlockAsync (
 	iov.iov_base = &req_lib_lck_resourceunlock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceunlock);
 
-	pthread_mutex_lock (lckLockIdInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (lckLockIdInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (lckLockIdInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourceunlockasync,
 		sizeof (struct res_lib_lck_resourceunlockasync));
-
-	pthread_mutex_unlock (lckLockIdInstance->response_mutex);
 
 	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
 
@@ -1158,15 +1090,11 @@ saLckLockPurge (
 	iov.iov_base = &req_lib_lck_lockpurge;
 	iov.iov_len = sizeof (struct req_lib_lck_lockpurge);
 
-	pthread_mutex_lock (lckResourceInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (lckResourceInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (lckResourceInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_lockpurge,
 		sizeof (struct res_lib_lck_lockpurge));
-
-	pthread_mutex_unlock (lckResourceInstance->response_mutex);
 
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 

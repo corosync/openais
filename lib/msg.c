@@ -63,32 +63,25 @@
 #include "util.h"
 
 struct msgInstance {
-	void *ipc_ctx;
+	hdb_handle_t ipc_handle;
 	int finalize;
 	SaMsgHandleT msg_handle;
 	SaMsgCallbacksT callbacks;
-	pthread_mutex_t response_mutex;
-	pthread_mutex_t dispatch_mutex;
 };
 
 struct queueInstance {
-	void *ipc_ctx;
+	hdb_handle_t ipc_handle;
 	SaNameT queue_name;
 	SaUint32T queue_id;
 	SaMsgHandleT msg_handle;
 	SaMsgQueueHandleT queue_handle;
 	SaMsgQueueOpenFlagsT open_flags;
 	SaMsgQueueCreationAttributesT creation_attributes;
-	pthread_mutex_t response_mutex;
-	pthread_mutex_t dispatch_mutex;
 };
 
-void msgHandleInstanceDestructor (void *instance);
-void queueHandleInstanceDestructor (void *instance);
+DECLARE_HDB_DATABASE(msgHandleDatabase,NULL);
 
-DECLARE_HDB_DATABASE(msgHandleDatabase,msgHandleInstanceDestructor);
-
-DECLARE_HDB_DATABASE(queueHandleDatabase,queueHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(queueHandleDatabase,NULL);
 
 static SaVersionT msgVersionsSupported[] = {
 	{ 'B', 1, 1 }
@@ -99,21 +92,7 @@ static struct saVersionDatabase msgVersionDatabase = {
 	msgVersionsSupported
 };
 
-void msgHandleInstanceDestructor (void *instance)
-{
-	struct msgInstance *msgInstance = instance;
-
-	pthread_mutex_destroy (&msgInstance->response_mutex);
-	pthread_mutex_destroy (&msgInstance->dispatch_mutex);
-}
-
-void queueHandleInstanceDestructor (void *instance)
-{
-	return;
-}
-
 #ifdef COMPILE_OUT
-
 static void msgInstanceFinalize (struct msgInstance *msgInstance)
 {
 	return;
@@ -162,7 +141,7 @@ saMsgInitialize (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&msgInstance->ipc_ctx);
+		&msgInstance->ipc_handle);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -174,8 +153,6 @@ saMsgInitialize (
 	}
 
 	msgInstance->msg_handle = *msgHandle;
-
-	pthread_mutex_init (&msgInstance->response_mutex, NULL);
 
 	hdb_handle_put (&msgHandleDatabase, *msgHandle);
 
@@ -196,6 +173,7 @@ saMsgSelectionObjectGet (
 {
 	struct msgInstance *msgInstance;
 	SaAisErrorT error = SA_AIS_OK;
+	int fd;
 
 	if (selectionObject == NULL) {
 		return (SA_AIS_ERR_INVALID_PARAM);
@@ -207,11 +185,12 @@ saMsgSelectionObjectGet (
 		return (error);
 	}
 
-	*selectionObject = coroipcc_fd_get (msgInstance->ipc_ctx);
+	error = coroipcc_fd_get (msgInstance->ipc_handle, &fd);
+	*selectionObject = fd;
 
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
-	return (SA_AIS_OK);
+	return (error);
 }
 
 SaAisErrorT
@@ -224,7 +203,6 @@ saMsgDispatch (
 	struct msgInstance *msgInstance;
 	/* struct queueInstance *queueInstance; */
 	coroipc_response_header_t *dispatch_data;
-	int dispatch_avail;
 	int timeout = 1;
 	int cont = 1;
 
@@ -251,29 +229,21 @@ saMsgDispatch (
 	}
 
 	do {
-		pthread_mutex_lock (&msgInstance->dispatch_mutex);
 
-		dispatch_avail = coroipcc_dispatch_get (
-			msgInstance->ipc_ctx,
+		error = coroipcc_dispatch_get (
+			msgInstance->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
-
-		pthread_mutex_unlock (&msgInstance->dispatch_mutex);
-
-		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			break;
-		}
-		else if (dispatch_avail == 0) {
-			continue;
-		}
-
-		if (dispatch_avail == -1) {
-			if (msgInstance->finalize == 1) {
-				error = SA_AIS_OK;
-			} else {
-				error = SA_AIS_ERR_LIBRARY;
-			}
+		if (error != CS_OK) {
 			goto error_put;
+		}
+
+		if (dispatch_data == NULL) {
+			if (dispatchFlags == CPG_DISPATCH_ALL) {
+				break; /* exit do while cont is 1 loop */
+			} else {
+				continue; /* next poll */
+			}
 		}
 
 		memcpy (&callbacks, &msgInstance->callbacks,
@@ -344,7 +314,7 @@ saMsgDispatch (
 		default:
 			break;
 		}
-		coroipcc_dispatch_put (msgInstance->ipc_ctx);
+		coroipcc_dispatch_put (msgInstance->ipc_handle);
 
 		switch (dispatchFlags)
 		{
@@ -358,7 +328,6 @@ saMsgDispatch (
 		}
 	} while (cont);
 
-	pthread_mutex_unlock (&msgInstance->dispatch_mutex);
 error_put:
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
@@ -378,21 +347,17 @@ saMsgFinalize (
 		return (error);
 	}
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	if (msgInstance->finalize) {
-		pthread_mutex_unlock (&msgInstance->response_mutex);
 		hdb_handle_put (&msgHandleDatabase, msgHandle);
 		return (SA_AIS_ERR_BAD_HANDLE);
 	}
 
 	msgInstance->finalize = 1;
 
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	/* msgInstanceFinalize (msgInstance); */
 
-	error = coroipcc_service_disconnect (msgInstance->ipc_ctx); /* ? */
+	error = coroipcc_service_disconnect (msgInstance->ipc_handle); /* ? */
 
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
@@ -450,8 +415,7 @@ saMsgQueueOpen (
 	printf ("[DEBUG]:\t name = %s\n",
 		(char *)(queueName->value));
 
-	queueInstance->ipc_ctx = msgInstance->ipc_ctx;
-	queueInstance->response_mutex = msgInstance->response_mutex;
+	queueInstance->ipc_handle = msgInstance->ipc_handle;
 
 	req_lib_msg_queueopen.header.size =
 		sizeof (struct req_lib_msg_queueopen);
@@ -478,16 +442,12 @@ saMsgQueueOpen (
 	iov.iov_base = &req_lib_msg_queueopen;
 	iov.iov_len = sizeof (struct req_lib_msg_queueopen);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		queueInstance->ipc_ctx,
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queueopen,
 		sizeof (struct res_lib_msg_queueopen));
-
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 
 	/* if (error != SA_AIS_OK) */
 
@@ -572,8 +532,7 @@ saMsgQueueOpenAsync (
 	printf ("[DEBUG]:\t name = %s\n",
 		(char *)(queueName->value));
 
-	queueInstance->ipc_ctx = msgInstance->ipc_ctx;
-	queueInstance->response_mutex = msgInstance->response_mutex;
+	queueInstance->ipc_handle = msgInstance->ipc_handle;
 
 	req_lib_msg_queueopenasync.header.size =
 		sizeof (struct req_lib_msg_queueopenasync);
@@ -600,16 +559,12 @@ saMsgQueueOpenAsync (
 	iov.iov_base = &req_lib_msg_queueopenasync;
 	iov.iov_len = sizeof (struct req_lib_msg_queueopenasync);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		queueInstance->ipc_ctx,
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queueopenasync,
 		sizeof (struct res_lib_msg_queueopenasync));
-
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 
 	/* if (error != SA_AIS_OK) */
 
@@ -678,16 +633,12 @@ saMsgQueueClose (
 	iov.iov_base = &req_lib_msg_queueclose;
 	iov.iov_len = sizeof (struct req_lib_msg_queueclose);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		queueInstance->ipc_ctx,
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queueclose,
 		sizeof (struct res_lib_msg_queueclose));
-
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 
 	if (res_lib_msg_queueclose.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueclose.header.error;
@@ -737,16 +688,12 @@ saMsgQueueStatusGet (
 	iov.iov_base = &req_lib_msg_queuestatusget;
 	iov.iov_len = sizeof (struct req_lib_msg_queuestatusget);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuestatusget,
 		sizeof (struct res_lib_msg_queuestatusget));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queuestatusget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuestatusget.header.error;
@@ -806,16 +753,12 @@ saMsgQueueRetentionTimeSet (
 	iov.iov_base = &req_lib_msg_queueretentiontimeset;
 	iov.iov_len = sizeof (struct req_lib_msg_queueretentiontimeset);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		queueInstance->ipc_ctx,
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queueretentiontimeset,
 		sizeof (struct res_lib_msg_queueretentiontimeset));
-
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 
 	if (res_lib_msg_queueretentiontimeset.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueretentiontimeset.header.error;
@@ -864,16 +807,12 @@ saMsgQueueUnlink (
 	iov.iov_base = &req_lib_msg_queueunlink;
 	iov.iov_len = sizeof (struct req_lib_msg_queueunlink);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queueunlink,
 		sizeof (struct res_lib_msg_queueunlink));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queueunlink.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueunlink.header.error;
@@ -925,16 +864,12 @@ saMsgQueueGroupCreate (
 	iov.iov_base = &req_lib_msg_queuegroupcreate;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupcreate);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupcreate,
 		sizeof (struct res_lib_msg_queuegroupcreate));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queuegroupcreate.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupcreate.header.error;
@@ -988,16 +923,12 @@ saMsgQueueGroupInsert (
 	iov.iov_base = &req_lib_msg_queuegroupinsert;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupinsert);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupinsert,
 		sizeof (struct res_lib_msg_queuegroupinsert));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queuegroupinsert.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupinsert.header.error;
@@ -1051,16 +982,12 @@ saMsgQueueGroupRemove (
 	iov.iov_base = &req_lib_msg_queuegroupremove;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupremove);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupremove,
 		sizeof (struct res_lib_msg_queuegroupremove));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queuegroupremove.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupremove.header.error;
@@ -1109,16 +1036,12 @@ saMsgQueueGroupDelete (
 	iov.iov_base = &req_lib_msg_queuegroupdelete;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupdelete);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupdelete,
 		sizeof (struct res_lib_msg_queuegroupdelete));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queuegroupdelete.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupdelete.header.error;
@@ -1204,19 +1127,17 @@ saMsgQueueGroupTrack (
 	iov.iov_base = &req_lib_msg_queuegrouptrack;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrack);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	/*
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuegrouptrack,
 		sizeof (struct res_lib_msg_queuegrouptrack));
 	*/
 
-	error = coroipcc_msg_send_reply_receive_in_buf (
-		msgInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive_in_buf_get (
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&buffer);
@@ -1242,9 +1163,10 @@ saMsgQueueGroupTrack (
 			res_lib_msg_queuegrouptrack->buffer.numberOfItems *
 			sizeof (SaMsgQueueGroupNotificationT));
 	}
+	error = coroipcc_msg_send_reply_receive_in_buf_put (
+		msgInstance->ipc_handle);
 
 error_unlock:
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 error_put:
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
@@ -1287,16 +1209,12 @@ saMsgQueueGroupTrackStop (
 	iov.iov_base = &req_lib_msg_queuegrouptrackstop;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrackstop);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuegrouptrackstop,
 		sizeof (struct res_lib_msg_queuegrouptrackstop));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queuegrouptrackstop.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegrouptrackstop.header.error;
@@ -1338,16 +1256,12 @@ saMsgQueueGroupNotificationFree (
 	iov.iov_base = &req_lib_msg_queuegroupnotificationfree;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupnotificationfree);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuegroupnotificationfree,
 		sizeof (struct res_lib_msg_queuegroupnotificationfree));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_queuegroupnotificationfree.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupnotificationfree.header.error;
@@ -1426,16 +1340,12 @@ saMsgMessageSend (
 	printf ("[DEBUG]:\t message->size = %u\n",
 		(unsigned int)(message->size));
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagesend,
 		sizeof (struct res_lib_msg_messagesend));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_messagesend.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesend.header.error;
@@ -1516,16 +1426,12 @@ saMsgMessageSendAsync (
 	printf ("[DEBUG]:\t message->size = %u\n",
 		(unsigned int)(message->size));
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagesendasync,
 		sizeof (struct res_lib_msg_messagesendasync));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_messagesendasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesendasync.header.error;
@@ -1585,10 +1491,8 @@ saMsgMessageGet (
 	iov.iov_base = &req_lib_msg_messageget;
 	iov.iov_len = sizeof (struct req_lib_msg_messageget);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive_in_buf (
-		queueInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive_in_buf_get (
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&buffer);
@@ -1627,8 +1531,10 @@ saMsgMessageGet (
 		(unsigned long long)(res_lib_msg_messageget->sender_id),
 		(unsigned long long)(res_lib_msg_messageget->sender_id));
 
+	error = coroipcc_msg_send_reply_receive_in_buf_put (
+		queueInstance->ipc_handle);
+
 error_unlock:
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
@@ -1699,16 +1605,12 @@ saMsgMessageCancel (
 	iov.iov_base = &req_lib_msg_messagecancel;
 	iov.iov_len = sizeof (struct req_lib_msg_messagecancel);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		queueInstance->ipc_ctx,
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_messagecancel,
 		sizeof (struct res_lib_msg_messagecancel));
-
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 
 	if (res_lib_msg_messagecancel.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagecancel.header.error;
@@ -1773,16 +1675,12 @@ saMsgMessageSendReceive (
 	printf ("[DEBUG]:\t sendMessage->size = %u\n",
 		(unsigned int)(sendMessage->size));
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagesendreceive,
 		sizeof (struct res_lib_msg_messagesendreceive));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_messagesendreceive.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesendreceive.header.error;
@@ -1848,16 +1746,12 @@ saMsgMessageReply (
 	printf ("[DEBUG]:\t replyMessage->size = %u\n",
 		(unsigned int)(replyMessage->size));
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagereply,
 		sizeof (struct res_lib_msg_messagereply));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_messagereply.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereply.header.error;
@@ -1931,16 +1825,12 @@ saMsgMessageReplyAsync (
 	printf ("[DEBUG]:\t replyMessage->size = %u\n",
 		(unsigned int)(replyMessage->size));
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagereplyasync,
 		sizeof (struct res_lib_msg_messagereplyasync));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_messagereplyasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereplyasync.header.error;
@@ -1993,16 +1883,12 @@ saMsgQueueCapacityThresholdSet (
 	iov.iov_base = &req_lib_msg_queuecapacitythresholdset;
 	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdset);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		queueInstance->ipc_ctx,
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuecapacitythresholdset,
 		sizeof (struct res_lib_msg_queuecapacitythresholdset));
-
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 
 	if (res_lib_msg_queuecapacitythresholdset.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdset.header.error;
@@ -2055,16 +1941,12 @@ saMsgQueueCapacityThresholdGet (
 	iov.iov_base = &req_lib_msg_queuecapacitythresholdget;
 	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdget);
 
-	pthread_mutex_lock (&queueInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		queueInstance->ipc_ctx,
+		queueInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_queuecapacitythresholdget,
 		sizeof (struct res_lib_msg_queuecapacitythresholdget));
-
-	pthread_mutex_unlock (&queueInstance->response_mutex);
 
 	if (res_lib_msg_queuecapacitythresholdget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdget.header.error;
@@ -2106,16 +1988,12 @@ saMsgMetadataSizeGet (
 	iov.iov_base = &req_lib_msg_metadatasizeget;
 	iov.iov_len = sizeof (struct req_lib_msg_metadatasizeget);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_metadatasizeget,
 		sizeof (struct res_lib_msg_metadatasizeget));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_metadatasizeget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_metadatasizeget.header.error;
@@ -2164,16 +2042,12 @@ saMsgLimitGet (
 	iov.iov_base = &req_lib_msg_limitget;
 	iov.iov_len = sizeof (struct req_lib_msg_limitget);
 
-	pthread_mutex_lock (&msgInstance->response_mutex);
-
 	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_ctx,
+		msgInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_msg_limitget,
 		sizeof (struct res_lib_msg_limitget));
-
-	pthread_mutex_unlock (&msgInstance->response_mutex);
 
 	if (res_lib_msg_limitget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_limitget.header.error;

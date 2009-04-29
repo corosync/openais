@@ -63,17 +63,13 @@
 #include "util.h"
 
 struct tmrInstance {
-	void *ipc_ctx;
+	hdb_handle_t ipc_handle;
 	SaTmrCallbacksT callbacks;
 	int finalize;
 	SaTmrHandleT tmrHandle;
-	pthread_mutex_t response_mutex;
-	pthread_mutex_t dispatch_mutex;
 };
 
-void tmrHandleInstanceDestructor (void *instance);
-
-DECLARE_HDB_DATABASE(tmrHandleDatabase,tmrHandleInstanceDestructor);
+DECLARE_HDB_DATABASE(tmrHandleDatabase,NULL);
 
 static SaVersionT tmrVersionsSupported[] = {
 	{ 'A', 1, 1 }
@@ -83,14 +79,6 @@ static struct saVersionDatabase tmrVersionDatabase = {
 	sizeof (tmrVersionsSupported) / sizeof (SaVersionT),
 	tmrVersionsSupported
 };
-
-void tmrHandleInstanceDestructor (void *instance)
-{
-	struct tmrInstance *tmrInstance = instance;
-
-	pthread_mutex_destroy (&tmrInstance->response_mutex);
-	pthread_mutex_destroy (&tmrInstance->dispatch_mutex);
-}
 
 #ifdef COMPILE_OUT
 static void tmrInstanceFinalize (struct tmrInstance *tmrInstance)
@@ -137,7 +125,7 @@ saTmrInitialize (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&tmrInstance->ipc_ctx);
+		&tmrInstance->ipc_handle);
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -149,8 +137,6 @@ saTmrInitialize (
 	}
 
 	tmrInstance->tmrHandle = *tmrHandle;
-
-	pthread_mutex_init (&tmrInstance->response_mutex, NULL);
 
 	hdb_handle_put (&tmrHandleDatabase, *tmrHandle);
 
@@ -171,6 +157,7 @@ saTmrSelectionObjectGet (
 {
 	struct tmrInstance *tmrInstance;
 	SaAisErrorT error = SA_AIS_OK;
+	int fd;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saTmrSelectionObjectGet\n");
@@ -185,12 +172,13 @@ saTmrSelectionObjectGet (
 		goto error_exit;
 	}
 
-	*selectionObject = coroipcc_fd_get (&tmrInstance->ipc_ctx);
+	error = coroipcc_fd_get (tmrInstance->ipc_handle, &fd);
+	*selectionObject = fd;
 
 	hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 
 error_exit:
-	return (SA_AIS_OK);
+	return (error);
 }
 
 SaAisErrorT
@@ -202,7 +190,6 @@ saTmrDispatch (
 	SaAisErrorT error = SA_AIS_OK;
 	struct tmrInstance *tmrInstance;
 	coroipc_response_header_t *dispatch_data;
-	int dispatch_avail;
 	int timeout = 1;
 	int cont = 1;
 
@@ -227,28 +214,20 @@ saTmrDispatch (
 	}
 
 	do {
-		pthread_mutex_lock (&tmrInstance->dispatch_mutex);
-
-		dispatch_avail = coroipcc_dispatch_get (
-			tmrInstance->ipc_ctx,
+		error = coroipcc_dispatch_get (
+			tmrInstance->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
-
-		pthread_mutex_unlock (&tmrInstance->dispatch_mutex);
-
-		if (dispatch_avail == 0 && dispatchFlags == SA_DISPATCH_ALL) {
-			break;
-		}
-		else if (dispatch_avail == 0) {
-			continue;
-		}
-		if (dispatch_avail == -1) {
-			if (tmrInstance->finalize == 1) {
-				error = SA_AIS_OK;
-			} else {
-				error = SA_AIS_ERR_LIBRARY;
-			}
+		if (error != CS_OK) {
 			goto error_put;
+		}
+
+		if (dispatch_data == NULL) {
+			if (dispatchFlags == CPG_DISPATCH_ALL) {
+				break; /* exit do while cont is 1 loop */
+			} else {
+				continue; /* next poll */
+			}
 		}
 
 		memcpy (&callbacks, &tmrInstance->callbacks,
@@ -272,7 +251,7 @@ saTmrDispatch (
 		default:
 			break;
 		}
-		coroipcc_dispatch_put (tmrInstance->ipc_ctx);
+		coroipcc_dispatch_put (tmrInstance->ipc_handle);
 
 		switch (dispatchFlags)
 		{
@@ -307,10 +286,7 @@ saTmrFinalize (
 		goto error_exit;
 	}
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
 	if (tmrInstance->finalize) {
-		pthread_mutex_unlock (&tmrInstance->response_mutex);
 		hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 		error = SA_AIS_ERR_BAD_HANDLE;
 		goto error_exit;
@@ -318,9 +294,7 @@ saTmrFinalize (
 
 	tmrInstance->finalize = 1;
 
-	coroipcc_service_disconnect (tmrInstance->ipc_ctx);
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
+	coroipcc_service_disconnect (tmrInstance->ipc_handle);
 
 	/* tmrInstanceFinalize (tmrInstance); */
 
@@ -393,15 +367,11 @@ saTmrTimerStart (
 	iov.iov_base = &req_lib_tmr_timerstart;
 	iov.iov_len = sizeof (struct req_lib_tmr_timerstart);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_timerstart,
 		sizeof (struct res_lib_tmr_timerstart));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	*timerId = (SaTmrTimerIdT)(res_lib_tmr_timerstart.timer_id);
 	*callTime = (SaTimeT)(res_lib_tmr_timerstart.call_time);
@@ -464,15 +434,11 @@ saTmrTimerReschedule (
 	iov.iov_base = &req_lib_tmr_timerreschedule,
 	iov.iov_len = sizeof (struct req_lib_tmr_timerreschedule);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_timerreschedule,
 		sizeof (struct res_lib_tmr_timerreschedule));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	if (res_lib_tmr_timerreschedule.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_timerreschedule.header.error;
@@ -521,15 +487,11 @@ saTmrTimerCancel (
 	iov.iov_base = &req_lib_tmr_timercancel,
 	iov.iov_len = sizeof (struct req_lib_tmr_timercancel);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_timercancel,
 		sizeof (struct res_lib_tmr_timercancel));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	if (res_lib_tmr_timercancel.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_timercancel.header.error;
@@ -574,15 +536,11 @@ saTmrPeriodicTimerSkip (
 	iov.iov_base = &req_lib_tmr_periodictimerskip,
 	iov.iov_len = sizeof (struct req_lib_tmr_periodictimerskip);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_periodictimerskip,
 		sizeof (struct res_lib_tmr_periodictimerskip));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	if (res_lib_tmr_periodictimerskip.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_periodictimerskip.header.error;
@@ -629,15 +587,11 @@ saTmrTimerRemainingTimeGet (
 	iov.iov_base = &req_lib_tmr_timerremainingtimeget,
 	iov.iov_len = sizeof (struct req_lib_tmr_timerremainingtimeget);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_timerremainingtimeget,
 		sizeof (struct res_lib_tmr_timerremainingtimeget));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	if (res_lib_tmr_timerremainingtimeget.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_timerremainingtimeget.header.error;
@@ -686,15 +640,11 @@ saTmrTimerAttributesGet (
 	iov.iov_base = &req_lib_tmr_timerattributesget,
 	iov.iov_len = sizeof (struct req_lib_tmr_timerattributesget);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_timerattributesget,
 		sizeof (struct res_lib_tmr_timerattributesget));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	if (res_lib_tmr_timerattributesget.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_timerattributesget.header.error;
@@ -740,15 +690,11 @@ saTmrTimeGet (
 	iov.iov_base = &req_lib_tmr_timeget,
 	iov.iov_len = sizeof (struct req_lib_tmr_timeget);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_timeget,
 		sizeof (struct res_lib_tmr_timeget));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	if (res_lib_tmr_timeget.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_timeget.header.error;
@@ -794,15 +740,11 @@ saTmrClockTickGet (
 	iov.iov_base = &req_lib_tmr_clocktickget,
 	iov.iov_len = sizeof (struct req_lib_tmr_clocktickget);
 
-	pthread_mutex_lock (&tmrInstance->response_mutex);
-
-	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_ctx,
+	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_tmr_clocktickget,
 		sizeof (struct res_lib_tmr_clocktickget));
-
-	pthread_mutex_unlock (&tmrInstance->response_mutex);
 
 	if (res_lib_tmr_clocktickget.header.error != SA_AIS_OK) {
 		error = res_lib_tmr_clocktickget.header.error;
