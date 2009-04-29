@@ -80,13 +80,6 @@ static struct saVersionDatabase tmrVersionDatabase = {
 	tmrVersionsSupported
 };
 
-#ifdef COMPILE_OUT
-static void tmrInstanceFinalize (struct tmrInstance *tmrInstance)
-{
-	return;
-}
-#endif /* COMPILE_OUT */
-
 SaAisErrorT
 saTmrInitialize (
 	SaTmrHandleT *tmrHandle,
@@ -295,8 +288,6 @@ saTmrFinalize (
 	tmrInstance->finalize = 1;
 
 	coroipcc_service_disconnect (tmrInstance->ipc_handle);
-
-	/* tmrInstanceFinalize (tmrInstance); */
 
 	hdb_handle_put (&tmrHandleDatabase, tmrHandle);
 
