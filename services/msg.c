@@ -1771,6 +1771,32 @@ static void msg_expire_queue (void *data)
 	return;
 }
 
+static inline void msg_sync_queue_timer (
+	struct list_head *queue_head)
+{
+	struct queue_entry *queue;
+	struct list_head *list;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: msg_sync_queue_timer\n");
+
+	list = queue_head->next;
+
+	while (list != queue_head) {
+		queue = list_entry (list, struct queue_entry, queue_list);
+		list = list->next;
+
+		if ((lowest_nodeid == api->totem_nodeid_get()) &&
+		    (queue->create_attrs.creationFlags != SA_MSG_QUEUE_PERSISTENT) &&
+		    (queue->refcount == 0))
+		{
+			api->timer_add_absolute (
+				(queue->create_attrs.retentionTime + queue->close_time),
+				(void *)(queue), msg_expire_queue, &queue->timer_handle);
+		}
+	}
+}
+
 static inline void msg_sync_queue_free (
 	struct list_head *queue_head)
 {
@@ -1785,6 +1811,7 @@ static inline void msg_sync_queue_free (
 	while (list != queue_head) {
 		queue = list_entry (list, struct queue_entry, queue_list);
 		list = list->next;
+
 		msg_release_queue (queue);
 	}
 
@@ -1805,6 +1832,7 @@ static inline void msg_sync_group_free (
 	while (list != group_head) {
 		group = list_entry (list, struct group_entry, group_list);
 		list = list->next;
+
 		msg_release_group (group);
 	}
 
@@ -2013,6 +2041,16 @@ static int msg_sync_queue_iterate (void)
 	     queue_list = queue_list->next)
 	{
 		queue = list_entry (queue_list, struct queue_entry, queue_list);
+
+		/*
+		 * If this queue has an active retention timer,
+		 * delete it immediately. When synchronization
+		 * is complete, we will recreate the retention
+		 * timers as needed.
+		 */
+		if (queue->timer_handle != 0) {
+			api->timer_delete (queue->timer_handle);
+		}
 
 		if (msg_sync_iteration_state == MSG_SYNC_ITERATION_STATE_QUEUE)
 		{
@@ -2229,6 +2267,13 @@ static void msg_sync_activate (void)
 	/* DEBUG */
 	/* msg_print_queue_list (&queue_list_head);
 	   msg_print_group_list (&group_list_head); */
+
+	/*
+	 * Now that synchronization is complete, we must
+	 * iterate over the list of queues and determine
+	 * if any retention timers need to be restarted.
+	 */
+	msg_sync_queue_timer (&queue_list_head);
 
 	msg_sync_state = MSG_SYNC_STATE_NOT_STARTED;
 
@@ -2689,12 +2734,12 @@ static void message_handler_req_exec_msg_queueclose (
 		 * (specified at queue creation time). When the timer expires,
 		 * the queue will be deleted.
 		 */
-		if ((queue->create_attrs.creationFlags != SA_MSG_QUEUE_PERSISTENT) &&
-		    (lowest_nodeid == api->totem_nodeid_get()))
+		if ((lowest_nodeid == api->totem_nodeid_get()) &&
+		    (queue->create_attrs.creationFlags != SA_MSG_QUEUE_PERSISTENT))
 		{
-			api->timer_add_duration (
-				queue->create_attrs.retentionTime, (void *)(queue),
-				msg_expire_queue, &queue->timer_handle);
+			api->timer_add_absolute (
+				(queue->create_attrs.retentionTime + queue->close_time),
+				(void *)(queue), msg_expire_queue, &queue->timer_handle);
 		}
 	}
 
@@ -4377,6 +4422,7 @@ static void message_handler_req_exec_msg_sync_queue_message (
 
 	list_add_tail (&msg->queue_list, &queue->message_head);
 	list_add_tail (&msg->list, &queue->priority[(msg->message.priority)].message_head);
+
 	queue->priority[(msg->message.priority)].queue_used += msg->message.size;
 	queue->priority[(msg->message.priority)].message_count += 1;
 
