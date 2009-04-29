@@ -2240,6 +2240,9 @@ static int msg_sync_process (void)
 		}
 
 		break;
+
+	default:
+		assert (0);
 	}
 
 	return (continue_process);
