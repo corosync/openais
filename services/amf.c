@@ -1826,7 +1826,7 @@ static void message_handler_req_lib_amf_componentregister (
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = SA_AIS_ERR_TRY_AGAIN;
-		openais_conn_send_response (
+		api->ipc_response_send (
 			conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 		return;
 	}
@@ -2235,7 +2235,7 @@ static void message_handler_req_lib_amf_componenterrorreport (
 		res_lib.header.id = MESSAGE_RES_AMF_COMPONENTREGISTER;
 		res_lib.header.size = sizeof (struct res_lib_amf_componentregister);
 		res_lib.header.error = SA_AIS_ERR_TRY_AGAIN;
-		openais_conn_send_response (
+		api->ipc_response_send (
 			conn, &res_lib, sizeof (struct res_lib_amf_componentregister));
 		return;
 	}
