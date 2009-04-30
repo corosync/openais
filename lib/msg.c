@@ -123,14 +123,14 @@ saMsgInitialize (
 		goto error_no_destroy;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&msgHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_create (&msgHandleDatabase,
 		sizeof (struct msgInstance), msgHandle));
 	if (error != SA_AIS_OK) {
 		goto error_no_destroy;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, *msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		*msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -179,13 +179,14 @@ saMsgSelectionObjectGet (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
 
 	error = coroipcc_fd_get (msgInstance->ipc_handle, &fd);
+
 	*selectionObject = fd;
 
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
@@ -218,8 +219,8 @@ saMsgDispatch (
 		return (SA_AIS_ERR_INVALID_PARAM);
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -240,18 +241,14 @@ saMsgDispatch (
 
 		if (dispatch_data == NULL) {
 			if (dispatchFlags == CPG_DISPATCH_ALL) {
-				break; /* exit do while cont is 1 loop */
+				break;
 			} else {
-				continue; /* next poll */
+				continue;
 			}
 		}
 
 		memcpy (&callbacks, &msgInstance->callbacks,
 			sizeof (msgInstance->callbacks));
-
-		/* DEBUG */
-		printf ("[DEBUG]: saMsgDispatch { id = %u }\n",
-			(unsigned int)(dispatch_data->id));
 
 		switch (dispatch_data->id) {
 		case MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK:
@@ -341,8 +338,8 @@ saMsgFinalize (
 	struct msgInstance *msgInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		return (error);
 	}
@@ -353,7 +350,6 @@ saMsgFinalize (
 	}
 
 	msgInstance->finalize = 1;
-
 
 	/* msgInstanceFinalize (msgInstance); */
 
@@ -384,8 +380,8 @@ saMsgQueueOpen (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpen\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -397,23 +393,17 @@ saMsgQueueOpen (
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&queueHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_create (&queueHandleDatabase,
 		sizeof (struct queueInstance), queueHandle));
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
 		*queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(*queueHandle));
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueName->value));
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
 
@@ -461,10 +451,6 @@ saMsgQueueOpen (
 	hdb_handle_put (&queueHandleDatabase, *queueHandle);
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t queue_id = %u\n",
-		(unsigned int)(res_lib_msg_queueopen.queue_id));
-
 	return (error);
 
 error_put_destroy:
@@ -497,8 +483,8 @@ saMsgQueueOpenAsync (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpenAsync\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -514,23 +500,17 @@ saMsgQueueOpenAsync (
 		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&queueHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_create (&queueHandleDatabase,
 		sizeof (struct queueInstance), &queueHandle));
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
 		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(queueHandle));
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueName->value));
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
 
@@ -578,10 +558,6 @@ saMsgQueueOpenAsync (
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t queue_id = %u\n",
-		(unsigned int)(res_lib_msg_queueopenasync.queue_id));
-
 	return (error);
 
 error_put_destroy:
@@ -608,17 +584,11 @@ saMsgQueueClose (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueClose\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
+		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(queueHandle));
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueInstance->queue_name.value));
 
 	req_lib_msg_queueclose.header.size =
 		sizeof (struct req_lib_msg_queueclose);
@@ -667,15 +637,11 @@ saMsgQueueStatusGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueStatusGet\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueName->value));
 
 	req_lib_msg_queuestatusget.header.size =
 		sizeof (struct req_lib_msg_queuestatusget);
@@ -694,6 +660,8 @@ saMsgQueueStatusGet (
 		1,
 		&res_lib_msg_queuestatusget,
 		sizeof (struct res_lib_msg_queuestatusget));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_queuestatusget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuestatusget.header.error;
@@ -726,17 +694,11 @@ saMsgQueueRetentionTimeSet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueRetentionTimeSet\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
+		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(queueHandle));
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueInstance->queue_name.value));
 
 	req_lib_msg_queueretentiontimeset.header.size =
 		sizeof (struct req_lib_msg_queueretentiontimeset);
@@ -786,15 +748,11 @@ saMsgQueueUnlink (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueUnlink\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueName->value));
 
 	req_lib_msg_queueunlink.header.size =
 		sizeof (struct req_lib_msg_queueunlink);
@@ -841,15 +799,11 @@ saMsgQueueGroupCreate (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupCreate\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t group = %s\n",
-		(char *)(queueGroupName->value));
 
 	req_lib_msg_queuegroupcreate.header.size =
 		sizeof (struct req_lib_msg_queuegroupcreate);
@@ -898,17 +852,11 @@ saMsgQueueGroupInsert (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupInsert\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t group = %s\n",
-		(char *)(queueGroupName->value));
-	printf ("[DEBUG]:\t queue = %s\n",
-		(char *)(queueName->value));
 
 	req_lib_msg_queuegroupinsert.header.size =
 		sizeof (struct req_lib_msg_queuegroupinsert);
@@ -957,17 +905,11 @@ saMsgQueueGroupRemove (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupRemove\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t group = %s\n",
-		(char *)(queueGroupName->value));
-	printf ("[DEBUG]:\t queue = %s\n",
-		(char *)(queueName->value));
 
 	req_lib_msg_queuegroupremove.header.size =
 		sizeof (struct req_lib_msg_queuegroupremove);
@@ -1015,15 +957,11 @@ saMsgQueueGroupDelete (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupDelete\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t group = %s\n",
-		(char *)(queueGroupName->value));
 
 	req_lib_msg_queuegroupdelete.header.size =
 		sizeof (struct req_lib_msg_queuegroupdelete);
@@ -1096,8 +1034,8 @@ saMsgQueueGroupTrack (
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1108,10 +1046,6 @@ saMsgQueueGroupTrack (
 		error = SA_AIS_ERR_INIT;
 		goto error_put;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t group = %s\n",
-		(char *)(queueGroupName->value));
 
 	req_lib_msg_queuegrouptrack.header.size =
 		sizeof (struct req_lib_msg_queuegrouptrack);
@@ -1126,15 +1060,6 @@ saMsgQueueGroupTrack (
 
 	iov.iov_base = &req_lib_msg_queuegrouptrack;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrack);
-
-	/*
-	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_handle,
-		&iov,
-		1,
-		&res_lib_msg_queuegrouptrack,
-		sizeof (struct res_lib_msg_queuegrouptrack));
-	*/
 
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
 		msgInstance->ipc_handle,
@@ -1188,15 +1113,11 @@ saMsgQueueGroupTrackStop (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupTrackStop\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t group = %s\n",
-		(char *)(queueGroupName->value));
 
 	req_lib_msg_queuegrouptrackstop.header.size =
 		sizeof (struct req_lib_msg_queuegrouptrackstop);
@@ -1242,8 +1163,8 @@ saMsgQueueGroupNotificationFree (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupNotificationfree\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1307,15 +1228,11 @@ saMsgMessageSend (
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t destination = %s\n",
-		(char *)(destination->value));
 
 	req_lib_msg_messagesend.header.size =
 		sizeof (struct req_lib_msg_messagesend) + message->size;
@@ -1334,18 +1251,14 @@ saMsgMessageSend (
 	iov[1].iov_base = message->data;
 	iov[1].iov_len = message->size;
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t message->data = %s\n",
-		(char *)(message->data));
-	printf ("[DEBUG]:\t message->size = %u\n",
-		(unsigned int)(message->size));
-
 	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagesend,
 		sizeof (struct res_lib_msg_messagesend));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_messagesend.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesend.header.error;
@@ -1386,8 +1299,8 @@ saMsgMessageSendAsync (
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1398,10 +1311,6 @@ saMsgMessageSendAsync (
 		error = SA_AIS_ERR_INIT;
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t destination = %s\n",
-		(char *)(destination->value));
 
 	req_lib_msg_messagesendasync.header.size =
 		sizeof (struct req_lib_msg_messagesendasync) + message->size;
@@ -1420,18 +1329,14 @@ saMsgMessageSendAsync (
 	iov[1].iov_base = message->data;
 	iov[1].iov_len = message->size;
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t message->data = %s\n",
-		(char *)(message->data));
-	printf ("[DEBUG]:\t message->size = %u\n",
-		(unsigned int)(message->size));
-
 	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagesendasync,
 		sizeof (struct res_lib_msg_messagesendasync));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_messagesendasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesendasync.header.error;
@@ -1456,6 +1361,7 @@ saMsgMessageGet (
 	struct req_lib_msg_messageget req_lib_msg_messageget;
 	struct res_lib_msg_messageget *res_lib_msg_messageget;
 	struct iovec iov;
+	hdb_handle_t msg_handle;
 
 	void * buffer;
 
@@ -1464,17 +1370,22 @@ saMsgMessageGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageGet\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance));
+	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase,
+		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(queueHandle));
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueInstance->queue_name.value));
+	error = coroipcc_service_connect (
+		COROSYNC_SOCKET_NAME,
+		MSG_SERVICE,
+		IPC_REQUEST_SIZE,
+		IPC_RESPONSE_SIZE,
+		IPC_DISPATCH_SIZE,
+		&msg_handle);
+	if (error != SA_AIS_OK) {
+		goto error_hdb_put;
+	}
 
 	req_lib_msg_messageget.header.size =
 		sizeof (struct req_lib_msg_messageget);
@@ -1492,7 +1403,7 @@ saMsgMessageGet (
 	iov.iov_len = sizeof (struct req_lib_msg_messageget);
 
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
-		queueInstance->ipc_handle,
+		msg_handle,
 		&iov,
 		1,
 		&buffer);
@@ -1501,7 +1412,7 @@ saMsgMessageGet (
 
 	if (res_lib_msg_messageget->header.error != SA_AIS_OK) {
 		error = res_lib_msg_messageget->header.error;
-		goto error_unlock;
+		goto error_disconnect;
 	}
 
 	if (message->data == NULL) {
@@ -1509,13 +1420,13 @@ saMsgMessageGet (
 		message->data = malloc (message->size);
 		if (message->data == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
-			goto error_unlock;
+			goto error_ipc_put;
 		}
 	}
 	else {
 		if (res_lib_msg_messageget->message.size > message->size) {
 			error = SA_AIS_ERR_NO_SPACE;
-			goto error_unlock;
+			goto error_ipc_put;
 		}
 	}
 
@@ -1526,15 +1437,11 @@ saMsgMessageGet (
 	*sendTime = res_lib_msg_messageget->send_time;
 	*senderId = res_lib_msg_messageget->sender_id;
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t sender_id = %llu (%llx)\n",
-		(unsigned long long)(res_lib_msg_messageget->sender_id),
-		(unsigned long long)(res_lib_msg_messageget->sender_id));
-
-	error = coroipcc_msg_send_reply_receive_in_buf_put (
-		queueInstance->ipc_handle);
-
-error_unlock:
+error_ipc_put:
+	coroipcc_msg_send_reply_receive_in_buf_put (msg_handle);
+error_disconnect:
+	coroipcc_service_disconnect (msg_handle);
+error_hdb_put:
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
 	return (error);
@@ -1551,8 +1458,8 @@ saMsgMessageDataFree (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageDataFree\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1582,15 +1489,11 @@ saMsgMessageCancel (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageCancel\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
+		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(queueHandle));
 
 	req_lib_msg_messagecancel.header.size =
 		sizeof (struct req_lib_msg_messagecancel);
@@ -1642,15 +1545,11 @@ saMsgMessageSendReceive (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageSendReceive\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t destination = %s\n",
-		(char *)(destination->value));
 
 	req_lib_msg_messagesendreceive.header.size =
 		sizeof (struct req_lib_msg_messagesendreceive) + sendMessage->size;
@@ -1669,18 +1568,14 @@ saMsgMessageSendReceive (
 	iov[1].iov_base = sendMessage->data;
 	iov[1].iov_len = sendMessage->size;
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t sendMessage->data = %s\n",
-		(char *)(sendMessage->data));
-	printf ("[DEBUG]:\t sendMessage->size = %u\n",
-		(unsigned int)(sendMessage->size));
-
 	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagesendreceive,
 		sizeof (struct res_lib_msg_messagesendreceive));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_messagesendreceive.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesendreceive.header.error;
@@ -1715,14 +1610,11 @@ saMsgMessageReply (
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t senderId = %llx\n", (unsigned long long)(*senderId));
 
 	req_lib_msg_messagereply.header.size =
 		sizeof (struct req_lib_msg_messagereply) + replyMessage->size;
@@ -1740,18 +1632,14 @@ saMsgMessageReply (
 	iov[1].iov_base = replyMessage->data;
 	iov[1].iov_len = replyMessage->size;
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t replyMessage->data = %s\n",
-		(char *)(replyMessage->data));
-	printf ("[DEBUG]:\t replyMessage->size = %u\n",
-		(unsigned int)(replyMessage->size));
-
 	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagereply,
 		sizeof (struct res_lib_msg_messagereply));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_messagereply.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereply.header.error;
@@ -1787,8 +1675,8 @@ saMsgMessageReplyAsync (
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -1799,9 +1687,6 @@ saMsgMessageReplyAsync (
 		error = SA_AIS_ERR_INIT;
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t senderId = %llx\n", (unsigned long long)(*senderId));
 
 	req_lib_msg_messagereplyasync.header.size =
 		sizeof (struct req_lib_msg_messagereplyasync) + replyMessage->size;
@@ -1819,18 +1704,14 @@ saMsgMessageReplyAsync (
 	iov[1].iov_base = replyMessage->data;
 	iov[1].iov_len = replyMessage->size;
 
-	/* DEBUG */
-	printf ("[DEBUG]:\t replyMessage->data = %s\n",
-		(char *)(replyMessage->data));
-	printf ("[DEBUG]:\t replyMessage->size = %u\n",
-		(unsigned int)(replyMessage->size));
-
 	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagereplyasync,
 		sizeof (struct res_lib_msg_messagereplyasync));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_messagereplyasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereplyasync.header.error;
@@ -1858,17 +1739,11 @@ saMsgQueueCapacityThresholdSet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueCapacityThresholdSet\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
+		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(queueHandle));
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueInstance->queue_name.value));
 
 	req_lib_msg_queuecapacitythresholdset.header.size =
 		sizeof (struct req_lib_msg_queuecapacitythresholdset);
@@ -1889,6 +1764,8 @@ saMsgQueueCapacityThresholdSet (
 		1,
 		&res_lib_msg_queuecapacitythresholdset,
 		sizeof (struct res_lib_msg_queuecapacitythresholdset));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_queuecapacitythresholdset.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdset.header.error;
@@ -1916,17 +1793,11 @@ saMsgQueueCapacityThresholdGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueCapacityThresholdGet\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase, queueHandle,
-		(void *)&queueInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
+		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-	/* DEBUG */
-	printf ("[DEBUG]:\t handle = 0x%04x\n",
-		(unsigned int)(queueHandle));
-	printf ("[DEBUG]:\t name = %s\n",
-		(char *)(queueInstance->queue_name.value));
 
 	req_lib_msg_queuecapacitythresholdget.header.size =
 		sizeof (struct req_lib_msg_queuecapacitythresholdget);
@@ -1947,6 +1818,8 @@ saMsgQueueCapacityThresholdGet (
 		1,
 		&res_lib_msg_queuecapacitythresholdget,
 		sizeof (struct res_lib_msg_queuecapacitythresholdget));
+
+	/* if (error != SA_AIS_OK) */
 
 	if (res_lib_msg_queuecapacitythresholdget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdget.header.error;
@@ -1974,8 +1847,8 @@ saMsgMetadataSizeGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMetadataSizeGet\n");
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
@@ -2027,8 +1900,8 @@ saMsgLimitGet (
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase, msgHandle,
-		(void *)&msgInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
+		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
