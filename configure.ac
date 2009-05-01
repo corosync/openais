@@ -158,10 +158,6 @@ SOMICRO="0"
 SONAME="${SOMAJOR}.${SOMINOR}.${SOMICRO}"
 
 # local options
-AC_ARG_ENABLE([ansi],
-	[  --enable-ansi           : force to build with ANSI standards. ],
-	[ default="no" ])
-
 AC_ARG_ENABLE([fatal-warnings],
 	[  --enable-fatal-warnings : enable fatal warnings. ],
 	[ default="no" ])
@@ -292,15 +288,6 @@ else
 	COVERAGE_LDFLAGS=""
 fi
 
-if test "x${enable_ansi}" = xyes && \
-		cc_supports_flag -std=iso9899:199409 ; then
-	AC_MSG_NOTICE([Enabling ANSI Compatibility])
-	ANSI_CPPFLAGS="-ansi -D_GNU_SOURCE -DANSI_ONLY"
-	PACKAGE_FEATURES="$PACKAGE_FEATURES ansi"
-else
-	ANSI_CPPFLAGS=""
-fi
-
 if test "x${enable_fatal_warnings}" = xyes && \
 		cc_supports_flag -Werror ; then
 	AC_MSG_NOTICE([Enabling Fatal Warnings (-Werror)])
@@ -313,7 +300,7 @@ fi
 # final build of *FLAGS
 CFLAGS="$ENV_CFLAGS $OPT_CFLAGS $GDB_FLAGS $OS_CFLAGS \
 	$COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS"
-CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS"
+CPPFLAGS="$ENV_CPPFLAGS $OS_CPPFLAGS"
 LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 
 # substitute what we need:
@@ -366,7 +353,6 @@ AC_MSG_RESULT([  OS   defined CFLAGS      = ${OS_CFLAGS}])
 AC_MSG_RESULT([  OS   defined CPPFLAGS    = ${OS_CPPFLAGS}])
 AC_MSG_RESULT([  OS   defined LDFLAGS     = ${OS_LDFLAGS}])
 AC_MSG_RESULT([  OS   defined DYFLAGS     = ${OS_DYFLAGS}])
-AC_MSG_RESULT([  ANSI defined CPPFLAGS    = ${ANSI_CPPFLAGS}])
 AC_MSG_RESULT([  Coverage     CFLAGS      = ${COVERAGE_CFLAGS}])
 AC_MSG_RESULT([  Coverage     LDFLAGS     = ${COVERAGE_LDFLAGS}])
 AC_MSG_RESULT([  Fatal War.   CFLAGS      = ${WERROR_CFLAGS}])
