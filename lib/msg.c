@@ -1391,13 +1391,13 @@ saMsgMessageGet (
 		sizeof (struct req_lib_msg_messageget);
 	req_lib_msg_messageget.header.id =
 		MESSAGE_REQ_MSG_MESSAGEGET;
-	req_lib_msg_messageget.queue_id =
-		queueInstance->queue_id;
+
+	req_lib_msg_messageget.queue_id = queueInstance->queue_id;
+	req_lib_msg_messageget.pid = (SaUint32T)(getpid());
+	req_lib_msg_messageget.timeout = timeout;
 
 	memcpy (&req_lib_msg_messageget.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));
-
-	req_lib_msg_messageget.timeout = timeout;
 
 	iov.iov_base = &req_lib_msg_messageget;
 	iov.iov_len = sizeof (struct req_lib_msg_messageget);
@@ -1499,8 +1499,9 @@ saMsgMessageCancel (
 		sizeof (struct req_lib_msg_messagecancel);
 	req_lib_msg_messagecancel.header.id =
 		MESSAGE_REQ_MSG_MESSAGECANCEL;
-	req_lib_msg_messagecancel.queue_id =
-		queueInstance->queue_id;
+
+	req_lib_msg_messagecancel.queue_id = queueInstance->queue_id;
+	req_lib_msg_messagecancel.pid = (SaUint32T)(getpid());
 
 	memcpy (&req_lib_msg_messagecancel.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));

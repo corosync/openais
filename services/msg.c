@@ -157,6 +157,7 @@ struct pending_entry {
 	mar_message_source_t source;
 	corosync_timer_handle_t timer_handle;
 	SaNameT queue_name;
+	SaUint32T pid;
 	struct list_head list;
 };
 
@@ -867,6 +868,7 @@ struct req_exec_msg_messageget {
 	mar_message_source_t source;
 	SaNameT queue_name;
 	SaUint32T queue_id;
+	SaUint32T pid;
 	SaTimeT timeout;
 };
 
@@ -880,6 +882,7 @@ struct req_exec_msg_messagecancel {
 	mar_message_source_t source;
 	SaNameT queue_name;
 	SaUint32T queue_id;
+	SaUint32T pid;
 };
 
 struct req_exec_msg_messagesendreceive {
@@ -1727,8 +1730,13 @@ static void msg_expire_pending (void *data)
 	struct pending_entry *pending = (struct pending_entry *)data;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_expire_pending { %p }\n", data);
-	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t queue = %s\n", (char *)(pending->queue_name.value));
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_expire_pending\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t queue = %s\n",
+		    (char *)(pending->queue_name.value));
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t pending = { nodeid=%x pid=%u conn=%p }\n",
+		    (unsigned int)(pending->source.nodeid),
+		    (unsigned int)(pending->pid),
+		    (void *)(pending->source.conn));
 
 	req_exec_msg_pending_timeout.header.size =
 		sizeof (struct req_exec_msg_pending_timeout);
@@ -3759,6 +3767,14 @@ static void message_handler_req_exec_msg_messageget (
 			&req_exec_msg_messageget->queue_name,
 			sizeof (SaNameT));
 
+		get->pid = req_exec_msg_messageget->pid;
+
+		/* DEBUG */
+		log_printf (LOGSYS_LEVEL_DEBUG, "\t pending = { nodeid=%x pid=%u conn=%p }\n",
+			    (unsigned int)(get->source.nodeid),
+			    (unsigned int)(get->pid),
+			    (void *)(get->source.conn));
+
 		list_add_tail (&get->list, &queue->pending_head);
 
 		if (api->ipc_source_is_local (&req_exec_msg_messageget->source)) {
@@ -5168,6 +5184,8 @@ static void message_handler_req_lib_msg_messageget (
 
 	req_exec_msg_messageget.queue_id =
 		req_lib_msg_messageget->queue_id;
+	req_exec_msg_messageget.pid =
+		req_lib_msg_messageget->pid;
 	req_exec_msg_messageget.timeout =
 		req_lib_msg_messageget->timeout;
 
@@ -5221,6 +5239,8 @@ static void message_handler_req_lib_msg_messagecancel (
 
 	req_exec_msg_messagecancel.queue_id =
 		req_lib_msg_messagecancel->queue_id;
+	req_exec_msg_messagecancel.pid =
+		req_lib_msg_messagecancel->pid;
 
 	iovec.iov_base = (char *)&req_exec_msg_messagecancel;
 	iovec.iov_len = sizeof (req_exec_msg_messagecancel);

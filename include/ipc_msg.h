@@ -263,6 +263,7 @@ struct req_lib_msg_messageget {
 	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
+	SaUint32T pid;
 	SaTimeT timeout;
 };
 
@@ -285,6 +286,7 @@ struct req_lib_msg_messagecancel {
 	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
+	SaUint32T pid;
 };
 
 struct res_lib_msg_messagecancel {
