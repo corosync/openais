@@ -1305,6 +1305,32 @@ static unsigned int msg_group_track_changes_only (
 	return (i);
 }
 
+static void msg_cancel_pending_message (
+	void *conn)
+{
+	struct res_lib_msg_messageget res_lib_msg_messageget;
+	struct iovec iov;
+
+	res_lib_msg_messageget.header.size =
+		sizeof (struct res_lib_msg_messageget);
+	res_lib_msg_messageget.header.id =
+		MESSAGE_RES_MSG_MESSAGEGET;
+	res_lib_msg_messageget.header.error = SA_AIS_ERR_INTERRUPT;
+
+	memset (&res_lib_msg_messageget.message, 0,
+		sizeof (SaMsgMessageT));
+
+	res_lib_msg_messageget.send_time = 0;
+	res_lib_msg_messageget.sender_id = 0;
+
+	iov.iov_base = &res_lib_msg_messageget;
+	iov.iov_len = sizeof (struct res_lib_msg_messageget);
+
+	api->ipc_response_iov_send (conn, &iov, 1);
+
+	return;
+}
+
 static void msg_deliver_pending_message (
 	void *conn,
 	struct message_entry *msg)
@@ -1528,16 +1554,55 @@ static int msg_close_queue (
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
 }
 
-static void msg_release_pending (
+static void msg_cancel_queue_pending (
 	struct queue_entry *queue,
-	unsigned int nodeid,
-	void *conn)
+	mar_message_source_t *source,
+	unsigned int pid)
 {
 	struct pending_entry *pending;
 	struct list_head *pending_list;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_release_pending ( %s )\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_cancel_queue_pending\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t queue=%s pid=%u\n",
+		    (char *)(queue->queue_name.value),
+		    (unsigned int)(pid));
+
+	pending_list = queue->pending_head.next;
+
+	while (pending_list != &queue->pending_head) {
+		pending = list_entry (pending_list, struct pending_entry, list);
+		pending_list = pending_list->next;
+
+		if ((source->nodeid == pending->source.nodeid) && (pid == pending->pid))
+		{
+			/*
+			 * If this is the local node, cancel the timer and
+			 * send a response to the pending message get operation.
+			 */
+			if (api->ipc_source_is_local (source)) {
+				api->timer_delete (pending->timer_handle);
+				msg_cancel_pending_message (pending->source.conn);
+			}
+
+			list_del (&pending->list);
+			list_init (&pending->list);
+
+			free (pending);
+		}
+	}
+}
+
+static void msg_release_queue_pending (
+	struct queue_entry *queue,
+	mar_message_source_t *source)
+{
+	struct pending_entry *pending;
+	struct list_head *pending_list;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t msg_release_queue_pending\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t queue=%s\n",
 		    (char *)(queue->queue_name.value));
 
 	pending_list = queue->pending_head.next;
@@ -1546,8 +1611,8 @@ static void msg_release_pending (
 		pending = list_entry (pending_list, struct pending_entry, list);
 		pending_list = pending_list->next;
 
-		if ((nodeid == pending->source.nodeid) &&
-		    (conn == pending->source.conn))
+		if ((source->nodeid == pending->source.nodeid) &&
+		    (source->conn == pending->source.conn))
 		{
 			list_del (&pending->list);
 			list_init (&pending->list);
@@ -3867,6 +3932,7 @@ static void message_handler_req_exec_msg_messagecancel (
 		message;
 	struct res_lib_msg_messagecancel res_lib_msg_messagecancel;
 	SaAisErrorT error = SA_AIS_OK;
+	struct queue_entry *queue = NULL;
 
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgMessageCancel\n");
 
@@ -3875,7 +3941,18 @@ static void message_handler_req_exec_msg_messagecancel (
 		    (char *)(req_exec_msg_messagecancel->queue_name.value),
 		    (unsigned int)(req_exec_msg_messagecancel->queue_id));
 
-/* error_exit: */
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_messagecancel->queue_name);
+	if (queue == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	msg_cancel_queue_pending (queue,
+		&req_exec_msg_messagecancel->source,
+		req_exec_msg_messagecancel->pid);
+
+error_exit:
 	if (api->ipc_source_is_local (&req_exec_msg_messagecancel->source))
 	{
 		res_lib_msg_messagecancel.header.size =
@@ -4313,9 +4390,8 @@ static void message_handler_req_exec_msg_pending_timeout (
 			req_exec_msg_pending_timeout->source.conn, &iov, 1);
 	}
 
-	msg_release_pending (queue,
-		req_exec_msg_pending_timeout->source.nodeid,
-		req_exec_msg_pending_timeout->source.conn);
+	msg_release_queue_pending (queue,
+		&req_exec_msg_pending_timeout->source);
 
 	return;
 }
