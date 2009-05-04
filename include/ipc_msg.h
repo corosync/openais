@@ -302,6 +302,8 @@ struct req_lib_msg_messagesendreceive {
 
 struct res_lib_msg_messagesendreceive {
 	coroipc_response_header_t header;
+	SaTimeT reply_time;
+	SaMsgMessageT message;
 };
 
 struct req_lib_msg_messagereply {
@@ -313,8 +315,8 @@ struct req_lib_msg_messagereply {
 
 struct res_lib_msg_messagereply {
 	coroipc_response_header_t header;
-}
-;
+};
+
 struct req_lib_msg_messagereplyasync {
 	coroipc_request_header_t header;
 	SaMsgMessageT reply_message;

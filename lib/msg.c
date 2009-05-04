@@ -1361,7 +1361,7 @@ saMsgMessageGet (
 	struct req_lib_msg_messageget req_lib_msg_messageget;
 	struct res_lib_msg_messageget *res_lib_msg_messageget;
 	struct iovec iov;
-	hdb_handle_t msg_handle;
+	hdb_handle_t ipc_handle;
 
 	void * buffer;
 
@@ -1382,7 +1382,7 @@ saMsgMessageGet (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&msg_handle);
+		&ipc_handle);
 	if (error != SA_AIS_OK) {
 		goto error_hdb_put;
 	}
@@ -1403,7 +1403,7 @@ saMsgMessageGet (
 	iov.iov_len = sizeof (struct req_lib_msg_messageget);
 
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
-		msg_handle,
+		ipc_handle,
 		&iov,
 		1,
 		&buffer);
@@ -1438,9 +1438,9 @@ saMsgMessageGet (
 	*senderId = res_lib_msg_messageget->sender_id;
 
 error_ipc_put:
-	coroipcc_msg_send_reply_receive_in_buf_put (msg_handle);
+	coroipcc_msg_send_reply_receive_in_buf_put (ipc_handle);
 error_disconnect:
-	coroipcc_service_disconnect (msg_handle);
+	coroipcc_service_disconnect (ipc_handle);
 error_hdb_put:
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
@@ -1538,8 +1538,11 @@ saMsgMessageSendReceive (
 {
 	struct msgInstance *msgInstance;
 	struct req_lib_msg_messagesendreceive req_lib_msg_messagesendreceive;
-	struct res_lib_msg_messagesendreceive res_lib_msg_messagesendreceive;
+	struct res_lib_msg_messagesendreceive *res_lib_msg_messagesendreceive;
 	struct iovec iov[2];
+	hdb_handle_t ipc_handle;
+
+	void * buffer;
 
 	SaAisErrorT error = SA_AIS_OK;
 
@@ -1552,38 +1555,84 @@ saMsgMessageSendReceive (
 		goto error_exit;
 	}
 
+	error = coroipcc_service_connect (
+		COROSYNC_SOCKET_NAME,
+		MSG_SERVICE,
+		IPC_REQUEST_SIZE,
+		IPC_RESPONSE_SIZE,
+		IPC_DISPATCH_SIZE,
+		&ipc_handle);
+	if (error != SA_AIS_OK) {
+		goto error_hdb_put;
+	}
+
 	req_lib_msg_messagesendreceive.header.size =
 		sizeof (struct req_lib_msg_messagesendreceive) + sendMessage->size;
 	req_lib_msg_messagesendreceive.header.id =
 		MESSAGE_REQ_MSG_MESSAGESENDRECEIVE;
+
+	req_lib_msg_messagesendreceive.timeout = timeout;
 
 	memcpy (&req_lib_msg_messagesendreceive.destination,
 		destination, sizeof (SaNameT));
 	memcpy (&req_lib_msg_messagesendreceive.message,
 		sendMessage, sizeof (SaMsgMessageT));
 
-	req_lib_msg_messagesendreceive.timeout = timeout;
-
 	iov[0].iov_base = &req_lib_msg_messagesendreceive;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagesendreceive);
 	iov[1].iov_base = sendMessage->data;
 	iov[1].iov_len = sendMessage->size;
 
+	/*
 	error = coroipcc_msg_send_reply_receive (
 		msgInstance->ipc_handle,
 		iov,
 		2,
 		&res_lib_msg_messagesendreceive,
 		sizeof (struct res_lib_msg_messagesendreceive));
+	*/
+
+	error = coroipcc_msg_send_reply_receive_in_buf_get (
+		ipc_handle,
+		iov,
+		2,
+		&buffer);
 
 	/* if (error != SA_AIS_OK) */
 
-	if (res_lib_msg_messagesendreceive.header.error != SA_AIS_OK) {
-		error = res_lib_msg_messagesendreceive.header.error;
-		goto error_put;	/* ! */
+	res_lib_msg_messagesendreceive = buffer;
+
+	if (res_lib_msg_messagesendreceive->header.error != SA_AIS_OK) {
+		error = res_lib_msg_messagesendreceive->header.error;
+		goto error_disconnect;
 	}
 
-error_put:
+	if (receiveMessage->data == NULL) {
+		receiveMessage->size = res_lib_msg_messagesendreceive->message.size;
+		receiveMessage->data = malloc (receiveMessage->size);
+		if (receiveMessage->data == NULL) {
+			error = SA_AIS_ERR_NO_MEMORY;
+			goto error_ipc_put;
+		}
+	}
+	else {
+		if (res_lib_msg_messagesendreceive->message.size > receiveMessage->size) {
+			error = SA_AIS_ERR_NO_SPACE;
+			goto error_ipc_put;
+		}
+	}
+
+	memcpy (receiveMessage->data, ((char *)(buffer) +
+		sizeof (struct res_lib_msg_messagesendreceive)),
+		res_lib_msg_messagesendreceive->message.size);
+
+	*replySendTime = res_lib_msg_messagesendreceive->reply_time;
+
+error_ipc_put:
+	coroipcc_msg_send_reply_receive_in_buf_put (ipc_handle);
+error_disconnect:
+	coroipcc_service_disconnect (ipc_handle);
+error_hdb_put:
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
 	return (error);
