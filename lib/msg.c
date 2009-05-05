@@ -1407,12 +1407,15 @@ saMsgMessageGet (
 		&iov,
 		1,
 		&buffer);
+	if (error != SA_AIS_OK) {
+		goto error_disconnect;
+	}
 
 	res_lib_msg_messageget = buffer;
 
 	if (res_lib_msg_messageget->header.error != SA_AIS_OK) {
 		error = res_lib_msg_messageget->header.error;
-		goto error_disconnect;
+		goto error_ipc_put;
 	}
 
 	if (message->data == NULL) {
@@ -1583,28 +1586,20 @@ saMsgMessageSendReceive (
 	iov[1].iov_base = sendMessage->data;
 	iov[1].iov_len = sendMessage->size;
 
-	/*
-	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_handle,
-		iov,
-		2,
-		&res_lib_msg_messagesendreceive,
-		sizeof (struct res_lib_msg_messagesendreceive));
-	*/
-
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
 		ipc_handle,
 		iov,
 		2,
 		&buffer);
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_disconnect;
+	}
 
 	res_lib_msg_messagesendreceive = buffer;
 
 	if (res_lib_msg_messagesendreceive->header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesendreceive->header.error;
-		goto error_disconnect;
+		goto error_ipc_put;
 	}
 
 	if (receiveMessage->data == NULL) {
