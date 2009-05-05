@@ -2783,8 +2783,9 @@ static void message_handler_req_exec_msg_queueclose (
 		    (char *)(req_exec_msg_queueclose->queue_name.value),
 		    (unsigned int)(req_exec_msg_queueclose->queue_id));
 
-	queue = msg_find_queue (&queue_list_head,
-		&req_exec_msg_queueclose->queue_name);
+	queue = msg_find_queue_id (&queue_list_head,
+		&req_exec_msg_queueclose->queue_name,
+		req_exec_msg_queueclose->queue_id);
 	if (queue == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
@@ -2912,8 +2913,9 @@ static void message_handler_req_exec_msg_queueretentiontimeset (
 		    (char *)(req_exec_msg_queueretentiontimeset->queue_name.value),
 		    (unsigned int)(req_exec_msg_queueretentiontimeset->queue_id));
 
-	queue = msg_find_queue (&queue_list_head,
-		&req_exec_msg_queueretentiontimeset->queue_name);
+	queue = msg_find_queue_id (&queue_list_head,
+		&req_exec_msg_queueretentiontimeset->queue_name,
+		req_exec_msg_queueretentiontimeset->queue_id);
 	if (queue == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
@@ -3808,8 +3810,9 @@ static void message_handler_req_exec_msg_messageget (
 		    (char *)(req_exec_msg_messageget->queue_name.value),
 		    (unsigned int)(req_exec_msg_messageget->queue_id));
 
-	queue = msg_find_queue (&queue_list_head,
-		&req_exec_msg_messageget->queue_name);
+	queue = msg_find_queue_id (&queue_list_head,
+		&req_exec_msg_messageget->queue_name,
+		req_exec_msg_messageget->queue_id);
 	if (queue == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
@@ -3941,8 +3944,9 @@ static void message_handler_req_exec_msg_messagecancel (
 		    (char *)(req_exec_msg_messagecancel->queue_name.value),
 		    (unsigned int)(req_exec_msg_messagecancel->queue_id));
 
-	queue = msg_find_queue (&queue_list_head,
-		&req_exec_msg_messagecancel->queue_name);
+	queue = msg_find_queue_id (&queue_list_head,
+		&req_exec_msg_messagecancel->queue_name,
+		req_exec_msg_messagecancel->queue_id);
 	if (queue == NULL) {
 		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
