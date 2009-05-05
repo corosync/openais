@@ -2583,12 +2583,6 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 	list_init(&ecs->ecs_entry);
 	list_add(&ecs->ecs_entry, &eco->eco_subscr);
 
-
-	res.ics_head.size = sizeof(res);
-	res.ics_head.id = MESSAGE_RES_EVT_SUBSCRIBE;
-	res.ics_head.error = error;
-	api->ipc_response_send(conn, &res, sizeof(res));
-
 	/*
 	 * See if an existing event with a retention time
 	 * needs to be delivered based on this subscription
@@ -2612,7 +2606,7 @@ static void lib_evt_event_subscribe(void *conn, const void *message)
 		}
 	}
 	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->ics_channel_handle));
-	return;
+	goto subr_done;
 
 subr_put:
 	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->ics_channel_handle));
