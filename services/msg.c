@@ -944,6 +944,8 @@ struct req_exec_msg_sync_queue {
 	SaNameT queue_name;
 	SaUint32T queue_id;
 	SaTimeT close_time;
+	SaSizeT capacity_available[SA_MSG_MESSAGE_LOWEST_PRIORITY+1];
+	SaSizeT capacity_reached[SA_MSG_MESSAGE_LOWEST_PRIORITY+1];
 	SaUint8T unlink_flag;
 	SaMsgQueueOpenFlagsT open_flags;
 	SaMsgQueueGroupChangesT change_flag;
@@ -1921,6 +1923,8 @@ static int msg_sync_queue_transmit (
 	struct req_exec_msg_sync_queue req_exec_msg_sync_queue;
 	struct iovec iov;
 
+	int i;
+
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_queue_transmit { queue=%s id=%u }\n",
 		    (char *)(queue->queue_name.value),
@@ -1946,6 +1950,14 @@ static int msg_sync_queue_transmit (
 	req_exec_msg_sync_queue.unlink_flag = queue->unlink_flag;
 	req_exec_msg_sync_queue.open_flags = queue->open_flags;
 	req_exec_msg_sync_queue.change_flag = queue->change_flag;
+	
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
+	{
+		req_exec_msg_sync_queue.capacity_available[i] =
+			queue->priority[i].capacity_available;
+		req_exec_msg_sync_queue.capacity_reached[i] =
+			queue->priority[i].capacity_reached;
+	}
 
 	iov.iov_base = (char *)&req_exec_msg_sync_queue;
 	iov.iov_len = sizeof (struct req_exec_msg_sync_queue);
@@ -2533,10 +2545,12 @@ static void message_handler_req_exec_msg_queueopen (
 
 		queue->open_flags = req_exec_msg_queueopen->open_flags;
 
-		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
+		{
 			queue->priority[i].queue_size = queue->create_attrs.size[i];
 			queue->priority[i].capacity_reached = queue->create_attrs.size[i];
 			queue->priority[i].capacity_available = 0;
+
 			list_init (&queue->priority[i].message_head);
 		}
 
@@ -2682,10 +2696,12 @@ static void message_handler_req_exec_msg_queueopenasync (
 
 		queue->open_flags = req_exec_msg_queueopenasync->open_flags;
 
-		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
+		{
 			queue->priority[i].queue_size = queue->create_attrs.size[i];
 			queue->priority[i].capacity_reached = queue->create_attrs.size[i];
 			queue->priority[i].capacity_available = 0;
+
 			list_init (&queue->priority[i].message_head);
 		}
 
@@ -4491,8 +4507,15 @@ static void message_handler_req_exec_msg_sync_queue (
 	queue->open_flags = req_exec_msg_sync_queue->open_flags;
 	queue->change_flag = req_exec_msg_sync_queue->change_flag;
 
-	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
-		queue->priority[i].queue_size = queue->create_attrs.size[i];
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
+	{
+		queue->priority[i].queue_size =
+			queue->create_attrs.size[i];
+		queue->priority[i].capacity_available =
+			req_exec_msg_sync_queue->capacity_available[i];
+		queue->priority[i].capacity_reached =
+			req_exec_msg_sync_queue->capacity_reached[i];
+
 		list_init (&queue->priority[i].message_head);
 	}
 
