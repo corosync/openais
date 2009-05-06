@@ -332,6 +332,7 @@ struct req_lib_msg_queuecapacitythresholdset {
 	coroipc_request_header_t header;
 	SaNameT queue_name;
 	SaUint32T queue_id;
+	SaMsgQueueThresholdsT thresholds;
 };
 
 struct res_lib_msg_queuecapacitythresholdset {
@@ -346,6 +347,7 @@ struct req_lib_msg_queuecapacitythresholdget {
 
 struct res_lib_msg_queuecapacitythresholdget {
 	coroipc_response_header_t header;
+	SaMsgQueueThresholdsT thresholds;
 };
 
 struct req_lib_msg_metadatasizeget {

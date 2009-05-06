@@ -149,6 +149,8 @@ struct queue_cleanup {
 struct priority_area {
 	SaSizeT queue_size;
 	SaSizeT queue_used;
+	SaSizeT capacity_reached;
+	SaSizeT capacity_available;
 	SaUint32T message_count;
 	struct list_head message_head;
 };
@@ -915,6 +917,7 @@ struct req_exec_msg_queuecapacitythresholdset {
 	mar_message_source_t source;
 	SaNameT queue_name;
 	SaUint32T queue_id;
+	SaMsgQueueThresholdsT thresholds;
 };
 
 struct req_exec_msg_queuecapacitythresholdget {
@@ -2532,6 +2535,8 @@ static void message_handler_req_exec_msg_queueopen (
 
 		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 			queue->priority[i].queue_size = queue->create_attrs.size[i];
+			queue->priority[i].capacity_reached = queue->create_attrs.size[i];
+			queue->priority[i].capacity_available = 0;
 			list_init (&queue->priority[i].message_head);
 		}
 
@@ -2679,6 +2684,8 @@ static void message_handler_req_exec_msg_queueopenasync (
 
 		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 			queue->priority[i].queue_size = queue->create_attrs.size[i];
+			queue->priority[i].capacity_reached = queue->create_attrs.size[i];
+			queue->priority[i].capacity_available = 0;
 			list_init (&queue->priority[i].message_head);
 		}
 
@@ -4192,7 +4199,10 @@ static void message_handler_req_exec_msg_queuecapacitythresholdset (
 	const struct req_exec_msg_queuecapacitythresholdset *req_exec_msg_queuecapacitythresholdset =
 		message;
 	struct res_lib_msg_queuecapacitythresholdset res_lib_msg_queuecapacitythresholdset;
+	struct queue_entry *queue = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+
+	int i;
 
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueCapacityThresholdSet\n");
 
@@ -4201,7 +4211,22 @@ static void message_handler_req_exec_msg_queuecapacitythresholdset (
 		    (char *)(req_exec_msg_queuecapacitythresholdset->queue_name.value),
 		    (unsigned int)(req_exec_msg_queuecapacitythresholdset->queue_id));
 
-/* error_exit: */
+	queue = msg_find_queue_id (&queue_list_head,
+		&req_exec_msg_queuecapacitythresholdset->queue_name,
+		req_exec_msg_queuecapacitythresholdset->queue_id);
+	if (queue == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		queue->priority[i].capacity_reached =
+			req_exec_msg_queuecapacitythresholdset->thresholds.capacityReached[i];
+		queue->priority[i].capacity_available =
+			req_exec_msg_queuecapacitythresholdset->thresholds.capacityAvailable[i];
+	}
+
+error_exit:
 	if (api->ipc_source_is_local (&req_exec_msg_queuecapacitythresholdset->source))
 	{
 		res_lib_msg_queuecapacitythresholdset.header.size =
@@ -4224,7 +4249,10 @@ static void message_handler_req_exec_msg_queuecapacitythresholdget (
 	const struct req_exec_msg_queuecapacitythresholdget *req_exec_msg_queuecapacitythresholdget =
 		message;
 	struct res_lib_msg_queuecapacitythresholdget res_lib_msg_queuecapacitythresholdget;
+	struct queue_entry *queue = NULL;
 	SaAisErrorT error = SA_AIS_OK;
+
+	int i;
 
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saMsgQueueCapacityThresholdGet\n");
 
@@ -4233,7 +4261,22 @@ static void message_handler_req_exec_msg_queuecapacitythresholdget (
 		    (char *)(req_exec_msg_queuecapacitythresholdget->queue_name.value),
 		    (unsigned int)(req_exec_msg_queuecapacitythresholdget->queue_id));
 
-/* error_exit: */
+	queue = msg_find_queue_id (&queue_list_head,
+		&req_exec_msg_queuecapacitythresholdget->queue_name,
+		req_exec_msg_queuecapacitythresholdget->queue_id);
+	if (queue == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		res_lib_msg_queuecapacitythresholdget.thresholds.capacityReached[i] =
+			queue->priority[i].capacity_reached;
+		res_lib_msg_queuecapacitythresholdget.thresholds.capacityAvailable[i] =
+			queue->priority[i].capacity_available;
+	}
+
+error_exit:
 	if (api->ipc_source_is_local (&req_exec_msg_queuecapacitythresholdget->source))
 	{
 		res_lib_msg_queuecapacitythresholdget.header.size =
@@ -5440,7 +5483,7 @@ static void message_handler_req_lib_msg_queuecapacitythresholdset (
 	const void *msg)
 {
 	const struct req_lib_msg_queuecapacitythresholdset *req_lib_msg_queuecapacitythresholdset = msg;
-	struct req_exec_msg_queuecapacitythresholdget req_exec_msg_queuecapacitythresholdset;
+	struct req_exec_msg_queuecapacitythresholdset req_exec_msg_queuecapacitythresholdset;
 	struct iovec iovec;
 
 	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saMsgQueueCapacityThresholdSet\n");
@@ -5454,6 +5497,8 @@ static void message_handler_req_lib_msg_queuecapacitythresholdset (
 
 	memcpy (&req_exec_msg_queuecapacitythresholdset.queue_name,
 		&req_lib_msg_queuecapacitythresholdset->queue_name, sizeof (SaNameT));
+	memcpy (&req_exec_msg_queuecapacitythresholdset.thresholds,
+		&req_lib_msg_queuecapacitythresholdset->thresholds, sizeof (SaMsgQueueThresholdsT));
 
 	req_exec_msg_queuecapacitythresholdset.queue_id =
 		req_lib_msg_queuecapacitythresholdset->queue_id;

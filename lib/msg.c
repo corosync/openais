@@ -1799,6 +1799,8 @@ saMsgQueueCapacityThresholdSet (
 
 	memcpy (&req_lib_msg_queuecapacitythresholdset.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));
+	memcpy (&req_lib_msg_queuecapacitythresholdset.thresholds,
+		thresholds, sizeof (SaMsgQueueThresholdsT));
 
 	iov.iov_base = &req_lib_msg_queuecapacitythresholdset;
 	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdset);
@@ -1870,6 +1872,9 @@ saMsgQueueCapacityThresholdGet (
 		error = res_lib_msg_queuecapacitythresholdget.header.error;
 		goto error_put;	/* ! */
 	}
+
+	memcpy (thresholds, &res_lib_msg_queuecapacitythresholdget.thresholds,
+		sizeof (SaMsgQueueThresholdsT));
 
 error_put:
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
