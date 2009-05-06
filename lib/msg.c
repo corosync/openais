@@ -64,9 +64,9 @@
 
 struct msgInstance {
 	hdb_handle_t ipc_handle;
-	int finalize;
 	SaMsgHandleT msg_handle;
 	SaMsgCallbacksT callbacks;
+	int finalize;
 };
 
 struct queueInstance {
@@ -76,12 +76,12 @@ struct queueInstance {
 	SaMsgHandleT msg_handle;
 	SaMsgQueueHandleT queue_handle;
 	SaMsgQueueOpenFlagsT open_flags;
-	SaMsgQueueCreationAttributesT creation_attributes;
+	SaMsgQueueCreationAttributesT create_attrs;
 };
 
-DECLARE_HDB_DATABASE(msgHandleDatabase,NULL);
+DECLARE_HDB_DATABASE(msgHandleDatabase, NULL);
 
-DECLARE_HDB_DATABASE(queueHandleDatabase,NULL);
+DECLARE_HDB_DATABASE(queueHandleDatabase, NULL);
 
 static SaVersionT msgVersionsSupported[] = {
 	{ 'B', 1, 1 }
@@ -406,6 +406,7 @@ saMsgQueueOpen (
 	}
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
+	queueInstance->open_flags = open_flags;
 
 	req_lib_msg_queueopen.header.size =
 		sizeof (struct req_lib_msg_queueopen);
@@ -423,6 +424,8 @@ saMsgQueueOpen (
 
 	if (creationAttributes != NULL) {
 		memcpy (&req_lib_msg_queueopen.create_attrs,
+			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
+		memcpy (&queueInstance->create_attrs,
 			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
 		req_lib_msg_queueopen.create_attrs_flag = 1;
 	} else {
@@ -513,6 +516,7 @@ saMsgQueueOpenAsync (
 	}
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
+	queueInstance->open_flags = open_flags;
 
 	req_lib_msg_queueopenasync.header.size =
 		sizeof (struct req_lib_msg_queueopenasync);
@@ -530,6 +534,8 @@ saMsgQueueOpenAsync (
 
 	if (creationAttributes != NULL) {
 		memcpy (&req_lib_msg_queueopenasync.create_attrs,
+			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
+		memcpy (&queueInstance->create_attrs,
 			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
 		req_lib_msg_queueopenasync.create_attrs_flag = 1;
 	} else {
@@ -1779,15 +1785,31 @@ saMsgQueueCapacityThresholdSet (
 	struct res_lib_msg_queuecapacitythresholdset res_lib_msg_queuecapacitythresholdset;
 	struct iovec iov;
 
+	int i;
+
 	SaAisErrorT error = SA_AIS_OK;
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueCapacityThresholdSet\n");
 
+	if (thresholds == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
 		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
+	}
+
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+		if ((thresholds->capacityAvailable[i]  > thresholds->capacityReached[i]) ||
+		    (thresholds->capacityReached[i] > queueInstance->create_attrs.size[i]))
+		{
+			error = SA_AIS_ERR_INVALID_PARAM;
+			goto error_exit;
+		}
 	}
 
 	req_lib_msg_queuecapacitythresholdset.header.size =
@@ -1839,6 +1861,11 @@ saMsgQueueCapacityThresholdGet (
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueCapacityThresholdGet\n");
+
+	if (thresholds == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
 		queueHandle, (void *)&queueInstance));
