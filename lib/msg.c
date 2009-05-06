@@ -273,7 +273,7 @@ saMsgDispatch (
 				(struct res_lib_msg_queuegrouptrack_callback *)dispatch_data;
 
 			res_lib_msg_queuegrouptrack_callback->buffer.notification =
-				(SaMsgQueueGroupNotificationT *)(res_lib_msg_queuegrouptrack_callback +
+				(SaMsgQueueGroupNotificationT *)(((char *)res_lib_msg_queuegrouptrack_callback) +
 				sizeof (struct res_lib_msg_queuegrouptrack_callback));
 
 			callbacks.saMsgQueueGroupTrackCallback (
