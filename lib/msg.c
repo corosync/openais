@@ -406,7 +406,7 @@ saMsgQueueOpen (
 	}
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
-	queueInstance->open_flags = open_flags;
+	queueInstance->open_flags = openFlags;
 
 	req_lib_msg_queueopen.header.size =
 		sizeof (struct req_lib_msg_queueopen);
@@ -516,7 +516,7 @@ saMsgQueueOpenAsync (
 	}
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
-	queueInstance->open_flags = open_flags;
+	queueInstance->open_flags = openFlags;
 
 	req_lib_msg_queueopenasync.header.size =
 		sizeof (struct req_lib_msg_queueopenasync);
