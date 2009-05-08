@@ -557,7 +557,7 @@ static int lib_comp_terminate_request (struct amf_comp *comp)
 
 static int clc_csi_remove_callback (struct amf_comp *comp)
 {
-	dprintf ("clc_tcsi_remove_callback\n");
+	log_printf (LOG_LEVEL_DEBUG, "clc_tcsi_remove_callback\n");
 	return (0);
 }
 
@@ -597,7 +597,7 @@ static int clc_cli_cleanup (struct amf_comp *comp)
 
 	struct clc_command_run_data *clc_command_run_data;
 
-	dprintf ("clc_cli_cleanup\n");
+	log_printf (LOG_LEVEL_DEBUG, "clc_cli_cleanup\n");
 	clc_command_run_data = malloc (sizeof (struct clc_command_run_data));
 	if (clc_command_run_data == NULL) {
 		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
@@ -619,7 +619,7 @@ static int clc_cli_cleanup (struct amf_comp *comp)
 
 static int clc_cli_cleanup_local (struct amf_comp *comp)
 {
-	dprintf ("clc_cli_cleanup_local\n");
+	log_printf (LOG_LEVEL_DEBUG, "clc_cli_cleanup_local\n");
 	return (0);
 }
 
@@ -628,7 +628,7 @@ static int clc_terminate (struct amf_comp *comp)
 {
 	int res;
 
-	dprintf ("clc terminate for comp %s\n", getSaNameT (&comp->name));
+	log_printf (LOG_LEVEL_DEBUG, "clc terminate for comp %s\n", getSaNameT (&comp->name));
 	assert (0);
 	operational_state_comp_set (comp, SA_AMF_OPERATIONAL_DISABLED);
 	comp_presence_state_set (comp, SA_AMF_PRESENCE_TERMINATING);
@@ -794,7 +794,7 @@ static void lib_csi_remove_request (struct amf_comp *comp,
 	struct res_lib_amf_csiremovecallback res_lib_amf_csiremovecallback;
 	struct csi_remove_callback_data *csi_remove_callback_data;
 
-	dprintf ("\t%s\n", getSaNameT (&comp->name));
+	log_printf (LOG_LEVEL_DEBUG, "\t%s\n", getSaNameT (&comp->name));
 
 	res_lib_amf_csiremovecallback.header.id = MESSAGE_RES_AMF_CSIREMOVECALLBACK;
 	res_lib_amf_csiremovecallback.header.size = sizeof (struct res_lib_amf_csiremovecallback);
@@ -922,7 +922,7 @@ static struct amf_csi_assignment *csi_assignment_find_in (
 static void healthcheck_deactivate (
 	struct amf_healthcheck *healthcheck_active)
 {
-	dprintf ("deactivating healthcheck for component %s\n",
+	log_printf (LOG_LEVEL_DEBUG, "deactivating healthcheck for component %s\n",
              getSaNameT (&healthcheck_active->comp->name));
 
     poll_timer_delete (aisexec_poll_handle,
@@ -1229,7 +1229,7 @@ SaAisErrorT amf_comp_healthcheck_start (
 		goto error_exit;
 	}
 
-	dprintf ("Healthcheckstart: '%s', key '%s'",
+	log_printf (LOG_LEVEL_DEBUG, "Healthcheckstart: '%s', key '%s'",
 			 comp->name.value, healthcheckKey->key);
 
 	/*
@@ -1285,7 +1285,7 @@ SaAisErrorT amf_comp_healthcheck_stop (
 	struct amf_healthcheck *healthcheck;
 	SaAisErrorT error = SA_AIS_OK;
 
-	dprintf ("Healthcheckstop: '%s', key '%s'",
+	log_printf (LOG_LEVEL_DEBUG, "Healthcheckstop: '%s', key '%s'",
 			 comp->name.value, healthcheckKey->key);
 
 	if (healthcheckKey == NULL) {
@@ -1397,7 +1397,7 @@ int amf_comp_response_1 (
 			struct component_terminate_callback_data *component_terminate_callback_data;
 			component_terminate_callback_data = data;
 
-			dprintf ("Lib component terminate callback response, error: %d", error);
+			log_printf (LOG_LEVEL_DEBUG, "Lib component terminate callback response, error: %d", error);
 			amf_comp_healthcheck_deactivate (component_terminate_callback_data->comp);
 			escalation_policy_restart (component_terminate_callback_data->comp);
 			return 1;
@@ -1442,7 +1442,7 @@ struct amf_comp *amf_comp_response_2 (
 	switch (interface) {
 		case AMF_RESPONSE_CSISETCALLBACK: {
 			struct amf_csi_assignment *csi_assignment = data;
-			dprintf ("CSI '%s' set callback response from '%s', error: %d",
+			log_printf (LOG_LEVEL_DEBUG, "CSI '%s' set callback response from '%s', error: %d",
 				csi_assignment->csi->name.value,
 				csi_assignment->comp->name.value, error);
 			comp = csi_assignment->comp;
@@ -1459,7 +1459,7 @@ struct amf_comp *amf_comp_response_2 (
 		}
 		case AMF_RESPONSE_CSIREMOVECALLBACK: {
 			struct amf_csi_assignment *csi_assignment = data;
-			dprintf ("Lib csi '%s' remove callback response from '%s', error: %d",
+			log_printf (LOG_LEVEL_DEBUG, "Lib csi '%s' remove callback response from '%s', error: %d",
 				csi_assignment->csi->name.value,
 				csi_assignment->comp->name.value, error);
 			comp = csi_assignment->comp;
@@ -1476,7 +1476,7 @@ struct amf_comp *amf_comp_response_2 (
 		}
 	    case AMF_RESPONSE_COMPONENTTERMINATECALLBACK: {
 			struct component_terminate_callback_data *callback_data = data;
-			dprintf ("Lib comp '%s' terminate callback response, error: %d",
+			log_printf (LOG_LEVEL_DEBUG, "Lib comp '%s' terminate callback response, error: %d",
 					 callback_data->comp->name.value, error);
 			comp_presence_state_set (callback_data->comp,
 				SA_AMF_PRESENCE_UNINSTANTIATED);
@@ -1521,7 +1521,7 @@ void amf_comp_hastate_set (
  */
 void amf_comp_terminate (struct amf_comp *comp)
 {
-	dprintf ("comp terminate '%s'\n", getSaNameT (&comp->name));
+	log_printf (LOG_LEVEL_DEBUG, "comp terminate '%s'\n", getSaNameT (&comp->name));
 	amf_comp_healthcheck_stop (comp, NULL);
 	comp_presence_state_set (comp, SA_AMF_PRESENCE_TERMINATING);
 
@@ -1540,7 +1540,7 @@ void amf_comp_terminate (struct amf_comp *comp)
  */
 void amf_comp_restart (struct amf_comp *comp)
 {
-	dprintf ("comp restart '%s'\n", getSaNameT (&comp->name));
+	log_printf (LOG_LEVEL_DEBUG, "comp restart '%s'\n", getSaNameT (&comp->name));
 	comp_presence_state_set (comp, SA_AMF_PRESENCE_RESTARTING);
 	comp->saAmfCompRestartCount += 1;
 	amf_comp_healthcheck_stop (comp, NULL);
@@ -1565,7 +1565,7 @@ SaAisErrorT amf_comp_hastate_get (
 
 	assert (comp != NULL && csi_name != NULL && ha_state != NULL);
 
-	dprintf ("comp ha state get from comp '%s' CSI '%s'\n",
+	log_printf (LOG_LEVEL_DEBUG, "comp ha state get from comp '%s' CSI '%s'\n",
 			 getSaNameT (&comp->name), csi_name->value);
 
 	assignment = csi_assignment_find_in (comp, csi_name);
@@ -1593,7 +1593,7 @@ SaAisErrorT amf_comp_healthcheck_confirm (
 	struct amf_healthcheck *healthcheck;
 	SaAisErrorT error = SA_AIS_OK;
 
-	dprintf ("Healthcheckconfirm: '%s', key '%s'",
+	log_printf (LOG_LEVEL_DEBUG, "Healthcheckconfirm: '%s', key '%s'",
 			 comp->name.value, healthcheckKey->key);
 
 	healthcheck = amf_comp_find_healthcheck (comp, healthcheckKey);

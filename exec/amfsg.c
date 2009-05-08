@@ -173,13 +173,13 @@ static void delete_si_assignments (struct amf_su *su)
 		if (si->assigned_sis->su == su) {
 			si_assignment = si->assigned_sis;
 			si->assigned_sis = si_assignment->next;
-			dprintf ("first");
+			log_printf (LOG_LEVEL_DEBUG, "first");
 		} else {
 			si_assignment = si->assigned_sis->next;
 			si->assigned_sis->next = NULL;
-			dprintf ("second");
+			log_printf (LOG_LEVEL_DEBUG, "second");
 		}
-		dprintf ("%p, %d, %d",
+		log_printf (LOG_LEVEL_DEBUG, "%p, %d, %d",
 				 si_assignment, si_assignment->name.length,
 				 si->assigned_sis->name.length);
 		assert (si_assignment != NULL);
@@ -309,7 +309,7 @@ static void assign_si_assumed_cbfn (
 				sg->avail_state = SG_AC_Idle;
 				amf_application_sg_assigned (sg->application, sg);
 			} else {
-				dprintf ("%d, %d", si_assignment_cnt, confirmed_assignments);
+				log_printf (LOG_LEVEL_DEBUG, "%d, %d", si_assignment_cnt, confirmed_assignments);
 			}
 			break;
 		case SG_AC_AssigningStandBy:
@@ -326,7 +326,7 @@ static void assign_si_assumed_cbfn (
 				break;
 			}
 		default:
-			dprintf ("%d, %d, %d", sg->avail_state, si_assignment_cnt,
+			log_printf (LOG_LEVEL_DEBUG, "%d, %d, %d", sg->avail_state, si_assignment_cnt,
 					 confirmed_assignments);
 			amf_runtime_attributes_print (amf_cluster);
 			assert (0);
@@ -463,7 +463,7 @@ static void sg_assign_nm_active (struct amf_sg *sg, int su_active_assign)
 	}
 	
 	if (total_assigned == 0) {
-		dprintf ("Info: No SIs assigned!");
+		log_printf (LOG_LEVEL_DEBUG, "Info: No SIs assigned!");
 	}
 }
 
@@ -513,7 +513,7 @@ static void sg_assign_nm_standby (struct amf_sg *sg, int su_standby_assign)
 		su = su->next;
 	}
 	if (total_assigned == 0) {
-		dprintf ("Info: No SIs assigned!");
+		log_printf (LOG_LEVEL_DEBUG, "Info: No SIs assigned!");
 	}
 }
 
@@ -594,14 +594,14 @@ void amf_sg_assign_si (struct amf_sg *sg, int dependency_level)
 	 * to assign based upon reduction procedure
 	 */
 	if ((inservice_count - active_sus_needed) < 0) {
-		dprintf ("assignment VI - partial assignment with SIs drop outs\n");
+		log_printf (LOG_LEVEL_DEBUG, "assignment VI - partial assignment with SIs drop outs\n");
 
 		su_active_assign = active_sus_needed;
 		su_standby_assign = 0;
 		su_spare_assign = 0;
 	} else
 	if ((inservice_count - active_sus_needed - standby_sus_needed) < 0) {
-		dprintf ("assignment V - partial assignment with reduction "
+		log_printf (LOG_LEVEL_DEBUG, "assignment V - partial assignment with reduction "
 				 "of standby units\n");
 
 		su_active_assign = active_sus_needed;
@@ -615,7 +615,7 @@ void amf_sg_assign_si (struct amf_sg *sg, int dependency_level)
 	if ((sg->saAmfSGMaxStandbySIsperSUs * units_for_standby) <=
 		sg_si_count_get (sg)) {
 
-		dprintf ("IV: full assignment with reduction of active service units\n");
+		log_printf (LOG_LEVEL_DEBUG, "IV: full assignment with reduction of active service units\n");
 		su_active_assign = inservice_count - standby_sus_needed;
 		su_standby_assign = standby_sus_needed;
 		su_spare_assign = 0;
@@ -623,27 +623,27 @@ void amf_sg_assign_si (struct amf_sg *sg, int dependency_level)
 	if ((sg->saAmfSGMaxActiveSIsperSUs * units_for_active) <=
 		sg_si_count_get (sg)) {
 
-		dprintf ("III: full assignment with reduction of standby "
+		log_printf (LOG_LEVEL_DEBUG, "III: full assignment with reduction of standby "
 				 "service units\n");
 		su_active_assign = sg->saAmfSGNumPrefActiveSUs;
 		su_standby_assign = units_for_standby;
 		su_spare_assign = 0;
 	} else
 	if (ii_spare == 0) {
-		dprintf ("II: full assignment with spare reduction\n");
+		log_printf (LOG_LEVEL_DEBUG, "II: full assignment with spare reduction\n");
 
 		su_active_assign = sg->saAmfSGNumPrefActiveSUs;
 		su_standby_assign = sg->saAmfSGNumPrefStandbySUs;
 		su_spare_assign = 0;
 	} else {
-		dprintf ("I: full assignment with spares\n");
+		log_printf (LOG_LEVEL_DEBUG, "I: full assignment with spares\n");
 
 		su_active_assign = sg->saAmfSGNumPrefActiveSUs;
 		su_standby_assign = sg->saAmfSGNumPrefStandbySUs;
 		su_spare_assign = ii_spare;
 	}
 
-	dprintf ("(inservice=%d) (assigning active=%d) (assigning standby=%d)"
+	log_printf (LOG_LEVEL_DEBUG, "(inservice=%d) (assigning active=%d) (assigning standby=%d)"
 			 " (assigning spares=%d)\n",
 		inservice_count, su_active_assign, su_standby_assign, su_spare_assign);
 	sg_assign_nm_active (sg, su_active_assign);

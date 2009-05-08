@@ -128,12 +128,6 @@ extern void log_atsegv (void);
     } \
 } while(0)
 
-#define dprintf(format, args...) do { \
-    if (LOG_LEVEL_DEBUG <= loggers[logger_identifier].level)	{ \
-		internal_log_printf2 (__FILE__, __LINE__, LOG_LEVEL_DEBUG, logger_identifier, format, ##args);  \
-    } \
-} while(0)
-
 #define ENTER_VOID() do { \
     if (LOG_LEVEL_DEBUG <= loggers[logger_identifier].level) { \
 		trace (__FILE__, __LINE__, TAG_ENTER, logger_identifier, ">%s\n", __FUNCTION__); \

@@ -201,7 +201,7 @@ static void comp_assign_csi (struct amf_comp *comp, struct amf_csi *csi,
 {
 	struct amf_csi_assignment *csi_assignment;
 
-	dprintf ("  Creating CSI '%s' to comp '%s' with hastate %s\n",
+	log_printf (LOG_LEVEL_DEBUG, "  Creating CSI '%s' to comp '%s' with hastate %s\n",
 		getSaNameT (&csi->name), getSaNameT (&comp->name),
 		amf_ha_state (ha_state));
 
@@ -274,7 +274,7 @@ void amf_su_assign_si (struct amf_su *su, struct amf_si *si,
 {
 	struct amf_si_assignment *si_assignment;
 
-	dprintf ("Creating SI '%s' to SU '%s' with hastate %s\n",
+	log_printf (LOG_LEVEL_DEBUG, "Creating SI '%s' to SU '%s' with hastate %s\n",
 		getSaNameT (&si->name), getSaNameT (&su->name),
 		amf_ha_state (ha_state));
 
@@ -425,7 +425,7 @@ static void su_comp_presence_state_changed (
 					}
 					break;
 				default:
-					dprintf ("state %d", su->restart_control_state);
+					log_printf (LOG_LEVEL_DEBUG, "state %d", su->restart_control_state);
 					assert (0);
 			}
 			break;

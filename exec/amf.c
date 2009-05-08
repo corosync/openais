@@ -417,7 +417,7 @@ static void amf_confchg_fn (
 	unsigned int *joined_list, int joined_list_entries,
 	struct memb_ring_id *ring_id)
 {
-	dprintf ("amf_confchg_fn : type = %d,mnum = %d,jnum = %d,lnum = %d\n",
+	log_printf (LOG_LEVEL_DEBUG, "amf_confchg_fn : type = %d,mnum = %d,jnum = %d,lnum = %d\n",
 		configuration_type,member_list_entries,
 		joined_list_entries,left_list_entries);
 }
@@ -431,7 +431,7 @@ static int amf_lib_exit_fn (void *conn)
 	comp = amf_pd->comp;
 	assert (comp != NULL);
 	comp->conn = NULL;
-	dprintf ("Lib exit from comp %s\n", getSaNameT (&comp->name));
+	log_printf (LOG_LEVEL_DEBUG, "Lib exit from comp %s\n", getSaNameT (&comp->name));
 
 	return (0);
 }

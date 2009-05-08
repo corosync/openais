@@ -107,7 +107,7 @@ static void timer_function_cluster_assign_workload_tmo (void *_cluster)
 	struct amf_application *app;
 	struct amf_cluster *cluster = _cluster;
 
-	dprintf("2nd Cluster start timer expired, assigning workload to application\n");
+	log_printf (LOG_LEVEL_DEBUG, "2nd Cluster start timer expired, assigning workload to application\n");
 
 	for (app = cluster->application_head; app != NULL; app = app->next) {
 		amf_application_assign_workload (app, this_amf_node);
