@@ -966,7 +966,7 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 	struct res_lib_cpg_mcast res_lib_cpg_mcast;
 	int msglen = req_lib_cpg_mcast->msglen;
 	int result;
-	SaAisErrorT error;
+	SaAisErrorT error = CPG_OK;
 
 	log_printf(LOG_LEVEL_DEBUG, "got mcast request on %p\n", conn);
 
@@ -1015,7 +1015,7 @@ static void message_handler_req_lib_cpg_mcast (void *conn, void *message)
 static void message_handler_req_lib_cpg_membership (void *conn, void *message)
 {
 	struct cpg_pd *cpd = (struct cpg_pd *)openais_conn_private_data_get (conn);
-	SaAisErrorT error;
+	SaAisErrorT error = CPG_OK;
 	mar_res_header_t res;
 
 	switch (cpd->cpd_state) {
