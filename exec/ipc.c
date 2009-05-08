@@ -560,7 +560,7 @@ static int poll_handler_connection (
 		 */
 		res = req_setup_recv (conn_info);
 		if (res == -1) {
-			req_setup_send (conn_info, SA_AIS_ERR_TRY_AGAIN);
+			req_setup_send (conn_info, SA_AIS_ERR_SECURITY);
 		}
 		if (res != 1) {
 			return (0);
