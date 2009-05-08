@@ -264,6 +264,16 @@ priv_change_send (struct ipc_segment *ipc_segment)
 	return (0);
 }
 	
+	
+#if defined(_SEM_SEMUN_UNDEFINED)
+union semun {
+	int val;
+	struct semid_ds *buf;
+	unsigned short int *array;
+	struct seminfo *__buf;
+};
+#endif
+
 SaAisErrorT
 openais_service_connect (
 	enum service_types service,
@@ -278,6 +288,7 @@ openais_service_connect (
 	int res;
 	mar_req_setup_t req_setup;
 	mar_res_setup_t res_setup;
+	union semun semun;
 
 	res_setup.error = SA_AIS_ERR_LIBRARY;
 
@@ -336,12 +347,18 @@ openais_service_connect (
 		goto error_exit;
 	}
 	
-	res = semctl (ipc_segment->semid, 0, SETVAL, 0);
+	semun.val = 0;
+	res = semctl (ipc_segment->semid, 0, SETVAL, semun);
 	if (res != 0) {
 		goto error_exit;
 	}
 
-	res = semctl (ipc_segment->semid, 1, SETVAL, 0);
+	res = semctl (ipc_segment->semid, 1, SETVAL, semun);
+	if (res != 0) {
+		goto error_exit;
+	}
+
+	res = semctl (ipc_segment->semid, 2, SETVAL, semun);
 	if (res != 0) {
 		goto error_exit;
 	}
