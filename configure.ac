@@ -267,6 +267,7 @@ WARNLIST="
 	unsigned-char
 	gnu89-inline
 	no-strict-aliasing
+	shadow
 	"
 
 for j in $WARNLIST; do
