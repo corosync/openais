@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2006 MontaVista Software, Inc.
- * Copyright (c) 2006 Red Hat, Inc.
+ * Copyright (c) 2006, 2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -1168,14 +1168,12 @@ static void msg_print_queue_message_list (
 }
 
 static void msg_print_group_member_list (
-	struct list_head *queue_list_head)
+	struct list_head *head)
 {
 	struct list_head *list;
 	struct queue_entry *queue;
 
-	for (list = queue_list_head->next;
-	     list != queue_list_head;
-	     list = list->next)
+	for (list = head->next; list != head; list = list->next)
 	{
 		queue = list_entry (list, struct queue_entry, group_list);
 
@@ -1187,15 +1185,13 @@ static void msg_print_group_member_list (
 }
 
 static void msg_print_queue_list (
-	struct list_head *queue_list_head)
+	struct list_head *head)
 {
 	struct list_head *list;
 	struct queue_entry *queue;
 	int i;
 
-	for (list = queue_list_head->next;
-	     list != queue_list_head;
-	     list = list->next)
+	for (list = head->next; list != head; list = list->next)
 	{
 		queue = list_entry (list, struct queue_entry, queue_list);
 
@@ -1218,14 +1214,12 @@ static void msg_print_queue_list (
 }
 
 static void msg_print_group_list (
-	struct list_head *group_list_head)
+	struct list_head *head)
 {
 	struct list_head *list;
 	struct group_entry *group;
 
-	for (list = group_list_head->next;
-	     list != group_list_head;
-	     list = list->next)
+	for (list = head->next; list != head; list = list->next)
 	{
 		group = list_entry (list, struct group_entry, group_list);
 
@@ -1402,15 +1396,13 @@ static struct message_entry *msg_get_message (
 }
 
 static struct queue_entry *msg_find_group_member (
-	struct list_head *queue_list_head,
+	struct list_head *head,
 	const SaNameT *queue_name)
 {
 	struct list_head *list;
 	struct queue_entry *queue;
 
-	for (list = queue_list_head->next;
-	     list != queue_list_head;
-	     list = list->next)
+	for (list = head->next; list != head; list = list->next)
 	{
 		queue = list_entry (list, struct queue_entry, group_list);
 
@@ -1469,16 +1461,14 @@ static struct queue_cleanup *msg_find_queue_cleanup (
 }
 
 static struct queue_entry *msg_find_queue_id (
-	struct list_head *queue_list_head,
+	struct list_head *head,
 	const SaNameT *queue_name,
 	SaUint32T queue_id)
 {
 	struct list_head *list;
 	struct queue_entry *queue;
 
-	for (list = queue_list_head->next;
-	     list != queue_list_head;
-	     list = list->next)
+	for (list = head->next; list != head; list = list->next)
 	{
 		queue = list_entry (list, struct queue_entry, queue_list);
 
@@ -1492,15 +1482,13 @@ static struct queue_entry *msg_find_queue_id (
 }
 
 static struct queue_entry *msg_find_queue (
-	struct list_head *queue_list_head,
+	struct list_head *head,
 	const SaNameT *queue_name)
 {
 	struct list_head *list;
 	struct queue_entry *queue;
 
-	for (list = queue_list_head->next;
-	     list != queue_list_head;
-	     list = list->next)
+	for (list = head->next; list != head; list = list->next)
 	{
 		queue = list_entry (list, struct queue_entry, queue_list);
 
@@ -1514,15 +1502,13 @@ static struct queue_entry *msg_find_queue (
 }
 
 static struct group_entry *msg_find_group (
-	struct list_head *group_list_head,
+	struct list_head *head,
 	const SaNameT *group_name)
 {
 	struct list_head *list;
 	struct group_entry *group;
 
-	for (list = group_list_head->next;
-	     list != group_list_head;
-	     list = list->next)
+	for (list = head->next; list != head; list = list->next)
 	{
 		group = list_entry (list, struct group_entry, group_list);
 
