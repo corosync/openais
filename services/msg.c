@@ -1547,7 +1547,7 @@ static int msg_close_queue (
 
 static void msg_cancel_queue_pending (
 	struct queue_entry *queue,
-	mar_message_source_t *source,
+	const mar_message_source_t *source,
 	unsigned int pid)
 {
 	struct pending_entry *pending;
@@ -1586,7 +1586,7 @@ static void msg_cancel_queue_pending (
 
 static void msg_release_queue_pending (
 	struct queue_entry *queue,
-	mar_message_source_t *source)
+	const mar_message_source_t *source)
 {
 	struct pending_entry *pending;
 	struct list_head *pending_list;
@@ -1936,7 +1936,7 @@ static int msg_sync_queue_transmit (
 	req_exec_msg_sync_queue.unlink_flag = queue->unlink_flag;
 	req_exec_msg_sync_queue.open_flags = queue->open_flags;
 	req_exec_msg_sync_queue.change_flag = queue->change_flag;
-	
+
 	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++)
 	{
 		req_exec_msg_sync_queue.capacity_available[i] =
