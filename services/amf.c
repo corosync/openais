@@ -465,7 +465,7 @@ static const char *scsm_state_names[] = {
  */
 static struct scsm_descriptor scsm;
 
-static char hostname[HOST_NAME_MAX + 1];
+static char g_hostname[HOST_NAME_MAX + 1];
 
 /*
  * List (implemented as an array) of nodes in the
@@ -1280,7 +1280,7 @@ static void amf_sync_activate (void)
  */
 static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
-	if (gethostname (hostname, sizeof (hostname)) == -1) {
+	if (gethostname (g_hostname, sizeof (g_hostname)) == -1) {
 		log_printf (LOGSYS_LEVEL_ERROR, "gethostname failed: %d", errno);
 		corosync_fatal_error (COROSYNC_FATAL_ERR);
 	}
@@ -1332,12 +1332,12 @@ static void amf_confchg_fn (
 			/* fall-through */
 		case PROBING_2:
 			if (joined_list_entries > 0) {
-				mcast_sync_request (hostname);
+				mcast_sync_request (g_hostname);
 			}
 			break;
 		case UPDATING_CLUSTER_MODEL:
 			if (joined_list_entries > 0) {
-				mcast_sync_request (hostname);
+				mcast_sync_request (g_hostname);
 			}
 
 			if (!is_list_member (scsm.sync_master, member_list, member_list_entries)) {
