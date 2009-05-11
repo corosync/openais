@@ -277,7 +277,7 @@ static int has_all_sg_on_node_failed_over (amf_node_t *node)
 	amf_application_t *app;
 	amf_sg_t *sg;
 	amf_su_t *su;
-	int has_all_sg_on_node_failed_over = 1;
+	int all_failed_over = 1;
 
 	for (app = amf_cluster->application_head; app != NULL; app = app->next) {
 		for (sg = app->sg_head; sg != NULL; sg = sg->next) {
@@ -286,7 +286,7 @@ static int has_all_sg_on_node_failed_over (amf_node_t *node)
 
 					if (sg->avail_state != SG_AC_Idle) {
 						TRACE1("%s %s",sg->name.value, su->name.value);
-						has_all_sg_on_node_failed_over = 0;
+						all_failed_over = 0;
 						goto out;
 					}
 					break;
@@ -296,7 +296,7 @@ static int has_all_sg_on_node_failed_over (amf_node_t *node)
 		}
 	}
 out:
-	return has_all_sg_on_node_failed_over;
+	return all_failed_over;
 }
 
 static void repair_node (amf_node_t *node)
