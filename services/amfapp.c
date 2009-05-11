@@ -213,15 +213,15 @@ static int no_su_is_instantiating (struct amf_application *app)
 static int all_sg_assigned (struct amf_application *app)
 {
 	struct amf_sg *sg;
-	int all_sg_assigned = 1;
+	int all_assigned = 1;
 
 	for (sg = app->sg_head; sg != NULL; sg = sg->next) {
 		if (sg->avail_state != SG_AC_Idle) {
-			all_sg_assigned = 0;
+			all_assigned = 0;
 			break;
 		}
 	}
-	return all_sg_assigned;
+	return all_assigned;
 }
 
 static void start_all_sg_for_cluster (amf_application_t *app)
