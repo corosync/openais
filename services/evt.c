@@ -1315,7 +1315,7 @@ static SaAisErrorT evt_close_channel(mar_name_t *cn, uint64_t unlink_id, void *c
  *
  */
 #define NODE_HASH_SIZE 256
-static struct member_node_data *nl[NODE_HASH_SIZE] = {0};
+static struct member_node_data *node_list[NODE_HASH_SIZE] = {0};
 static inline int
 hash_sock_addr(unsigned int nodeid)
 {
@@ -1324,11 +1324,11 @@ hash_sock_addr(unsigned int nodeid)
 
 static struct member_node_data **lookup_node(unsigned int nodeid)
 {
-	int index = hash_sock_addr(nodeid);
+	int idx = hash_sock_addr(nodeid);
 	struct member_node_data **nlp;
 
-	nlp = &nl[index];
-	for (nlp = &nl[index]; *nlp; nlp = &((*nlp)->mn_next)) {
+	nlp = &node_list[idx];
+	for (nlp = &node_list[idx]; *nlp; nlp = &((*nlp)->mn_next)) {
 		if ((*(nlp))->mn_nodeid == nodeid) {
 			break;
 		}
