@@ -1379,9 +1379,9 @@ static void comp_recover_action (amf_comp_t *comp,
 					break;
 				case SA_AMF_NODE_FAILOVER: {
                     /* Node failover */
-					amf_node_t *node = amf_node_find (
+					amf_node_t *n = amf_node_find (
 						&comp->su->saAmfSUHostedByNode);
-					amf_node_failover(node);
+					amf_node_failover(n);
 				}
 				break;
 				case SA_AMF_NODE_FAILFAST:
