@@ -692,20 +692,20 @@ test_channel(void)
 
 }
 
-	SaUint8T pat0[100];
-	SaUint8T pat1[100];
-	SaUint8T pat2[100];
-	SaUint8T pat3[100];
-	SaUint8T pat4[100];
-	SaEvtEventPatternT evt_patts[5] = {
-		{100, 100, pat0},
-		{100, 100, pat1},
-		{100, 100, pat2},
-		{100, 100, pat3},
-		{100, 100, pat4}};
-	SaEvtEventPatternArrayT	evt_pat_get_array = { 5, 0, evt_patts };
+static SaUint8T pat0_[100];
+static SaUint8T pat1_[100];
+static SaUint8T pat2_[100];
+static SaUint8T pat3_[100];
+static SaUint8T pat4_[100];
+static SaEvtEventPatternT evt_patts[5] = {
+		{100, 100, pat0_},
+		{100, 100, pat1_},
+		{100, 100, pat2_},
+		{100, 100, pat3_},
+		{100, 100, pat4_}};
+static SaEvtEventPatternArrayT evt_pat_get_array = { 5, 0, evt_patts };
 
-SaEvtEventPatternT patterns[] = {
+static SaEvtEventPatternT patterns[] = {
 	{patt1_size, patt1_size, patt1},
 	{patt2_size, patt2_size, patt2},
 	{patt3_size, patt3_size, patt3},
