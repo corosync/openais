@@ -1,17 +1,17 @@
-echo "OpenAIS Project LOC"
+#!/bin/sh
+# Assumes find and xargs honor -print0 and -0, like GNU versions do.
+
+fmt='%-12s %7.7s\n'
+echo "OpenAIS Project Lines of Code"
+printf "$fmt" subdir LoC
 echo "---------------------------"
-echo -n "services LOC "
-printf "%7.7s\n" `find services -name *.[ch] -exec cat {} \; | wc -l`
 
-echo -n "lib LOC      "
-printf "%7.7s\n" `find lib -name *.[ch] -exec cat {} \; | wc -l`
-
-echo -n "include LOC  "
-printf "%7.7s\n" `find include -name *.[ch] -exec cat {} \; | wc -l`
-
-echo -n "test LOC     "
-printf "%7.7s\n" `find test -name *.[ch] -exec cat {} \; | wc -l`
+total=0
+for i in services lib include test; do
+  n=`find $i -name '*.[ch]' -print0 | xargs -0 cat | wc -l`
+  printf "$fmt" $i $n
+  total=`expr $total + $n`
+done
 
 echo "---------------------------"
-echo -n "total LOC    "
-printf "%7.7s\n" `find . -name *.[ch] -exec cat {} \; | wc -l`
+printf "$fmt" total $total
