@@ -1391,29 +1391,30 @@ static inline int div_round (int a, int b)
 }
 
 static int no_su_has_presence_state (
-	struct amf_sg *sg, struct amf_node *node_to_start,
+	const struct amf_sg *sg,
+	const struct amf_node *node_to_start,
 	SaAmfPresenceStateT state)
 {
 	struct amf_su *su;
-	int no_su_has_presence_state = 1;
+	int any_su_has_presence_state = 0;
 
 	for (su = sg->su_head; su != NULL; su = su->next) {
 
 		if (su->saAmfSUPresenceState == state) {
 			if (node_to_start == NULL) {
-				no_su_has_presence_state = 0;
+				any_su_has_presence_state = 1;
 				break;
 			} else {
 				if (name_match(&node_to_start->name,
 					&su->saAmfSUHostedByNode)) {
-					no_su_has_presence_state = 0;
+					any_su_has_presence_state = 1;
 					break;
 				}
 			}
 		}
 	}
 
-	return no_su_has_presence_state;
+	return ! any_su_has_presence_state;
 }
 
 #if COMPILE_OUT
@@ -2608,7 +2609,6 @@ static void dependent_si_deactivated_cbfn (
 	 * goto next state (TerminatingSuspected).
 	 */
 	for (su = sg->su_head ; su != NULL; su = su->next) {
-		struct amf_si_assignment *si_assignment;
 		si_assignment = amf_su_get_next_si_assignment(su, NULL);
 
 		while (si_assignment != NULL) {
