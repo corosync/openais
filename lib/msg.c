@@ -684,6 +684,11 @@ saMsgQueueClose (
 		goto error_put;	/* ! */
 	}
 
+	/*No Error -> destroy handle*/
+	hdb_handle_put (&queueHandleDatabase, queueHandle);
+	hdb_handle_destroy (&queueHandleDatabase, queueHandle);
+
+	return (error);
 error_put:
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
