@@ -3823,7 +3823,7 @@ static void message_handler_req_exec_msg_messageget (
 		&req_exec_msg_messageget->queue_name,
 		req_exec_msg_messageget->queue_id);
 	if (queue == NULL) {
-		error = SA_AIS_ERR_NOT_EXIST;
+		error = SA_AIS_ERR_BAD_HANDLE;
 		goto error_exit;
 	}
 
@@ -3889,9 +3889,6 @@ error_exit:
 			MESSAGE_RES_MSG_MESSAGEGET;
 		res_lib_msg_messageget.header.error = error;
 
-		memcpy (&res_lib_msg_messageget.message, &msg->message,
-			sizeof (SaMsgMessageT)); /* ? */
-
 		iov[0].iov_base = &res_lib_msg_messageget;
 		iov[0].iov_len = sizeof (struct res_lib_msg_messageget);
 
@@ -3899,6 +3896,8 @@ error_exit:
 			iov[1].iov_base = msg->message.data;
 			iov[1].iov_len = msg->message.size;
 
+			memcpy (&res_lib_msg_messageget.message, &msg->message,
+				sizeof (SaMsgMessageT)); /* ? */
 			api->ipc_response_iov_send (req_exec_msg_messageget->source.conn, iov, 2);
 		}
 		else {
@@ -3906,7 +3905,8 @@ error_exit:
 		}
 	}
 
-	free (msg);
+	if (msg != NULL)
+	    free (msg);
 }
 
 static void message_handler_req_exec_msg_messagedatafree (
