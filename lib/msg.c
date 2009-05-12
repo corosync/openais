@@ -385,6 +385,11 @@ saMsgQueueOpen (
 		goto error_exit;
 	}
 
+	if ((openFlags & (~SA_MSG_QUEUE_CREATE) & (~SA_MSG_QUEUE_RECEIVE_CALLBACK) & (~SA_MSG_QUEUE_EMPTY)) != 0) {
+		error = SA_AIS_ERR_BAD_FLAGS;
+		goto error_exit;
+	}
+
 	if ((!(openFlags & SA_MSG_QUEUE_CREATE)) && creationAttributes != NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -513,6 +518,11 @@ saMsgQueueOpenAsync (
 
 	if (queueName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if ((openFlags & (~SA_MSG_QUEUE_CREATE) & (~SA_MSG_QUEUE_RECEIVE_CALLBACK) & (~SA_MSG_QUEUE_EMPTY)) != 0) {
+		error = SA_AIS_ERR_BAD_FLAGS;
 		goto error_exit;
 	}
 
