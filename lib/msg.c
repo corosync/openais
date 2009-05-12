@@ -380,6 +380,11 @@ saMsgQueueOpen (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpen\n");
 
+	if (queueName == NULL || queueHandle == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
@@ -390,7 +395,7 @@ saMsgQueueOpen (
 	    (msgInstance->callbacks.saMsgMessageReceivedCallback == NULL))
 	{
 		error = SA_AIS_ERR_INIT;
-		goto error_exit;
+		goto error_put;
 	}
 
 	error = hdb_error_to_sa (hdb_handle_create (&queueHandleDatabase,
@@ -485,6 +490,11 @@ saMsgQueueOpenAsync (
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueOpenAsync\n");
+
+	if (queueName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
@@ -643,6 +653,11 @@ saMsgQueueStatusGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueStatusGet\n");
 
+	if (queueName == NULL || queueStatus == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
@@ -754,6 +769,11 @@ saMsgQueueUnlink (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueUnlink\n");
 
+	if (queueName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
@@ -804,6 +824,11 @@ saMsgQueueGroupCreate (
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupCreate\n");
+
+	if (queueGroupName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
@@ -858,6 +883,11 @@ saMsgQueueGroupInsert (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupInsert\n");
 
+	if (queueName == NULL || queueGroupName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
@@ -911,6 +941,11 @@ saMsgQueueGroupRemove (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupRemove\n");
 
+	if (queueName == NULL || queueGroupName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
@@ -962,6 +997,11 @@ saMsgQueueGroupDelete (
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupDelete\n");
+
+	if (queueGroupName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
@@ -1118,6 +1158,11 @@ saMsgQueueGroupTrackStop (
 
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgQueueGroupTrackStop\n");
+
+	if (queueGroupName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
@@ -1376,6 +1421,11 @@ saMsgMessageGet (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageGet\n");
 
+	if (message == NULL || senderId == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa(hdb_handle_get (&queueHandleDatabase,
 		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
@@ -1443,7 +1493,10 @@ saMsgMessageGet (
 		sizeof (struct res_lib_msg_messageget)),
 		res_lib_msg_messageget->message.size);
 
-	*sendTime = res_lib_msg_messageget->send_time;
+	if (sendTime != NULL) {
+		*sendTime = res_lib_msg_messageget->send_time;
+	}
+
 	*senderId = res_lib_msg_messageget->sender_id;
 
 error_ipc_put:
@@ -1558,6 +1611,11 @@ saMsgMessageSendReceive (
 	/* DEBUG */
 	printf ("[DEBUG]: saMsgMessageSendReceive\n");
 
+	if (destination == NULL || sendMessage == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
@@ -1627,7 +1685,9 @@ saMsgMessageSendReceive (
 		sizeof (struct res_lib_msg_messagesendreceive)),
 		res_lib_msg_messagesendreceive->message.size);
 
-	*replySendTime = res_lib_msg_messagesendreceive->reply_time;
+	if (replySendTime != NULL) {
+		*replySendTime = res_lib_msg_messagesendreceive->reply_time;
+	}
 
 error_ipc_put:
 	coroipcc_msg_send_reply_receive_in_buf_put (ipc_handle);
