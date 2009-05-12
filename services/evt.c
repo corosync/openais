@@ -109,7 +109,7 @@ static void lib_evt_close_channel(void *conn, const void *message);
 static void lib_evt_unlink_channel(void *conn, const void *message);
 static void lib_evt_event_subscribe(void *conn, const void *message);
 static void lib_evt_event_unsubscribe(void *conn, const void *message);
-static void lib_evt_event_publish(void *conn, void *message);
+static void lib_evt_event_publish(void *conn, const void *message);
 static void lib_evt_event_clear_retentiontime(void *conn, const void *message);
 static void lib_evt_event_data_get(void *conn, const void *message);
 
@@ -182,8 +182,8 @@ static struct corosync_lib_handler evt_lib_engine[] = {
 };
 
 
-static void evt_remote_evt(void *msg, unsigned int nodeid);
-static void evt_remote_recovery_evt(void *msg, unsigned int nodeid);
+static void evt_remote_evt(const void *msg, unsigned int nodeid);
+static void evt_remote_recovery_evt(const void *msg, unsigned int nodeid);
 static void evt_remote_chan_op(const void *msg, unsigned int nodeid);
 
 static struct corosync_exec_handler evt_exec_engine[] = {
@@ -2685,16 +2685,17 @@ unsubr_done:
 /*
  * saEvtEventPublish Handler
  */
-static void lib_evt_event_publish(void *conn, void *message)
+static void lib_evt_event_publish(void *conn, const void *message)
 {
-	struct lib_event_data *req = message;
+	struct lib_event_data *req;
+	const struct lib_event_data *req_ro = message;
 	struct res_evt_event_publish res;
 	struct event_svr_channel_open	*eco;
 	struct event_svr_channel_instance *eci;
 	mar_evteventid_t event_id = 0;
 	uint64_t msg_id = 0;
 	SaAisErrorT error = SA_AIS_OK;
-	struct iovec pub_iovec;
+	struct iovec pub_iovec[2];
 	void *ptr;
 	int result;
 	unsigned int ret;
@@ -2705,6 +2706,12 @@ static void lib_evt_event_publish(void *conn, void *message)
 	log_printf(LOGSYS_LEVEL_DEBUG,
 			"saEvtEventPublish (Publish event request)\n");
 
+
+	/*
+	 * Allocate new req and copy there message
+	 */
+	req = alloca (sizeof (*req));
+	memcpy (req, message, sizeof (*req));
 
 	/*
 	 * look up and validate open channel info
@@ -2735,9 +2742,11 @@ static void lib_evt_event_publish(void *conn, void *message)
 	 * The multicasted event will be picked up and delivered
 	 * locally by the local network event receiver.
 	 */
-	pub_iovec.iov_base = (char *)req;
-	pub_iovec.iov_len = req->led_head.size;
-	result = api->totem_mcast (&pub_iovec, 1, TOTEM_AGREED);
+	pub_iovec[0].iov_base = (char *)req;
+	pub_iovec[0].iov_len = sizeof (*req);
+	pub_iovec[1].iov_base = (char *)&req_ro->led_body;
+	pub_iovec[1].iov_len = req->led_user_data_offset + req->led_user_data_size;
+	result = api->totem_mcast (pub_iovec, 2, TOTEM_AGREED);
 	if (result != 0) {
 			error = SA_AIS_ERR_LIBRARY;
 	}
@@ -2897,7 +2906,7 @@ static void evt_conf_change(
 {
 	log_printf(RECOVERY_DEBUG, "Evt conf change %d\n",
 			configuration_type);
-	log_printf(RECOVERY_DEBUG, "m %"PRIu64", j %"PRIu64" l %"PRIu64,
+	log_printf(RECOVERY_DEBUG, "m %u, j %u l %u",
 					member_list_entries,
 					joined_list_entries,
 					left_list_entries);
@@ -3201,7 +3210,7 @@ fflush (stdout);
 /*
  * Receive the network event message and distribute it to local subscribers
  */
-static void evt_remote_evt(void *msg, unsigned int nodeid)
+static void evt_remote_evt(const void *msg, unsigned int nodeid)
 {
 	/*
 	 * - retain events that have a retention time
@@ -3210,10 +3219,11 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 	 * - Apply filters
 	 * - Deliver events that pass the filter test
 	 */
-	struct lib_event_data *evtpkt = msg;
+	const struct lib_event_data *evtpkt = msg;
 	struct event_svr_channel_instance *eci;
 	struct event_data *evt;
 	SaClmClusterNodeT *cn;
+	mar_time_t evtpkt_recieve_time;
 
 	log_printf(LOGSYS_LEVEL_DEBUG, "Remote event data received from nodeid %s\n",
 			api->totem_ifaces_print (nodeid));
@@ -3235,9 +3245,7 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 	log_printf(LOGSYS_LEVEL_DEBUG, "Cluster node ID %s name %s\n",
 					api->totem_ifaces_print (cn->nodeId), cn->nodeName.value);
 
-	evtpkt->led_publisher_node_id = nodeid;
-	evtpkt->led_nodeid = nodeid;
-	evtpkt->led_receive_time = clust_time_now();
+	evtpkt_recieve_time = clust_time_now();
 
 	if (evtpkt->led_chan_unlink_id != EVT_CHAN_ACTIVE) {
 		log_printf(CHAN_UNLINK_DEBUG,
@@ -3282,6 +3290,10 @@ static void evt_remote_evt(void *msg, unsigned int nodeid)
 		return;
 	}
 
+	evt->ed_event.led_publisher_node_id = nodeid;
+	evt->ed_event.led_nodeid = nodeid;
+	evt->ed_event.led_receive_time = evtpkt_recieve_time;
+
 	if (evt->ed_event.led_retention_time) {
 		retain_event(evt);
 	}
@@ -3306,7 +3318,7 @@ static inline mar_time_t calc_retention_time(mar_time_t retention,
 /*
  * Receive a recovery network event message and save it in the retained list
  */
-static void evt_remote_recovery_evt(void *msg, unsigned int nodeid)
+static void evt_remote_recovery_evt(const void *msg, unsigned int nodeid)
 {
 	/*
 	 * - calculate remaining retention time
@@ -3315,12 +3327,13 @@ static void evt_remote_recovery_evt(void *msg, unsigned int nodeid)
 	 * - Apply filters
 	 * - Deliver events that pass the filter test
 	 */
-	struct lib_event_data *evtpkt = msg;
+	const struct lib_event_data *evtpkt = msg;
 	struct event_svr_channel_instance *eci;
 	struct event_data *evt;
 	struct member_node_data *md;
 	int num_delivered;
 	mar_time_t now;
+	mar_time_t evtpkt_retention_time;
 
 	now = clust_time_now();
 
@@ -3345,7 +3358,7 @@ static void evt_remote_recovery_evt(void *msg, unsigned int nodeid)
 	/*
 	 * Calculate remaining retention time
 	 */
-	evtpkt->led_retention_time = calc_retention_time(
+	evtpkt_retention_time = calc_retention_time(
 				evtpkt->led_retention_time,
 				evtpkt->led_receive_time,
 				now);
@@ -3403,6 +3416,8 @@ static void evt_remote_recovery_evt(void *msg, unsigned int nodeid)
 			errno = ENOMEM;
 			return;
 		}
+
+		evt->ed_event.led_retention_time = evtpkt_retention_time;
 
 		retain_event(evt);
 		num_delivered = try_deliver_event(evt, eci);
