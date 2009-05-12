@@ -4913,7 +4913,7 @@ static void message_handler_req_lib_msg_queueunlink (
 	req_exec_msg_queueunlink.header.size =
 		sizeof (struct req_exec_msg_queueunlink);
 	req_exec_msg_queueunlink.header.id =
-		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUESTATUSGET);
+		SERVICE_ID_MAKE (MSG_SERVICE, MESSAGE_REQ_EXEC_MSG_QUEUEUNLINK);
 
 	api->ipc_source_set (&req_exec_msg_queueunlink.source, conn);
 
