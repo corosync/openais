@@ -2481,6 +2481,32 @@ static void message_handler_req_exec_msg_queueopen (
 	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queueopen->queue_name.value));
 
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_queueopen->queue_name);
+
+	/* Make some tests*/
+	if (queue == NULL) {
+		if ((req_exec_msg_queueopen->create_attrs_flag == 0) ||
+		    (req_exec_msg_queueopen->open_flags & SA_MSG_QUEUE_CREATE) == 0)
+		{
+			error = SA_AIS_ERR_NOT_EXIST;
+			goto error_exit;
+		}
+	} else {
+		/* Test, if flags are same as creation flags*/
+		if (req_exec_msg_queueopen->open_flags & SA_MSG_QUEUE_CREATE) {
+			if ((req_exec_msg_queueopen->create_attrs.creationFlags != queue->create_attrs.creationFlags) ||
+			    (memcmp (req_exec_msg_queueopen->create_attrs.size,
+				    queue->create_attrs.size,
+				    sizeof (queue->create_attrs.size)) != 0)) {
+				/*Return error*/
+				error = SA_AIS_ERR_EXIST;
+
+				goto error_exit;
+			}
+		}
+	}
+
 	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 		if (req_exec_msg_queueopen->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
 			error = SA_AIS_ERR_TOO_BIG;
@@ -2505,17 +2531,8 @@ static void message_handler_req_exec_msg_queueopen (
 		goto error_exit;
 	}
 
-	queue = msg_find_queue (&queue_list_head,
-		&req_exec_msg_queueopen->queue_name);
 
 	if (queue == NULL) {
-		if ((req_exec_msg_queueopen->create_attrs_flag == 0) ||
-		    (req_exec_msg_queueopen->open_flags & SA_MSG_QUEUE_CREATE) == 0)
-		{
-			error = SA_AIS_ERR_NOT_EXIST;
-			goto error_exit;
-		}
-
 		queue = malloc (sizeof (struct queue_entry));
 		if (queue == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
@@ -2598,7 +2615,8 @@ error_exit:
 			list_add_tail (&cleanup->list, &msg_pd->queue_cleanup_list);
 		}
 		else {
-			free (cleanup);
+			if (cleanup)
+				free (cleanup);
 		}
 
 		api->ipc_response_send (
@@ -2632,6 +2650,32 @@ static void message_handler_req_exec_msg_queueopenasync (
 	log_printf (LOGSYS_LEVEL_DEBUG, "\t queue = %s\n",
 		    (char *)(req_exec_msg_queueopenasync->queue_name.value));
 
+	queue = msg_find_queue (&queue_list_head,
+		&req_exec_msg_queueopenasync->queue_name);
+
+	/* Make some tests*/
+	if (queue == NULL) {
+		if ((req_exec_msg_queueopenasync->create_attrs_flag == 0) ||
+		    (req_exec_msg_queueopenasync->open_flags & SA_MSG_QUEUE_CREATE) == 0)
+		{
+			error = SA_AIS_ERR_NOT_EXIST;
+			goto error_exit;
+		}
+	} else {
+		/* Test, if flags are same as creation flags*/
+		if (req_exec_msg_queueopenasync->open_flags & SA_MSG_QUEUE_CREATE) {
+			if ((req_exec_msg_queueopenasync->create_attrs.creationFlags != queue->create_attrs.creationFlags) ||
+			    (memcmp (req_exec_msg_queueopenasync->create_attrs.size,
+				    queue->create_attrs.size,
+				    sizeof (queue->create_attrs.size)) != 0)) {
+				/*Return error*/
+				error = SA_AIS_ERR_EXIST;
+
+				goto error_exit;
+			}
+		}
+	}
+
 	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 		if (req_exec_msg_queueopenasync->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
 			error = SA_AIS_ERR_TOO_BIG;
@@ -2656,17 +2700,7 @@ static void message_handler_req_exec_msg_queueopenasync (
 		goto error_exit;
 	}
 
-	queue = msg_find_queue (&queue_list_head,
-		&req_exec_msg_queueopenasync->queue_name);
-
 	if (queue == NULL) {
-		if ((req_exec_msg_queueopenasync->create_attrs_flag == 0) &&
-		    (req_exec_msg_queueopenasync->open_flags & SA_MSG_QUEUE_CREATE) == 0)
-		{
-			error = SA_AIS_ERR_NOT_EXIST;
-			goto error_exit;
-		}
-
 		queue = malloc (sizeof (struct queue_entry));
 		if (queue == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
@@ -2749,7 +2783,8 @@ error_exit:
 			list_add_tail (&cleanup->list, &msg_pd->queue_cleanup_list);
 		}
 		else {
-			free (cleanup);
+			if (cleanup)
+				free (cleanup);
 		}
 
 		api->ipc_response_send (
