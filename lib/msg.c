@@ -385,6 +385,24 @@ saMsgQueueOpen (
 		goto error_exit;
 	}
 
+	if ((!(openFlags & SA_MSG_QUEUE_CREATE)) && creationAttributes != NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if (openFlags & SA_MSG_QUEUE_CREATE) {
+	    if (creationAttributes == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_put;
+	    }
+
+	    if ((creationAttributes->creationFlags != 0) &&
+		(creationAttributes->creationFlags != SA_MSG_QUEUE_PERSISTENT)) {
+			error = SA_AIS_ERR_BAD_FLAGS;
+			goto error_exit;
+		}
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
@@ -447,7 +465,9 @@ saMsgQueueOpen (
 		&res_lib_msg_queueopen,
 		sizeof (struct res_lib_msg_queueopen));
 
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
+	}
 
 	if (res_lib_msg_queueopen.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueopen.header.error;
@@ -496,17 +516,30 @@ saMsgQueueOpenAsync (
 		goto error_exit;
 	}
 
+	if ((!(openFlags & SA_MSG_QUEUE_CREATE)) && creationAttributes != NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if (openFlags & SA_MSG_QUEUE_CREATE) {
+	    if (creationAttributes == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_put;
+	    }
+
+	    if ((creationAttributes->creationFlags != 0) &&
+		(creationAttributes->creationFlags != SA_MSG_QUEUE_PERSISTENT)) {
+			error = SA_AIS_ERR_BAD_FLAGS;
+			goto error_exit;
+		}
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
-	if ((openFlags & SA_MSG_QUEUE_CREATE) &&
-	    (creationAttributes == NULL)) {
-		error = SA_AIS_ERR_INVALID_PARAM;
-		goto error_put;
-	}
 	if ((openFlags & SA_MSG_QUEUE_RECEIVE_CALLBACK) &&
 	    (msgInstance->callbacks.saMsgMessageReceivedCallback == NULL)) {
 		error = SA_AIS_ERR_INIT;
@@ -567,7 +600,9 @@ saMsgQueueOpenAsync (
 		&res_lib_msg_queueopenasync,
 		sizeof (struct res_lib_msg_queueopenasync));
 
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
+	}
 
 	if (res_lib_msg_queueopenasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueopenasync.header.error;
@@ -630,6 +665,9 @@ saMsgQueueClose (
 		1,
 		&res_lib_msg_queueclose,
 		sizeof (struct res_lib_msg_queueclose));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queueclose.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueclose.header.error;
@@ -686,8 +724,9 @@ saMsgQueueStatusGet (
 		1,
 		&res_lib_msg_queuestatusget,
 		sizeof (struct res_lib_msg_queuestatusget));
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuestatusget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuestatusget.header.error;
@@ -747,6 +786,9 @@ saMsgQueueRetentionTimeSet (
 		1,
 		&res_lib_msg_queueretentiontimeset,
 		sizeof (struct res_lib_msg_queueretentiontimeset));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queueretentiontimeset.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueretentiontimeset.header.error;
@@ -802,6 +844,9 @@ saMsgQueueUnlink (
 		1,
 		&res_lib_msg_queueunlink,
 		sizeof (struct res_lib_msg_queueunlink));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queueunlink.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueunlink.header.error;
@@ -860,6 +905,9 @@ saMsgQueueGroupCreate (
 		1,
 		&res_lib_msg_queuegroupcreate,
 		sizeof (struct res_lib_msg_queuegroupcreate));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuegroupcreate.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupcreate.header.error;
@@ -918,6 +966,9 @@ saMsgQueueGroupInsert (
 		1,
 		&res_lib_msg_queuegroupinsert,
 		sizeof (struct res_lib_msg_queuegroupinsert));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuegroupinsert.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupinsert.header.error;
@@ -977,6 +1028,10 @@ saMsgQueueGroupRemove (
 		&res_lib_msg_queuegroupremove,
 		sizeof (struct res_lib_msg_queuegroupremove));
 
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
+
 	if (res_lib_msg_queuegroupremove.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupremove.header.error;
 		goto error_put;	/* ! */
@@ -1031,6 +1086,9 @@ saMsgQueueGroupDelete (
 		1,
 		&res_lib_msg_queuegroupdelete,
 		sizeof (struct res_lib_msg_queuegroupdelete));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuegroupdelete.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupdelete.header.error;
@@ -1117,6 +1175,9 @@ saMsgQueueGroupTrack (
 		&iov,
 		1,
 		&buffer);
+	if (error != SA_AIS_OK) {
+		goto error_unlock;
+	}
 
 	res_lib_msg_queuegrouptrack = buffer;
 
@@ -1192,6 +1253,9 @@ saMsgQueueGroupTrackStop (
 		1,
 		&res_lib_msg_queuegrouptrackstop,
 		sizeof (struct res_lib_msg_queuegrouptrackstop));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuegrouptrackstop.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegrouptrackstop.header.error;
@@ -1239,6 +1303,9 @@ saMsgQueueGroupNotificationFree (
 		1,
 		&res_lib_msg_queuegroupnotificationfree,
 		sizeof (struct res_lib_msg_queuegroupnotificationfree));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuegroupnotificationfree.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupnotificationfree.header.error;
@@ -1313,8 +1380,9 @@ saMsgMessageSend (
 		2,
 		&res_lib_msg_messagesend,
 		sizeof (struct res_lib_msg_messagesend));
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_messagesend.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesend.header.error;
@@ -1391,8 +1459,9 @@ saMsgMessageSendAsync (
 		2,
 		&res_lib_msg_messagesendasync,
 		sizeof (struct res_lib_msg_messagesendasync));
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_messagesendasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesendasync.header.error;
@@ -1582,6 +1651,9 @@ saMsgMessageCancel (
 		1,
 		&res_lib_msg_messagecancel,
 		sizeof (struct res_lib_msg_messagecancel));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_messagecancel.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagecancel.header.error;
@@ -1754,8 +1826,9 @@ saMsgMessageReply (
 		2,
 		&res_lib_msg_messagereply,
 		sizeof (struct res_lib_msg_messagereply));
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_messagereply.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereply.header.error;
@@ -1826,8 +1899,9 @@ saMsgMessageReplyAsync (
 		2,
 		&res_lib_msg_messagereplyasync,
 		sizeof (struct res_lib_msg_messagereplyasync));
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_messagereplyasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereplyasync.header.error;
@@ -1898,8 +1972,9 @@ saMsgQueueCapacityThresholdSet (
 		1,
 		&res_lib_msg_queuecapacitythresholdset,
 		sizeof (struct res_lib_msg_queuecapacitythresholdset));
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuecapacitythresholdset.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdset.header.error;
@@ -1957,8 +2032,9 @@ saMsgQueueCapacityThresholdGet (
 		1,
 		&res_lib_msg_queuecapacitythresholdget,
 		sizeof (struct res_lib_msg_queuecapacitythresholdget));
-
-	/* if (error != SA_AIS_OK) */
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_queuecapacitythresholdget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdget.header.error;
@@ -2009,6 +2085,9 @@ saMsgMetadataSizeGet (
 		1,
 		&res_lib_msg_metadatasizeget,
 		sizeof (struct res_lib_msg_metadatasizeget));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_metadatasizeget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_metadatasizeget.header.error;
@@ -2063,6 +2142,9 @@ saMsgLimitGet (
 		1,
 		&res_lib_msg_limitget,
 		sizeof (struct res_lib_msg_limitget));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
 	if (res_lib_msg_limitget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_limitget.header.error;
