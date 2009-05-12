@@ -502,6 +502,11 @@ saMsgQueueOpenAsync (
 		goto error_exit;
 	}
 
+	if ((openFlags & SA_MSG_QUEUE_CREATE) &&
+	    (creationAttributes == NULL)) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_put;
+	}
 	if ((openFlags & SA_MSG_QUEUE_RECEIVE_CALLBACK) &&
 	    (msgInstance->callbacks.saMsgMessageReceivedCallback == NULL)) {
 		error = SA_AIS_ERR_INIT;
