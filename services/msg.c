@@ -2507,17 +2507,19 @@ static void message_handler_req_exec_msg_queueopen (
 		}
 	}
 
-	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
-		if (req_exec_msg_queueopen->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
+	if (queue == NULL) {
+		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+			if (req_exec_msg_queueopen->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
+				error = SA_AIS_ERR_TOO_BIG;
+				goto error_exit;
+			}
+			queue_size += req_exec_msg_queueopen->create_attrs.size[i];
+		}
+
+		if (queue_size > MAX_QUEUE_SIZE) {
 			error = SA_AIS_ERR_TOO_BIG;
 			goto error_exit;
 		}
-		queue_size += req_exec_msg_queueopen->create_attrs.size[i];
-	}
-
-	if (queue_size > MAX_QUEUE_SIZE) {
-		error = SA_AIS_ERR_TOO_BIG;
-		goto error_exit;
 	}
 
 	if ((global_queue_count + 1) > MAX_NUM_QUEUES) {
@@ -2676,17 +2678,19 @@ static void message_handler_req_exec_msg_queueopenasync (
 		}
 	}
 
-	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
-		if (req_exec_msg_queueopenasync->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
+	if (queue == NULL) {
+		for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+			if (req_exec_msg_queueopenasync->create_attrs.size[i] > MAX_PRIORITY_AREA_SIZE) {
+				error = SA_AIS_ERR_TOO_BIG;
+				goto error_exit;
+			}
+			queue_size += req_exec_msg_queueopenasync->create_attrs.size[i];
+		}
+
+		if (queue_size > MAX_QUEUE_SIZE) {
 			error = SA_AIS_ERR_TOO_BIG;
 			goto error_exit;
 		}
-		queue_size += req_exec_msg_queueopenasync->create_attrs.size[i];
-	}
-
-	if (queue_size > MAX_QUEUE_SIZE) {
-		error = SA_AIS_ERR_TOO_BIG;
-		goto error_exit;
 	}
 
 	if ((global_queue_count + 1) > MAX_NUM_QUEUES) {
