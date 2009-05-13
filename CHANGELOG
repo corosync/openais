@@ -1,4 +1,1272 @@
 ------------------------------------------------------------------------
+r1919 | sdake | 2009-05-13 04:11:16 -0700 (Wed, 13 May 2009) | 2 lines
+
+Install confdb header/libs.
+
+------------------------------------------------------------------------
+r1896 | sdake | 2009-05-08 16:37:21 -0700 (Fri, 08 May 2009) | 2 lines
+
+Fix cpg compile warnings.
+
+------------------------------------------------------------------------
+r1895 | sdake | 2009-05-08 16:21:11 -0700 (Fri, 08 May 2009) | 2 lines
+
+Remove warning about waitpid being undefined.
+
+------------------------------------------------------------------------
+r1894 | sdake | 2009-05-08 16:15:04 -0700 (Fri, 08 May 2009) | 2 lines
+
+Fix cpg segfault.
+
+------------------------------------------------------------------------
+r1893 | sdake | 2009-05-08 16:03:57 -0700 (Fri, 08 May 2009) | 2 lines
+
+Return ERR_SECURITY when invalid user connects to aisexec.
+
+------------------------------------------------------------------------
+r1892 | sdake | 2009-05-08 15:52:08 -0700 (Fri, 08 May 2009) | 2 lines
+
+Remove dprintf from tree.
+
+------------------------------------------------------------------------
+r1891 | sdake | 2009-05-08 15:47:39 -0700 (Fri, 08 May 2009) | 2 lines
+
+Fix compile error on fedora 11 version of gcc related to invalid use of #elif.
+
+------------------------------------------------------------------------
+r1890 | sdake | 2009-05-08 15:44:02 -0700 (Fri, 08 May 2009) | 2 lines
+
+Fix ppc64 ipc regression.
+
+------------------------------------------------------------------------
+r1831 | sdake | 2009-04-19 21:42:12 -0700 (Sun, 19 Apr 2009) | 4 lines
+
+A recent change introduced a bug fix to throw away incomplete messages 
+in the assembly algorithm.  The algorithm depends on a global variable, 
+but instead that variable should be instanced per nodeid.
+
+------------------------------------------------------------------------
+r1774 | sdake | 2009-04-07 13:42:33 -0700 (Tue, 07 Apr 2009) | 3 lines
+
+Fix when dispatch has error condition to execute a put on the handle as 
+to not leak resources.
+
+------------------------------------------------------------------------
+r1761 | sdake | 2009-03-26 16:59:06 -0700 (Thu, 26 Mar 2009) | 2 lines
+
+Keep mulitple threads out of the aisexec service engines.
+
+------------------------------------------------------------------------
+r1755 | sdake | 2009-03-21 04:27:40 -0700 (Sat, 21 Mar 2009) | 6 lines
+
+
+This patch fixes a crash in cpg.c where a group is left befopre
+cpg_finalise is called. It can cause the process_info structure to be
+removed twice from the group list.
+
+
+------------------------------------------------------------------------
+r1754 | sdake | 2009-03-13 12:47:05 -0700 (Fri, 13 Mar 2009) | 2 lines
+
+sched_setscheduler was commented out in previous commit.
+
+------------------------------------------------------------------------
+r1753 | sdake | 2009-03-13 11:59:02 -0700 (Fri, 13 Mar 2009) | 3 lines
+
+Serialize ipc access so only one thread accesses a service engine at a 
+time.
+
+------------------------------------------------------------------------
+r1752 | sdake | 2009-03-13 11:55:40 -0700 (Fri, 13 Mar 2009) | 3 lines
+
+Remove break from benchmark loop because it caused benchmark to exit
+if try again was returned.
+
+------------------------------------------------------------------------
+r1750 | sdake | 2009-03-13 02:44:36 -0700 (Fri, 13 Mar 2009) | 2 lines
+
+Remove pass by value in the ckpt service.
+
+------------------------------------------------------------------------
+r1749 | sdake | 2009-03-13 02:30:38 -0700 (Fri, 13 Mar 2009) | 2 lines
+
+Remove extra debugging output.
+
+------------------------------------------------------------------------
+r1747 | sdake | 2009-03-12 16:33:23 -0700 (Thu, 12 Mar 2009) | 2 lines
+
+Patch to fix refcounting problem for checkpoints from leaving nodes.
+
+------------------------------------------------------------------------
+r1744 | sdake | 2009-03-10 19:25:10 -0700 (Tue, 10 Mar 2009) | 2 lines
+
+Prevent logging deadlocks due to fork() in service engines.
+
+------------------------------------------------------------------------
+r1743 | sdake | 2009-03-10 01:09:42 -0700 (Tue, 10 Mar 2009) | 4 lines
+
+CPGs with large node IDS greater then 0xffffff would not synchronize 
+properly.  This results in no configuration change when one would be 
+expected.
+
+------------------------------------------------------------------------
+r1742 | sdake | 2009-03-10 01:07:45 -0700 (Tue, 10 Mar 2009) | 4 lines
+
+The ckpt service with new versions of openais would segfault with older 
+versions.  keep in mind that even tip doesn't interoperate with 0.80.3 
+at the moment because of confdb addition, but we are working on it.
+
+------------------------------------------------------------------------
+r1740 | sdake | 2009-03-05 19:37:34 -0700 (Thu, 05 Mar 2009) | 3 lines
+
+Delete process info from list parsing if ipc connection dies.  This 
+prevents a segfault if no groups are joined and an ipc connection fails.
+
+------------------------------------------------------------------------
+r1739 | sdake | 2009-03-05 17:29:43 -0700 (Thu, 05 Mar 2009) | 2 lines
+
+Remove reserved count from totempg_mcast operations.
+
+------------------------------------------------------------------------
+r1738 | sdake | 2009-03-03 05:48:05 -0700 (Tue, 03 Mar 2009) | 2 lines
+
+Fix commit error.
+
+------------------------------------------------------------------------
+r1737 | sdake | 2009-03-03 05:39:37 -0700 (Tue, 03 Mar 2009) | 3 lines
+
+change totempg interface to allow for reserve and release instead of 
+send_ok primative.
+
+------------------------------------------------------------------------
+r1735 | sdake | 2009-03-02 11:42:32 -0700 (Mon, 02 Mar 2009) | 4 lines
+
+changes structure of ipc system to allow reference counting in 
+lib_init_fn and lib_exit_fn for services (cpg) which record the 
+conn_info data  structure there.
+
+------------------------------------------------------------------------
+r1734 | sdake | 2009-03-02 11:40:12 -0700 (Mon, 02 Mar 2009) | 2 lines
+
+Fix IPC reference counting in cpg service.
+
+------------------------------------------------------------------------
+r1732 | sdake | 2009-02-25 01:13:23 -0700 (Wed, 25 Feb 2009) | 2 lines
+
+Add generic init script for openais.
+
+------------------------------------------------------------------------
+r1730 | sdake | 2009-02-24 20:16:44 -0700 (Tue, 24 Feb 2009) | 2 lines
+
+Make openais-cfgtool work properly (as well as rest of cfg services).
+
+------------------------------------------------------------------------
+r1729 | sdake | 2009-02-24 20:15:28 -0700 (Tue, 24 Feb 2009) | 2 lines
+
+Remove extra printf from totemrrp ring reenable operation.
+
+------------------------------------------------------------------------
+r1725 | sdake | 2009-02-24 03:57:34 -0700 (Tue, 24 Feb 2009) | 2 lines
+
+Add loading of modules support to openais whitetank.
+
+------------------------------------------------------------------------
+r1724 | sdake | 2009-02-24 03:53:53 -0700 (Tue, 24 Feb 2009) | 3 lines
+
+Bounds checking of the messages in the IPC system with core dump 
+analysis from Andrew.
+
+------------------------------------------------------------------------
+r1714 | chrissie | 2009-02-18 02:48:20 -0700 (Wed, 18 Feb 2009) | 2 lines
+
+Fix compilation of testconfdb
+
+------------------------------------------------------------------------
+r1713 | sdake | 2009-02-18 02:04:58 -0700 (Wed, 18 Feb 2009) | 2 lines
+
+Add file missing from original patch.
+
+------------------------------------------------------------------------
+r1710 | sdake | 2009-02-17 19:19:31 -0700 (Tue, 17 Feb 2009) | 2 lines
+
+ConfDB diagnostics tool backport from corosync.
+
+------------------------------------------------------------------------
+r1709 | sdake | 2009-02-17 19:12:56 -0700 (Tue, 17 Feb 2009) | 2 lines
+
+Remove redundant statement in totemsrp.
+
+------------------------------------------------------------------------
+r1708 | sdake | 2009-02-17 19:09:50 -0700 (Tue, 17 Feb 2009) | 2 lines
+
+Use definition instead of magic number.
+
+------------------------------------------------------------------------
+r1707 | sdake | 2009-02-17 19:05:15 -0700 (Tue, 17 Feb 2009) | 2 lines
+
+change project link for upstream crypto code.
+
+------------------------------------------------------------------------
+r1706 | sdake | 2009-02-17 18:57:04 -0700 (Tue, 17 Feb 2009) | 7 lines
+
+Backport the minimal set of objdb changes from corosync that are 
+needed to allow pacemaker to function
+
+Adds the ability to delete an objdb entry and to save and restore 
+objdb iterators
+
+
+------------------------------------------------------------------------
+r1705 | sdake | 2009-02-17 18:56:22 -0700 (Tue, 17 Feb 2009) | 4 lines
+
+Backport cleanups from corosync
+ - Centralize and standardize the handling of HZ
+
+
+------------------------------------------------------------------------
+r1704 | sdake | 2009-02-17 18:55:46 -0700 (Tue, 17 Feb 2009) | 3 lines
+
+Backport cleanups from corosync
+ - Remove unused enum
+
+------------------------------------------------------------------------
+r1703 | sdake | 2009-02-17 18:53:37 -0700 (Tue, 17 Feb 2009) | 7 lines
+
+Backport build fixes from corosync.
+ - Consistent use of PREFIX and DESTDIR
+ - Allow the LCRSO directory to be specified manually
+ - Fix installation on Darwin (cp does not support -a)
+ - Fix generation of shared libraries on Darwin
+
+
+------------------------------------------------------------------------
+r1698 | sdake | 2009-02-13 02:11:05 -0700 (Fri, 13 Feb 2009) | 2 lines
+
+IPC Redesign and rewrite.
+
+------------------------------------------------------------------------
+r1697 | fabient | 2009-02-12 02:07:31 -0700 (Thu, 12 Feb 2009) | 1 line
+
+fix IP address for nodeid under BSD
+------------------------------------------------------------------------
+r1694 | sdake | 2009-02-10 21:42:24 -0700 (Tue, 10 Feb 2009) | 2 lines
+
+Ensure BSD platform compiles because of changed API.
+
+------------------------------------------------------------------------
+r1692 | sdake | 2009-02-10 20:47:23 -0700 (Tue, 10 Feb 2009) | 3 lines
+
+Avoid totem overflow in send_ok when the totempg header is larger then 
+the header the user provided in the incoming message.
+
+------------------------------------------------------------------------
+r1691 | sdake | 2009-02-10 20:46:15 -0700 (Tue, 10 Feb 2009) | 3 lines
+
+Execute a list_init for the expiry entry on the creation of a checkpoint 
+during the recovery operation. 
+
+------------------------------------------------------------------------
+r1690 | sdake | 2009-02-10 20:45:03 -0700 (Tue, 10 Feb 2009) | 3 lines
+
+Execute a proper list_del operation when unlinking a checkpoint so it is
+not later double freed during an expiry.
+
+------------------------------------------------------------------------
+r1682 | sdake | 2009-01-26 13:46:12 -0700 (Mon, 26 Jan 2009) | 2 lines
+
+Ensure high bit is masked properly.
+
+------------------------------------------------------------------------
+r1681 | sdake | 2009-01-26 13:24:36 -0700 (Mon, 26 Jan 2009) | 2 lines
+
+Fix secauth to work properly on platforms which evaluate unsigned long to 8 bytes (s390x).
+
+------------------------------------------------------------------------
+r1680 | sdake | 2009-01-25 15:38:54 -0700 (Sun, 25 Jan 2009) | 2 lines
+
+Fix regression in open async of the event service.
+
+------------------------------------------------------------------------
+r1679 | sdake | 2009-01-25 14:44:55 -0700 (Sun, 25 Jan 2009) | 2 lines
+
+convert notice to debug message.
+
+------------------------------------------------------------------------
+r1678 | sdake | 2009-01-25 14:26:24 -0700 (Sun, 25 Jan 2009) | 2 lines
+
+Throw away incomplete message on startup to avoid segfault.
+
+------------------------------------------------------------------------
+r1677 | sdake | 2009-01-25 14:16:54 -0700 (Sun, 25 Jan 2009) | 2 lines
+
+Fix message rejection problem with many services.
+
+------------------------------------------------------------------------
+r1676 | sdake | 2009-01-20 11:14:50 -0700 (Tue, 20 Jan 2009) | 2 lines
+
+Finish poll_stop function.
+
+------------------------------------------------------------------------
+r1675 | sdake | 2009-01-20 11:12:36 -0700 (Tue, 20 Jan 2009) | 2 lines
+
+Make ckptbench work properly by setting section expiration timers to SA_TIME_END.
+
+------------------------------------------------------------------------
+r1673 | sdake | 2009-01-20 10:42:44 -0700 (Tue, 20 Jan 2009) | 2 lines
+
+Cancel token hold mode when a totem token callback is added to the system.
+
+------------------------------------------------------------------------
+r1665 | beekhof | 2008-12-02 07:45:23 -0700 (Tue, 02 Dec 2008) | 8 lines
+
+Correctly compare local addresses with bindnetaddr
+
+This patch allows whitetank/corosync to behave correctly when the supplied value of bindnetaddr has more precision than the netmask, but is not a full IPv4 address.
+
+For example, currently, if the netmask is /16 but the user specifies 192.168.1.0, then OpenAIS is unable to determine the correct address and uses the loopback address instead.
+
+The following patch allows OpenAIS to correctly determine which interface/address to use.
+
+------------------------------------------------------------------------
+r1664 | beekhof | 2008-12-02 07:41:36 -0700 (Tue, 02 Dec 2008) | 13 lines
+
+Use the node's full ipv4 address when generating nodeids
+
+Commit r1655 brought forward nodeid generation and erroneously started
+using bindnet.addr instead of bound_to.addr
+Since then, if the admin used an address ending in one or more .0's
+for bindnetaddr, this would result in _all_ nodes having the same
+nodeid.
+
+This patch moves the clear_node_high_bit processing to the location
+where nodeid was originally populated (netif_determine) and goes back
+to using the bound_to address (which was not yet populated during
+totemnet_initialize()) which is suitable for generating nodeids.
+
+------------------------------------------------------------------------
+r1662 | sdake | 2008-11-24 14:36:13 -0700 (Mon, 24 Nov 2008) | 3 lines
+
+Patch to fix segfault when user with inappropriate permissions accesses
+aisexec.
+
+------------------------------------------------------------------------
+r1661 | sdake | 2008-11-10 00:52:55 -0700 (Mon, 10 Nov 2008) | 2 lines
+
+Fix a message lost during delivery which resulted in checkpoint segfault.
+
+------------------------------------------------------------------------
+r1660 | sdake | 2008-11-10 00:52:19 -0700 (Mon, 10 Nov 2008) | 2 lines
+
+Fix commit token recieved_flg being incorrect in some rare circumstances.
+
+------------------------------------------------------------------------
+r1659 | sdake | 2008-11-10 00:51:25 -0700 (Mon, 10 Nov 2008) | 2 lines
+
+Fix rare problem where checkpoint synchronization database could be thrown away.
+
+------------------------------------------------------------------------
+r1655 | beekhof | 2008-10-09 05:34:16 -0700 (Thu, 09 Oct 2008) | 12 lines
+
+Add a configuraiton option to allow generated nodeids to be limited to 31-bits
+
+Some openais clients require a signed 32 bit nodeid that is greater
+than zero however by default openais uses all 32 bits of the IPv4 address
+space when generating a nodeid.  Setting this option to yes ensures any
+generated nodeid is a positive signed 32 bit integer.
+
+The clusters behavior is undefined if this option is enabled on only
+a subset of the cluster (for example during a rolling upgrade) and should
+be enabled with caution.
+
+
+------------------------------------------------------------------------
+r1653 | sdake | 2008-09-23 10:41:17 -0700 (Tue, 23 Sep 2008) | 2 lines
+
+Remove IPC scheduling starvation.
+
+------------------------------------------------------------------------
+r1652 | sdake | 2008-09-23 10:38:28 -0700 (Tue, 23 Sep 2008) | 2 lines
+
+Second fix for IPC signal flooding.
+
+------------------------------------------------------------------------
+r1651 | sdake | 2008-09-22 16:37:27 -0700 (Mon, 22 Sep 2008) | 2 lines
+
+Fix Library queue full messages in some conditions.
+
+------------------------------------------------------------------------
+r1647 | sdake | 2008-09-03 14:19:13 -0700 (Wed, 03 Sep 2008) | 3 lines
+
+Change a LOG_LEVEL_NOTICE to LOG_LEVEL_DEBUG to avoid too much tracing
+output.  Also remove an extraneous printf.
+
+------------------------------------------------------------------------
+r1646 | sdake | 2008-09-03 14:11:07 -0700 (Wed, 03 Sep 2008) | 3 lines
+
+Add a test case which creates 30000 checkpoints and then exits ungracefully
+testing the automatic closing of checkpoints and the expirations of them.
+
+------------------------------------------------------------------------
+r1645 | sdake | 2008-09-03 14:09:49 -0700 (Wed, 03 Sep 2008) | 3 lines
+
+Remove deadlock that occurs when ipc system, totem, and timer system are
+all overloaded with operatoins.
+
+------------------------------------------------------------------------
+r1644 | sdake | 2008-09-03 14:09:10 -0700 (Wed, 03 Sep 2008) | 2 lines
+
+Make lib_exit_fn work properly in the condition of overload.
+
+------------------------------------------------------------------------
+r1643 | sdake | 2008-09-03 14:08:26 -0700 (Wed, 03 Sep 2008) | 3 lines
+
+Remove assertion that occurs when thousands of checkpoint expirations occur
+at about the same time.
+
+------------------------------------------------------------------------
+r1642 | sdake | 2008-09-03 14:07:16 -0700 (Wed, 03 Sep 2008) | 2 lines
+
+Remove checkpoint close assertion which occurs during overload conditions.
+
+------------------------------------------------------------------------
+r1548 | sdake | 2008-05-18 13:47:28 -0700 (Sun, 18 May 2008) | 3 lines
+
+Fix synchronization of global id for checkpoint service when no checkpoints
+are active in the checkpoint service.
+
+------------------------------------------------------------------------
+r1546 | fthomas | 2008-05-13 00:38:04 -0700 (Tue, 13 May 2008) | 1 line
+
+repair the build for conn user/group authentication under Darwin and FreeBSD
+------------------------------------------------------------------------
+r1524 | sdake | 2008-04-23 05:36:09 -0700 (Wed, 23 Apr 2008) | 2 lines
+
+Fix system call usage in keygen application.
+
+------------------------------------------------------------------------
+r1521 | sdake | 2008-04-22 07:39:10 -0700 (Tue, 22 Apr 2008) | 2 lines
+
+Compile on latest glibc.
+
+------------------------------------------------------------------------
+r1514 | sdake | 2008-04-01 20:44:21 -0700 (Tue, 01 Apr 2008) | 2 lines
+
+Remove extra log_printf.
+
+------------------------------------------------------------------------
+r1513 | sdake | 2008-04-01 09:04:34 -0700 (Tue, 01 Apr 2008) | 3 lines
+
+Remove comparison with zero and replace with comparsion with NULL in handle
+database code.
+
+------------------------------------------------------------------------
+r1512 | sdake | 2008-04-01 09:03:35 -0700 (Tue, 01 Apr 2008) | 3 lines
+
+Remove early commit of synchronization data  when a synchronization in progress
+is followed by a node leaving or joining the cluster.
+
+------------------------------------------------------------------------
+r1511 | sdake | 2008-04-01 09:01:18 -0700 (Tue, 01 Apr 2008) | 2 lines
+
+Remove double pthread_mutex_destroy from evt service.
+
+------------------------------------------------------------------------
+r1510 | sdake | 2008-04-01 08:59:54 -0700 (Tue, 01 Apr 2008) | 2 lines
+
+Remove double pthread_mutex_destroy from evs service.
+
+------------------------------------------------------------------------
+r1509 | sdake | 2008-04-01 08:59:32 -0700 (Tue, 01 Apr 2008) | 2 lines
+
+Remove double pthread_mutex_destroy from cpg service.
+
+------------------------------------------------------------------------
+r1508 | sdake | 2008-04-01 08:59:08 -0700 (Tue, 01 Apr 2008) | 2 lines
+
+Remove double pthread_mutex_destroy from CLM service.
+
+------------------------------------------------------------------------
+r1507 | sdake | 2008-04-01 08:58:24 -0700 (Tue, 01 Apr 2008) | 2 lines
+
+Remove double pthread_mutex_destroy from the checkpoint service.
+
+------------------------------------------------------------------------
+r1506 | sdake | 2008-03-17 23:38:10 -0700 (Mon, 17 Mar 2008) | 2 lines
+
+Resolve incomplete synchronization when totem queue is full.
+
+------------------------------------------------------------------------
+r1504 | sdake | 2008-03-06 15:05:55 -0700 (Thu, 06 Mar 2008) | 2 lines
+
+Fixes checkpoint synchronization issue when new node is started.
+
+------------------------------------------------------------------------
+r1503 | sdake | 2008-02-26 01:06:04 -0700 (Tue, 26 Feb 2008) | 2 lines
+
+Backport ./aisexec -f foreground option.
+
+------------------------------------------------------------------------
+r1502 | sdake | 2008-02-26 00:59:21 -0700 (Tue, 26 Feb 2008) | 2 lines
+
+Revert revision 1477 which exhibits problems with cman.
+
+------------------------------------------------------------------------
+r1501 | sdake | 2008-02-26 00:41:53 -0700 (Tue, 26 Feb 2008) | 4 lines
+
+If a node sends a multicast message at roughly the same time as a new
+node joins the CPG, the new node can receive the mcast then its own join
+message which is improper unexpected behavior.
+
+------------------------------------------------------------------------
+r1500 | sdake | 2008-02-26 00:38:17 -0700 (Tue, 26 Feb 2008) | 3 lines
+
+IPC locks up if a POLLERR is returned in certain circumstances from the 
+poll descriptor.  This patch fixes that problem.
+
+------------------------------------------------------------------------
+r1499 | sdake | 2008-01-15 03:15:54 -0700 (Tue, 15 Jan 2008) | 2 lines
+
+rework of IPC system initial merge
+
+------------------------------------------------------------------------
+r1498 | sdake | 2008-01-15 02:23:26 -0700 (Tue, 15 Jan 2008) | 3 lines
+
+Report string description of error instead of an error code which has to be
+decoded by the user.
+
+------------------------------------------------------------------------
+r1497 | sdake | 2008-01-15 02:22:52 -0700 (Tue, 15 Jan 2008) | 2 lines
+
+Follow LSB guidelines for initscript to throw an error 5 if the aisexec program is not found
+
+------------------------------------------------------------------------
+r1496 | sdake | 2008-01-15 01:13:25 -0700 (Tue, 15 Jan 2008) | 2 lines
+
+Revert patch 1480 since it causes problems with cman.
+
+------------------------------------------------------------------------
+r1493 | sdake | 2007-12-10 14:50:09 -0700 (Mon, 10 Dec 2007) | 3 lines
+
+Backport of patch 1379 to remove this_ip and replace with accessor functions
+in totempg.
+
+------------------------------------------------------------------------
+r1486 | sdake | 2007-11-28 11:06:35 -0700 (Wed, 28 Nov 2007) | 2 lines
+
+unlock mutex on error condition of no memory when creating handle.
+
+------------------------------------------------------------------------
+r1480 | sdake | 2007-10-29 02:09:09 -0700 (Mon, 29 Oct 2007) | 2 lines
+
+Endian fixes for the totempg code.
+
+------------------------------------------------------------------------
+r1479 | sdake | 2007-10-29 02:08:43 -0700 (Mon, 29 Oct 2007) | 2 lines
+
+Remove & when regular reference works properly.
+
+------------------------------------------------------------------------
+r1478 | sdake | 2007-10-29 02:08:09 -0700 (Mon, 29 Oct 2007) | 2 lines
+
+Patch to set system from properly in retransmitted messages.
+
+------------------------------------------------------------------------
+r1477 | sdake | 2007-10-29 02:07:41 -0700 (Mon, 29 Oct 2007) | 2 lines
+
+Patch to not increment the ring seq id on the first operational ring.
+
+------------------------------------------------------------------------
+r1473 | sdake | 2007-10-22 09:05:23 -0700 (Mon, 22 Oct 2007) | 2 lines
+
+fix pthread_equal for timer_delete
+
+------------------------------------------------------------------------
+r1471 | sdake | 2007-10-22 08:43:43 -0700 (Mon, 22 Oct 2007) | 2 lines
+
+Endian convert cpg downlist messages properly.
+
+------------------------------------------------------------------------
+r1469 | sdake | 2007-10-22 08:41:36 -0700 (Mon, 22 Oct 2007) | 2 lines
+
+Change initialDataSize parameter from saUint32T to SaSizeT to match specification
+
+------------------------------------------------------------------------
+r1465 | sdake | 2007-10-06 23:38:54 -0700 (Sat, 06 Oct 2007) | 4 lines
+
+Remove fsync call that happens after writing commit token sequence number.
+This fsync call could block for 15-20 seconds in high IO loads resulting
+in inability of the system to form a configuration.
+
+------------------------------------------------------------------------
+r1464 | sdake | 2007-10-02 09:30:01 -0700 (Tue, 02 Oct 2007) | 4 lines
+
+Fix problem where adding a timer in a timer callback would lock system
+and also timer additions were not protected by mutex because of backwards
+pthread_equal comparison.
+
+------------------------------------------------------------------------
+r1455 | sdake | 2007-09-24 14:31:51 -0700 (Mon, 24 Sep 2007) | 3 lines
+
+fix loss of node joins in commit state resulting in looping of membership
+protocol.
+
+------------------------------------------------------------------------
+r1453 | sdake | 2007-09-19 22:46:39 -0700 (Wed, 19 Sep 2007) | 2 lines
+
+Fix assertion if registration happens during certain phases of instantation.
+
+------------------------------------------------------------------------
+r1450 | sdake | 2007-09-15 13:40:48 -0700 (Sat, 15 Sep 2007) | 2 lines
+
+Fix reference counting in the LCR code so lcr_ifact_release works properly.
+
+------------------------------------------------------------------------
+r1449 | sdake | 2007-09-15 13:37:44 -0700 (Sat, 15 Sep 2007) | 2 lines
+
+Allow missing services in synchronization to not cause a segfault.
+
+------------------------------------------------------------------------
+r1446 | sdake | 2007-09-11 19:44:49 -0700 (Tue, 11 Sep 2007) | 3 lines
+
+Remove inadvertant commit of changes to totemsrp which happened when the
+security changes were patched in.
+
+------------------------------------------------------------------------
+r1426 | sdake | 2007-09-08 23:15:59 -0700 (Sat, 08 Sep 2007) | 4 lines
+
+Patch to log security warnings when invalid identifier is used in message
+header for a totem message.
+
+
+------------------------------------------------------------------------
+r1423 | sdake | 2007-08-28 07:55:21 -0700 (Tue, 28 Aug 2007) | 3 lines
+
+Fix synchronization engine so that it only synchronizes on the regular
+configuration, not the transitional configuration.
+
+------------------------------------------------------------------------
+r1422 | sdake | 2007-08-24 12:46:12 -0700 (Fri, 24 Aug 2007) | 4 lines
+
+Patch to allocate event dispatch data in saEvtInitialize instead of directly
+on the stack for small thread-stack sized dispatch functions.
+
+
+------------------------------------------------------------------------
+r1419 | sdake | 2007-08-10 21:37:32 -0700 (Fri, 10 Aug 2007) | 2 lines
+
+Patch to allow a fresh checkout of the code to work with the make doxygen command
+
+------------------------------------------------------------------------
+r1416 | sdake | 2007-08-10 20:46:37 -0700 (Fri, 10 Aug 2007) | 4 lines
+
+Fix a crash in cross endian environment where when a message with endian 
+conversion required and then one not required results in both messages requiring
+endian conversion.
+
+------------------------------------------------------------------------
+r1415 | sdake | 2007-08-10 20:45:04 -0700 (Fri, 10 Aug 2007) | 3 lines
+
+Only set the high seq received when token possession results in the transmission
+of new messages on the ring.
+
+------------------------------------------------------------------------
+r1414 | sdake | 2007-08-10 20:16:15 -0700 (Fri, 10 Aug 2007) | 2 lines
+
+Adds missing free that could occur in an error condition resulting in a leak.
+
+------------------------------------------------------------------------
+r1413 | sdake | 2007-08-07 16:53:35 -0700 (Tue, 07 Aug 2007) | 2 lines
+
+Fix minor leaks throughout the code caused by not calling pthread_mutex_destroy.
+
+------------------------------------------------------------------------
+r1410 | sdake | 2007-08-07 16:48:19 -0700 (Tue, 07 Aug 2007) | 2 lines
+
+Patch to fix compile warning on mac platforms.
+
+------------------------------------------------------------------------
+r1409 | sdake | 2007-08-01 04:52:21 -0700 (Wed, 01 Aug 2007) | 2 lines
+
+Add subtractor to availability of message entries for the totem message queue
+
+------------------------------------------------------------------------
+r1408 | sdake | 2007-08-01 04:43:30 -0700 (Wed, 01 Aug 2007) | 2 lines
+
+Store the ring id information properly when it changes.
+
+------------------------------------------------------------------------
+r1407 | sdake | 2007-08-01 04:42:52 -0700 (Wed, 01 Aug 2007) | 2 lines
+
+Reset consensus array on entering operational mode.
+
+------------------------------------------------------------------------
+r1406 | sdake | 2007-08-01 04:41:54 -0700 (Wed, 01 Aug 2007) | 2 lines
+
+Filter the commit token properly when it is retransmitted.
+
+------------------------------------------------------------------------
+r1402 | sdake | 2007-06-26 04:38:35 -0700 (Tue, 26 Jun 2007) | 3 lines
+
+Remove return error code of 0 (status ok) when file isn't executable or doesn't
+exist and instead depend upon the status command.
+
+------------------------------------------------------------------------
+r1401 | sdake | 2007-06-26 04:16:50 -0700 (Tue, 26 Jun 2007) | 2 lines
+
+Remove LOG_NOTICE from expiration of checkpoints.
+
+------------------------------------------------------------------------
+r1400 | sdake | 2007-06-26 03:13:19 -0700 (Tue, 26 Jun 2007) | 2 lines
+
+Fix compile warning/error on some platforms.
+
+------------------------------------------------------------------------
+r1396 | sdake | 2007-06-25 01:42:58 -0700 (Mon, 25 Jun 2007) | 2 lines
+
+Update testckpt program to properly test the checkpoint system.
+
+------------------------------------------------------------------------
+r1395 | sdake | 2007-06-25 01:40:45 -0700 (Mon, 25 Jun 2007) | 3 lines
+
+Fix problem where sometimes when a checkpoint section is expired the timer
+also fires at the same time resulting in a warning.
+
+------------------------------------------------------------------------
+r1394 | sdake | 2007-06-24 20:11:10 -0700 (Sun, 24 Jun 2007) | 2 lines
+
+Add cpg_context_get and cpg_context_set man pages.
+
+------------------------------------------------------------------------
+r1393 | sdake | 2007-06-24 20:09:31 -0700 (Sun, 24 Jun 2007) | 2 lines
+
+Add cpg_context_get and cpg_context_set api calls.
+
+------------------------------------------------------------------------
+r1392 | sdake | 2007-06-24 20:07:30 -0700 (Sun, 24 Jun 2007) | 2 lines
+
+install timer.h file for external service handlers.
+
+------------------------------------------------------------------------
+r1390 | sdake | 2007-06-24 19:52:58 -0700 (Sun, 24 Jun 2007) | 2 lines
+
+Tests cpg_local_get functionality.
+
+------------------------------------------------------------------------
+r1389 | sdake | 2007-06-24 19:22:54 -0700 (Sun, 24 Jun 2007) | 3 lines
+
+Track timers based upon nanoseconds since epoch and add absolute and relative
+timers.
+
+------------------------------------------------------------------------
+r1387 | sdake | 2007-06-23 23:33:09 -0700 (Sat, 23 Jun 2007) | 2 lines
+
+Update all copyright and email addresses in source tree.
+
+------------------------------------------------------------------------
+r1382 | sdake | 2007-06-12 10:43:15 -0700 (Tue, 12 Jun 2007) | 2 lines
+
+Add cpg_local_get to get the local node id.
+
+------------------------------------------------------------------------
+r1372 | sdake | 2007-05-17 13:37:43 -0700 (Thu, 17 May 2007) | 3 lines
+
+on 32 bit platforms, the message source conn info could have uninitialized
+values.
+
+------------------------------------------------------------------------
+r1369 | sdake | 2007-04-24 16:11:56 -0700 (Tue, 24 Apr 2007) | 4 lines
+
+This bug was posted via bugzilla and a patch was attached.  Essentially
+the checkpoint retention duration was being verified on a checkpoint
+open which should be ignored.
+
+------------------------------------------------------------------------
+r1368 | sdake | 2007-04-24 16:11:08 -0700 (Tue, 24 Apr 2007) | 2 lines
+
+Fix section iteration size comparison
+
+------------------------------------------------------------------------
+r1364 | sdake | 2007-04-24 16:05:56 -0700 (Tue, 24 Apr 2007) | 2 lines
+
+Have totemsrp use the proper ring id file.
+
+------------------------------------------------------------------------
+r1363 | sdake | 2007-04-24 16:05:38 -0700 (Tue, 24 Apr 2007) | 2 lines
+
+Fix references to evs_initialize in cpg_initialize man pages
+
+------------------------------------------------------------------------
+r1357 | sdake | 2007-03-21 13:07:58 -0700 (Wed, 21 Mar 2007) | 2 lines
+
+Fix some type errors within the AMF service.
+
+------------------------------------------------------------------------
+r1356 | sdake | 2007-03-21 13:07:25 -0700 (Wed, 21 Mar 2007) | 2 lines
+
+Patch to fix some documentation errors relating to CPG service.
+
+------------------------------------------------------------------------
+r1344 | sdake | 2006-12-18 09:08:02 -0700 (Mon, 18 Dec 2006) | 2 lines
+
+Fix compile warnings about unused variables.
+
+------------------------------------------------------------------------
+r1340 | sdake | 2006-12-18 08:02:48 -0700 (Mon, 18 Dec 2006) | 2 lines
+
+Fix unaligned access in totem ip on IA64 architecture.
+
+------------------------------------------------------------------------
+r1339 | sdake | 2006-12-12 11:54:51 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Convert some spaces to tabs.
+
+------------------------------------------------------------------------
+r1338 | sdake | 2006-12-12 11:54:25 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Destroy mutex after it is done being used instead of before it is done being used.
+
+------------------------------------------------------------------------
+r1337 | sdake | 2006-12-12 11:45:25 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Remove return and use pthread_exit instead.
+
+------------------------------------------------------------------------
+r1334 | sdake | 2006-12-12 11:38:51 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Backport comparison of 0 and NULL.
+
+------------------------------------------------------------------------
+r1330 | sdake | 2006-12-12 11:13:54 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Fix argument off by one in instiation of AMF components.
+
+------------------------------------------------------------------------
+r1329 | sdake | 2006-12-12 11:11:07 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Remove unnecessary strdup.
+
+------------------------------------------------------------------------
+r1325 | sdake | 2006-12-12 10:56:17 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Change rundir to /var/lib/openais.
+
+------------------------------------------------------------------------
+r1323 | pcaulfie | 2006-12-12 10:45:50 -0700 (Tue, 12 Dec 2006) | 2 lines
+
+Fix ordering of CPG join messages.
+
+------------------------------------------------------------------------
+r1319 | sdake | 2006-12-05 09:34:10 -0700 (Tue, 05 Dec 2006) | 2 lines
+
+Increase size of default outbound message queue.
+
+------------------------------------------------------------------------
+r1316 | sdake | 2006-11-29 14:30:58 -0700 (Wed, 29 Nov 2006) | 2 lines
+
+Improvements on segfault logging.
+
+------------------------------------------------------------------------
+r1315 | sdake | 2006-11-29 13:56:17 -0700 (Wed, 29 Nov 2006) | 2 lines
+
+Fix compile error in libcpg
+
+------------------------------------------------------------------------
+r1314 | sdake | 2006-11-29 13:47:40 -0700 (Wed, 29 Nov 2006) | 2 lines
+
+Change rundir to /var/openais otherwise core files and ringid file is deleted
+
+------------------------------------------------------------------------
+r1313 | sdake | 2006-11-29 13:35:32 -0700 (Wed, 29 Nov 2006) | 2 lines
+
+Flow control fixes for the CPG service.
+
+------------------------------------------------------------------------
+r1312 | fthomas | 2006-11-23 02:10:19 -0700 (Thu, 23 Nov 2006) | 1 line
+
+correct incorrect commit that must use SA_AIS_ERR_LIBRARY instead of ERR_LIBRARY
+------------------------------------------------------------------------
+r1311 | fthomas | 2006-11-23 01:49:21 -0700 (Thu, 23 Nov 2006) | 1 line
+
+handle case where POLLHUP or POLLERR are not supported by OS
+------------------------------------------------------------------------
+r1309 | fthomas | 2006-11-16 10:36:52 -0700 (Thu, 16 Nov 2006) | 1 line
+
+set default downcheck value to 1000ms
+------------------------------------------------------------------------
+r1308 | fthomas | 2006-11-16 10:34:44 -0700 (Thu, 16 Nov 2006) | 1 line
+
+remove invalid code / warnings detected by Intel compiler
+------------------------------------------------------------------------
+r1307 | sdake | 2006-11-15 00:23:10 -0700 (Wed, 15 Nov 2006) | 2 lines
+
+Remove flow control compile warning.
+
+------------------------------------------------------------------------
+r1306 | sdake | 2006-11-15 00:21:02 -0700 (Wed, 15 Nov 2006) | 2 lines
+
+Make clean for makefiles improvement to actually remove all files.
+
+------------------------------------------------------------------------
+r1305 | sdake | 2006-11-15 00:19:37 -0700 (Wed, 15 Nov 2006) | 2 lines
+
+Set scheduler SCHED_RR to max priority available in the system.
+
+------------------------------------------------------------------------
+r1300 | sdake | 2006-11-13 10:38:13 -0700 (Mon, 13 Nov 2006) | 2 lines
+
+Improve behavior of flow control of CPG service during configuration changes.
+
+------------------------------------------------------------------------
+r1296 | sdake | 2006-11-09 05:34:08 -0700 (Thu, 09 Nov 2006) | 2 lines
+
+Remove compile warnings.
+
+------------------------------------------------------------------------
+r1295 | sdake | 2006-11-09 05:26:56 -0700 (Thu, 09 Nov 2006) | 5 lines
+
+the totem membership protocol was changed to match specificatoins.  The sending
+join messages now use the local seq id of he ring instead of the maximum seqidsrreceived.  This resuls in running of the mp5 test for several hours.  Also
+the consensus timeout was increased to allow for the membership protocol to
+form a proper membership in network overload situations.
+
+------------------------------------------------------------------------
+r1294 | sdake | 2006-11-08 18:33:06 -0700 (Wed, 08 Nov 2006) | 3 lines
+
+Modify location of ringid file and create and chdir to
+/var/run/openais directory so cores are saved there.
+
+------------------------------------------------------------------------
+r1293 | sdake | 2006-11-08 14:48:20 -0700 (Wed, 08 Nov 2006) | 2 lines
+
+Flush output of debug messages on exit or segv.
+
+------------------------------------------------------------------------
+r1288 | sdake | 2006-11-04 15:22:02 -0700 (Sat, 04 Nov 2006) | 2 lines
+
+Ported revision 1287 - updated README.devmap
+
+------------------------------------------------------------------------
+r1286 | sdake | 2006-11-03 16:48:53 -0700 (Fri, 03 Nov 2006) | 3 lines
+
+Fix problem where checkpoints can't be written afer an unlink opeation occurs
+and a new node is started.
+
+------------------------------------------------------------------------
+r1284 | sdake | 2006-10-24 13:31:15 -0700 (Tue, 24 Oct 2006) | 3 lines
+
+Checkpoint section variables were not properly initialized resulting in
+segfaults.
+
+------------------------------------------------------------------------
+r1283 | sdake | 2006-10-24 08:39:45 -0700 (Tue, 24 Oct 2006) | 2 lines
+
+Fix memory leaks.
+
+------------------------------------------------------------------------
+r1282 | sdake | 2006-10-24 04:28:18 -0700 (Tue, 24 Oct 2006) | 2 lines
+
+New generation checkpoint synchronization state machine.
+
+------------------------------------------------------------------------
+r1279 | sdake | 2006-10-23 21:08:57 -0700 (Mon, 23 Oct 2006) | 2 lines
+
+Call abort in synchronization service when processing is interrupted.
+
+------------------------------------------------------------------------
+r1278 | sdake | 2006-10-23 20:48:41 -0700 (Mon, 23 Oct 2006) | 2 lines
+
+Patch testckpt to use proper section id size.
+
+------------------------------------------------------------------------
+r1277 | sdake | 2006-10-23 20:36:40 -0700 (Mon, 23 Oct 2006) | 2 lines
+
+Replace spaces with tabs on two lines.
+
+------------------------------------------------------------------------
+r1276 | sdake | 2006-10-23 20:29:12 -0700 (Mon, 23 Oct 2006) | 2 lines
+
+remove makefile debug added accidentally in last patch
+
+------------------------------------------------------------------------
+r1275 | sdake | 2006-10-23 20:28:26 -0700 (Mon, 23 Oct 2006) | 2 lines
+
+pthread_mutex_destroy cleanup patch from Fabien
+
+------------------------------------------------------------------------
+r1271 | sdake | 2006-10-19 13:38:22 -0700 (Thu, 19 Oct 2006) | 2 lines
+
+Fix errors in ia64 alignment.
+
+------------------------------------------------------------------------
+r1270 | sdake | 2006-10-19 10:43:39 -0700 (Thu, 19 Oct 2006) | 2 lines
+
+Resolve IPC segfault.
+
+------------------------------------------------------------------------
+r1269 | sdake | 2006-10-18 16:10:34 -0700 (Wed, 18 Oct 2006) | 2 lines
+
+Specific stack size for ia64 architectures required.
+
+------------------------------------------------------------------------
+r1268 | sdake | 2006-10-18 16:09:59 -0700 (Wed, 18 Oct 2006) | 3 lines
+
+Align totem deliveries on 4 byte boudnaries to avoid segfaults and warnings
+on sparc and ia64 architectures.
+
+------------------------------------------------------------------------
+r1267 | sdake | 2006-10-16 09:07:01 -0700 (Mon, 16 Oct 2006) | 2 lines
+
+Rework of the checkpoint synchronization system.
+
+------------------------------------------------------------------------
+r1265 | sdake | 2006-10-12 15:24:36 -0700 (Thu, 12 Oct 2006) | 2 lines
+
+Only originate one regular token.
+
+------------------------------------------------------------------------
+r1264 | sdake | 2006-10-12 15:23:26 -0700 (Thu, 12 Oct 2006) | 3 lines
+
+If the failed_list has zero entries, don't add it as an iovector in join
+messages.
+
+------------------------------------------------------------------------
+r1263 | sdake | 2006-10-12 15:22:53 -0700 (Thu, 12 Oct 2006) | 3 lines
+
+Use the fullset variable instead of the local variable j to make easier code
+reading.
+
+------------------------------------------------------------------------
+r1262 | sdake | 2006-10-12 15:22:09 -0700 (Thu, 12 Oct 2006) | 2 lines
+
+Set the ring sequence number according to the totem specificatoins.
+
+------------------------------------------------------------------------
+r1261 | sdake | 2006-10-12 15:21:42 -0700 (Thu, 12 Oct 2006) | 2 lines
+
+Cleanup the way the memb_index variable is handled in the commit token
+
+------------------------------------------------------------------------
+r1260 | sdake | 2006-10-12 15:21:04 -0700 (Thu, 12 Oct 2006) | 3 lines
+
+Allocate the retransmission token in instance_initialize instead of
+totemsrp_initialize
+
+------------------------------------------------------------------------
+r1258 | sdake | 2006-10-09 00:43:45 -0700 (Mon, 09 Oct 2006) | 2 lines
+
+Accept commit token in proper cases.
+
+------------------------------------------------------------------------
+r1257 | sdake | 2006-10-09 00:43:04 -0700 (Mon, 09 Oct 2006) | 2 lines
+
+Fix subset operation to work properly.
+
+------------------------------------------------------------------------
+r1256 | sdake | 2006-10-09 00:42:36 -0700 (Mon, 09 Oct 2006) | 2 lines
+
+Remove some extra debug logging output when in DEBUG mode that is not needed.
+
+------------------------------------------------------------------------
+r1252 | sdake | 2006-10-04 21:11:40 -0700 (Wed, 04 Oct 2006) | 2 lines
+
+Print out left members properly from totemsrp.
+
+------------------------------------------------------------------------
+r1248 | sdake | 2006-09-28 11:49:00 -0700 (Thu, 28 Sep 2006) | 2 lines
+
+Set the proper size of responses to cpg_mcast messages.
+
+------------------------------------------------------------------------
+r1246 | sdake | 2006-09-27 15:57:03 -0700 (Wed, 27 Sep 2006) | 2 lines
+
+Flow control part 2 patch.
+
+------------------------------------------------------------------------
+r1245 | sdake | 2006-09-25 02:41:57 -0700 (Mon, 25 Sep 2006) | 2 lines
+
+Add cpgbench tool and group wide flow control services for the cpg service.
+
+------------------------------------------------------------------------
+r1230 | fthomas | 2006-08-28 03:12:25 -0700 (Mon, 28 Aug 2006) | 1 line
+
+add missing include for assert
+------------------------------------------------------------------------
+r1224 | sdake | 2006-08-21 21:40:26 -0700 (Mon, 21 Aug 2006) | 2 lines
+
+Fix up printing of SaNameT and mar_name_t in case it is not null terminated.
+
+------------------------------------------------------------------------
+r1223 | sdake | 2006-08-21 21:39:08 -0700 (Mon, 21 Aug 2006) | 2 lines
+
+Fix checkpoints with write size of zero to return INVALID PARAM error code
+
+------------------------------------------------------------------------
+r1217 | sdake | 2006-08-15 21:35:15 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Remove invalid commit.
+
+------------------------------------------------------------------------
+r1213 | sdake | 2006-08-15 21:22:30 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Return ERR_TIMEOUT on zero timeout parameter to saEvtEventChannelOpen.
+
+------------------------------------------------------------------------
+r1212 | sdake | 2006-08-15 18:22:40 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Return ERR_TIMEOUT if timeout parameter is zero in saEvtChannelOpen.
+
+------------------------------------------------------------------------
+r1210 | sdake | 2006-08-15 17:45:14 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Add more scalability by adding a new send_join parameter to openais.
+
+------------------------------------------------------------------------
+r1209 | sdake | 2006-08-15 17:37:54 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Remove warning about assert being undefined by including assert.h.
+
+------------------------------------------------------------------------
+r1205 | sdake | 2006-08-15 17:03:45 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Fix hash collision in cpg service.
+
+------------------------------------------------------------------------
+r1204 | sdake | 2006-08-15 16:57:44 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Install proper shared object files for clm service.
+
+------------------------------------------------------------------------
+r1203 | sdake | 2006-08-15 16:55:44 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+Improve recovery state data output.
+
+------------------------------------------------------------------------
+r1202 | sdake | 2006-08-15 16:53:01 -0700 (Tue, 15 Aug 2006) | 3 lines
+
+Improve gather notifications so user knows where gather was entered from.  This
+is useful for debugging.
+
+------------------------------------------------------------------------
+r1201 | sdake | 2006-08-15 16:51:56 -0700 (Tue, 15 Aug 2006) | 2 lines
+
+This cleans up some of the error reporting of the testckpt tool.
+
+------------------------------------------------------------------------
+r1198 | sdake | 2006-08-08 08:54:02 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Use braces in the totemip code.
+
+------------------------------------------------------------------------
+r1197 | sdake | 2006-08-08 08:52:49 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Ensure compile with GIVE_INFO gives proper information.
+
+------------------------------------------------------------------------
+r1196 | sdake | 2006-08-08 08:52:05 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Resend the commit token if it is lost
+
+------------------------------------------------------------------------
+r1195 | sdake | 2006-08-08 08:51:03 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Move SYNC output data to DEBUG mode.
+
+------------------------------------------------------------------------
+r1194 | sdake | 2006-08-08 08:49:31 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Give better user error messages when token is lost.
+
+------------------------------------------------------------------------
+r1193 | sdake | 2006-08-08 08:41:44 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Fix checkpoint synchronization.
+
+------------------------------------------------------------------------
+r1192 | sdake | 2006-08-08 08:41:22 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Move notice debug outputs in checkpoint service to debug outputs.
+
+------------------------------------------------------------------------
+r1191 | sdake | 2006-08-08 08:40:05 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Use GNU formatting for printf output
+
+------------------------------------------------------------------------
+r1190 | sdake | 2006-08-08 08:38:08 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Clean header includes from swab code.
+
+------------------------------------------------------------------------
+r1189 | sdake | 2006-08-08 08:35:42 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Fix endian marshalling in YKD service.
+
+------------------------------------------------------------------------
+r1188 | sdake | 2006-08-08 08:35:00 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Cleanup lcr_ifact code.
+
+------------------------------------------------------------------------
+r1187 | sdake | 2006-08-08 08:34:36 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Fix endian marshalling for eventing service.
+
+------------------------------------------------------------------------
+r1186 | sdake | 2006-08-08 08:34:10 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Add endian conversion for evs service.
+
+------------------------------------------------------------------------
+r1185 | sdake | 2006-08-08 08:33:13 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Fix marshalling with CPG service.
+
+------------------------------------------------------------------------
+r1184 | sdake | 2006-08-08 08:32:33 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Fix endian marshalling with clm service.
+
+------------------------------------------------------------------------
+r1183 | sdake | 2006-08-08 08:32:04 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Set proper socket for IPV6 membership add
+
+------------------------------------------------------------------------
+r1182 | sdake | 2006-08-08 08:30:40 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Fix processor count in EVS service so EVS service operates properly.
+
+------------------------------------------------------------------------
+r1181 | sdake | 2006-08-08 08:27:05 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+fix ckpt-rd and ckpt-wr test applications
+
+------------------------------------------------------------------------
+r1180 | sdake | 2006-08-08 08:23:33 -0700 (Tue, 08 Aug 2006) | 2 lines
+
+Use worker threads for debug output
+
+------------------------------------------------------------------------
+r1179 | sdake | 2006-08-07 15:50:58 -0700 (Mon, 07 Aug 2006) | 2 lines
+
+Unlink header prototype incorrect.
+
+------------------------------------------------------------------------
+r1173 | sdake | 2006-08-02 22:31:34 -0700 (Wed, 02 Aug 2006) | 2 lines
+
+Ensure sync_activate is only called once
+
+------------------------------------------------------------------------
+r1155 | sdake | 2006-07-24 22:18:52 -0700 (Mon, 24 Jul 2006) | 2 lines
+
+Added whitetank branch.
+
+------------------------------------------------------------------------
+r1153 | sdake | 2006-07-23 18:36:18 -0700 (Sun, 23 Jul 2006) | 2 lines
+
+Release of version 0.80 First Whitetank release
+
+------------------------------------------------------------------------
 r1152 | sdake | 2006-07-23 18:34:17 -0700 (Sun, 23 Jul 2006) | 2 lines
 
 Allow build type of COVERAGE for code coverage analysis
