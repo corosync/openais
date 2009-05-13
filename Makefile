@@ -92,6 +92,7 @@ install:
 	ln -sf libevs.so.2.0.0 lib/libevs.so
 	ln -sf libcpg.so.2.0.0 lib/libcpg.so
 	ln -sf libcfg.so.2.0.0 lib/libcfg.so
+	ln -sf libconfdb.so.2.0.0 lib/libconfdb.so
 	ln -sf libtotem_pg.so.2.0.0 exec/libtotem_pg.so
 
 	ln -sf libais.so.2.0.0 lib/libais.so.2
@@ -104,6 +105,7 @@ install:
 	ln -sf libevs.so.2.0.0 lib/libevs.so.2
 	ln -sf libcpg.so.2.0.0 lib/libcpg.so.2
 	ln -sf libcfg.so.2.0.0 lib/libcfg.so.2
+	ln -sf libconfdb.so.2.0.0 lib/libconfdb.so.2
 	ln -sf libtotem_pg.so.2.0.0 exec/libtotem_pg.so.2
 
 	$(CP) -a lib/libais.so $(DESTDIR)$(LIBDIR)
@@ -116,6 +118,7 @@ install:
 	$(CP) -a lib/libevs.so $(DESTDIR)$(LIBDIR)
 	$(CP) -a lib/libcpg.so $(DESTDIR)$(LIBDIR)
 	$(CP) -a lib/libcfg.so $(DESTDIR)$(LIBDIR)
+	$(CP) -a lib/libconfdb.so $(DESTDIR)$(LIBDIR)
 	$(CP) -a exec/libtotem_pg.so $(DESTDIR)$(LIBDIR)
 
 	$(CP) -a lib/libais.so.2 $(DESTDIR)$(LIBDIR)
@@ -128,6 +131,7 @@ install:
 	$(CP) -a lib/libevs.so.2 $(DESTDIR)$(LIBDIR)
 	$(CP) -a lib/libcpg.so.2 $(DESTDIR)$(LIBDIR)
 	$(CP) -a lib/libcfg.so.2 $(DESTDIR)$(LIBDIR)
+	$(CP) -a lib/libconfdb.so.2 $(DESTDIR)$(LIBDIR)
 	$(CP) -a exec/libtotem_pg.so.2 $(DESTDIR)$(LIBDIR)
 
 	install -m 755 lib/libais.so.2.* $(DESTDIR)$(LIBDIR)
@@ -140,6 +144,7 @@ install:
 	install -m 755 lib/libevs.so.2.* $(DESTDIR)$(LIBDIR)
 	install -m 755 lib/libcpg.so.2.* $(DESTDIR)$(LIBDIR)
 	install -m 755 lib/libcfg.so.2.* $(DESTDIR)$(LIBDIR)
+	install -m 755 lib/libconfdb.so.2.* $(DESTDIR)$(LIBDIR)
 	install -m 755 exec/libtotem_pg.so.2.* $(DESTDIR)$(LIBDIR)
 
 ifneq "NO" "$(STATICLIBS)"
@@ -155,6 +160,7 @@ ifneq "NO" "$(STATICLIBS)"
 	install -m 755 lib/libevs.a $(DESTDIR)$(LIBDIR)
 	install -m 755 lib/libcpg.a $(DESTDIR)$(LIBDIR)
 	install -m 755 lib/libcfg.a $(DESTDIR)$(LIBDIR)
+	install -m 755 lib/libconfdb.a $(DESTDIR)$(LIBDIR)
 	install -m 755 exec/libtotem_pg.a $(DESTDIR)$(LIBDIR)
 endif
 
@@ -175,6 +181,7 @@ endif
 	install -m 644 include/saEvt.h $(DESTDIR)$(INCLUDEDIR)
 	install -m 644 include/saLck.h $(DESTDIR)$(INCLUDEDIR)
 	install -m 644 include/saMsg.h $(DESTDIR)$(INCLUDEDIR)
+	install -m 644 include/confdb.h $(DESTDIR)$(INCLUDEDIR)
 	install -m 644 include/cpg.h $(DESTDIR)$(INCLUDEDIR)
 	install -m 644 include/cfg.h $(DESTDIR)$(INCLUDEDIR)
 	install -m 644 include/evs.h $(DESTDIR)$(INCLUDEDIR)
