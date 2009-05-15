@@ -67,6 +67,7 @@ struct msgInstance {
 	SaMsgHandleT msg_handle;
 	SaMsgCallbacksT callbacks;
 	int finalize;
+	struct list_head queue_list;
 };
 
 struct queueInstance {
@@ -77,6 +78,7 @@ struct queueInstance {
 	SaMsgQueueHandleT queue_handle;
 	SaMsgQueueOpenFlagsT open_flags;
 	SaMsgQueueCreationAttributesT create_attrs;
+	struct list_head list;
 };
 
 DECLARE_HDB_DATABASE(msgHandleDatabase, NULL);
@@ -92,18 +94,33 @@ static struct saVersionDatabase msgVersionDatabase = {
 	msgVersionsSupported
 };
 
-#ifdef COMPILE_OUT
-static void msgInstanceFinalize (struct msgInstance *msgInstance)
-{
-	return;
-}
-
 static void queueInstanceFinalize (struct queueInstance *queueInstance)
 {
+	list_del (&queueInstance->list);
+
+	hdb_handle_destroy (&queueHandleDatabase, queueInstance->queue_handle);
+
 	return;
 }
 
-#endif /* COMPILE_OUT */
+static void msgInstanceFinalize (struct msgInstance *msgInstance)
+{
+	struct queueInstance *queueInstance;
+	struct list_head *queueInstanceList;
+
+	queueInstanceList = msgInstance->queue_list.next;
+
+	while (queueInstanceList != &msgInstance->queue_list)
+	{
+		queueInstance = list_entry (queueInstanceList, struct queueInstance, list);
+		queueInstanceList = queueInstanceList->next;
+		queueInstanceFinalize (queueInstance);
+	}
+
+	hdb_handle_destroy (&msgHandleDatabase, msgInstance->msg_handle);
+
+	return;
+}
 
 SaAisErrorT
 saMsgInitialize (
@@ -151,6 +168,8 @@ saMsgInitialize (
 	} else {
 		memset (&msgInstance->callbacks, 0, sizeof (SaMsgCallbacksT));
 	}
+
+	list_init (&msgInstance->queue_list);
 
 	msgInstance->msg_handle = *msgHandle;
 
@@ -341,23 +360,25 @@ saMsgFinalize (
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	if (msgInstance->finalize) {
 		hdb_handle_put (&msgHandleDatabase, msgHandle);
-		return (SA_AIS_ERR_BAD_HANDLE);
+		error = SA_AIS_ERR_BAD_HANDLE;
+		goto error_exit;
 	}
 
 	msgInstance->finalize = 1;
 
-	/* msgInstanceFinalize (msgInstance); */
+	coroipcc_service_disconnect (msgInstance->ipc_handle);
 
-	error = coroipcc_service_disconnect (msgInstance->ipc_handle); /* ? */
+	msgInstanceFinalize (msgInstance);
 
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
-	return (SA_AIS_OK);
+error_exit:
+	return (error);
 }
 
 SaAisErrorT
@@ -435,6 +456,7 @@ saMsgQueueOpen (
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
 	queueInstance->open_flags = openFlags;
+	queueInstance->queue_handle = *queueHandle;
 
 	req_lib_msg_queueopen.header.size =
 		sizeof (struct req_lib_msg_queueopen);
@@ -480,6 +502,9 @@ saMsgQueueOpen (
 	}
 
 	queueInstance->queue_id = res_lib_msg_queueopen.queue_id;
+
+	list_init (&queueInstance->list);
+	list_add_tail (&queueInstance->list, &msgInstance->queue_list);
 
 	hdb_handle_put (&queueHandleDatabase, *queueHandle);
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
@@ -575,6 +600,7 @@ saMsgQueueOpenAsync (
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
 	queueInstance->open_flags = openFlags;
+	queueInstance->queue_handle = queueHandle;
 
 	req_lib_msg_queueopenasync.header.size =
 		sizeof (struct req_lib_msg_queueopenasync);
@@ -620,6 +646,9 @@ saMsgQueueOpenAsync (
 	}
 
 	queueInstance->queue_id = res_lib_msg_queueopenasync.queue_id;
+
+	list_init (&queueInstance->list);
+	list_add_tail (&queueInstance->list, &msgInstance->queue_list);
 
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
@@ -684,11 +713,13 @@ saMsgQueueClose (
 		goto error_put;	/* ! */
 	}
 
-	/*No Error -> destroy handle*/
+	list_del (&queueInstance->list);
+
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 	hdb_handle_destroy (&queueHandleDatabase, queueHandle);
 
 	return (error);
+
 error_put:
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 error_exit:
