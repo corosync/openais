@@ -290,6 +290,10 @@ saClmDispatch (
 			clmInstance->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
+		if (error == CS_ERR_BAD_HANDLE) {
+			error = CS_OK;
+			goto error_put;
+		}
 		if (error != CS_OK) {
 			goto error_put;
 		}

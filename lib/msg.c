@@ -254,6 +254,9 @@ saMsgDispatch (
 			msgInstance->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
+		if (error == CS_ERR_BAD_HANDLE) {
+			return (CS_OK);
+		}
 		if (error != CS_OK) {
 			goto error_put;
 		}
