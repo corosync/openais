@@ -276,10 +276,14 @@ static int authenticate_and_decrypt (
 	hmac_done (&instance->totemnet_hmac_state, digest_comparison, &len);
 
 	if (memcmp (digest_comparison, header->hash_digest, len) != 0) {
-		log_printf (instance->totemnet_log_level_security, "Received message has invalid digest... ignoring.\n");
+		/*
+		 * The computed digest did not match the received one,
+		 * so return failure, but let the upper level log it in
+		 * case it fancies retrying the operation
+		 */
 		return (-1);
 	}
-	
+
 	/*
 	 * Decrypt the contents of the message with the cipher key
 	 */
@@ -657,10 +661,25 @@ static int net_deliver_fn (
 
 		res = authenticate_and_decrypt (instance, iovec);
 		if (res == -1) {
-			log_printf (instance->totemnet_log_level_security,
-				"Invalid packet data\n");
-			iovec->iov_len = FRAME_SIZE_MAX;
-			return 0;
+			/*
+			 * Corosync forward compatibility.
+			 * If the digest fails and the last byte is zero, then
+			 * 'remove' the last byte and try again
+			 */
+			unsigned char *buf = iovec[0].iov_base;
+			if (iovec[0].iov_len > 0 &&
+			    buf[iovec[0].iov_len-1] == 0) {
+				iovec[0].iov_len -= 1;
+				bytes_received -= 1;
+				res = authenticate_and_decrypt (instance, iovec);
+			}
+			if (res == -1) {
+				log_printf (instance->totemnet_log_level_security, "Received message has invalid digest... ignoring.\n");
+				log_printf (instance->totemnet_log_level_security,
+					    "Invalid packet data\n");
+				iovec->iov_len = FRAME_SIZE_MAX;
+				return 0;
+			}
 		}
 		msg_offset = iovec->iov_base +
 			sizeof (struct security_header);
