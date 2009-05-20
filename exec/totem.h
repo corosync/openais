@@ -128,6 +128,8 @@ struct totem_config {
 	unsigned int max_messages;
 
 	char *vsf_type;
+
+	unsigned int broadcast_use;
 };
 
 enum totem_configuration_type {
