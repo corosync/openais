@@ -49,6 +49,8 @@
 #include "print.h"
 #include "totem.h"
 #include "service.h"
+#include <pwd.h>
+#include <grp.h>
 
 static char error_string_response[512];
 
@@ -87,10 +89,89 @@ static inline void objdb_get_int (
 	}
 }
 
+static int uid_determine (const char *req_user, char **error_string)
+{
+        struct passwd *passwd;
+        int ais_uid = 0;
+
+        passwd = getpwnam(req_user);
+        if (passwd == 0) {
+               *error_string="ERROR: Can't find user in /etc/passwd, please read the documentation.";
+               return -1;
+        }
+        ais_uid = passwd->pw_uid;
+        endpwent ();
+        return ais_uid;
+}
+
+static int gid_determine (const char *req_group, char **error_string)
+{
+        struct group *group;
+        int ais_gid = 0;
+
+        group = getgrnam (req_group);
+        if (group == 0) {
+               *error_string = "ERROR: Can't find group in /etc/group, please read the documentation.";
+               return -1;
+        }
+        ais_gid = group->gr_gid;
+        endgrent ();
+        return ais_gid;
+}
+
+
+static int ais_main_config_read_uidgid (
+	struct objdb_iface_ver0 *objdb,
+	char **error_string,
+	struct list_head *uidgid_list)
+{
+	unsigned int object_service_handle;
+	char *value;
+	int uid, gid;
+	struct uidgid_item *ugi;
+
+	list_init (uidgid_list);
+
+	objdb->object_find_reset (OBJECT_PARENT_HANDLE);
+
+	while (objdb->object_find (
+		OBJECT_PARENT_HANDLE,
+		"uidgid",
+		strlen ("uidgid"),
+		&object_service_handle) == 0) {
+		uid = -1;
+		gid = -1;
+
+		if (!objdb_get_string (objdb,object_service_handle, "uid", &value)) {
+			if ((uid = uid_determine(value, error_string)) == -1)
+				return 0;
+		}
+
+		if (!objdb_get_string (objdb,object_service_handle, "gid", &value)) {
+			if ((gid = gid_determine(value, error_string)) == -1)
+				return 0;
+		}
+
+		if (uid > -1 || gid > -1) {
+			ugi = malloc (sizeof (*ugi));
+			if (ugi == NULL) {
+				*error_string = "Out of memory";
+				return 0;
+			}
+			ugi->uid = uid;
+			ugi->gid = gid;
+			list_add (&ugi->list, uidgid_list);
+		}
+	}
+
+	return 1;
+}
+
 int openais_main_config_read (
 	struct objdb_iface_ver0 *objdb,
 	char **error_string,
-	struct main_config *main_config)
+	struct main_config *main_config,
+	struct list_head *uidgid_list)
 {
 	unsigned int object_service_handle;
 	unsigned int object_logger_handle;
@@ -296,6 +377,11 @@ int openais_main_config_read (
 
 	if (!main_config->syslog_facility)
 		main_config->syslog_facility = LOG_DAEMON;
+
+	if (!ais_main_config_read_uidgid (objdb, &error_reason, uidgid_list)) {
+	printf("BLE\n");
+		goto parse_error;
+	}
 
 	return 0;
 

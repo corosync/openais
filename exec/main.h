@@ -61,4 +61,6 @@ poll_handle aisexec_poll_handle;
 
 extern SaClmClusterNodeT *(*main_clm_get_by_nodeid) (unsigned int node_id);
 
+extern int ais_security_valid (int euid, int egid);
+
 #endif /* AIS_EXEC_H_DEFINED */

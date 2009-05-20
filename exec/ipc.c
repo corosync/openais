@@ -457,7 +457,7 @@ req_setup_recv (
 	if (getpeerucred (conn_info->fd, &uc) == 0) {
 		euid = ucred_geteuid (uc);
 		egid = ucred_getegid (uc);
-		if ((euid == 0) || (egid == g_gid_valid)) {
+		if ((euid == 0) || (egid == g_gid_valid) || ais_security_valid (euid, egid)) {
 			conn_info->authenticated = 1;
 		}
 		ucred_free(uc);
@@ -506,12 +506,12 @@ retry_recv:
 	assert (cmsg);
 	cred = (struct ucred *)CMSG_DATA (cmsg);
 	if (cred) {
-		if (cred->uid == 0 || cred->gid == g_gid_valid) {
+		if (cred->uid == 0 || cred->gid == g_gid_valid || ais_security_valid (cred->uid, cred->gid)) {
 		} else {
 			ipc_disconnect (conn_info);
 			log_printf (LOG_LEVEL_SECURITY,
-				"Connection not authenticated because gid is %d, expecting %d\n",
-				cred->gid, g_gid_valid);
+				"Connection with uid %d and gid %d not authenticated\n",
+				cred->uid, cred->gid);
 			return (-1);
 		}
 	}

@@ -41,6 +41,7 @@
 #include "totempg.h"
 */
 #include "objdb.h"
+#include "../include/list.h"
 
 #ifndef MAINCONFIG_H_DEFINED
 #define MAINCONFIG_H_DEFINED
@@ -63,6 +64,16 @@ struct logger_config {
 	int mode;
 };
 
+/*
+ * Structure describing cached uidgid item
+ */
+struct uidgid_item {
+	struct list_head list;
+	int uid;
+	int gid;
+};
+
+
 struct main_config {
 	/*
 	 * logging
@@ -82,6 +93,7 @@ struct main_config {
 extern int openais_main_config_read (
 	struct objdb_iface_ver0 *objdb,
 	char **error_string,
-	struct main_config *main_config);
-	
+	struct main_config *main_config,
+	struct list_head *uidgid_list);
+
 #endif /* MAINCONFIG_H_DEFINED */

@@ -93,6 +93,8 @@ static char delivery_data[MESSAGE_SIZE_MAX];
 
 static struct objdb_iface_ver0 *objdb = NULL;
 
+static struct list_head uidgid_list;
+
 SaClmClusterNodeT *(*main_clm_get_by_nodeid) (unsigned int node_id);
 
 static void sigusr2_handler (int num)
@@ -277,6 +279,19 @@ static void aisexec_gid_determine (struct main_config *main_config)
 	}
 	gid_valid = group->gr_gid;
 	endgrent();
+}
+
+int ais_security_valid (int euid, int egid)
+{
+	struct list_head *iter;
+
+	for (iter = uidgid_list.next; iter != &uidgid_list; iter = iter->next) {
+		struct uidgid_item *ugi = list_entry (iter, struct uidgid_item, list);
+		if (euid == ugi->uid || egid == ugi->gid)
+			return (1);
+	}
+
+	return (0);
 }
 
 static void aisexec_priv_drop (void)
@@ -527,7 +542,7 @@ int main (int argc, char **argv)
 		openais_exit_error (AIS_DONE_MAINCONFIGREAD);
 	}
 
-	res = openais_main_config_read (objdb, &error_string, &main_config);
+	res = openais_main_config_read (objdb, &error_string, &main_config, &uidgid_list);
 	if (res == -1) {
 		log_printf (LOG_LEVEL_ERROR, error_string);
 		openais_exit_error (AIS_DONE_MAINCONFIGREAD);

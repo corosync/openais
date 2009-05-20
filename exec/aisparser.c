@@ -44,6 +44,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
+#include <dirent.h>
 
 #include "../lcr/lcr_comp.h"
 #include "objdb.h"
@@ -56,6 +57,14 @@ static int read_config_file_into_objdb(
 	char **error_string);
 static char error_string_response[512];
 
+#define PCHECK_ADD_SUBSECTION 1
+#define PCHECK_ADD_ITEM       2
+
+typedef int (*parser_check_item_f)(struct objdb_iface_ver0 *objdb,
+				unsigned int parent_handle,
+				int type,
+				const char *name,
+				char **error_string);
 
 static int aisparser_readconfig (struct objdb_iface_ver0 *objdb, char **error_string)
 {
@@ -83,7 +92,8 @@ static char *remove_whitespace(char *string)
 static int parse_section(FILE *fp,
 			 struct objdb_iface_ver0 *objdb,
 			 unsigned int parent_handle,
-			 char **error_string)
+			 char **error_string,
+			 parser_check_item_f parser_check_item_call)
 {
 	char line[512];
 	int i;
@@ -115,9 +125,15 @@ static int parse_section(FILE *fp,
 
 			loc--;
 			*loc = '\0';
+			if (parser_check_item_call) {
+				if (!parser_check_item_call(objdb, parent_handle, PCHECK_ADD_SUBSECTION,
+				    section, error_string))
+					    return -1;
+			}
+
 			objdb->object_create (parent_handle, &new_parent,
 					      section, strlen (section));
-			if (parse_section(fp, objdb, new_parent, error_string))
+			if (parse_section(fp, objdb, new_parent, error_string, parser_check_item_call))
 				return -1;
 		}
 
@@ -129,6 +145,11 @@ static int parse_section(FILE *fp,
 			*(loc-1) = '\0';
 			key = remove_whitespace(line);
 			value = remove_whitespace(loc);
+			if (parser_check_item_call) {
+				if (!parser_check_item_call(objdb, parent_handle, PCHECK_ADD_ITEM,
+				    key, error_string))
+					    return -1;
+			}
 			objdb->object_key_create (parent_handle, key,
 				strlen (key),
 				value, strlen (value) + 1);
@@ -147,6 +168,73 @@ static int parse_section(FILE *fp,
 	return 0;
 }
 
+static int parser_check_item_uidgid(struct objdb_iface_ver0 *objdb,
+			unsigned int parent_handle,
+			int type,
+			const char *name,
+			char **error_string)
+{
+	if (type == PCHECK_ADD_SUBSECTION) {
+		if (parent_handle != OBJECT_PARENT_HANDLE) {
+			*error_string = "uidgid: Can't add second level subsection";
+			return 0;
+		}
+
+		if (strcmp (name, "uidgid") != 0) {
+			*error_string = "uidgid: Can't add subsection different then uidgid";
+			return 0;
+		}
+	}
+
+	if (type == PCHECK_ADD_ITEM) {
+		if (!(strcmp (name, "uid") == 0 || strcmp (name, "gid") == 0)) {
+			*error_string = "uidgid: Only uid and gid are allowed items";
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+static int read_uidgid_files_into_objdb(
+	struct objdb_iface_ver0 *objdb,
+	char **error_string)
+{
+	FILE *fp;
+	const char *dirname;
+	DIR *dp;
+	struct dirent *dirent;
+	char filename[PATH_MAX + NAME_MAX + 1];
+	int res = 0;
+
+	dirname = "/etc/ais/uidgid.d";
+	dp = opendir (dirname);
+
+	if (dp == NULL)
+		return 0;
+
+	while ((dirent = readdir (dp))) {
+		if (dirent->d_type == DT_REG) {
+			snprintf(filename, sizeof (filename), "%s/%s", dirname, dirent->d_name);
+
+			fp = fopen (filename, "r");
+			if (fp == NULL) continue;
+
+			res = parse_section(fp, objdb, OBJECT_PARENT_HANDLE, error_string, parser_check_item_uidgid);
+
+			fclose (fp);
+
+			if (res != 0) {
+				goto error_exit;
+			}
+		}
+	}
+
+error_exit:
+	closedir(dp);
+
+	return res;
+}
 
 
 /* Read config file and load into objdb */
@@ -171,10 +259,13 @@ static int read_config_file_into_objdb(
 		return -1;
 	}
 
-	res = parse_section(fp, objdb, OBJECT_PARENT_HANDLE, error_string);
+	res = parse_section(fp, objdb, OBJECT_PARENT_HANDLE, error_string, NULL);
 
 	fclose(fp);
 
+	if (res == 0) {
+		res = read_uidgid_files_into_objdb(objdb, error_string);
+	}
 	return res;
 }
 
