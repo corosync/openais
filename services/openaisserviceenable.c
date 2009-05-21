@@ -1,9 +1,10 @@
 /*
- * Copyright (c) 2006 Red Hat, Inc.
+ * Copyright (c) 2006-2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
- * Author: Patrick Caulfield (pcaulfie@redhat.com)
+ * Author: Christine Caulfield (ccaulfie@redhat.com)
+ * Author: Jan Friesse (jfriesse@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
  *
@@ -66,20 +67,40 @@ static struct service_engine service_engines[] = {
 	{ "openais_tmr", "0" },
 };
 
-static int openais_service_enable (
+static const char *exluded_service_engines[] = {
+	"openais_amf"
+};
+
+static int openais_service_enable_worker (
 	struct objdb_iface_ver0 *objdb,
-	const char **error_string)
+	const char **error_string,
+	const char **excluded_services,
+	const int no_excluded_services)
 {
 	unsigned int i;
+	unsigned int j;
+	int include_service;
+
 	hdb_handle_t object_handle;
 
 	for (i = 0; i < sizeof (service_engines) / sizeof (struct service_engine); i++) {
-		objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
-			"service", strlen("service"));
-		objdb->object_key_create(object_handle, "name", strlen("name"),
-			service_engines[i].name, strlen(service_engines[i].name)+ 1);
-		objdb->object_key_create(object_handle, "ver", strlen("ver"),
-			service_engines[i].ver, 2);
+		include_service = 1;
+
+		for (j = 0; no_excluded_services && j < no_excluded_services; j++) {
+			if (strcmp (service_engines[i].name, excluded_services[j]) == 0) {
+				include_service = 0;
+				break;
+			}
+		}
+
+		if (include_service) {
+			objdb->object_create(OBJECT_PARENT_HANDLE, &object_handle,
+				"service", strlen("service"));
+			objdb->object_key_create(object_handle, "name", strlen("name"),
+				service_engines[i].name, strlen(service_engines[i].name)+ 1);
+			objdb->object_key_create(object_handle, "ver", strlen("ver"),
+				service_engines[i].ver, 2);
+		}
 	}
 
 	sprintf (error_reason, "Successfully configured openais services to load\n");
@@ -88,19 +109,49 @@ static int openais_service_enable (
 	return (0);
 }
 
+static int openais_service_enable_experimental (
+	struct objdb_iface_ver0 *objdb,
+	const char **error_string)
+{
+	return openais_service_enable_worker (objdb, error_string, NULL, 0);
+}
+
+static int openais_service_enable_stable (
+	struct objdb_iface_ver0 *objdb,
+	const char **error_string)
+{
+	return openais_service_enable_worker (objdb, error_string, exluded_service_engines, 1);
+}
 /*
  * Dynamic Loader definition
  */
 
-struct config_iface_ver0 serviceenable_iface_ver0 = {
-	.config_readconfig      = openais_service_enable,
+struct config_iface_ver0 serviceenable_stable_iface_ver0 = {
+	.config_readconfig      = openais_service_enable_stable,
 	.config_writeconfig 	= NULL,
 	.config_reloadconfig 	= NULL
 };
 
-struct lcr_iface openais_serviceenable_ver0[1] = {
+struct config_iface_ver0 serviceenable_experimental_iface_ver0 = {
+	.config_readconfig      = openais_service_enable_experimental,
+	.config_writeconfig 	= NULL,
+	.config_reloadconfig 	= NULL
+};
+
+struct lcr_iface openais_serviceenable_ver0[2] = {
 	{
-		.name				= "openaisserviceenable",
+		.name				= "openaisserviceenablestable",
+		.version			= 0,
+		.versions_replace		= 0,
+		.versions_replace_count		= 0,
+		.dependencies			= 0,
+		.dependency_count		= 0,
+		.constructor			= NULL,
+		.destructor			= NULL,
+		.interfaces			= NULL,
+	},
+	{
+		.name				= "openaisserviceenableexperimental",
 		.version			= 0,
 		.versions_replace		= 0,
 		.versions_replace_count		= 0,
@@ -115,12 +166,14 @@ struct lcr_iface openais_serviceenable_ver0[1] = {
 struct openais_service_handler *serviceenable_get_handler_ver0 (void);
 
 struct lcr_comp serviceenable_comp_ver0 = {
-	.iface_count				= 1,
+	.iface_count				= 2,
 	.ifaces					= openais_serviceenable_ver0
 };
 
 
 __attribute__ ((constructor)) static void serviceenable_comp_register (void) {
-        lcr_interfaces_set (&openais_serviceenable_ver0[0], &serviceenable_iface_ver0);
+        lcr_interfaces_set (&openais_serviceenable_ver0[0], &serviceenable_stable_iface_ver0);
+        lcr_interfaces_set (&openais_serviceenable_ver0[1], &serviceenable_experimental_iface_ver0);
+
 	lcr_component_register (&serviceenable_comp_ver0);
 }
