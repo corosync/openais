@@ -587,7 +587,7 @@ static void exec_lck_resourceopen_endian_convert (void *msg)
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->resource_name);
 	swab_mar_uint32_t (&to_swab->open_flags);
-	swab_mar_uint64_t (to_swab->resource_handle);
+	swab_mar_uint64_t (&to_swab->resource_handle);
 
 	return;
 }
@@ -2263,8 +2263,8 @@ error_exit:
 		}
 
 		if (error == SA_AIS_OK) {
-			hdb_handle_put (&resource_hdb, &req_exec_lck_resourceclose->resource_id);
-			hdb_handle_destroy (&resource_hdb, &req_exec_lck_resourceclose->resource_id);
+			hdb_handle_put (&resource_hdb, req_exec_lck_resourceclose->resource_id);
+			hdb_handle_destroy (&resource_hdb, req_exec_lck_resourceclose->resource_id);
 		}
 	}
 }
