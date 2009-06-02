@@ -753,6 +753,11 @@ saLckResourceLock (
 	/* DEBUG */
 	printf ("[DEBUG]: saLckResourceLock\n");
 
+	if ((lockMode != SA_LCK_PR_LOCK_MODE) && (lockMode != SA_LCK_EX_LOCK_MODE)) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
 		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
@@ -873,6 +878,11 @@ saLckResourceLockAsync (
 
 	/* DEBUG */
 	printf ("[DEBUG]: saLckResourceLockAsync\n");
+
+	if ((lockMode != SA_LCK_PR_LOCK_MODE) && (lockMode != SA_LCK_EX_LOCK_MODE)) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
 		lckResourceHandle, (void *)&lckResourceInstance));
