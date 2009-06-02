@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2002-2005 MontaVista Software, Inc.
- * Copyright (c) 2006 Sun Microsystems, Inc.
+ * Copyright (c) 2005 MontaVista Software, Inc.
  *
  * All rights reserved.
  *
@@ -32,12 +31,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef IPC_LCK_H_DEFINED
-#define IPC_LCK_H_DEFINED
+
+#ifndef IPC_MSG_H_DEFINED
+#define IPC_MSG_H_DEFINED
 
 #include "saAis.h"
 #include "saLck.h"
-#include <corosync/swab.h>
+#include <corosync/hdb.h>
+#include "mar_lck.h"
 
 enum req_lib_lck_resource_types {
 	MESSAGE_REQ_LCK_RESOURCEOPEN = 0,
@@ -48,6 +49,7 @@ enum req_lib_lck_resource_types {
 	MESSAGE_REQ_LCK_RESOURCEUNLOCK = 5,
 	MESSAGE_REQ_LCK_RESOURCEUNLOCKASYNC = 6,
 	MESSAGE_REQ_LCK_LOCKPURGE = 7,
+	MESSAGE_REQ_LCK_LIMITGET = 8,
 };
 
 enum res_lib_lck_resource_types {
@@ -59,129 +61,147 @@ enum res_lib_lck_resource_types {
 	MESSAGE_RES_LCK_RESOURCEUNLOCK = 5,
 	MESSAGE_RES_LCK_RESOURCEUNLOCKASYNC = 6,
 	MESSAGE_RES_LCK_LOCKPURGE = 7,
-	MESSAGE_RES_LCK_LOCKWAITERCALLBACK = 8
+	MESSAGE_RES_LCK_LIMITGET = 8,
+	MESSAGE_RES_LCK_RESOURCEOPEN_CALLBACK = 9,
+	MESSAGE_RES_LCK_LOCKGRANT_CALLBACK = 10,
+	MESSAGE_RES_LCK_LOCKWAITER_CALLBACK = 11,
+	MESSAGE_RES_LCK_RESOURCEUNLOCK_CALLBACK = 12,
 };
 
 struct req_lib_lck_resourceopen {
-	coroipc_request_header_t header;
-	SaInvocationT invocation;
-	mar_name_t lockResourceName;
-	SaLckResourceOpenFlagsT resourceOpenFlags;
-	SaLckResourceHandleT resourceHandle;
-	SaTimeT timeout;
-	int async_call;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint32_t open_flags __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_resourceopen {
-	coroipc_response_header_t header;
-	SaLckResourceHandleT resourceHandle;
-/* TODO should be a handle from a handle database in the server	mar_message_source_t source;*/
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	hdb_handle_t resource_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct req_lib_lck_resourceopenasync {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint32_t open_flags __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_resourceopenasync {
-	coroipc_response_header_t header;
-	SaInvocationT invocation;
-	SaLckResourceHandleT resourceHandle;
-/* TODO should be a hnadle from a handle database in the server 	mar_message_source_t source; */
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	hdb_handle_t resource_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_lck_resourceclose {
-	coroipc_request_header_t header;
-	mar_name_t lockResourceName;
-	SaLckResourceHandleT resourceHandle;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	hdb_handle_t resource_id __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_resourceclose {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+}; __attribute__((aligned(8)))
 
 struct req_lib_lck_resourcelock {
-	coroipc_request_header_t header;
-	mar_name_t lockResourceName;
-	SaInvocationT invocation;
-	SaLckLockModeT lockMode;
-	SaLckLockFlagsT lockFlags;
-	SaLckWaiterSignalT waiterSignal;
-	SaTimeT timeout;
-	SaLckLockIdT lockId;
-	int async_call;
-/* TODO should be a handle from a handle database in the server  mar_message_source_t source; */
-	SaLckResourceHandleT resourceHandle;
-};
-
-static inline void swab_req_lib_lck_resourcelock (
-	struct req_lib_lck_resourcelock *to_swab)
-{
-	swab_coroipc_request_header_t (&to_swab->header);
-	swab_mar_name_t (&to_swab->lockResourceName);
-	to_swab->invocation = swab64 (to_swab->invocation);
-	to_swab->lockMode = swab64 (to_swab->lockMode);
-	to_swab->lockFlags = swab32 (to_swab->lockFlags);
-	to_swab->waiterSignal = swab64 (to_swab->waiterSignal);
-	to_swab->timeout = swab64 (to_swab->timeout);
-	to_swab->lockId = swab64 (to_swab->lockId);
-	to_swab->async_call = swab32 (to_swab->async_call);
-/* TODO should swap a handle from a handle database in the server swab_mar_message_source_t (&to_swab->source); */
-	to_swab->resourceHandle = swab64 (to_swab->resourceHandle);
-}
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	hdb_handle_t resource_id __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_uint32_t lock_mode __attribute__((aligned(8)));
+	mar_uint32_t lock_flags __attribute__((aligned(8)));
+	mar_uint64_t waiter_signal __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_resourcelock {
-	coroipc_response_header_t header;
-	SaLckLockStatusT lockStatus;
-	void *resource_lock;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint32_t lock_status __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct req_lib_lck_resourcelockasync {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	hdb_handle_t resource_id __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_uint32_t lock_mode __attribute__((aligned(8)));
+	mar_uint32_t lock_flags __attribute__((aligned(8)));
+	mar_uint64_t waiter_signal __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_resourcelockasync {
-	coroipc_response_header_t header;
-	SaLckLockStatusT lockStatus;
-	SaLckLockIdT lockId;
-	void *resource_lock;
-	SaInvocationT invocation;
-	SaLckResourceHandleT resourceHandle;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_lck_resourceunlock {
-	coroipc_request_header_t header;
-	mar_name_t lockResourceName;
-	SaLckLockIdT lockId;
-	SaInvocationT invocation;
-	SaTimeT timeout;
-	int async_call;
-	void *resource_lock;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_resourceunlock {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct req_lib_lck_resourceunlockasync {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_resourceunlockasync {
-	coroipc_response_header_t header;
-	SaInvocationT invocation;
-	SaLckLockIdT lockId;
-};
+	coroipc_response_header_t header; __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_lck_lockpurge {
-	coroipc_request_header_t header;
-	mar_name_t lockResourceName;
-};
-
-static inline void swab_req_lib_lck_lockpurge (
-	struct req_lib_lck_lockpurge *to_swab)
-{
-	swab_coroipc_request_header_t (&to_swab->header);
-	swab_mar_name_t (&to_swab->lockResourceName);
-}
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_lck_lockpurge {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
-struct res_lib_lck_lockwaitercallback {
-	coroipc_response_header_t header;
-	SaLckWaiterSignalT waiter_signal;
-	SaLckLockIdT lock_id;
-	SaLckLockModeT mode_held;
-	SaLckLockModeT mode_requested;
-};
+struct req_lib_lck_limitget {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct res_lib_lck_limitget {
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct res_lib_lck_resourceopen_callback {
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_uint32_t lock_status __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct res_lib_lck_lockgrant_callback {
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+	mar_uint32_t lock_status __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct res_lib_lck_lockwaiter_callback {
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint64_t waiter_signal __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_uint32_t mode_held __attribute__((aligned(8)));
+	mar_uint32_t mode_requested __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
+
+struct res_lib_lck_resourceunlock_callback {
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 #endif /* IPC_LCK_H_DEFINED */

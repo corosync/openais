@@ -39,72 +39,68 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <errno.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <sys/un.h>
 
 #include <saAis.h>
+#include <saLck.h>
+
 #include <corosync/corotypes.h>
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
 #include <corosync/corodefs.h>
 #include <corosync/hdb.h>
-#include <corosync/mar_gen.h>
 #include <corosync/list.h>
-#include <saLck.h>
-#include "ipc_lck.h"
-#include "mar_sa.h"
+#include <corosync/mar_gen.h>
+
+#include "../include/ipc_lck.h"
+#include "../include/mar_lck.h"
+#include "../include/mar_sa.h"
 
 #include "util.h"
 
-/*
- * Data structure for instance data
- */
 struct lckInstance {
 	hdb_handle_t ipc_handle;
+	SaLckHandleT lck_handle;
 	SaLckCallbacksT callbacks;
 	int finalize;
-	SaLckHandleT lckHandle;
 	struct list_head resource_list;
 };
 
 struct lckResourceInstance {
 	hdb_handle_t ipc_handle;
-	SaLckHandleT lckHandle;
-	SaLckResourceHandleT lckResourceHandle;
-	SaLckResourceOpenFlagsT resourceOpenFlags;
-	SaNameT lockResourceName;
+	hdb_handle_t resource_id;
+	SaLckHandleT lck_handle;
+	SaNameT resource_name;
+	SaLckResourceHandleT resource_handle;
+	SaLckResourceOpenFlagsT open_flags;
+	struct list_head lock_id_list;
 	struct list_head list;
-/* TODO
- *this should be a handle from a handle database	mar_message_source_t source;
- */
 };
 
 struct lckLockIdInstance {
 	hdb_handle_t ipc_handle;
-	SaLckResourceHandleT lckResourceHandle;
-	struct list_head list;
+	hdb_handle_t resource_id;
+	SaLckHandleT lck_handle;
+	SaLckLockIdT lock_id;
+	SaLckResourceHandleT resource_handle;
 	void *resource_lock;
+	struct list_head list;
 };
 
-/*
- * All LCK instances in this database
- */
-DECLARE_HDB_DATABASE(lckHandleDatabase,NULL);
+DECLARE_HDB_DATABASE(lckHandleDatabase, NULL);
+DECLARE_HDB_DATABASE(lckResourceHandleDatabase, NULL);
+DECLARE_HDB_DATABASE(lckLockIdHandleDatabase, NULL);
 
-DECLARE_HDB_DATABASE(lckResourceHandleDatabase,NULL);
-
-DECLARE_HDB_DATABASE(lckLockIdHandleDatabase,NULL);
-
-/*
- * Versions supported
- */
 static SaVersionT lckVersionsSupported[] = {
-	{ 'B', 1, 1 }
+	{ 'B', 3, 1 }
 };
 
 static struct saVersionDatabase lckVersionDatabase = {
@@ -112,111 +108,85 @@ static struct saVersionDatabase lckVersionDatabase = {
 	lckVersionsSupported
 };
 
-
-/*
- * Implementation
- */
-
-#ifdef NOT_DONE
-static void lckSectionIterationInstanceFinalize (struct lckSectionIterationInstance *lckSectionIterationInstance)
+static void lckLockIdInstanceFinalize (struct lckLockIdInstance *lckLockIdInstance)
 {
-	struct iteratorSectionIdListEntry *iteratorSectionIdListEntry;
-	struct list_head *sectionIdIterationList;
-	struct list_head *sectionIdIterationListNext;
-	/*
-	 * iterate list of section ids for this iterator to free the allocated memory
-	 * be careful to cache next pointer because free removes memory from use
-	 */
-	for (sectionIdIterationList = lckSectionIterationInstance->sectionIdListHead.next,
-		sectionIdIterationListNext = sectionIdIterationList->next;
-		sectionIdIterationList != &lckSectionIterationInstance->sectionIdListHead;
-		sectionIdIterationList = sectionIdIterationListNext,
-		sectionIdIterationListNext = sectionIdIterationList->next) {
+	list_del (&lckLockIdInstance->list);
 
-		iteratorSectionIdListEntry = list_entry (sectionIdIterationList,
-			struct iteratorSectionIdListEntry, list);
+	hdb_handle_destroy (&lckLockIdHandleDatabase, lckLockIdInstance->lock_id);
 
-		free (iteratorSectionIdListEntry);
-	}
-
-	list_del (&lckSectionIterationInstance->list);
-
-	hdb_handle_destroy (&lckSectionIterationHandleDatabase,
-		lckSectionIterationInstance->sectionIterationHandle);
+	return;
 }
 
 static void lckResourceInstanceFinalize (struct lckResourceInstance *lckResourceInstance)
 {
-	struct lckSectionIterationInstance *sectionIterationInstance;
-	struct list_head *sectionIterationList;
-	struct list_head *sectionIterationListNext;
+	struct lckLockIdInstance *lckLockIdInstance;
+	struct list_head *lckLockIdInstanceList;
 
-	for (sectionIterationList = lckResourceInstance->section_iteration_list_head.next,
-		sectionIterationListNext = sectionIterationList->next;
-		sectionIterationList != &lckResourceInstance->section_iteration_list_head;
-		sectionIterationList = sectionIterationListNext,
-		sectionIterationListNext = sectionIterationList->next) {
+	lckLockIdInstanceList = lckResourceInstance->lock_id_list.next;
 
-		sectionIterationInstance = list_entry (sectionIterationList,
-			struct lckSectionIterationInstance, list);
-
-		lckSectionIterationInstanceFinalize (sectionIterationInstance);
+	while (lckLockIdInstanceList != &lckResourceInstance->lock_id_list)
+	{
+		lckLockIdInstance = list_entry (lckLockIdInstanceList, struct lckLockIdInstance, list);
+		lckLockIdInstanceList = lckLockIdInstanceList->next;
+		lckLockIdInstanceFinalize (lckLockIdInstance);
 	}
 
 	list_del (&lckResourceInstance->list);
 
-	hdb_handle_destroy (&lckResourceHandleDatabase, lckResourceInstance->lckResourceHandle);
+	hdb_handle_destroy (&lckResourceHandleDatabase, lckResourceInstance->resource_handle);
+
+	return;
 }
 
 static void lckInstanceFinalize (struct lckInstance *lckInstance)
 {
 	struct lckResourceInstance *lckResourceInstance;
-	struct list_head *resourceInstanceList;
-	struct list_head *resourceInstanceListNext;
+	struct list_head *lckResourceInstanceList;
 
-	for (resourceInstanceList = lckInstance->resource_list.next,
-		resourceInstanceListNext = resourceInstanceList->next;
-		resourceInstanceList != &lckInstance->resource_list;
-		resourceInstanceList = resourceInstanceListNext,
-		resourceInstanceListNext = resourceInstanceList->next) {
+	lckResourceInstanceList = lckInstance->resource_list.next;
 
-		lckResourceInstance = list_entry (resourceInstanceList,
-			struct lckResourceInstance, list);
-
+	while (lckResourceInstanceList != &lckInstance->resource_list)
+	{
+		lckResourceInstance = list_entry (lckResourceInstanceList, struct lckResourceInstance, list);
+		lckResourceInstanceList = lckResourceInstanceList->next;
 		lckResourceInstanceFinalize (lckResourceInstance);
 	}
 
-	hdb_handle_destroy (&lckHandleDatabase, lckInstance->lckHandle);
-}
+	hdb_handle_destroy (&lckHandleDatabase, lckInstance->lck_handle);
 
-#endif
+	return;
+}
 
 SaAisErrorT
 saLckInitialize (
 	SaLckHandleT *lckHandle,
-	const SaLckCallbacksT *callbacks,
+	const SaLckCallbacksT *lckCallbacks,
 	SaVersionT *version)
 {
 	struct lckInstance *lckInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
+	/* DEBUG */
+	printf ("[DEBUG]: saLckInitialize\n");
+
 	if (lckHandle == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = saVersionVerify (&lckVersionDatabase, version);
 	if (error != SA_AIS_OK) {
-		goto error_no_destroy;
+		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&lckHandleDatabase, sizeof (struct lckInstance),
-		lckHandle));
+	error = hdb_error_to_sa (hdb_handle_create (&lckHandleDatabase,
+		sizeof (struct lckInstance), lckHandle));
 	if (error != SA_AIS_OK) {
-		goto error_no_destroy;
+		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, *lckHandle,
-		(void *)&lckInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		*lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -232,15 +202,15 @@ saLckInitialize (
 		goto error_put_destroy;
 	}
 
-	if (callbacks) {
-		memcpy (&lckInstance->callbacks, callbacks, sizeof (SaLckCallbacksT));
+	if (lckCallbacks != NULL) {
+		memcpy (&lckInstance->callbacks, lckCallbacks, sizeof (SaLckCallbacksT));
 	} else {
 		memset (&lckInstance->callbacks, 0, sizeof (SaLckCallbacksT));
 	}
 
 	list_init (&lckInstance->resource_list);
 
-	lckInstance->lckHandle = *lckHandle;
+	lckInstance->lck_handle = *lckHandle;
 
 	hdb_handle_put (&lckHandleDatabase, *lckHandle);
 
@@ -250,32 +220,38 @@ error_put_destroy:
 	hdb_handle_put (&lckHandleDatabase, *lckHandle);
 error_destroy:
 	hdb_handle_destroy (&lckHandleDatabase, *lckHandle);
-error_no_destroy:
+error_exit:
 	return (error);
 }
 
 SaAisErrorT
 saLckSelectionObjectGet (
-	const SaLckHandleT lckHandle,
+	SaLckHandleT lckHandle,
 	SaSelectionObjectT *selectionObject)
 {
 	struct lckInstance *lckInstance;
-	SaAisErrorT error;
+	SaAisErrorT error = SA_AIS_OK;
+
 	int fd;
 
 	if (selectionObject == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
-	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle, (void *)&lckInstance));
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	error = coroipcc_fd_get (lckInstance->ipc_handle, &fd);
+
 	*selectionObject = fd;
 
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
+error_exit:
 	return (error);
 }
 
@@ -284,50 +260,59 @@ saLckOptionCheck (
 	SaLckHandleT lckHandle,
 	SaLckOptionsT *lckOptions)
 {
-	return (SA_AIS_OK);
-}
-
-SaAisErrorT
-saLckDispatch (
-	const SaLckHandleT lckHandle,
-	SaDispatchFlagsT dispatchFlags)
-{
-	int timeout = 1;
-	SaLckCallbacksT callbacks;
-	SaAisErrorT error;
 	struct lckInstance *lckInstance;
-	struct lckResourceInstance *lckResourceInstance;
-	struct lckLockIdInstance *lckLockIdInstance;
-	int cont = 1; /* always continue do loop except when set to 0 */
-	coroipc_response_header_t *dispatch_data;
-	struct res_lib_lck_lockwaitercallback *res_lib_lck_lockwaitercallback;
-	struct res_lib_lck_resourceopenasync *res_lib_lck_resourceopenasync = NULL;
-	struct res_lib_lck_resourcelockasync *res_lib_lck_resourcelockasync = NULL;
-	struct res_lib_lck_resourceunlockasync *res_lib_lck_resourceunlockasync;
+	SaAisErrorT error = SA_AIS_OK;
 
-
-	if (dispatchFlags != SA_DISPATCH_ONE &&
-		dispatchFlags != SA_DISPATCH_ALL &&
-		dispatchFlags != SA_DISPATCH_BLOCKING) {
-
-		return (SA_AIS_ERR_INVALID_PARAM);
-	}
-
-	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
-	/*
-	 * Timeout instantly for SA_DISPATCH_ALL
-	 */
+	/* TODO */
+
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
+
+error_exit:
+	return (error);
+}
+
+SaAisErrorT
+saLckDispatch (
+	SaLckHandleT lckHandle,
+	SaDispatchFlagsT dispatchFlags)
+{
+	struct lckInstance *lckInstance;
+	struct res_lib_lck_resourceopen_callback *res_lib_lck_resourceopen_callback;
+	struct res_lib_lck_lockgrant_callback *res_lib_lck_lockgrant_callback;
+	struct res_lib_lck_lockwaiter_callback *res_lib_lck_lockwaiter_callback;
+	struct res_lib_lck_resourceunlock_callback *res_lib_lck_resourceunlock_callback;
+	SaLckCallbacksT callbacks;
+	SaAisErrorT error = SA_AIS_OK;
+
+	coroipc_response_header_t *dispatch_data;
+	int timeout = 1;
+	int cont = 1;
+
+	if (dispatchFlags != SA_DISPATCH_ONE &&
+	    dispatchFlags != SA_DISPATCH_ALL &&
+	    dispatchFlags != SA_DISPATCH_BLOCKING)
+	{
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckHandle, (void *)&lckInstance));
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
 	if (dispatchFlags == SA_DISPATCH_ALL) {
 		timeout = 0;
 	}
 
 	do {
-
 		error = coroipcc_dispatch_get (
 			lckInstance->ipc_handle,
 			(void **)&dispatch_data,
@@ -342,160 +327,77 @@ saLckDispatch (
 
 		if (dispatch_data == NULL) {
 			if (dispatchFlags == CPG_DISPATCH_ALL) {
-				break; /* exit do while cont is 1 loop */
+				break;
 			} else {
-				continue; /* next poll */
+				continue;
 			}
 		}
 
-		/*
-		* Make copy of callbacks, message data, unlock instance,
-		* and call callback. A risk of this dispatch method is that
-		* the callback routines may operate at the same time that
-		* LckFinalize has been called in another thread.
-		*/
-		memcpy(&callbacks,&lckInstance->callbacks, sizeof(lckInstance->callbacks));
+		memcpy (&callbacks, &lckInstance->callbacks,
+			sizeof(lckInstance->callbacks));
 
-		/*
-		 * Dispatch incoming response
-		 */
 		switch (dispatch_data->id) {
-		case MESSAGE_RES_LCK_LOCKWAITERCALLBACK:
+		case MESSAGE_RES_LCK_RESOURCEOPEN_CALLBACK:
 			if (callbacks.saLckResourceOpenCallback == NULL) {
 				continue;
 			}
-			res_lib_lck_lockwaitercallback = (struct res_lib_lck_lockwaitercallback *)dispatch_data;
-			callbacks.saLckLockWaiterCallback (
-				res_lib_lck_lockwaitercallback->waiter_signal,
-				res_lib_lck_lockwaitercallback->lock_id,
-				res_lib_lck_lockwaitercallback->mode_held,
-				res_lib_lck_lockwaitercallback->mode_requested);
+			res_lib_lck_resourceopen_callback =
+				(struct res_lib_lck_resourceopen_callback *)dispatch_data;
+
+			callbacks.saLckResourceOpenCallback (
+				res_lib_lck_resourceopen_callback->invocation,
+				res_lib_lck_resourceopen_callback->resource_handle,
+				res_lib_lck_resourceopen_callback->header.error);
+
 			break;
 
-		case MESSAGE_RES_LCK_RESOURCEOPENASYNC:
-			if (callbacks.saLckLockWaiterCallback == NULL) {
-				continue;
-			}
-			res_lib_lck_resourceopenasync = (struct res_lib_lck_resourceopenasync *)dispatch_data;
-			/*
-			 * This instance get/listadd/put required so that close
-			 * later has the proper list of resources
-			 */
-			if (res_lib_lck_resourceopenasync->header.error == SA_AIS_OK) {
-				error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
-					res_lib_lck_resourceopenasync->resourceHandle,
-					(void *)&lckResourceInstance));
-
-					assert (error == SA_AIS_OK); /* should only be valid handles here */
-				/*
-				 * open succeeded without error
-				 */
-
-				callbacks.saLckResourceOpenCallback(
-					res_lib_lck_resourceopenasync->invocation,
-					res_lib_lck_resourceopenasync->resourceHandle,
-					res_lib_lck_resourceopenasync->header.error);
-/*
- * Should be a handle from a handle database in the server
-				memcpy (&lckResourceInstance->source,
-						&res_lib_lck_resourceopenasync->source,
-						sizeof (mar_message_source_t));
- */
-				hdb_handle_put (&lckResourceHandleDatabase,
-					res_lib_lck_resourceopenasync->resourceHandle);
-			} else {
-				/*
-				 * open failed with error
-				 */
-				callbacks.saLckResourceOpenCallback(
-					res_lib_lck_resourceopenasync->invocation,
-					-1,
-					res_lib_lck_resourceopenasync->header.error);
-			}
-			break;
-		case MESSAGE_RES_LCK_RESOURCELOCKASYNC:
+		case MESSAGE_RES_LCK_LOCKGRANT_CALLBACK:
 			if (callbacks.saLckLockGrantCallback == NULL) {
 				continue;
 			}
-			res_lib_lck_resourcelockasync = (struct res_lib_lck_resourcelockasync *)dispatch_data;
-			/*
-			 * This instance get/listadd/put required so that close
-			 * later has the proper list of resources
-			 */
-			if (res_lib_lck_resourcelockasync->header.error == SA_AIS_OK) {
-				error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase,
-					res_lib_lck_resourcelockasync->lockId,
-					(void *)&lckLockIdInstance));
+			res_lib_lck_lockgrant_callback =
+				(struct res_lib_lck_lockgrant_callback *)dispatch_data;
 
-					assert (error == SA_AIS_OK); /* should only be valid handles here */
-				/*
-				 * open succeeded without error
-				 */
-				lckLockIdInstance->resource_lock = res_lib_lck_resourcelockasync->resource_lock;
+			callbacks.saLckLockGrantCallback (
+				res_lib_lck_lockgrant_callback->invocation,
+				res_lib_lck_lockgrant_callback->lock_status,
+				res_lib_lck_lockgrant_callback->header.error);
 
-				callbacks.saLckLockGrantCallback(
-					res_lib_lck_resourcelockasync->invocation,
-					res_lib_lck_resourcelockasync->lockStatus,
-					res_lib_lck_resourcelockasync->header.error);
-				hdb_handle_put (&lckLockIdHandleDatabase,
-					res_lib_lck_resourcelockasync->lockId);
-			} else {
-				/*
-				 * open failed with error
-				 */
-				callbacks.saLckLockGrantCallback (
-					res_lib_lck_resourceopenasync->invocation,
-					-1,
-					res_lib_lck_resourceopenasync->header.error);
-			}
 			break;
 
+		case MESSAGE_RES_LCK_LOCKWAITER_CALLBACK:
+			if (callbacks.saLckLockWaiterCallback == NULL) {
+				continue;
+			}
+			res_lib_lck_lockwaiter_callback =
+				(struct res_lib_lck_lockwaiter_callback *)dispatch_data;
 
-		case MESSAGE_RES_LCK_RESOURCEUNLOCKASYNC:
+			callbacks.saLckLockWaiterCallback (
+				res_lib_lck_lockwaiter_callback->waiter_signal,
+				res_lib_lck_lockwaiter_callback->lock_id,
+				res_lib_lck_lockwaiter_callback->mode_held,
+				res_lib_lck_lockwaiter_callback->mode_requested);
+
+			break;
+
+		case MESSAGE_RES_LCK_RESOURCEUNLOCK_CALLBACK:
 			if (callbacks.saLckResourceUnlockCallback == NULL) {
 				continue;
 			}
-			res_lib_lck_resourceunlockasync = (struct res_lib_lck_resourceunlockasync *)dispatch_data;
+			res_lib_lck_resourceunlock_callback =
+				(struct res_lib_lck_resourceunlock_callback *)dispatch_data;
+
 			callbacks.saLckResourceUnlockCallback (
-				res_lib_lck_resourceunlockasync->invocation,
-				res_lib_lck_resourceunlockasync->header.error);
+				res_lib_lck_resourceunlock_callback->invocation,
+				res_lib_lck_resourceunlock_callback->header.error);
 
-			if (res_lib_lck_resourceunlockasync->header.error == SA_AIS_OK) {
-				error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase,
-				     res_lib_lck_resourceunlockasync->lockId,
-				     (void *)&lckLockIdInstance));
-				if (error == SA_AIS_OK) {
-					hdb_handle_put (&lckLockIdHandleDatabase, res_lib_lck_resourceunlockasync->lockId);
-
-					hdb_handle_destroy (&lckLockIdHandleDatabase, res_lib_lck_resourceunlockasync->lockId);
-				}
-			}
 			break;
-#ifdef NOT_DONE_YET
-
-		case MESSAGE_RES_LCK_RESOURCESYNCHRONIZEASYNC:
-			if (callbacks.saLckResourceSynchronizeCallback == NULL) {
-				continue;
-			}
-
-			res_lib_lck_resourcesynchronizeasync = (struct res_lib_lck_resourcesynchronizeasync *) dispatch_data;
-
-			callbacks.saLckResourceSynchronizeCallback(
-				res_lib_lck_resourcesynchronizeasync->invocation,
-				res_lib_lck_resourcesynchronizeasync->header.error);
-			break;
-#endif
 
 		default:
-			/* TODO */
 			break;
 		}
-
 		coroipcc_dispatch_put (lckInstance->ipc_handle);
 
-		/*
-		 * Determine if more messages should be processed
-		 */
 		switch (dispatchFlags) {
 		case SA_DISPATCH_ONE:
 			cont = 0;
@@ -508,98 +410,110 @@ saLckDispatch (
 	} while (cont);
 
 error_put:
-	hdb_handle_put(&lckHandleDatabase, lckHandle);
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
 }
 
 SaAisErrorT
 saLckFinalize (
-	const SaLckHandleT lckHandle)
+	SaLckHandleT lckHandle)
 {
 	struct lckInstance *lckInstance;
-	SaAisErrorT error;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
-	/*
-	 * Another thread has already started finalizing
-	 */
 	if (lckInstance->finalize) {
 		hdb_handle_put (&lckHandleDatabase, lckHandle);
-		return (SA_AIS_ERR_BAD_HANDLE);
+		error = SA_AIS_ERR_BAD_HANDLE;
+		goto error_exit;
 	}
 
 	lckInstance->finalize = 1;
 
 	coroipcc_service_disconnect (lckInstance->ipc_handle);
 
-// TODO	lckInstanceFinalize (lckInstance);
+	lckInstanceFinalize (lckInstance);
 
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
-	return (SA_AIS_OK);
+error_exit:
+	return (error);
 }
 
 SaAisErrorT
 saLckResourceOpen (
 	SaLckHandleT lckHandle,
-	const SaNameT *lockResourceName,
-	SaLckResourceOpenFlagsT resourceOpenFlags,
+	const SaNameT *lckResourceName,
+	SaLckResourceOpenFlagsT resourceFlags,
 	SaTimeT timeout,
 	SaLckResourceHandleT *lckResourceHandle)
 {
-	SaAisErrorT error;
-	struct lckResourceInstance *lckResourceInstance;
 	struct lckInstance *lckInstance;
-	struct iovec iov;
+	struct lckResourceInstance *lckResourceInstance;
 	struct req_lib_lck_resourceopen req_lib_lck_resourceopen;
 	struct res_lib_lck_resourceopen res_lib_lck_resourceopen;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct iovec iov;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saLckResourceOpen\n");
 
 	if (lckResourceHandle == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
-	if (lockResourceName == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+	if (lckResourceName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&lckResourceHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_create (&lckResourceHandleDatabase,
 		sizeof (struct lckResourceInstance), lckResourceHandle));
 	if (error != SA_AIS_OK) {
-		goto error_put_lck;
+		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
 		*lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
 
 	lckResourceInstance->ipc_handle = lckInstance->ipc_handle;
+	lckResourceInstance->lck_handle = lckHandle;
+	lckResourceInstance->resource_handle = *lckResourceHandle;
 
-	lckResourceInstance->lckHandle = lckHandle;
-	lckResourceInstance->lckResourceHandle = *lckResourceHandle;
+	memcpy (&lckResourceInstance->resource_name, lckResourceName,
+		sizeof(SaNameT));
 
-	req_lib_lck_resourceopen.header.size = sizeof (struct req_lib_lck_resourceopen);
-	req_lib_lck_resourceopen.header.id = MESSAGE_REQ_LCK_RESOURCEOPEN;
+	req_lib_lck_resourceopen.header.size =
+		sizeof (struct req_lib_lck_resourceopen);
+	req_lib_lck_resourceopen.header.id =
+		MESSAGE_REQ_LCK_RESOURCEOPEN;
 
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName, (SaNameT *)lockResourceName);
+/* 	memcpy (&req_lib_lck_resourceopen.resource_name, */
+/* 		lckResourceName, sizeof (SaNameT)); */
 
-	memcpy (&lckResourceInstance->lockResourceName, lockResourceName, sizeof(SaNameT));
-	req_lib_lck_resourceopen.resourceOpenFlags = resourceOpenFlags;
-	req_lib_lck_resourceopen.resourceHandle = *lckResourceHandle;
-	req_lib_lck_resourceopen.async_call = 0;
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_resourceopen.resource_name,
+		(SaNameT *)lckResourceName);
+
+	req_lib_lck_resourceopen.open_flags = resourceFlags;
+	req_lib_lck_resourceopen.resource_handle = *lckResourceHandle;
 
 	iov.iov_base = &req_lib_lck_resourceopen;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceopen);
@@ -611,32 +525,32 @@ saLckResourceOpen (
 		&res_lib_lck_resourceopen,
 		sizeof (struct res_lib_lck_resourceopen));
 
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
+	}
+
 	if (res_lib_lck_resourceopen.header.error != SA_AIS_OK) {
 		error = res_lib_lck_resourceopen.header.error;
 		goto error_put_destroy;
 	}
 
-/*
- * Should be a handle from a handle database in the server
-	memcpy (&lckResourceInstance->source,
-		&res_lib_lck_resourceopen.source,
-		sizeof (mar_message_source_t));
-*/
+	lckResourceInstance->resource_id =
+		res_lib_lck_resourceopen.resource_id;
+
+	list_init (&lckResourceInstance->lock_id_list);
+	list_init (&lckResourceInstance->list);
+	list_add_tail (&lckResourceInstance->list, &lckInstance->resource_list);
 
 	hdb_handle_put (&lckResourceHandleDatabase, *lckResourceHandle);
-
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
-	list_init (&lckResourceInstance->list);
-
-	list_add (&lckResourceInstance->list, &lckInstance->resource_list);
 	return (error);
 
 error_put_destroy:
 	hdb_handle_put (&lckResourceHandleDatabase, *lckResourceHandle);
 error_destroy:
 	hdb_handle_destroy (&lckResourceHandleDatabase, *lckResourceHandle);
-error_put_lck:
+error_put:
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
@@ -646,57 +560,77 @@ SaAisErrorT
 saLckResourceOpenAsync (
 	SaLckHandleT lckHandle,
 	SaInvocationT invocation,
-	const SaNameT *lockResourceName,
-	SaLckResourceOpenFlagsT resourceOpenFlags)
+	const SaNameT *lckResourceName,
+	SaLckResourceOpenFlagsT resourceFlags)
 {
-	struct lckResourceInstance *lckResourceInstance;
 	struct lckInstance *lckInstance;
-	SaLckResourceHandleT lckResourceHandle;
-	struct iovec iov;
-	SaAisErrorT error;
-	struct req_lib_lck_resourceopen req_lib_lck_resourceopen;
+	struct lckResourceInstance *lckResourceInstance;
+	struct req_lib_lck_resourceopenasync req_lib_lck_resourceopenasync;
 	struct res_lib_lck_resourceopenasync res_lib_lck_resourceopenasync;
+	SaLckResourceHandleT lckResourceHandle;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckHandleDatabase, lckHandle,
-		(void *)&lckInstance));
+	struct iovec iov;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saLckResourceOpenAsync\n");
+
+	if (lckResourceName == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
 
+	/* 
+	 * Check that saLckLockGrantCallback is defined.
+	 */
 	if (lckInstance->callbacks.saLckResourceOpenCallback == NULL) {
 		error = SA_AIS_ERR_INIT;
-		goto error_put_lck;
+		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&lckResourceHandleDatabase,
+	error = hdb_error_to_sa (hdb_handle_create (&lckResourceHandleDatabase,
 		sizeof (struct lckResourceInstance), &lckResourceHandle));
 	if (error != SA_AIS_OK) {
-		goto error_put_lck;
+		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
 
 	lckResourceInstance->ipc_handle = lckInstance->ipc_handle;
-	lckResourceInstance->lckHandle = lckHandle;
-	lckResourceInstance->lckResourceHandle = lckResourceHandle;
-	lckResourceInstance->resourceOpenFlags = resourceOpenFlags;
+	lckResourceInstance->lck_handle = lckHandle;
+	lckResourceInstance->resource_handle = lckResourceHandle;
 
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceopen.lockResourceName,
-			(SaNameT *)lockResourceName);
-	memcpy (&lckResourceInstance->lockResourceName, lockResourceName, sizeof (SaNameT));
-	req_lib_lck_resourceopen.header.size = sizeof (struct req_lib_lck_resourceopen);
-	req_lib_lck_resourceopen.header.id = MESSAGE_REQ_LCK_RESOURCEOPENASYNC;
-	req_lib_lck_resourceopen.invocation = invocation;
-	req_lib_lck_resourceopen.resourceOpenFlags = resourceOpenFlags;
-	req_lib_lck_resourceopen.resourceHandle = lckResourceHandle;
-	req_lib_lck_resourceopen.async_call = 1;
+	memcpy (&lckResourceInstance->resource_name, lckResourceName,
+		sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_lck_resourceopen;
-	iov.iov_len = sizeof (struct req_lib_lck_resourceopen);
+	req_lib_lck_resourceopenasync.header.size =
+		sizeof (struct req_lib_lck_resourceopenasync);
+	req_lib_lck_resourceopenasync.header.id =
+		MESSAGE_REQ_LCK_RESOURCEOPENASYNC;
+
+/* 	memcpy (&req_lib_lck_resourceopenasync.resource_name, */
+/* 		lckResourceName, sizeof (SaNameT)); */
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_resourceopenasync.resource_name,
+		(SaNameT *)lckResourceName);
+
+	req_lib_lck_resourceopenasync.open_flags = resourceFlags;
+	req_lib_lck_resourceopenasync.resource_handle = lckResourceHandle;
+	req_lib_lck_resourceopenasync.invocation = invocation;
+
+	iov.iov_base = &req_lib_lck_resourceopenasync;
+	iov.iov_len = sizeof (struct req_lib_lck_resourceopenasync);
 
 	error = coroipcc_msg_send_reply_receive (
 		lckResourceInstance->ipc_handle,
@@ -705,17 +639,32 @@ saLckResourceOpenAsync (
 		&res_lib_lck_resourceopenasync,
 		sizeof (struct res_lib_lck_resourceopenasync));
 
-	if (error == SA_AIS_OK) {
-		hdb_error_to_sa(hdb_handle_put (&lckResourceHandleDatabase,
-			lckResourceHandle));
-		hdb_handle_put (&lckHandleDatabase, lckHandle);
-		return (res_lib_lck_resourceopenasync.header.error);
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
 	}
 
+	if (res_lib_lck_resourceopenasync.header.error != SA_AIS_OK) {
+		error = res_lib_lck_resourceopenasync.header.error;
+		goto error_put_destroy;
+	}
+
+	lckResourceInstance->resource_id =
+		res_lib_lck_resourceopenasync.resource_id;
+
+	list_init (&lckResourceInstance->lock_id_list);
+	list_init (&lckResourceInstance->list);
+	list_add_tail (&lckResourceInstance->list, &lckInstance->resource_list);
+
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
+
+	return (error);
+
+error_put_destroy:
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
 error_destroy:
 	hdb_handle_destroy (&lckResourceHandleDatabase, lckResourceHandle);
-error_put_lck:
+error_put:
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
 error_exit:
 	return (error);
@@ -725,23 +674,35 @@ SaAisErrorT
 saLckResourceClose (
 	SaLckResourceHandleT lckResourceHandle)
 {
+	struct lckResourceInstance *lckResourceInstance;
 	struct req_lib_lck_resourceclose req_lib_lck_resourceclose;
 	struct res_lib_lck_resourceclose res_lib_lck_resourceclose;
 	struct iovec iov;
-	SaAisErrorT error;
-	struct lckResourceInstance *lckResourceInstance;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance));
+	/* DEBUG */
+	printf ("[DEBUG]: saLckResourceClose\n");
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
-	req_lib_lck_resourceclose.header.size = sizeof (struct req_lib_lck_resourceclose);
-	req_lib_lck_resourceclose.header.id = MESSAGE_REQ_LCK_RESOURCECLOSE;
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceclose.lockResourceName,
-		&lckResourceInstance->lockResourceName);
-	req_lib_lck_resourceclose.resourceHandle = lckResourceHandle;
+	req_lib_lck_resourceclose.header.size =
+		sizeof (struct req_lib_lck_resourceclose);
+	req_lib_lck_resourceclose.header.id =
+		MESSAGE_REQ_LCK_RESOURCECLOSE;
+
+/* 	memcpy (&req_lib_lck_resourceclose.resource_name, */
+/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_resourceclose.resource_name,
+		&lckResourceInstance->resource_name);
+
+	req_lib_lck_resourceclose.resource_handle = lckResourceHandle;
+	req_lib_lck_resourceclose.resource_id = lckResourceInstance->resource_id;
 
 	iov.iov_base = &req_lib_lck_resourceclose;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceclose);
@@ -753,11 +714,21 @@ saLckResourceClose (
 		&res_lib_lck_resourceclose,
 		sizeof (struct res_lib_lck_resourceclose));
 
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
+
+	if (res_lib_lck_resourceclose.header.error != SA_AIS_OK) {
+		error = res_lib_lck_resourceclose.header.error;
+		goto error_put;
+	}
+
+	/* lckResourceInstanceFinalize (lckResourceInstance) */
+
+error_put:
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
-
-	hdb_handle_destroy (&lckResourceHandleDatabase, lckResourceHandle);
-
-	return (error == SA_AIS_OK ? res_lib_lck_resourceclose.header.error : error);
+error_exit:
+	return (error);
 }
 
 SaAisErrorT
@@ -770,28 +741,39 @@ saLckResourceLock (
 	SaTimeT timeout,
 	SaLckLockStatusT *lockStatus)
 {
+	struct lckLockIdInstance *lckLockIdInstance;
+	struct lckResourceInstance *lckResourceInstance;
 	struct req_lib_lck_resourcelock req_lib_lck_resourcelock;
 	struct res_lib_lck_resourcelock res_lib_lck_resourcelock;
 	struct iovec iov;
-	SaAisErrorT error;
-	struct lckResourceInstance *lckResourceInstance;
-	struct lckLockIdInstance *lckLockIdInstance;
-	hdb_handle_t lock_handle;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance));
+	hdb_handle_t ipc_handle;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saLckResourceLock\n");
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&lckLockIdHandleDatabase,
+/* 	memcpy (&req_lib_lck_resourcelock.resource_name, */
+/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_resourcelock.resource_name,
+		&lckResourceInstance->resource_name);
+
+	error = hdb_error_to_sa (hdb_handle_create (&lckLockIdHandleDatabase,
 		sizeof (struct lckLockIdInstance), lockId));
 	if (error != SA_AIS_OK) {
-		goto error_put_lck;
+		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, *lockId,
-		(void *)&lckLockIdInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
+		*lockId, (void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
@@ -802,61 +784,72 @@ saLckResourceLock (
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&lock_handle);
-	if (error != SA_AIS_OK) { // TODO error handling
-		goto error_destroy;
+		&ipc_handle);
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
 	}
 
 	lckLockIdInstance->ipc_handle = lckResourceInstance->ipc_handle;
-	lckLockIdInstance->lckResourceHandle = lckResourceHandle;
+	lckLockIdInstance->resource_id = lckResourceInstance->resource_id;
+	lckLockIdInstance->lck_handle = lckResourceInstance->lck_handle;
+	lckLockIdInstance->resource_handle = lckResourceHandle;
+	lckLockIdInstance->lock_id = *lockId;
 
-	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
-	req_lib_lck_resourcelock.header.id = MESSAGE_REQ_LCK_RESOURCELOCK;
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourcelock.lockResourceName,
-		&lckResourceInstance->lockResourceName);
-	req_lib_lck_resourcelock.lockMode = lockMode;
-	req_lib_lck_resourcelock.lockFlags = lockFlags;
-	req_lib_lck_resourcelock.waiterSignal = waiterSignal;
-	req_lib_lck_resourcelock.lockId = *lockId;
-	req_lib_lck_resourcelock.async_call = 0;
-	req_lib_lck_resourcelock.invocation = 0;
-	req_lib_lck_resourcelock.resourceHandle = lckResourceHandle;
+	req_lib_lck_resourcelock.header.size =
+		sizeof (struct req_lib_lck_resourcelock);
+	req_lib_lck_resourcelock.header.id =
+		MESSAGE_REQ_LCK_RESOURCELOCK;
 
-/*
- * Should be a handle from a handle database in the server
-	memcpy (&req_lib_lck_resourcelock.source,
-		&lckResourceInstance->source,
-		sizeof (mar_message_source_t));
-*/
+	req_lib_lck_resourcelock.lock_id = *lockId;
+	req_lib_lck_resourcelock.lock_mode = lockMode;
+	req_lib_lck_resourcelock.lock_flags = lockFlags;
+	req_lib_lck_resourcelock.waiter_signal = waiterSignal;
+	req_lib_lck_resourcelock.resource_handle = lckResourceHandle;
+	req_lib_lck_resourcelock.resource_id = lckResourceInstance->resource_id;
+	req_lib_lck_resourcelock.timeout = timeout;
 
 	iov.iov_base = &req_lib_lck_resourcelock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
 
-	error = coroipcc_msg_send_reply_receive (lock_handle,
+	error = coroipcc_msg_send_reply_receive (
+		ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourcelock,
 		sizeof (struct res_lib_lck_resourcelock));
 
-	if (error == SA_AIS_OK) {
-		lckLockIdInstance->resource_lock = res_lib_lck_resourcelock.resource_lock;
-		*lockStatus = res_lib_lck_resourcelock.lockStatus;
-
-		return (res_lib_lck_resourcelock.header.error);
+	if (error != SA_AIS_OK) {
+		goto error_disconnect;
 	}
 
-	/*
-	 * Error
-	 */
+	if (res_lib_lck_resourcelock.header.error != SA_AIS_OK) {
+		*lockStatus = res_lib_lck_resourcelock.lock_status;
+		error = res_lib_lck_resourcelock.header.error;
+		goto error_disconnect;
+	}
+
+	coroipcc_service_disconnect (ipc_handle);
+
+	list_init (&lckLockIdInstance->list);
+	list_add_tail (&lckLockIdInstance->list, &lckResourceInstance->lock_id_list);
+
 	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
-
-error_destroy:
-	hdb_handle_destroy (&lckLockIdHandleDatabase, *lockId);
-
-error_put_lck:
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
+
+	*lockStatus = res_lib_lck_resourcelock.lock_status;
+
 	return (error);
 
+error_disconnect:
+	coroipcc_service_disconnect (ipc_handle);
+error_put_destroy:
+	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
+error_destroy:
+	hdb_handle_destroy (&lckLockIdHandleDatabase, *lockId);
+error_put:
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
+error_exit:
+	return (error);
 }
 
 SaAisErrorT
@@ -868,88 +861,138 @@ saLckResourceLockAsync (
 	SaLckLockFlagsT lockFlags,
 	SaLckWaiterSignalT waiterSignal)
 {
-	struct req_lib_lck_resourcelock req_lib_lck_resourcelock;
+	struct lckInstance *lckInstance;
+	struct lckLockIdInstance *lckLockIdInstance;
+	struct lckResourceInstance *lckResourceInstance;
+	struct req_lib_lck_resourcelockasync req_lib_lck_resourcelockasync;
 	struct res_lib_lck_resourcelockasync res_lib_lck_resourcelockasync;
 	struct iovec iov;
-	SaAisErrorT error;
-	struct lckResourceInstance *lckResourceInstance;
-	struct lckLockIdInstance *lckLockIdInstance;
-	hdb_handle_t lock_handle;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance));
+	hdb_handle_t ipc_handle;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saLckResourceLockAsync\n");
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_create (&lckLockIdHandleDatabase,
+/* 	memcpy (&req_lib_lck_resourcelockasync.resource_name, */
+/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_resourcelockasync.resource_name,
+		&lckResourceInstance->resource_name);
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckResourceInstance->lck_handle, (void *)&lckInstance));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
+
+	/* 
+	 * Check that saLckLockGrantCallback is defined.
+	 */
+	if (lckInstance->callbacks.saLckLockGrantCallback == NULL) {
+		hdb_handle_put (&lckHandleDatabase,
+			lckResourceInstance->lck_handle);
+		error = SA_AIS_ERR_INIT;
+		goto error_put;
+	}
+
+	hdb_handle_put (&lckHandleDatabase,
+		lckResourceInstance->lck_handle);
+
+	error = hdb_error_to_sa (hdb_handle_create (&lckLockIdHandleDatabase,
 		sizeof (struct lckLockIdInstance), lockId));
 	if (error != SA_AIS_OK) {
-		goto error_put_lck;
+		goto error_put;
 	}
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, *lockId,
-		(void *)&lckLockIdInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
+		*lockId, (void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
 		goto error_destroy;
 	}
 
+	/*
 	error = coroipcc_service_connect (
 		COROSYNC_SOCKET_NAME,
 		LCK_SERVICE,
 		IPC_REQUEST_SIZE,
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
-		&lock_handle);
-	if (error != SA_AIS_OK) { // TODO error handling
-		goto error_destroy;
+		&ipc_handle);
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
 	}
+	*/
 
 	lckLockIdInstance->ipc_handle = lckResourceInstance->ipc_handle;
-	lckLockIdInstance->lckResourceHandle = lckResourceHandle;
+	lckLockIdInstance->resource_id = lckResourceInstance->resource_id;
+	lckLockIdInstance->lck_handle = lckResourceInstance->lck_handle;
+	lckLockIdInstance->resource_handle = lckResourceHandle;
+	lckLockIdInstance->lock_id = *lockId;
 
-	req_lib_lck_resourcelock.header.size = sizeof (struct req_lib_lck_resourcelock);
-	req_lib_lck_resourcelock.header.id = MESSAGE_REQ_LCK_RESOURCELOCKASYNC;
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourcelock.lockResourceName,
-		&lckResourceInstance->lockResourceName);
-	req_lib_lck_resourcelock.lockMode = lockMode;
-	req_lib_lck_resourcelock.lockFlags = lockFlags;
-	req_lib_lck_resourcelock.waiterSignal = waiterSignal;
-	req_lib_lck_resourcelock.lockId = *lockId;
-	req_lib_lck_resourcelock.async_call = 1;
-	req_lib_lck_resourcelock.invocation = invocation;
-	req_lib_lck_resourcelock.resourceHandle = lckResourceHandle;
+	req_lib_lck_resourcelockasync.header.size =
+		sizeof (struct req_lib_lck_resourcelockasync);
+	req_lib_lck_resourcelockasync.header.id =
+		MESSAGE_REQ_LCK_RESOURCELOCKASYNC;
 
-/* Should be a handle from a handle  database in the server 
-	memcpy (&req_lib_lck_resourcelock.source,
-		&lckResourceInstance->source,
-		sizeof (mar_message_source_t));
-*/
+	req_lib_lck_resourcelockasync.lock_id = *lockId;
+	req_lib_lck_resourcelockasync.lock_mode = lockMode;
+	req_lib_lck_resourcelockasync.lock_flags = lockFlags;
+	req_lib_lck_resourcelockasync.waiter_signal = waiterSignal;
+	req_lib_lck_resourcelockasync.resource_handle = lckResourceHandle;
+	req_lib_lck_resourcelockasync.resource_id = lckResourceInstance->resource_id;
+	req_lib_lck_resourcelockasync.invocation = invocation;
 
-	iov.iov_base = &req_lib_lck_resourcelock;
-	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
+	iov.iov_base = &req_lib_lck_resourcelockasync;
+	iov.iov_len = sizeof (struct req_lib_lck_resourcelockasync);
 
 	error = coroipcc_msg_send_reply_receive (
-		lock_handle,
+		/* ipc_handle, */
+		lckResourceInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourcelockasync,
-		sizeof (struct res_lib_lck_resourcelock));
+		sizeof (struct res_lib_lck_resourcelockasync));
 
-	if (error == SA_AIS_OK) {
-		return (res_lib_lck_resourcelockasync.header.error);
+	if (error != SA_AIS_OK) {
+		/* goto error_disconnect; */
+		goto error_put_destroy;
 	}
 
-	/*
-	 * Error
-	 */
-	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
+	if (res_lib_lck_resourcelockasync.header.error != SA_AIS_OK) {
+		error = res_lib_lck_resourcelockasync.header.error;
+		/* goto error_disconnect; */
+		goto error_put_destroy;
+	}
 
+	coroipcc_service_disconnect (ipc_handle);
+
+	list_init (&lckLockIdInstance->list);
+	list_add_tail (&lckLockIdInstance->list, &lckResourceInstance->lock_id_list);
+
+	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
+
+	return (error);
+
+/*
+error_disconnect:
+	coroipcc_service_disconnect (ipc_handle);
+*/
+error_put_destroy:
+	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
 error_destroy:
 	hdb_handle_destroy (&lckLockIdHandleDatabase, *lockId);
-
-error_put_lck:
+error_put:
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
+error_exit:
 	return (error);
 }
 
@@ -958,42 +1001,46 @@ saLckResourceUnlock (
 	SaLckLockIdT lockId,
 	SaTimeT timeout)
 {
+	struct lckLockIdInstance *lckLockIdInstance;
+	struct lckResourceInstance *lckResourceInstance;
 	struct req_lib_lck_resourceunlock req_lib_lck_resourceunlock;
 	struct res_lib_lck_resourceunlock res_lib_lck_resourceunlock;
 	struct iovec iov;
-	SaAisErrorT error;
-	struct lckLockIdInstance *lckLockIdInstance;
-	struct lckResourceInstance *lckResourceInstance;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, lockId,
-		(void *)&lckLockIdInstance));
+	/* DEBUG */
+	printf ("[DEBUG]: saLckResourceUnlock\n");
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
+		lockId, (void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
-	/*
-	 * Retrieve resource name
-	 */
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
-		lckLockIdInstance->lckResourceHandle, (void *)&lckResourceInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+		lckLockIdInstance->resource_handle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		hdb_handle_put (&lckLockIdHandleDatabase, lockId);
-		return (error);
+		goto error_put;
 	}
 
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
-		&lckResourceInstance->lockResourceName);
+/* 	memcpy (&req_lib_lck_resourceunlock.resource_name, */
+/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
 
-	hdb_handle_put (&lckResourceHandleDatabase,
-		lckLockIdInstance->lckResourceHandle);
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_resourceunlock.resource_name,
+		&lckResourceInstance->resource_name);
 
-	req_lib_lck_resourceunlock.header.size = sizeof (struct req_lib_lck_resourceunlock);
-	req_lib_lck_resourceunlock.header.id = MESSAGE_REQ_LCK_RESOURCEUNLOCK;
-	req_lib_lck_resourceunlock.lockId = lockId;
-	req_lib_lck_resourceunlock.timeout = timeout;
-	req_lib_lck_resourceunlock.invocation = -1;
-	req_lib_lck_resourceunlock.async_call = 0;
-	req_lib_lck_resourceunlock.resource_lock = lckLockIdInstance->resource_lock;
+	req_lib_lck_resourceunlock.resource_handle =
+		lckLockIdInstance->resource_handle;
+
+	hdb_handle_put (&lckResourceHandleDatabase, lckLockIdInstance->resource_handle);
+
+	req_lib_lck_resourceunlock.header.size =
+		sizeof (struct req_lib_lck_resourceunlock);
+	req_lib_lck_resourceunlock.header.id =
+		MESSAGE_REQ_LCK_RESOURCEUNLOCK;
+
+	req_lib_lck_resourceunlock.lock_id = lockId;
 
 	iov.iov_base = &req_lib_lck_resourceunlock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceunlock);
@@ -1005,11 +1052,22 @@ saLckResourceUnlock (
 		&res_lib_lck_resourceunlock,
 		sizeof (struct res_lib_lck_resourceunlock));
 
-	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
+	/* if (error != SA_AIS_OK) */
 
+	if (res_lib_lck_resourceunlock.header.error != SA_AIS_OK) {
+		error = res_lib_lck_resourceunlock.header.error;
+		goto error_put;
+	}
+
+	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
 	hdb_handle_destroy (&lckLockIdHandleDatabase, lockId);
 
-	return (error == SA_AIS_OK ? res_lib_lck_resourceunlock.header.error : error);
+	return (error);
+
+error_put:
+	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
+error_exit:
+	return (error);
 }
 
 SaAisErrorT
@@ -1017,90 +1075,198 @@ saLckResourceUnlockAsync (
 	SaInvocationT invocation,
 	SaLckLockIdT lockId)
 {
-	struct req_lib_lck_resourceunlock req_lib_lck_resourceunlock;
-	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
-	struct iovec iov;
-	SaAisErrorT error;
+	struct lckInstance *lckInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
 	struct lckResourceInstance *lckResourceInstance;
+	struct req_lib_lck_resourceunlockasync req_lib_lck_resourceunlockasync;
+	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
+	struct iovec iov;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckLockIdHandleDatabase, lockId,
-		(void *)&lckLockIdInstance));
+	/* DEBUG */
+	printf ("[DEBUG]: saLckResourceUnlockAsync\n");
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
+		lockId, (void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
-	/*
-	 * Retrieve resource name
-	 */
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase,
-		lckLockIdInstance->lckResourceHandle, (void *)&lckResourceInstance));
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+		lckLockIdInstance->resource_handle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		hdb_handle_put (&lckLockIdHandleDatabase, lockId);
-		return (error);
+		goto error_put;
 	}
 
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_resourceunlock.lockResourceName,
-		&lckResourceInstance->lockResourceName);
+/* 	memcpy (&req_lib_lck_resourceunlockasync.resource_name, */
+/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
 
-	hdb_handle_put (&lckResourceHandleDatabase,
-		lckLockIdInstance->lckResourceHandle);
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_resourceunlockasync.resource_name,
+		&lckResourceInstance->resource_name);
 
+	req_lib_lck_resourceunlockasync.resource_handle =
+		lckLockIdInstance->resource_handle;
 
-	/*
-	 * Build and send request
-	 */
-	req_lib_lck_resourceunlock.header.size = sizeof (struct req_lib_lck_resourceunlock);
-	req_lib_lck_resourceunlock.header.id = MESSAGE_REQ_LCK_RESOURCEUNLOCKASYNC;
-	req_lib_lck_resourceunlock.invocation = invocation;
-	req_lib_lck_resourceunlock.lockId = lockId;
-	req_lib_lck_resourceunlock.async_call = 1;
+	hdb_handle_put (&lckResourceHandleDatabase, lckLockIdInstance->resource_handle);
 
-	iov.iov_base = &req_lib_lck_resourceunlock;
-	iov.iov_len = sizeof (struct req_lib_lck_resourceunlock);
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckResourceInstance->lck_handle, (void *)&lckInstance));
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
-	error = coroipcc_msg_send_reply_receive (lckLockIdInstance->ipc_handle,
+	if (lckInstance->callbacks.saLckResourceUnlockCallback == NULL) {
+		hdb_handle_put (&lckHandleDatabase,
+			lckResourceInstance->lck_handle);
+		error = SA_AIS_ERR_INIT;
+		goto error_put;
+	}
+
+	hdb_handle_put (&lckHandleDatabase,
+		lckResourceInstance->lck_handle);
+
+	req_lib_lck_resourceunlockasync.header.size =
+		sizeof (struct req_lib_lck_resourceunlockasync);
+	req_lib_lck_resourceunlockasync.header.id =
+		MESSAGE_REQ_LCK_RESOURCEUNLOCKASYNC;
+
+	req_lib_lck_resourceunlockasync.lock_id = lockId;
+	req_lib_lck_resourceunlockasync.invocation = invocation;
+
+	iov.iov_base = &req_lib_lck_resourceunlockasync;
+	iov.iov_len = sizeof (struct req_lib_lck_resourceunlockasync);
+
+	error = coroipcc_msg_send_reply_receive (
+		lckLockIdInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_resourceunlockasync,
 		sizeof (struct res_lib_lck_resourceunlockasync));
 
-	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
+	/* if (error != SA_AIS_OK) */
 
-	return (error == SA_AIS_OK ? res_lib_lck_resourceunlockasync.header.error : error);
+	if (res_lib_lck_resourceunlockasync.header.error != SA_AIS_OK) {
+		error = res_lib_lck_resourceunlockasync.header.error;
+		goto error_put;
+	}
+
+	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
+	hdb_handle_destroy (&lckLockIdHandleDatabase, lockId);
+
+	return (error);
+
+error_put:
+	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
+error_exit:
+	return (error);
 }
 
 SaAisErrorT
 saLckLockPurge (
 	SaLckResourceHandleT lckResourceHandle)
 {
+	struct lckResourceInstance *lckResourceInstance;
 	struct req_lib_lck_lockpurge req_lib_lck_lockpurge;
 	struct res_lib_lck_lockpurge res_lib_lck_lockpurge;
 	struct iovec iov;
-	SaAisErrorT error;
-	struct lckResourceInstance *lckResourceInstance;
+	SaAisErrorT error = SA_AIS_OK;
 
-	error = hdb_error_to_sa(hdb_handle_get (&lckResourceHandleDatabase, lckResourceHandle,
-		(void *)&lckResourceInstance));
+	/* DEBUG */
+	printf ("[DEBUG]: saLckLockPurge\n");
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
-	req_lib_lck_lockpurge.header.size = sizeof (struct req_lib_lck_lockpurge);
-	req_lib_lck_lockpurge.header.id = MESSAGE_REQ_LCK_LOCKPURGE;
-	marshall_SaNameT_to_mar_name_t (&req_lib_lck_lockpurge.lockResourceName,
-		&lckResourceInstance->lockResourceName);
+/* 	memcpy (&req_lib_lck_lockpurge.resource_name, */
+/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_lck_lockpurge.resource_name,
+		&lckResourceInstance->resource_name);
+
+	req_lib_lck_lockpurge.resource_handle = lckResourceHandle;
+
+	req_lib_lck_lockpurge.header.size =
+		sizeof (struct req_lib_lck_lockpurge);
+	req_lib_lck_lockpurge.header.id =
+		MESSAGE_REQ_LCK_LOCKPURGE;
 
 	iov.iov_base = &req_lib_lck_lockpurge;
 	iov.iov_len = sizeof (struct req_lib_lck_lockpurge);
 
-	error = coroipcc_msg_send_reply_receive (lckResourceInstance->ipc_handle,
+	error = coroipcc_msg_send_reply_receive (
+		lckResourceInstance->ipc_handle,
 		&iov,
 		1,
 		&res_lib_lck_lockpurge,
 		sizeof (struct res_lib_lck_lockpurge));
 
-	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
 
-	return (error == SA_AIS_OK ? res_lib_lck_lockpurge.header.error : error);
+	if (res_lib_lck_lockpurge.header.error != SA_AIS_OK) {
+		error = res_lib_lck_lockpurge.header.error;
+		goto error_put;
+	}
+
+error_put:
+	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
+error_exit:
+	return (error);
+}
+
+SaAisErrorT
+saLckLimitGet (
+	SaLckHandleT lckHandle,
+	SaLckLimitIdT limitId,
+	SaLimitValueT *limitValue)
+{
+	struct lckInstance *lckInstance;
+	struct req_lib_lck_limitget req_lib_lck_limitget;
+	struct res_lib_lck_limitget res_lib_lck_limitget;
+	struct iovec iov;
+	SaAisErrorT error = SA_AIS_OK;
+
+	/* DEBUG */
+	printf ("[DEBUG]: saLckLimitGet\n");
+
+	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
+		lckHandle, (void *)&lckInstance));
+	if (error != SA_AIS_OK) {
+		goto error_exit;
+	}
+
+	req_lib_lck_limitget.header.size =
+		sizeof (struct req_lib_lck_limitget);
+	req_lib_lck_limitget.header.id =
+		MESSAGE_REQ_LCK_LIMITGET;
+
+	iov.iov_base = &req_lib_lck_limitget;
+	iov.iov_len = sizeof (struct req_lib_lck_limitget);
+
+	error = coroipcc_msg_send_reply_receive (
+		lckInstance->ipc_handle,
+		&iov,
+		1,
+		&res_lib_lck_limitget,
+		sizeof (struct res_lib_lck_limitget));
+
+	if (error != SA_AIS_OK) {
+		goto error_put;
+	}
+
+	if (res_lib_lck_limitget.header.error != SA_AIS_OK) {
+		error = res_lib_lck_limitget.header.error;
+		goto error_put;
+	}
+
+error_put:
+	hdb_handle_put (&lckHandleDatabase, lckHandle);
+error_exit:
+	return (error);
 }

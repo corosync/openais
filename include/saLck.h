@@ -60,12 +60,12 @@ typedef enum {
 	SA_LCK_LOCK_NOT_QUEUED = 3,
 	SA_LCK_LOCK_ORPHANED = 4,
 	SA_LCK_LOCK_NO_MORE = 5,
-	SA_LCK_LOCK_DUPLICATE_EX = 6
+	SA_LCK_LOCK_DUPLICATE_EX = 6,
 } SaLckLockStatusT;
 
 typedef enum {
 	SA_LCK_PR_LOCK_MODE = 1,
-	SA_LCK_EX_LOCK_MODE = 2
+	SA_LCK_EX_LOCK_MODE = 2,
 } SaLckLockModeT;
 
 #define SA_LCK_OPT_ORPHAN_LOCKS 0x1
@@ -74,6 +74,10 @@ typedef enum {
 typedef SaUint32T SaLckOptionsT;
 
 typedef SaUint64T SaLckWaiterSignalT;
+
+typedef enum {
+	SA_LCK_MAX_NUM_LOCKS_ID = 1,
+} SaLckLimitIdT;
 
 typedef void (*SaLckResourceOpenCallbackT) (
 	SaInvocationT invocation,
@@ -178,5 +182,11 @@ saLckResourceUnlockAsync (
 SaAisErrorT
 saLckLockPurge (
 	SaLckResourceHandleT lockResourceHandle);
+
+SaAisErrorT
+saLckLimitGet (
+	SaLckHandleT lckHandle,
+	SaLckLimitIdT limitId,
+	SaLimitValueT *limitValue);
 
 #endif /* SALCK_H_DEFINED */

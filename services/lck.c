@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2005-2006 MontaVista Software, Inc.
  * Copyright (c) 2006 Red Hat, Inc.
- * Copyright (c) 2006 Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -46,20 +45,24 @@
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
+#include <time.h>
 #include <arpa/inet.h>
+
+#include <assert.h>
+#include <inttypes.h>
 
 #include <corosync/corotypes.h>
 #include <corosync/coroipc_types.h>
 #include <corosync/coroipcc.h>
 #include <corosync/corodefs.h>
 #include <corosync/mar_gen.h>
-#include <corosync/list.h>
-#include <corosync/lcr/lcr_comp.h>
 #include <corosync/swab.h>
+#include <corosync/list.h>
+#include <corosync/hdb.h>
 #include <corosync/engine/coroapi.h>
 #include <corosync/engine/logsys.h>
+#include <corosync/lcr/lcr_comp.h>
 
-#include "../include/saAis.h"
 #include "../include/saAis.h"
 #include "../include/saLck.h"
 #include "../include/ipc_lck.h"
@@ -68,14 +71,30 @@ LOGSYS_DECLARE_SUBSYS ("LCK");
 
 enum lck_message_req_types {
 	MESSAGE_REQ_EXEC_LCK_RESOURCEOPEN = 0,
-	MESSAGE_REQ_EXEC_LCK_RESOURCECLOSE = 1,
-	MESSAGE_REQ_EXEC_LCK_RESOURCELOCK = 2,
-	MESSAGE_REQ_EXEC_LCK_RESOURCEUNLOCK = 3,
-	MESSAGE_REQ_EXEC_LCK_RESOURCELOCKORPHAN = 4,
-	MESSAGE_REQ_EXEC_LCK_LOCKPURGE = 5,
-	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE = 6,
-	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_LOCK = 7,
-	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_REFCOUNT = 8,
+	MESSAGE_REQ_EXEC_LCK_RESOURCEOPENASYNC = 1,
+	MESSAGE_REQ_EXEC_LCK_RESOURCECLOSE = 2,
+	MESSAGE_REQ_EXEC_LCK_RESOURCELOCK = 3,
+	MESSAGE_REQ_EXEC_LCK_RESOURCELOCKASYNC = 4,
+	MESSAGE_REQ_EXEC_LCK_RESOURCEUNLOCK = 5,
+	MESSAGE_REQ_EXEC_LCK_RESOURCEUNLOCKASYNC = 6,
+	MESSAGE_REQ_EXEC_LCK_LOCKPURGE = 7,
+	MESSAGE_REQ_EXEC_LCK_LIMITGET = 8,
+	MESSAGE_REQ_EXEC_LCK_RESOURCELOCK_TIMEOUT = 9,
+	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE = 10,
+	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_LOCK = 11,
+	MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_REFCOUNT = 12,
+};
+
+enum lck_sync_state {
+	LCK_SYNC_STATE_NOT_STARTED,
+	LCK_SYNC_STATE_STARTED,
+	LCK_SYNC_STATE_RESOURCE,
+};
+
+enum lck_sync_iteration_state {
+	LCK_SYNC_ITERATION_STATE_RESOURCE,
+	LCK_SYNC_ITERATION_STATE_RESOURCE_LOCK,
+	LCK_SYNC_ITERATION_STATE_RESOURCE_REFCOUNT,
 };
 
 struct refcount_set {
@@ -88,42 +107,59 @@ typedef struct {
 	unsigned int nodeid __attribute__((aligned(8)));
 } mar_refcount_set_t;
 
-struct resource;
-
-struct resource_lock {
-	SaLckLockModeT lock_mode;
-	SaLckLockIdT lock_id;
-	SaLckLockFlagsT lock_flags;
-	SaLckWaiterSignalT waiter_signal;
-	SaLckLockStatusT lock_status;
-	SaTimeT timeout;
-	struct resource *resource;
-	int async_call;
-	SaInvocationT invocation;
-	mar_message_source_t callback_source;
-	mar_message_source_t response_source;
-	struct list_head list;
+struct resource {
+	mar_name_t resource_name;
+	mar_uint32_t refcount;
+	struct refcount_set refcount_set[PROCESSOR_COUNT_MAX];
+	struct resource_lock *ex_lock_granted;
+	struct list_head resource_lock_list_head;
+	struct list_head pr_lock_granted_list_head;
+	struct list_head pr_lock_pending_list_head;
+	struct list_head ex_lock_pending_list_head;
 	struct list_head resource_list;
+	mar_message_source_t source;
 };
 
-struct resource {
-	mar_name_t name;
-	int refcount;
+struct resource_lock {
+	mar_uint64_t lock_id;
+	mar_uint32_t lock_mode;
+	mar_uint32_t lock_flags;
+	mar_uint32_t lock_status;
+	mar_uint64_t waiter_signal;
+	mar_uint64_t resource_handle;
+	mar_invocation_t invocation;
+	mar_uint8_t orphan_flag;
+	mar_time_t timeout;
+	struct resource *resource;
+	struct list_head resource_lock_list;
 	struct list_head list;
-	struct list_head resource_lock_list_head;
-	struct list_head pr_granted_list_head;
-	struct list_head pr_pending_list_head;
-	struct list_head ex_pending_list_head;
-	struct resource_lock *ex_granted;
-	struct refcount_set refcount_set[PROCESSOR_COUNT_MAX];
+	mar_message_source_t response_source;
+	mar_message_source_t callback_source;
+	corosync_timer_handle_t timer_handle;
 };
 
 struct resource_cleanup {
-	mar_name_t name;
-	SaLckResourceHandleT resource_handle;
-	struct list_head resource_lock_list_head;
-	struct list_head list;
+	mar_name_t resource_name;
+	hdb_handle_t resource_id;
+	struct list_head cleanup_list;
 };
+
+struct resource_instance {
+	mar_message_source_t source;
+};
+
+unsigned int global_lock_count = 0;
+unsigned int sync_lock_count = 0;
+
+/*
+ * Define the limits for the lock service.
+ * These limits are implementation specific and
+ * can be obtained via the library call saLckLimitGet
+ * by passing the appropriate limitId (see saLck.h).
+ */
+#define MAX_NUM_LOCKS 256
+
+DECLARE_HDB_DATABASE (resource_hdb, NULL);
 
 DECLARE_LIST_INIT(resource_list_head);
 
@@ -131,21 +167,17 @@ DECLARE_LIST_INIT(sync_resource_list_head);
 
 static struct corosync_api_v1 *api;
 
-/* static int lck_dump_fn (void); */
+static void lck_exec_dump_fn (void);
 
 static int lck_exec_init_fn (struct corosync_api_v1 *);
-
+static int lck_lib_init_fn (void *conn);
 static int lck_lib_exit_fn (void *conn);
 
-static int lck_lib_init_fn (void *conn);
-
-static unsigned int my_member_list[PROCESSOR_COUNT_MAX];
-
-static unsigned int my_member_list_entries = 0;
-
-static unsigned int my_lowest_nodeid = 0;
-
 static void message_handler_req_exec_lck_resourceopen (
+	const void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_lck_resourceopenasync (
 	const void *message,
 	unsigned int nodeid);
 
@@ -154,18 +186,30 @@ static void message_handler_req_exec_lck_resourceclose (
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_resourcelock (
-	void *message,
+	const void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_lck_resourcelockasync (
+	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_resourceunlock (
 	const void *message,
 	unsigned int nodeid);
 
-static void message_handler_req_exec_lck_resourcelockorphan (
+static void message_handler_req_exec_lck_resourceunlockasync (
 	const void *message,
 	unsigned int nodeid);
 
 static void message_handler_req_exec_lck_lockpurge (
+	const void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_lck_limitget (
+	const void *message,
+	unsigned int nodeid);
+
+static void message_handler_req_exec_lck_resourcelock_timeout (
 	const void *message,
 	unsigned int nodeid);
 
@@ -213,16 +257,20 @@ static void message_handler_req_lib_lck_lockpurge (
 	void *conn,
 	const void *msg);
 
+static void message_handler_req_lib_lck_limitget (
+	void *conn,
+	const void *msg);
+
 static void exec_lck_resourceopen_endian_convert (void *msg);
+static void exec_lck_resourceopenasync_endian_convert (void *msg);
 static void exec_lck_resourceclose_endian_convert (void *msg);
 static void exec_lck_resourcelock_endian_convert (void *msg);
+static void exec_lck_resourcelockasync_endian_convert (void *msg);
 static void exec_lck_resourceunlock_endian_convert (void *msg);
-static void exec_lck_resourcelockorphan_endian_convert (void *msg);
+static void exec_lck_resourceunlockasync_endian_convert (void *msg);
 static void exec_lck_lockpurge_endian_convert (void *msg);
-#ifdef TODO
-static void exec_lck_resource_endian_convert (void *msg);
-static void exec_lck_resource_lock_endian_convert (void *msg);
-#endif
+static void exec_lck_limitget_endian_convert (void *msg);
+static void exec_lck_resourcelock_timeout_endian_convert (void *msg);
 static void exec_lck_sync_resource_endian_convert (void *msg);
 static void exec_lck_sync_resource_lock_endian_convert (void *msg);
 static void exec_lck_sync_resource_refcount_endian_convert (void *msg);
@@ -232,25 +280,24 @@ static int  lck_sync_process (void);
 static void lck_sync_activate (void);
 static void lck_sync_abort (void);
 
-static void sync_refcount_increment (
+static enum lck_sync_state lck_sync_state = LCK_SYNC_STATE_NOT_STARTED;
+static enum lck_sync_iteration_state lck_sync_iteration_state;
+
+static struct list_head *lck_sync_iteration_resource;
+static struct list_head *lck_sync_iteration_resource_lock;
+
+static void lck_sync_refcount_increment (
 	struct resource *resource, unsigned int nodeid);
-static void sync_refcount_decrement (
+static void lck_sync_refcount_decrement (
 	struct resource *resource, unsigned int nodeid);
-static void sync_refcount_calculate (
+static void lck_sync_refcount_calculate (
 	struct resource *resource);
 
-void resource_release (struct resource *resource);
-void resource_lock_release (struct resource_lock *resource_lock);
+static unsigned int lck_member_list[PROCESSOR_COUNT_MAX];
+static unsigned int lck_member_list_entries = 0;
+static unsigned int lowest_nodeid = 0;
 
-/*
-static struct list_head *recovery_lck_next = 0;
-static struct list_head *recovery_lck_section_next = 0;
-static int recovery_section_data_offset = 0;
-static int recovery_section_send_flag = 0;
-static int recovery_abort = 0;
-*/
-
-static struct memb_ring_id my_saved_ring_id;
+static struct memb_ring_id saved_ring_id;
 
 static void lck_confchg_fn (
 	enum totem_configuration_type configuration_type,
@@ -264,70 +311,87 @@ struct lck_pd {
 	struct list_head resource_cleanup_list;
 };
 
-/*
- * Executive Handler Definition
- */
-static struct corosync_lib_handler lck_lib_engine[] =
+struct corosync_lib_handler lck_lib_engine[] =
 {
-	{ /* 0 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceopen,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 1 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceopenasync,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 2 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceclose,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 3 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_lck_resourcelock,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 4 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_lck_resourcelockasync,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 5 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceunlock,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 6 */
+	{
 		.lib_handler_fn		= message_handler_req_lib_lck_resourceunlockasync,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
-	{ /* 7 */
+		{
 		.lib_handler_fn		= message_handler_req_lib_lck_lockpurge,
 		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
-	}
+	},
+	{
+		.lib_handler_fn		= message_handler_req_lib_lck_limitget,
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
+	},
 };
 
-
-static struct corosync_exec_handler lck_exec_engine[] = {
+static struct corosync_exec_handler lck_exec_engine[] =
+{
 	{
 		.exec_handler_fn	= message_handler_req_exec_lck_resourceopen,
-		.exec_endian_convert_fn	= exec_lck_resourceopen_endian_convert
+		.exec_endian_convert_fn = exec_lck_resourceopen_endian_convert
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_lck_resourceopenasync,
+		.exec_endian_convert_fn = exec_lck_resourceopenasync_endian_convert
 	},
 	{
 		.exec_handler_fn	= message_handler_req_exec_lck_resourceclose,
-		.exec_endian_convert_fn	= exec_lck_resourceclose_endian_convert
+		.exec_endian_convert_fn = exec_lck_resourceclose_endian_convert
 	},
 	{
 		.exec_handler_fn	= message_handler_req_exec_lck_resourcelock,
-		.exec_endian_convert_fn	= exec_lck_resourcelock_endian_convert
+		.exec_endian_convert_fn = exec_lck_resourcelock_endian_convert
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_lck_resourcelockasync,
+		.exec_endian_convert_fn = exec_lck_resourcelockasync_endian_convert
 	},
 	{
 		.exec_handler_fn	= message_handler_req_exec_lck_resourceunlock,
-		.exec_endian_convert_fn	= exec_lck_resourceunlock_endian_convert
+		.exec_endian_convert_fn = exec_lck_resourceunlock_endian_convert
 	},
 	{
-		.exec_handler_fn	= message_handler_req_exec_lck_resourcelockorphan,
-		.exec_endian_convert_fn	= exec_lck_resourcelockorphan_endian_convert
+		.exec_handler_fn	= message_handler_req_exec_lck_resourceunlockasync,
+		.exec_endian_convert_fn = exec_lck_resourceunlockasync_endian_convert
 	},
 	{
 		.exec_handler_fn	= message_handler_req_exec_lck_lockpurge,
-		.exec_endian_convert_fn	= exec_lck_lockpurge_endian_convert
+		.exec_endian_convert_fn = exec_lck_lockpurge_endian_convert
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_lck_limitget,
+		.exec_endian_convert_fn = exec_lck_limitget_endian_convert
+	},
+	{
+		.exec_handler_fn	= message_handler_req_exec_lck_resourcelock_timeout,
+		.exec_endian_convert_fn = exec_lck_resourcelock_timeout_endian_convert
 	},
 	{
 		.exec_handler_fn	= message_handler_req_exec_lck_sync_resource,
@@ -344,7 +408,7 @@ static struct corosync_exec_handler lck_exec_engine[] = {
 };
 
 struct corosync_service_engine lck_service_engine = {
-	.name				= "openais distributed locking service B.01.01",
+	.name				= "openais distributed locking service B.03.01",
 	.id				= LCK_SERVICE,
 	.private_data_size		= sizeof (struct lck_pd),
 	.flow_control			= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED,
@@ -353,7 +417,7 @@ struct corosync_service_engine lck_service_engine = {
 	.lib_engine			= lck_lib_engine,
 	.lib_engine_count		= sizeof (lck_lib_engine) / sizeof (struct corosync_lib_handler),
 	.exec_init_fn			= lck_exec_init_fn,
-	.exec_dump_fn			= NULL,
+	.exec_dump_fn			= lck_exec_dump_fn,
 	.exec_engine			= lck_exec_engine,
 	.exec_engine_count		= sizeof (lck_exec_engine) / sizeof (struct corosync_exec_handler),
 	.confchg_fn			= lck_confchg_fn,
@@ -363,32 +427,29 @@ struct corosync_service_engine lck_service_engine = {
 	.sync_abort			= lck_sync_abort,
 };
 
-/*
- * Dynamic loader definition
- */
 static struct corosync_service_engine *lck_get_engine_ver0 (void);
 
 static struct corosync_service_engine_iface_ver0 lck_service_engine_iface = {
-	.corosync_get_service_engine_ver0	= lck_get_engine_ver0
+	.corosync_get_service_engine_ver0 = lck_get_engine_ver0
 };
 
 static struct lcr_iface openais_lck_ver0[1] = {
 	{
-		.name				= "openais_lck",
-		.version			= 0,
-		.versions_replace		= 0,
-		.versions_replace_count		= 0,
-		.dependencies			= 0,
-		.dependency_count		= 0,
-		.constructor			= NULL,
-		.destructor			= NULL,
-		.interfaces			= (void **)(void *)&lck_service_engine_iface,
+		.name			= "openais_lck",
+		.version		= 0,
+		.versions_replace	= 0,
+		.versions_replace_count	= 0,
+		.dependencies		= 0,
+		.dependency_count	= 0,
+		.constructor		= NULL,
+		.destructor		= NULL,
+		.interfaces		= (void **)(void *)&lck_service_engine_iface,
 	}
 };
 
 static struct lcr_comp lck_comp_ver0 = {
-	.iface_count				= 1,
-	.ifaces					= openais_lck_ver0
+	.iface_count	= 1,
+	.ifaces		= openais_lck_ver0
 };
 
 static struct corosync_service_engine *lck_get_engine_ver0 (void)
@@ -398,23 +459,123 @@ static struct corosync_service_engine *lck_get_engine_ver0 (void)
 
 __attribute__ ((constructor)) static void register_this_component (void) {
 	lcr_interfaces_set (&openais_lck_ver0[0], &lck_service_engine_iface);
-
 	lcr_component_register (&lck_comp_ver0);
 }
 
-/*
- * All data types used for executive messages
- */
 struct req_exec_lck_resourceopen {
-	coroipc_request_header_t header;
-	mar_message_source_t source;
-	mar_name_t resource_name;
-	SaLckResourceHandleT resource_handle;
-	SaInvocationT invocation;
-	SaTimeT timeout;
-	SaLckResourceOpenFlagsT open_flags;
-	int async_call;
-	SaAisErrorT fail_with_error;
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint32_t open_flags __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_resourceopenasync {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint32_t open_flags __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_resourceclose {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	hdb_handle_t resource_id __attribute__((aligned(8)));
+	mar_uint8_t exit_flag __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_resourcelock {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_uint32_t lock_mode __attribute__((aligned(8)));
+	mar_uint32_t lock_flags __attribute__((aligned(8)));
+	mar_uint64_t waiter_signal __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_message_source_t callback_source __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_resourcelockasync {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_uint32_t lock_mode __attribute__((aligned(8)));
+	mar_uint32_t lock_flags __attribute__((aligned(8)));
+	mar_uint64_t waiter_signal __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_message_source_t callback_source __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_resourceunlock {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_resourceunlockasync {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_lockpurge {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_limitget {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_resourcelock_timeout {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_message_source_t response_source __attribute__((aligned(8)));
+	mar_message_source_t callback_source __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_sync_resource {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	struct memb_ring_id ring_id __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_message_source_t source __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_sync_resource_lock {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	struct memb_ring_id ring_id __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
+	mar_uint32_t lock_mode __attribute__((aligned(8)));
+	mar_uint32_t lock_flags __attribute__((aligned(8)));
+	mar_uint32_t lock_status __attribute__((aligned(8)));
+	mar_uint64_t waiter_signal __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+	mar_uint8_t orphan_flag __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+	mar_message_source_t response_source __attribute__((aligned(8)));
+	mar_message_source_t callback_source __attribute__((aligned(8)));
+};
+
+struct req_exec_lck_sync_resource_refcount {
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	struct memb_ring_id ring_id __attribute__((aligned(8)));
+	mar_name_t resource_name __attribute__((aligned(8)));
+	mar_refcount_set_t refcount_set[PROCESSOR_COUNT_MAX] __attribute__((aligned(8)));
 };
 
 static void exec_lck_resourceopen_endian_convert (void *msg)
@@ -425,20 +586,26 @@ static void exec_lck_resourceopen_endian_convert (void *msg)
 	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->resource_name);
-	to_swab->resource_handle = swab64 (to_swab->resource_handle);
-	to_swab->invocation = swab64 (to_swab->invocation);
-	to_swab->timeout = swab64 (to_swab->timeout);
-	to_swab->open_flags = swab32 (to_swab->open_flags);
-	to_swab->async_call = swab32 (to_swab->async_call);
-	to_swab->fail_with_error = swab32 (to_swab->fail_with_error);
+	swab_mar_uint32_t (&to_swab->open_flags);
+	swab_mar_uint64_t (to_swab->resource_handle);
+
+	return;
 }
 
-struct req_exec_lck_resourceclose {
-	coroipc_request_header_t header;
-	mar_message_source_t source;
-	mar_name_t lockResourceName;
-	SaLckResourceHandleT resource_handle;
-};
+static void exec_lck_resourceopenasync_endian_convert (void *msg)
+{
+	struct req_exec_lck_resourceopenasync *to_swab =
+		(struct req_exec_lck_resourceopenasync *)msg;
+
+	swab_coroipc_request_header_t (&to_swab->header);
+	swab_mar_message_source_t (&to_swab->source);
+	swab_mar_name_t (&to_swab->resource_name);
+	swab_mar_uint32_t (&to_swab->open_flags);
+	swab_mar_uint64_t (&to_swab->resource_handle);
+	swab_mar_invocation_t (&to_swab->invocation);
+
+	return;
+}
 
 static void exec_lck_resourceclose_endian_convert (void *msg)
 {
@@ -447,19 +614,12 @@ static void exec_lck_resourceclose_endian_convert (void *msg)
 
 	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
-	swab_mar_name_t (&to_swab->lockResourceName);
-	to_swab->resource_handle = swab64 (to_swab->resource_handle);
-}
+	swab_mar_name_t (&to_swab->resource_name);
+	swab_mar_uint64_t (&to_swab->resource_id);
+	swab_mar_uint8_t (&to_swab->exit_flag);
 
-struct req_exec_lck_resourcelock {
-	coroipc_request_header_t header;
-	SaLckResourceHandleT resource_handle;
-	SaInvocationT invocation;
-	int async_call;
-	SaAisErrorT fail_with_error;
-	mar_message_source_t source;
-	struct req_lib_lck_resourcelock req_lib_lck_resourcelock;
-};
+	return;
+}
 
 static void exec_lck_resourcelock_endian_convert (void *msg)
 {
@@ -467,23 +627,37 @@ static void exec_lck_resourcelock_endian_convert (void *msg)
 		(struct req_exec_lck_resourcelock *)msg;
 
 	swab_coroipc_request_header_t (&to_swab->header);
-	to_swab->resource_handle = swab64 (to_swab->resource_handle);
-	to_swab->invocation = swab64 (to_swab->invocation);
-	to_swab->async_call = swab32 (to_swab->async_call);
-	to_swab->fail_with_error = swab32 (to_swab->fail_with_error);
 	swab_mar_message_source_t (&to_swab->source);
-	swab_req_lib_lck_resourcelock (&to_swab->req_lib_lck_resourcelock);
+	swab_mar_name_t (&to_swab->resource_name);
+	swab_mar_uint64_t (&to_swab->lock_id);
+	swab_mar_uint32_t (&to_swab->lock_mode);
+	swab_mar_uint32_t (&to_swab->lock_flags);
+	swab_mar_uint64_t (&to_swab->waiter_signal);
+	swab_mar_uint64_t (&to_swab->resource_handle);
+	swab_mar_message_source_t (&to_swab->callback_source);
+	swab_mar_time_t (&to_swab->timeout);
+
+	return;
 }
 
-struct req_exec_lck_resourceunlock {
-	coroipc_request_header_t header;
-	mar_message_source_t source;
-	mar_name_t resource_name;
-	SaLckLockIdT lock_id;
-	SaInvocationT invocation;
-	SaTimeT timeout;
-	int async_call;
-};
+static void exec_lck_resourcelockasync_endian_convert (void *msg)
+{
+	struct req_exec_lck_resourcelockasync *to_swab =
+		(struct req_exec_lck_resourcelockasync *)msg;
+
+	swab_coroipc_request_header_t (&to_swab->header);
+	swab_mar_message_source_t (&to_swab->source);
+	swab_mar_name_t (&to_swab->resource_name);
+	swab_mar_uint64_t (&to_swab->lock_id);
+	swab_mar_uint32_t (&to_swab->lock_mode);
+	swab_mar_uint32_t (&to_swab->lock_flags);
+	swab_mar_uint64_t (&to_swab->waiter_signal);
+	swab_mar_uint64_t (&to_swab->resource_handle);
+	swab_mar_message_source_t (&to_swab->callback_source);
+	swab_mar_invocation_t (&to_swab->invocation);
+
+	return;
+}
 
 static void exec_lck_resourceunlock_endian_convert (void *msg)
 {
@@ -493,35 +667,24 @@ static void exec_lck_resourceunlock_endian_convert (void *msg)
 	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->resource_name);
-	to_swab->lock_id = swab64 (to_swab->lock_id);
-	to_swab->invocation = swab64 (to_swab->invocation);
-	to_swab->timeout = swab64 (to_swab->timeout);
-	to_swab->async_call = swab32 (to_swab->async_call);
+	swab_mar_uint64_t (&to_swab->lock_id);
+
+	return;
 }
 
-struct req_exec_lck_resourcelockorphan {
-	coroipc_request_header_t header;
-	mar_message_source_t source;
-	mar_name_t resource_name;
-	SaLckLockIdT lock_id;
-};
-
-static void exec_lck_resourcelockorphan_endian_convert (void *msg)
+static void exec_lck_resourceunlockasync_endian_convert (void *msg)
 {
-	struct req_exec_lck_resourcelockorphan *to_swab =
-		(struct req_exec_lck_resourcelockorphan *)msg;
+	struct req_exec_lck_resourceunlockasync *to_swab =
+		(struct req_exec_lck_resourceunlockasync *)msg;
 
 	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
 	swab_mar_name_t (&to_swab->resource_name);
-	to_swab->lock_id = swab64 (to_swab->lock_id);
-}
+	swab_mar_uint64_t (&to_swab->lock_id);
+	swab_mar_invocation_t (&to_swab->invocation);
 
-struct req_exec_lck_lockpurge {
-	coroipc_request_header_t header;
-	mar_message_source_t source;
-	struct req_lib_lck_lockpurge req_lib_lck_lockpurge;
-};
+	return;
+}
 
 static void exec_lck_lockpurge_endian_convert (void *msg)
 {
@@ -530,202 +693,74 @@ static void exec_lck_lockpurge_endian_convert (void *msg)
 
 	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
-	swab_req_lib_lck_lockpurge (&to_swab->req_lib_lck_lockpurge);
-}
-
-struct req_exec_lck_sync_resource {
-	coroipc_request_header_t header;
-	struct memb_ring_id ring_id;
-	mar_name_t resource_name;
-};
-
-static void exec_lck_sync_resource_endian_convert (void *msg)
-{
-	struct req_exec_lck_sync_resource *to_swab =
-		(struct req_exec_lck_sync_resource *)msg;
-
-	swab_coroipc_request_header_t (&to_swab->header);
-	/* swab_mar_memb_ring_id_t (&to_swab->memb_ring_id); */
 	swab_mar_name_t (&to_swab->resource_name);
-}
 
-struct req_exec_lck_sync_resource_lock {
-	coroipc_request_header_t header;
-	struct memb_ring_id ring_id;
-	mar_name_t resource_name;
-	SaLckLockIdT lock_id;
-	SaLckLockModeT lock_mode;
-	SaLckLockFlagsT lock_flags;
-	SaLckWaiterSignalT waiter_signal;
-	SaLckLockStatusT lock_status;
-	SaTimeT timeout;
-};
-
-static void exec_lck_sync_resource_lock_endian_convert (void *msg)
-{
-	struct req_exec_lck_sync_resource_lock *to_swab =
-		(struct req_exec_lck_sync_resource_lock *)msg;
-
-	swab_coroipc_request_header_t (&to_swab->header);
-	/* swab_mar_memb_ring_id_t (&to_swab->memb_ring_id); */
-	swab_mar_name_t (&to_swab->resource_name);
-	to_swab->lock_id = swab64 (to_swab->lock_id);
-	to_swab->lock_mode = swab64 (to_swab->lock_mode);
-	to_swab->lock_flags = swab32 (to_swab->lock_flags);
-	to_swab->waiter_signal = swab32 (to_swab->waiter_signal);
-	to_swab->lock_status = swab64 (to_swab->lock_status);
-	to_swab->timeout = swab64 (to_swab->timeout);
-}
-
-struct req_exec_lck_sync_resource_refcount {
-	coroipc_request_header_t header __attribute__((aligned(8)));
-	struct memb_ring_id ring_id __attribute__((aligned(8)));
-	mar_name_t resource_name __attribute__((aligned(8)));
-	mar_refcount_set_t refcount_set[PROCESSOR_COUNT_MAX] __attribute__((aligned(8)));
-};
-
-static void exec_lck_sync_resource_refcount_endian_convert (void *msg)
-{
 	return;
 }
 
-#ifdef PRINTING_ENABLED
-static void print_resource_lock_list (struct resource *resource)
+static void exec_lck_limitget_endian_convert (void *msg)
 {
-	struct list_head *list;
-	struct resource_lock *resource_lock;
+	struct req_exec_lck_limitget *to_swab =
+		(struct req_exec_lck_limitget *)msg;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_lock_list ...\n");
+	swab_coroipc_request_header_t (&to_swab->header);
+	swab_mar_message_source_t (&to_swab->source);
 
-	for (list = resource->resource_lock_list_head.next;
-	     list != &resource->resource_lock_list_head;
-	     list = list->next)
-	{
-		resource_lock = list_entry (list, struct resource_lock, resource_list);
+	return;
+}
 
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
-			    (unsigned int)(resource_lock->lock_id),
-			    (unsigned int)(resource_lock->lock_mode),
-			    (unsigned int)(resource_lock->lock_status),
-			    (void *)(resource_lock));
+static void exec_lck_resourcelock_timeout_endian_convert (void *msg)
+{
+	struct req_exec_lck_resourcelock_timeout *to_swab =
+		(struct req_exec_lck_resourcelock_timeout *)msg;
+
+	swab_coroipc_request_header_t (&to_swab->header);
+	swab_mar_name_t (&to_swab->resource_name);
+	swab_mar_uint64_t (&to_swab->lock_id);
+	swab_mar_message_source_t (&to_swab->response_source);
+	swab_mar_message_source_t (&to_swab->callback_source);
+
+	return;
+}
+
+static void exec_lck_sync_resource_endian_convert (void *msg)
+{
+/* 	struct req_exec_lck_sync_resource *to_swab = */
+/* 		(struct req_exec_lck_sync_resource *)msg; */
+
+	return;
+}
+
+static void exec_lck_sync_resource_lock_endian_convert (void *msg)
+{
+/* 	struct req_exec_lck_sync_resource_lock *to_swab = */
+/* 		(struct req_exec_lck_sync_resource_lock *)msg; */
+
+	return;
+}
+
+static void exec_lck_sync_resource_refcount_endian_convert (void *msg)
+{
+/* 	struct req_exec_lck_sync_resource_refcount *to_swab = */
+/* 		(struct req_exec_lck_sync_resource_refcount *)msg; */
+
+	return;
+}
+
+static int lck_find_member_nodeid (
+	unsigned int nodeid)
+{
+	unsigned int i;
+
+	for (i = 0; i < lck_member_list_entries; i++) {
+		if (nodeid == lck_member_list[i]) {
+			return (1);
+		}
 	}
+	return (0);
 }
 
-static void print_pr_pending_list (struct resource *resource)
-{
-	struct list_head *list;
-	struct resource_lock *resource_lock;
-
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: pr_pending_list ...\n");
-
-	for (list = resource->pr_pending_list_head.next;
-	     list != &resource->pr_pending_list_head;
-	     list = list->next)
-	{
-		resource_lock = list_entry (list, struct resource_lock, list);
-
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
-			    (unsigned int)(resource_lock->lock_id),
-			    (unsigned int)(resource_lock->lock_mode),
-			    (unsigned int)(resource_lock->lock_status),
-			    (void *)(resource_lock));
-	}
-}
-
-static void print_pr_granted_list (struct resource *resource)
-{
-	struct list_head *list;
-	struct resource_lock *resource_lock;
-
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: pr_granted_list ...\n");
-
-	for (list = resource->pr_granted_list_head.next;
-	     list != &resource->pr_granted_list_head;
-	     list = list->next)
-	{
-		resource_lock = list_entry (list, struct resource_lock, list);
-
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
-			    (unsigned int)(resource_lock->lock_id),
-			    (unsigned int)(resource_lock->lock_mode),
-			    (unsigned int)(resource_lock->lock_status),
-			    (void *)(resource_lock));
-	}
-}
-
-static void print_ex_pending_list (struct resource *resource)
-{
-	struct list_head *list;
-	struct resource_lock *resource_lock;
-
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: ex_pending_list ...\n");
-
-	for (list = resource->ex_pending_list_head.next;
-	     list != &resource->ex_pending_list_head;
-	     list = list->next)
-	{
-		resource_lock = list_entry (list, struct resource_lock, list);
-
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t id=%u mode=%u status=%u addr=%p\n",
-			    (unsigned int)(resource_lock->lock_id),
-			    (unsigned int)(resource_lock->lock_mode),
-			    (unsigned int)(resource_lock->lock_status),
-			    (void *)(resource_lock));
-	}
-}
-
-static void print_resource_list (struct list_head *head)
-{
-	struct list_head *list;
-	struct resource *resource;
-
-	for (list = head->next;
-	     list != head;
-	     list = list->next)
-	{
-		resource = list_entry (list, struct resource, list);
-
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: print_resource_list { name=%s addr=%p }\n",
-			    get_mar_name_t (&resource->name), (void *)(resource));
-
-		print_resource_lock_list (resource);
-	}
-}
-#endif
-
-void resource_release (struct resource *resource)
-{
-	struct resource_lock *resource_lock;
-	struct list_head *list;
-
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_release { name=%s addr=%p }\n",
-		    get_mar_name_t (&resource->name), (void *)(resource));
-
-	for (list = resource->resource_lock_list_head.next;
-	     list != &resource->resource_lock_list_head;)
-	{
-		resource_lock = list_entry (list, struct resource_lock, resource_list);
-
-		list = list->next;
-
-		resource_lock_release (resource_lock);
-	}
-
-	list_del (&resource->list);
-}
-
-void resource_lock_release (struct resource_lock *resource_lock)
-{
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_lock_release { id=%u addr=%p }\n",
-		    (unsigned int)(resource_lock->lock_id), (void *)(resource_lock));
-
-	list_del (&resource_lock->list);
-	free (resource_lock);
-}
-
-static void sync_refcount_increment (
+void lck_sync_refcount_increment (
 	struct resource *resource,
 	unsigned int nodeid)
 {
@@ -744,7 +779,7 @@ static void sync_refcount_increment (
 	}
 }
 
-static void sync_refcount_decrement (
+void lck_sync_refcount_decrement (
 	struct resource *resource,
 	unsigned int nodeid)
 {
@@ -761,7 +796,7 @@ static void sync_refcount_decrement (
 	}
 }
 
-static void sync_refcount_calculate (
+void lck_sync_refcount_calculate (
 	struct resource *resource)
 {
 	unsigned int i;
@@ -772,36 +807,362 @@ static void sync_refcount_calculate (
 		if (resource->refcount_set[i].nodeid == 0) {
 			break;
 		}
+		resource->refcount += resource->refcount_set[i].refcount;
 	}
-	resource->refcount += resource->refcount_set[i].refcount;
 }
 
-static inline void sync_resource_free (struct list_head *head)
+static void lck_confchg_fn (
+	enum totem_configuration_type configuration_type,
+	const unsigned int *member_list, size_t member_list_entries,
+	const unsigned int *left_list, size_t left_list_entries,
+	const unsigned int *joined_list, size_t joined_list_entries,
+	const struct memb_ring_id *ring_id)
+{
+	unsigned int i;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_confchg_fn\n");
+
+	memcpy (&saved_ring_id, ring_id,
+		sizeof (struct memb_ring_id));
+
+	if (configuration_type != TOTEM_CONFIGURATION_REGULAR) {
+		return;
+	}
+	if (lck_sync_state != LCK_SYNC_STATE_NOT_STARTED) {
+		return;
+	}
+
+	lck_sync_state = LCK_SYNC_STATE_STARTED;
+
+	lowest_nodeid =  0xffffffff;
+
+	for (i = 0; i < member_list_entries; i++) {
+		if (lowest_nodeid > member_list[i]) {
+			lowest_nodeid = member_list[i];
+		}
+	}
+
+	memcpy (lck_member_list, member_list,
+		sizeof (unsigned int) * member_list_entries);
+
+	lck_member_list_entries = member_list_entries;
+
+	return;
+}
+
+static void lck_print_pr_pending_list (
+	struct resource *resource)
+{
+	struct list_head *list;
+	struct resource_lock *lock;
+
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: pr_lock_pending_list { name=%s }\n",
+		    (char *)(resource->resource_name.value));
+
+	for (list = resource->pr_lock_pending_list_head.next;
+	     list != &resource->pr_lock_pending_list_head;
+	     list = list->next)
+	{
+		lock = list_entry (list, struct resource_lock, list);
+
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t lock_id=%u (status=%d)\n",
+			    (unsigned int)(lock->lock_id), lock->lock_status);
+	}
+}
+
+static void lck_print_pr_granted_list (
+	struct resource *resource)
+{
+	struct list_head *list;
+	struct resource_lock *lock;
+
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: pr_lock_granted_list { name=%s }\n",
+		    (char *)(resource->resource_name.value));
+
+	for (list = resource->pr_lock_granted_list_head.next;
+	     list != &resource->pr_lock_granted_list_head;
+	     list = list->next)
+	{
+		lock = list_entry (list, struct resource_lock, list);
+
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t lock_id=%u (status=%d)\n",
+			    (unsigned int)(lock->lock_id), lock->lock_status);
+	}
+}
+
+static void lck_print_ex_pending_list (
+	struct resource *resource)
+{
+	struct list_head *list;
+	struct resource_lock *lock;
+
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: ex_lock_pending_list { name=%s }\n",
+		    (char *)(resource->resource_name.value));
+
+	for (list = resource->ex_lock_pending_list_head.next;
+	     list != &resource->ex_lock_pending_list_head;
+	     list = list->next)
+	{
+		lock = list_entry (list, struct resource_lock, list);
+
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t lock_id=%u (status=%d)\n",
+			    (unsigned int)(lock->lock_id), lock->lock_status);
+	}
+}
+
+static void lck_print_resource_lock_list (
+	struct resource *resource)
+{
+	struct list_head *list;
+	struct resource_lock *lock;
+
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: resource_lock_list { name=%s }\n",
+		    (char *)(resource->resource_name.value));
+
+	for (list = resource->resource_lock_list_head.next;
+	     list != &resource->resource_lock_list_head;
+	     list = list->next)
+	{
+		lock = list_entry (list, struct resource_lock, resource_lock_list);
+
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t [id=%u] status=%d flags=%d\n",
+			    (unsigned int)(lock->lock_id), lock->lock_status, lock->lock_flags);
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: response { %x %p }\n",
+			    (unsigned int)(lock->response_source.nodeid),
+			    (void *)(lock->response_source.conn));
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: callback { %x %p }\n",
+			    (unsigned int)(lock->callback_source.nodeid),
+			    (void *)(lock->callback_source.conn));
+	}
+
+	return;
+}
+
+static void lck_print_resource_list (
+	struct list_head *head)
+{
+	struct list_head *resource_list;
+	struct resource *resource;
+
+	resource_list = head->next;
+
+	while (resource_list != head)
+	{
+		resource = list_entry (resource_list, struct resource, resource_list);
+		resource_list = resource_list->next;
+
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: resource_name = %s\n",
+			    (char *)(resource->resource_name.value));
+
+		if (resource->ex_lock_granted != NULL) {
+			log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t ex_lock_granted { id=%u }\n",
+				    (unsigned int)(resource->ex_lock_granted->lock_id));
+		}
+
+		lck_print_resource_lock_list (resource);
+/* 		lck_print_ex_pending_list (resource); */
+/* 		lck_print_pr_pending_list (resource); */
+/* 		lck_print_pr_granted_list (resource); */
+	}
+
+	return;
+}
+
+static void lck_resource_close (
+	const mar_name_t *resource_name,
+	const hdb_handle_t resource_id,
+	const mar_message_source_t *source)
+{
+	struct req_exec_lck_resourceclose req_exec_lck_resourceclose;
+	struct iovec iovec;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_resource_close { name=%s }\n",
+		    (char *)(resource_name->value));
+
+	req_exec_lck_resourceclose.header.size =
+		sizeof (struct req_exec_lck_resourceclose);
+	req_exec_lck_resourceclose.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCECLOSE);
+
+	memcpy (&req_exec_lck_resourceclose.resource_name,
+		resource_name,	sizeof (mar_name_t));
+	memcpy (&req_exec_lck_resourceclose.source,
+		source,	sizeof (mar_message_source_t));
+
+	req_exec_lck_resourceclose.resource_id = resource_id;
+	req_exec_lck_resourceclose.exit_flag = 1;
+
+	iovec.iov_base = &req_exec_lck_resourceclose;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourceclose);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void lck_resourcelock_timeout (void *data)
+{
+	struct req_exec_lck_resourcelock_timeout req_exec_lck_resourcelock_timeout;
+	struct iovec iovec;
+
+	struct resource_lock *lock = (struct resource_lock *)data;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_resourcelock_timeout { id=%u }\n",
+		    (unsigned int)(lock->lock_id));
+
+	req_exec_lck_resourcelock_timeout.header.size =
+		sizeof (struct req_exec_lck_resourcelock_timeout);
+	req_exec_lck_resourcelock_timeout.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCELOCK_TIMEOUT);
+
+	memcpy (&req_exec_lck_resourcelock_timeout.resource_name,
+		&lock->resource->resource_name, sizeof (mar_name_t));
+	memcpy (&req_exec_lck_resourcelock_timeout.response_source,
+		&lock->response_source, sizeof (mar_message_source_t));
+	memcpy (&req_exec_lck_resourcelock_timeout.callback_source,
+		&lock->callback_source, sizeof (mar_message_source_t));
+
+	req_exec_lck_resourcelock_timeout.lock_id = lock->lock_id;
+
+	iovec.iov_base = &req_exec_lck_resourcelock_timeout;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourcelock_timeout);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static inline void lck_sync_resource_lock_timer_stop (void)
 {
 	struct resource *resource;
-	struct list_head *list;
+	struct list_head *resource_list;
 
-	list = head->next;
+	struct resource_lock *resource_lock;
+	struct list_head *resource_lock_list;
 
-	while (list != head) {
-		resource = list_entry (list, struct resource, list);
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_resource_lock_timer_stop\n");
 
-		list = list->next;
+	for (resource_list = resource_list_head.next;
+	     resource_list != &resource_list_head;
+	     resource_list = resource_list->next)
+	{
+		resource = list_entry (resource_list,
+			struct resource, resource_list);
 
-		resource_release (resource);
+		for (resource_lock_list = resource->resource_lock_list_head.next;
+		     resource_lock_list != &resource->resource_lock_list_head;
+		     resource_lock_list = resource_lock_list->next)
+		{
+			resource_lock = list_entry (resource_lock_list,
+				struct resource_lock, resource_lock_list);
+
+			if (resource_lock->timer_handle != 0)
+			{
+				resource_lock->timeout =
+					api->timer_expire_time_get (resource_lock->timer_handle);
+			
+				api->timer_delete (resource_lock->timer_handle);
+
+				/* DEBUG */
+				log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t resource_name = %s\n",
+					    (char *)(resource->resource_name.value));
+				log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t lock_id = %u\n",
+					    (unsigned int)(resource_lock->lock_id));
+			}
+		}
+	}
+}
+
+static inline void lck_sync_resource_lock_timer_start (void)
+{
+	struct resource *resource;
+	struct list_head *resource_list;
+
+	struct resource_lock *resource_lock;
+	struct list_head *resource_lock_list;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_resource_lock_timer_start\n");
+
+	for (resource_list = resource_list_head.next;
+	     resource_list != &resource_list_head;
+	     resource_list = resource_list->next)
+	{
+		resource = list_entry (resource_list, struct resource, resource_list);
+
+		for (resource_lock_list = resource->resource_lock_list_head.next;
+		     resource_lock_list != &resource->resource_lock_list_head;
+		     resource_lock_list = resource_lock_list->next)
+		{
+			resource_lock = list_entry (resource_lock_list,
+				struct resource_lock, resource_lock_list);
+
+			if ((resource_lock->timeout != 0) &&
+			    (api->ipc_source_is_local (&resource_lock->response_source)))
+			{
+				api->timer_add_absolute (
+					resource_lock->timeout, (void *)(resource_lock),
+					lck_resourcelock_timeout, &resource_lock->timer_handle);
+
+				resource_lock->timeout = 0;
+
+				/* DEBUG */
+				log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t resource_name = %s\n",
+					    (char *)(resource->resource_name.value));
+				log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t lock_id = %u\n",
+					    (unsigned int)(resource_lock->lock_id));
+			}
+		}
+	}
+}
+
+static inline void lck_sync_resource_free (
+	struct list_head *resource_head)
+{
+	struct resource *resource;
+	struct list_head *resource_list;
+
+	struct resource_lock *resource_lock;
+	struct list_head *resource_lock_list;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_resource_free\n");
+
+	resource_list = resource_head->next;
+
+	while (resource_list != resource_head) {
+		resource = list_entry (resource_list,
+			struct resource, resource_list);
+		resource_list = resource_list->next;
+
+		/* DEBUG */
+		log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t resource_name = %s\n",
+			    (char *)(resource->resource_name.value));
+
+		resource_lock_list = resource->resource_lock_list_head.next;
+
+		while (resource_lock_list != &resource->resource_lock_list_head) {
+			resource_lock = list_entry (resource_lock_list,
+				struct resource_lock, resource_lock_list);
+			resource_lock_list = resource_lock_list->next;
+
+			/* DEBUG */
+			log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t lock_id = %u\n",
+				    (unsigned int)(resource_lock->lock_id));
+
+			list_del (&resource_lock->resource_lock_list);
+			free (resource_lock);
+
+		}
+
+		list_del (&resource->resource_list);
+		free (resource);
 	}
 
-	list_init (head);
-
-	return;
+	list_init (resource_head);
 }
 
-static inline void sync_resource_lock_free (struct list_head *head)
-{
-	return;
-}
-
-static int sync_resource_transmit (
+static int lck_sync_resource_transmit (
 	struct resource *resource)
 {
 	struct req_exec_lck_sync_resource req_exec_lck_sync_resource;
@@ -816,9 +1177,9 @@ static int sync_resource_transmit (
 		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE);
 
 	memcpy (&req_exec_lck_sync_resource.ring_id,
-		&my_saved_ring_id, sizeof (struct memb_ring_id));
+		&saved_ring_id, sizeof (struct memb_ring_id));
 	memcpy (&req_exec_lck_sync_resource.resource_name,
-		&resource->name, sizeof (mar_name_t));
+		&resource->resource_name, sizeof (mar_name_t));
 
 	iovec.iov_base = (char *)&req_exec_lck_sync_resource;
 	iovec.iov_len = sizeof (req_exec_lck_sync_resource);
@@ -826,7 +1187,7 @@ static int sync_resource_transmit (
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
 }
 
-static int sync_resource_lock_transmit (
+static int lck_sync_resource_lock_transmit (
 	struct resource *resource,
 	struct resource_lock *resource_lock)
 {
@@ -842,15 +1203,22 @@ static int sync_resource_lock_transmit (
 		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_LOCK);
 
 	memcpy (&req_exec_lck_sync_resource_lock.ring_id,
-		&my_saved_ring_id, sizeof (struct memb_ring_id));
+		&saved_ring_id, sizeof (struct memb_ring_id));
 	memcpy (&req_exec_lck_sync_resource_lock.resource_name,
-		&resource->name, sizeof (mar_name_t));
+		&resource->resource_name, sizeof (mar_name_t));
+
+	memcpy (&req_exec_lck_sync_resource_lock.response_source,
+		&resource_lock->response_source, sizeof (mar_message_source_t));
+	memcpy (&req_exec_lck_sync_resource_lock.callback_source,
+		&resource_lock->callback_source, sizeof (mar_message_source_t));
 
 	req_exec_lck_sync_resource_lock.lock_id = resource_lock->lock_id;
 	req_exec_lck_sync_resource_lock.lock_mode = resource_lock->lock_mode;
 	req_exec_lck_sync_resource_lock.lock_flags = resource_lock->lock_flags;
-	req_exec_lck_sync_resource_lock.waiter_signal = resource_lock->waiter_signal;
 	req_exec_lck_sync_resource_lock.lock_status = resource_lock->lock_status;
+	req_exec_lck_sync_resource_lock.waiter_signal = resource_lock->waiter_signal;
+	req_exec_lck_sync_resource_lock.orphan_flag = resource_lock->orphan_flag;
+	req_exec_lck_sync_resource_lock.invocation = resource_lock->invocation;
 	req_exec_lck_sync_resource_lock.timeout = resource_lock->timeout;
 
 	iovec.iov_base = (char *)&req_exec_lck_sync_resource_lock;
@@ -859,7 +1227,7 @@ static int sync_resource_lock_transmit (
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
 }
 
-static int sync_resource_refcount_transmit (
+static int lck_sync_resource_refcount_transmit (
 	struct resource *resource)
 {
 	struct req_exec_lck_sync_resource_refcount req_exec_lck_sync_resource_refcount;
@@ -875,9 +1243,9 @@ static int sync_resource_refcount_transmit (
 		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_SYNC_RESOURCE_REFCOUNT);
 
 	memcpy (&req_exec_lck_sync_resource_refcount.ring_id,
-		&my_saved_ring_id, sizeof (struct memb_ring_id));
+		&saved_ring_id, sizeof (struct memb_ring_id));
 	memcpy (&req_exec_lck_sync_resource_refcount.resource_name,
-		&resource->name, sizeof (mar_name_t));
+		&resource->resource_name, sizeof (mar_name_t));
 
 	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
 		req_exec_lck_sync_resource_refcount.refcount_set[i].refcount =
@@ -887,98 +1255,150 @@ static int sync_resource_refcount_transmit (
 	}
 
 	iovec.iov_base = (char *)&req_exec_lck_sync_resource_refcount;
-	iovec.iov_len = sizeof (struct req_exec_lck_sync_resource_refcount);
+	iovec.iov_len = sizeof (req_exec_lck_sync_resource_refcount);
 
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
 }
 
-static int sync_resource_iterate (void)
+static int lck_sync_resource_iterate (void)
 {
 	struct resource *resource;
-	struct resource_lock *resource_lock;
 	struct list_head *resource_list;
-	struct list_head *resource_lock_list;
-	unsigned int res = 0;
 
-	for (resource_list = resource_list_head.next;
+	struct resource_lock *resource_lock;
+	struct list_head *resource_lock_list;
+
+	int result;
+
+	for (resource_list = lck_sync_iteration_resource;
 	     resource_list != &resource_list_head;
 	     resource_list = resource_list->next)
 	{
-		resource = list_entry (resource_list, struct resource, list);
+		resource = list_entry (resource_list,
+			struct resource, resource_list);
 
-		res = sync_resource_transmit (resource);
-		if (res != 0) {
-			break;
+		if (lck_sync_iteration_state == LCK_SYNC_ITERATION_STATE_RESOURCE)
+		{
+			result = lck_sync_resource_transmit (resource);
+			if (result != 0) {
+				return (-1);
+			}
+			lck_sync_iteration_state = LCK_SYNC_ITERATION_STATE_RESOURCE_REFCOUNT;
 		}
 
-		for (resource_lock_list = resource->resource_lock_list_head.next;
-		     resource_lock_list != &resource->resource_lock_list_head;
-		     resource_lock_list = resource_lock_list->next)
+		if (lck_sync_iteration_state == LCK_SYNC_ITERATION_STATE_RESOURCE_REFCOUNT)
 		{
-			resource_lock = list_entry (resource_lock_list,
-						    struct resource_lock,
-						    resource_list);
+			result = lck_sync_resource_refcount_transmit (resource);
+			if (result != 0) {
+				return (-1);
+			}
+			lck_sync_iteration_resource_lock = resource->resource_lock_list_head.next;
+			lck_sync_iteration_state = LCK_SYNC_ITERATION_STATE_RESOURCE_LOCK;
+		}
 
-			res = sync_resource_lock_transmit (resource, resource_lock);
-			if (res != 0) {
-				break;
+		if (lck_sync_iteration_state == LCK_SYNC_ITERATION_STATE_RESOURCE_LOCK)
+		{
+			for (resource_lock_list = lck_sync_iteration_resource_lock;
+			     resource_lock_list != &resource->resource_lock_list_head;
+			     resource_lock_list = resource_lock_list->next)
+			{
+				resource_lock = list_entry (resource_lock_list,
+					struct resource_lock, resource_lock_list);
+
+				result = lck_sync_resource_lock_transmit (resource, resource_lock);
+				if (result != 0) {
+					return (-1);
+				}
+				lck_sync_iteration_resource_lock = resource_lock_list->next;
 			}
 		}
-	}
 
-	return (res);
-}
-
-static int sync_refcount_iterate (void)
-{
-	struct resource *resource;
-	struct list_head *list;
-	unsigned int res = 0;
-
-	for (list = resource_list_head.next;
-	     list != &resource_list_head;
-	     list = list->next) {
-
-		resource = list_entry (list, struct resource, list);
-
-		res = sync_resource_refcount_transmit (resource);
-		if (res != 0) {
-			break;
-		}
-	}
-
-	return (res);
-}
-
-static void lck_sync_init (void)
-{
-	return;
-}
-
-static int lck_sync_process (void)
-{
-	unsigned int res = 0;
-
-	if (my_lowest_nodeid == api->totem_nodeid_get ()) {
-		TRACE1 ("transmit resources because lowest member in old configuration.\n");
-
-		res = sync_resource_iterate ();
-	}
-
-	if (my_lowest_nodeid == api->totem_nodeid_get ()) {
-		TRACE1 ("transmit refcounts because lowest member in old configuration.\n");
-
-		sync_refcount_iterate ();
+		lck_sync_iteration_state = LCK_SYNC_ITERATION_STATE_RESOURCE;
+		lck_sync_iteration_resource = resource_list->next;
 	}
 
 	return (0);
 }
 
+static void lck_sync_resource_enter (void)
+{
+	struct resource *resource;
+
+	resource = list_entry (resource_list_head.next, struct resource, resource_list);
+
+	lck_sync_state = LCK_SYNC_STATE_RESOURCE;
+	lck_sync_iteration_state = LCK_SYNC_ITERATION_STATE_RESOURCE;
+
+	lck_sync_iteration_resource = resource_list_head.next;
+	lck_sync_iteration_resource_lock = resource->resource_lock_list_head.next;
+}
+
+static void lck_sync_init (void)
+{
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_init\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t global_lock_count = %u\n", global_lock_count);
+
+	/* DEBUG */
+	lck_print_resource_list (&resource_list_head);
+
+	lck_sync_resource_enter ();
+
+	/*
+	 * Stop timers for pending lock requests.
+	 */
+	lck_sync_resource_lock_timer_stop ();
+
+	/*
+	 * Reset the lock couter.
+	 */
+	sync_lock_count = 0;
+
+	return;
+}
+
+static int lck_sync_process (void)
+{
+	int continue_process = 0;
+	int iterate_result;
+	int iterate_finish;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_process\n");
+
+	switch (lck_sync_state)
+	{
+	case LCK_SYNC_STATE_RESOURCE:
+		iterate_finish = 1;
+		continue_process = 1;
+
+		if (lowest_nodeid == api->totem_nodeid_get()) {
+			TRACE1 ("transmit resources because lowest member in old configuration.\n");
+
+			iterate_result = lck_sync_resource_iterate ();
+			if (iterate_result != 0) {
+				iterate_finish = 0;
+			}
+		}
+
+		if (iterate_finish == 1) {
+			continue_process = 0;
+		}
+
+		break;
+	default:
+		assert (0);
+	}
+
+	return (continue_process);
+}
+
 static void lck_sync_activate (void)
 {
-	sync_resource_free (&resource_list_head);
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_activate\n");
 
-	list_init (&resource_list_head);
+	lck_sync_resource_free (&resource_list_head);
 
 	if (!list_empty (&sync_resource_list_head)) {
 		list_splice (&sync_resource_list_head, &resource_list_head);
@@ -986,71 +1406,142 @@ static void lck_sync_activate (void)
 
 	list_init (&sync_resource_list_head);
 
+	/*
+	 * Set the global lock count.
+	 */
+	global_lock_count = sync_lock_count;
+
+	/*
+	 * Restart timers for pending lock requests.
+	 */
+	lck_sync_resource_lock_timer_start ();
+
+	lck_sync_state = LCK_SYNC_STATE_NOT_STARTED;
+
+	/* DEBUG */
+	lck_print_resource_list (&resource_list_head);
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t global_lock_count = %u\n", global_lock_count);
+
 	return;
 }
 
 static void lck_sync_abort (void)
 {
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_abort\n");
+
+	lck_sync_resource_free (&resource_list_head);
+
+	list_init (&sync_resource_list_head);
+
 	return;
 }
 
-static void lck_confchg_fn (
-	enum totem_configuration_type configuration_type,
-	const unsigned int *member_list, size_t member_list_entries,
-	const unsigned int *left_list, size_t left_list_entries,
-	const unsigned int *joined_list, size_t joined_list_entries,
-	const struct memb_ring_id *ring_id)
+static void lck_exec_dump_fn (void)
 {
-	unsigned int i, j;
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_exec_dump_fn\n");
 
-	/*
-	 * Determine lowest nodeid in old regular configuration for the
-	 * purpose of executing the synchronization algorithm
-	 */
-	if (configuration_type == TOTEM_CONFIGURATION_TRANSITIONAL) {
-		for (i = 0; i < left_list_entries; i++) {
-			for (j = 0; j < my_member_list_entries; j++) {
-				if (left_list[i] == my_member_list[j]) {
-					my_member_list[j] = 0;
-				}
-			}
+	return;
+}
+
+static int lck_exec_init_fn (struct corosync_api_v1 *corosync_api)
+{
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_exec_init_fn\n");
+
+	api = corosync_api;
+
+	return (0);
+}
+
+static int lck_lib_init_fn (void *conn)
+{
+	struct lck_pd *lck_pd = (struct lck_pd *)(api->ipc_private_data_get(conn));
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_lib_init_fn\n");
+
+	list_init (&lck_pd->resource_list);
+	list_init (&lck_pd->resource_cleanup_list);
+
+	return (0);
+}
+
+static int lck_lib_exit_fn (void *conn)
+{
+	struct resource_cleanup *cleanup;
+	struct list_head *cleanup_list;
+	mar_message_source_t source;
+
+	struct lck_pd *lck_pd = (struct lck_pd *)(api->ipc_private_data_get(conn));
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_lib_exit_fn\n");
+
+	api->ipc_source_set (&source, conn);
+
+	cleanup_list = lck_pd->resource_cleanup_list.next;
+
+	while (!list_empty (&lck_pd->resource_cleanup_list))
+	{
+		cleanup = list_entry (cleanup_list, struct resource_cleanup, cleanup_list);
+		cleanup_list = cleanup_list->next;
+
+		lck_resource_close (
+			&cleanup->resource_name,
+			cleanup->resource_id,
+			&source);
+
+		list_del (&cleanup->cleanup_list);
+		free (cleanup);
+	}
+
+	return (0);
+}
+
+static int lck_resource_orphan_check (
+	struct resource *resource)
+{
+	struct resource_lock *lock;
+	struct list_head *list;
+
+	if (resource->ex_lock_granted != NULL) {
+		if (resource->ex_lock_granted->orphan_flag) {
+			return (1);
+		}
+		else {
+			return (0);
 		}
 	}
 
-	my_lowest_nodeid = 0xffffffff;
+	for (list = resource->pr_lock_granted_list_head.next;
+	     list != &resource->pr_lock_granted_list_head;
+	     list = list->next)
+	{
+		lock = list_entry (list, struct resource_lock, list);
 
-	/*
-	 * Handle regular configuration
-	 */
-	if (configuration_type == TOTEM_CONFIGURATION_REGULAR) {
-		memcpy (my_member_list, member_list,
-			sizeof (unsigned int) * member_list_entries);
-		my_member_list_entries = member_list_entries;
-		memcpy (&my_saved_ring_id, ring_id,
-			sizeof (struct memb_ring_id));
-		for (i = 0; i < my_member_list_entries; i++) {
-			if ((my_member_list[i] != 0) &&
-			    (my_member_list[i] < my_lowest_nodeid)) {
-				my_lowest_nodeid = my_member_list[i];
-			}
+		if (lock->orphan_flag) {
+			return (1);
 		}
 	}
+	return (0);
 }
 
 static struct resource *lck_resource_find (
-	struct list_head *head,
-	const mar_name_t *name)
+	struct list_head *resource_head,
+	const mar_name_t *resource_name)
 {
-	struct list_head *resource_list;
 	struct resource *resource;
+	struct list_head *resource_list;
 
-	for (resource_list = head->next;
-	     resource_list != head;
+	for (resource_list = resource_head->next;
+	     resource_list != resource_head;
 	     resource_list = resource_list->next)
 	{
-		resource = list_entry (resource_list, struct resource, list);
+		resource = list_entry (resource_list, struct resource, resource_list);
 
-		if (mar_name_match (name, &resource->name)) {
+		if (mar_name_match (resource_name, &resource->resource_name)) {
 			return (resource);
 		}
 	}
@@ -1062,229 +1553,423 @@ static struct resource_lock *lck_resource_lock_find (
 	const mar_message_source_t *source,
 	SaLckLockIdT lock_id)
 {
-	struct list_head *list;
 	struct resource_lock *resource_lock;
+	struct list_head *resource_lock_list;
 
-	for (list = resource->resource_lock_list_head.next;
-	     list != &resource->resource_lock_list_head;
-	     list = list->next)
+	for (resource_lock_list = resource->resource_lock_list_head.next;
+	     resource_lock_list != &resource->resource_lock_list_head;
+	     resource_lock_list = resource_lock_list->next)
 	{
-		resource_lock = list_entry (list, struct resource_lock, resource_list);
+		resource_lock = list_entry (resource_lock_list, struct resource_lock, resource_lock_list);
 
-		if ((memcmp (&resource_lock->callback_source,
-			     source, sizeof (mar_message_source_t)) == 0) &&
-		    (lock_id == resource_lock->lock_id)) {
+		if ((memcmp (&resource_lock->callback_source, source,
+			    sizeof (mar_message_source_t)) == 0) &&
+		    (lock_id == resource_lock->lock_id))
+		{
 			return (resource_lock);
 		}
 	}
 	return (0);
 }
 
-static struct resource_cleanup *lck_resource_cleanup_find (
-	void *conn,
-	SaLckResourceHandleT resource_handle)
+static void lck_resourcelock_response_send (
+	struct resource_lock *resource_lock,
+	SaAisErrorT error)
 {
-	struct list_head *list;
-	struct resource_cleanup *resource_cleanup;
-	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
-
-	for (list = lck_pd->resource_cleanup_list.next;
-	     list != &lck_pd->resource_cleanup_list;
-	     list = list->next)
-	{
-		resource_cleanup = list_entry (list, struct resource_cleanup, list);
-
-		if (resource_cleanup->resource_handle == resource_handle) {
-			return (resource_cleanup);
-		}
-	}
-	return (0);
-}
-
-static int lck_resource_close (const mar_name_t *resource_name)
-{
-	struct req_exec_lck_resourceclose req_exec_lck_resourceclose;
-	struct iovec iovec;
-
-	req_exec_lck_resourceclose.header.size =
-		sizeof (struct req_exec_lck_resourceclose);
-	req_exec_lck_resourceclose.header.id =
-		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCECLOSE);
-
-	memcpy (&req_exec_lck_resourceclose.lockResourceName,
-		resource_name, sizeof (mar_name_t));
-
-	iovec.iov_base = (char *)&req_exec_lck_resourceclose;
-	iovec.iov_len = sizeof (req_exec_lck_resourceclose);
-
-	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
-	return (-1);
-}
-
-static void resource_lock_orphan (struct resource_lock *resource_lock)
-{
-	struct req_exec_lck_resourcelockorphan req_exec_lck_resourcelockorphan;
-	struct iovec iovec;
-
-	req_exec_lck_resourcelockorphan.header.size =
-		sizeof (struct req_exec_lck_resourcelockorphan);
-	req_exec_lck_resourcelockorphan.header.id =
-		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCELOCKORPHAN);
-
-	memcpy (&req_exec_lck_resourcelockorphan.source,
-		&resource_lock->callback_source,
-		sizeof (mar_message_source_t));
-
-	memcpy (&req_exec_lck_resourcelockorphan.resource_name,
-		&resource_lock->resource->name,
-		sizeof (mar_name_t));
-
-	req_exec_lck_resourcelockorphan.lock_id = resource_lock->lock_id;
-
-	iovec.iov_base = (char *)&req_exec_lck_resourcelockorphan;
-	iovec.iov_len = sizeof (req_exec_lck_resourcelockorphan);
-
-	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
-}
-
-static void lck_resource_cleanup_lock_remove (
-	struct resource_cleanup *resource_cleanup)
-{
-	struct list_head *list;
-	struct resource *resource;
-	struct resource_lock *resource_lock;
+	struct res_lib_lck_resourcelock res_lib_lck_resourcelock;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_cleanup_lock_remove { %s }\n",
-		    get_mar_name_t (&resource_cleanup->name));
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_resourcelock_response_send\n");
 
-	resource = lck_resource_find (&resource_list_head,
-		&resource_cleanup->name);
-
-	assert (resource != NULL);
-
-	for (list = resource->resource_lock_list_head.next;
-	     list != &resource->resource_lock_list_head;
-	     list = list->next)
+	if (api->ipc_source_is_local (&resource_lock->response_source))
 	{
-		resource_lock = list_entry (list, struct resource_lock, resource_list);
+		res_lib_lck_resourcelock.header.size =
+			sizeof (struct res_lib_lck_resourcelock);
+		res_lib_lck_resourcelock.header.id =
+			MESSAGE_RES_LCK_RESOURCELOCK;
+		res_lib_lck_resourcelock.header.error = error;
 
-		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t lock_id=%u addr=%p\n",
-			    (unsigned int)(resource_lock->lock_id),
-			    (void *)(resource_lock));
+		if (resource_lock != NULL) {
+			res_lib_lck_resourcelock.lock_status =
+				resource_lock->lock_status;
+		}
 
-		resource_lock_orphan (resource_lock);
+		api->ipc_response_send (
+			resource_lock->response_source.conn,
+			&res_lib_lck_resourcelock,
+			sizeof (struct res_lib_lck_resourcelock));
 	}
-
 }
 
-static void lck_resource_cleanup_remove (
-	void *conn,
-	SaLckResourceHandleT resource_handle)
+static void lck_lockwaiter_callback_send (
+	struct resource_lock *request_lock,
+	struct resource_lock *grant_lock)
 {
-	struct list_head *list;
-	struct resource_cleanup *resource_cleanup;
-	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
+	struct res_lib_lck_lockwaiter_callback res_lib_lck_lockwaiter_callback;
 
-	for (list = lck_pd->resource_cleanup_list.next;
-	     list != &lck_pd->resource_cleanup_list;
-	     list = list->next) {
+	if ((api->ipc_source_is_local (&grant_lock->callback_source)) &&
+	    (grant_lock->orphan_flag == 0))
+	{
+		res_lib_lck_lockwaiter_callback.header.size =
+			sizeof (struct res_lib_lck_lockwaiter_callback);
+		res_lib_lck_lockwaiter_callback.header.id =
+			MESSAGE_RES_LCK_LOCKWAITER_CALLBACK;
+		res_lib_lck_lockwaiter_callback.header.error = SA_AIS_OK;
 
-		resource_cleanup = list_entry (list, struct resource_cleanup, list);
+		res_lib_lck_lockwaiter_callback.waiter_signal = request_lock->waiter_signal;
+		res_lib_lck_lockwaiter_callback.lock_id = grant_lock->lock_id; /* ? */
+		res_lib_lck_lockwaiter_callback.mode_requested = request_lock->lock_mode;
 
-		if (resource_cleanup->resource_handle == resource_handle) {
-			list_del (&resource_cleanup->list);
-			free (resource_cleanup);
-			return;
+		if (grant_lock->resource->ex_lock_granted != NULL) {
+			res_lib_lck_lockwaiter_callback.mode_held = SA_LCK_EX_LOCK_MODE;
+		}
+		else {
+			res_lib_lck_lockwaiter_callback.mode_held = SA_LCK_PR_LOCK_MODE;
+		}
+
+		api->ipc_dispatch_send (
+			grant_lock->callback_source.conn,
+			&res_lib_lck_lockwaiter_callback,
+			sizeof (struct res_lib_lck_lockwaiter_callback));
+	}
+}
+
+static void lck_lockwaiter_callback_list_send (
+	struct resource_lock *request_lock,
+	struct list_head *grant_list_head)
+{
+	struct resource_lock *grant_lock;
+	struct list_head *grant_list;
+
+	for (grant_list = grant_list_head->next;
+	     grant_list != grant_list_head;
+	     grant_list = grant_list->next)
+	{
+		grant_lock = list_entry (grant_list, struct resource_lock, list);
+		lck_lockwaiter_callback_send (request_lock, grant_lock);
+	}
+}
+
+static void lck_lockgrant_callback_send (
+	struct resource_lock *resource_lock,
+	SaAisErrorT error)
+{
+	struct res_lib_lck_lockgrant_callback res_lib_lck_lockgrant_callback;
+
+	if (api->ipc_source_is_local (&resource_lock->callback_source))
+	{
+		res_lib_lck_lockgrant_callback.header.size =
+			sizeof (struct res_lib_lck_lockgrant_callback);
+		res_lib_lck_lockgrant_callback.header.id =
+			MESSAGE_RES_LCK_LOCKGRANT_CALLBACK;
+		res_lib_lck_lockgrant_callback.header.error = error;
+
+		if (resource_lock != NULL) {
+			res_lib_lck_lockgrant_callback.lock_status =
+				resource_lock->lock_status;
+			res_lib_lck_lockgrant_callback.invocation =
+				resource_lock->invocation;
+		}
+
+		api->ipc_dispatch_send (
+			resource_lock->callback_source.conn,
+			&res_lib_lck_lockgrant_callback,
+			sizeof (struct res_lib_lck_lockgrant_callback));
+	}
+}
+
+static void lck_grant_lock (
+	struct resource *resource,
+	struct resource_lock *resource_lock)
+{
+	if (resource_lock->lock_mode == SA_LCK_PR_LOCK_MODE) {
+		list_add_tail (&resource_lock->list,
+			&resource->pr_lock_granted_list_head);
+		resource_lock->lock_status = SA_LCK_LOCK_GRANTED;
+		global_lock_count += 1;
+	}
+	else if (resource_lock->lock_mode == SA_LCK_EX_LOCK_MODE) {
+		resource->ex_lock_granted = resource_lock;
+		resource_lock->lock_status = SA_LCK_LOCK_GRANTED;
+		global_lock_count += 1;
+	}
+}
+
+static void lck_queue_lock (
+	struct resource *resource,
+	struct resource_lock *resource_lock)
+{
+	if (resource_lock->lock_flags & SA_LCK_LOCK_NO_QUEUE) {
+		resource_lock->lock_status = SA_LCK_LOCK_NOT_QUEUED;
+	}
+	else {
+		if (lck_resource_orphan_check (resource)) {
+			resource_lock->lock_status = SA_LCK_LOCK_ORPHANED;
+		}
+		if (resource_lock->lock_mode == SA_LCK_PR_LOCK_MODE) {
+			list_add_tail (&resource_lock->list,
+				&resource->pr_lock_pending_list_head);
+
+			global_lock_count += 1;
+
+			lck_lockwaiter_callback_send (
+				resource_lock,
+				resource->ex_lock_granted);
+		}
+		else if (resource_lock->lock_mode == SA_LCK_EX_LOCK_MODE) {
+			list_add_tail (&resource_lock->list,
+				&resource->ex_lock_pending_list_head);
+
+			global_lock_count += 1;
+
+			if (resource->ex_lock_granted != NULL) {
+				lck_lockwaiter_callback_send (
+					resource_lock,
+					resource->ex_lock_granted);
+			}
+			else {
+				lck_lockwaiter_callback_list_send (
+					resource_lock,
+					&resource->pr_lock_granted_list_head);
+			}
 		}
 	}
 }
 
-static int lck_exec_init_fn (struct corosync_api_v1 *corosync_api)
+static void lck_lock (
+	struct resource *resource,
+	struct resource_lock *lock)
 {
-	api = corosync_api;
+	lock->lock_status = 0;
+
+	if (resource->ex_lock_granted != NULL) {
+		/*
+		 * Exclusive lock is granted on this resource.
+		 * Add this lock request to the pending lock list.
+		 */
+		lck_queue_lock (resource, lock);
+	}
+	else {
+		/*
+		 * Exclusive lock is not granted on this resource.
+		 */
+		if (lock->lock_mode == SA_LCK_EX_LOCK_MODE) {
+			if (list_empty (&resource->pr_lock_granted_list_head) == 0) {
+				/*
+				 * This lock request is for an exclusive lock and
+				 * shared locks are granted on this resource.
+				 * Add this lock request to the pending lock list.
+				 */
+				lck_queue_lock (resource, lock);
+			}
+			else {
+				/*
+				 * This lock request is for an exclusive lock and
+				 * no locks are currently granted on this resource.
+				 * Acquire an exclusive lock on the resource.
+				 */
+				lck_grant_lock (resource, lock);
+			}
+		}
+		else {
+			/*
+			 * This lock request is for a shared lock.
+			 * Acquire a shared lock on the resource.
+			 */
+			lck_grant_lock (resource, lock);
+		}
+	}
+}
+
+static void lck_unlock (
+	struct resource *resource,
+	struct resource_lock *resource_lock)
+{
+	struct resource_lock *lock;
+	struct list_head *list;
+
+	if (resource_lock == resource->ex_lock_granted) {
+		/*
+		 * We are unlocking the exclusive lock.
+		 * Reset the exclusive lock and continue.
+		 */
+		resource->ex_lock_granted = NULL;
+	}
+	else {
+		/*
+		 * We are not unlocking the exclusive lock, therefore 
+		 * this lock must be in one of the lock lists.
+		 * Remove the lock from the list.
+		 */
+		list_del (&resource_lock->list);
+
+		if (resource_lock->timer_handle != 0) {
+				api->timer_delete (resource_lock->timer_handle);
+				lck_resourcelock_response_send (resource_lock, SA_AIS_ERR_TIMEOUT); /* ? */
+			}
+			else {
+				lck_lockgrant_callback_send (resource_lock, SA_AIS_ERR_NOT_EXIST); /* ? */
+			}
+	}
 
 	/*
-	 *  Initialize the saved ring ID.
+	 * All locks are in the resource_lock_list.
+	 * Remove the lock from the list.
 	 */
-	return (0);
-}
+	list_del (&resource_lock->resource_lock_list);
 
-static int lck_lib_exit_fn (void *conn)
-{
-	struct resource_cleanup *resource_cleanup;
-	struct list_head *cleanup_list;
-	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
-
-	log_printf (LOGSYS_LEVEL_DEBUG, "lck_exit_fn conn_info %p\n", conn);
-
-	cleanup_list = lck_pd->resource_cleanup_list.next;
-
-	while (!list_empty(&lck_pd->resource_cleanup_list)) {
-
-		resource_cleanup = list_entry (cleanup_list, struct resource_cleanup, list);
-
-		/* if (resource_cleanup->resource->name.length > 0) {
-			lck_resource_cleanup_lock_remove (resource_cleanup);
-			lck_resource_close (resource_cleanup->resource);
-		}*/
-
-		assert (resource_cleanup->name.length != 0);
-
-		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_cleanup { %s }\n",
-			    get_mar_name_t (&resource_cleanup->name));
-
-		lck_resource_cleanup_lock_remove (resource_cleanup);
-		lck_resource_close (&resource_cleanup->name);
-
-		list_del (&resource_cleanup->list);
-		free (resource_cleanup);
-
-		cleanup_list = lck_pd->resource_cleanup_list.next;
-	}
-
-	return (0);
-}
-
-#if 0
-static int lck_lib_exit_fn (void *conn)
-{
-	struct resource_cleanup *resource_cleanup;
-	struct list_head *cleanup_list;
-	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
-
-	log_printf (LOGSYS_LEVEL_DEBUG, "lck_exit_fn conn_info %p\n", conn);
-
-	for (cleanup_list = lck_pd->resource_cleanup_list.next;
-	     cleanup_list != &lck_pd->resource_cleanup_list;
-	     cleanup_list = cleanup_list->next)
+	if ((resource->ex_lock_granted == NULL) &&
+	    (list_empty (&resource->pr_lock_granted_list_head)))
 	{
-		resource_cleanup = list_entry (cleanup_list, struct resource_cleanup, list);
+		/*
+		 * There is no exclusive lock being held for this resource
+		 * and there are no granted shared locks.
+		 * Check if there are any pending exclusive lock requests.
+		 */
+		if (list_empty (&resource->ex_lock_pending_list_head) == 0) {
+			/*
+			 * There are pending exclusive lock requests.
+			 * Grant the first request on the list.
+			 */
+			lock = list_entry (
+				resource->ex_lock_pending_list_head.next,
+				struct resource_lock, list);
 
-		/* DEBUG */
-		log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: resource_cleanup { %s }\n",
-			    get_mar_name_t (&resource_cleanup->name));
+			list_del (&lock->list);
 
-		lck_resource_cleanup_lock_remove (resource_cleanup);
-		lck_resource_close (resource_cleanup->name);
+			resource->ex_lock_granted = lock;
+
+			lock->lock_status = SA_LCK_LOCK_GRANTED;
+
+			if (lock->timer_handle != 0) {
+				api->timer_delete (lock->timer_handle);
+				lck_resourcelock_response_send (lock, SA_AIS_OK);
+			}
+			else {
+				lck_lockgrant_callback_send (lock, SA_AIS_OK);
+			}
+		}
 	}
 
-	return (0);
+	if (resource->ex_lock_granted == NULL) {
+		/*
+		 * There is no exclusive lock being held on this resource.
+		 * Check if there are any pending shared lock requests.
+		 */
+		if (list_empty (&resource->pr_lock_pending_list_head) == 0) {
+			/*
+			 * There are pending shared lock requests.
+			 * Grant all of requests in the list.
+			 */
+			for (list = resource->pr_lock_pending_list_head.next;
+			     list != &resource->pr_lock_pending_list_head;
+			     list = list->next)
+			{
+				lock = list_entry (list, struct resource_lock, list);
+				lock->lock_status = SA_LCK_LOCK_GRANTED;
+
+				/* list_del (&lock->list); */
+				/* list_add_tail (&lock->list, &resource->pr_lock_granted_list_head); */
+
+				if (lock->timer_handle != 0) {
+					api->timer_delete (lock->timer_handle);
+					lck_resourcelock_response_send (lock, SA_AIS_OK);
+				}
+				else {
+					lck_lockgrant_callback_send (lock, SA_AIS_OK);
+				}
+			}
+
+			/*
+			 * Move pending shared locks to granted list.
+			 */
+			list = resource->pr_lock_pending_list_head.next;
+			list_del (&resource->pr_lock_pending_list_head);
+			list_init (&resource->pr_lock_pending_list_head);
+			list_add_tail (list, &resource->pr_lock_granted_list_head);
+		}
+	}
 }
-#endif
 
-static int lck_lib_init_fn (void *conn)
+static void lck_purge (
+	struct resource *resource)
 {
-	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
+	struct resource_lock *resource_lock;
+	struct list_head *resource_lock_list;
 
-	log_printf (LOGSYS_LEVEL_DEBUG, "lck_init_fn conn_info %p\n", conn);
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_purge { name=%s }\n",
+		    (char *)(resource->resource_name.value));
 
-	list_init (&lck_pd->resource_list);
-	list_init (&lck_pd->resource_cleanup_list);
+	resource_lock_list = resource->resource_lock_list_head.next;
 
-	return (0);
+	while (resource_lock_list != &resource->resource_lock_list_head)
+	{
+		resource_lock = list_entry (resource_lock_list, struct resource_lock, resource_lock_list);
+		resource_lock_list = resource_lock_list->next;
+
+		if (resource_lock->orphan_flag == 1) {
+			lck_unlock (resource, resource_lock);
+			global_lock_count -= 1;
+			free (resource_lock);
+		}
+	}
+	return;
+}
+
+static void lck_resourcelock_release (
+	struct resource *resource,
+	const unsigned int exit_flag,
+	const mar_message_source_t *source)
+{
+	struct resource_lock *resource_lock;
+	struct list_head *resource_lock_list;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_resourcelock_release { name=%s } [%u]\n",
+		    (char *)(resource->resource_name.value),
+		    (unsigned int)(exit_flag));
+
+	resource_lock_list = resource->resource_lock_list_head.next;
+
+	while (resource_lock_list != &resource->resource_lock_list_head)
+	{
+		resource_lock = list_entry (resource_lock_list, struct resource_lock, resource_lock_list);
+		resource_lock_list = resource_lock_list->next;
+
+		if (memcmp (&resource_lock->callback_source,
+			    source, sizeof (mar_message_source_t)) == 0)
+		{
+			/*
+			 * This is a hack to prevent lck_unlock from sending
+			 * a callback (or response) to the library.
+			 */
+			if (exit_flag) {
+				memset (&resource_lock->response_source, 0, sizeof (mar_message_source_t));
+				memset (&resource_lock->callback_source, 0, sizeof (mar_message_source_t));
+			}
+
+			if (resource_lock->lock_status == SA_LCK_LOCK_GRANTED) {
+				if (resource_lock->lock_flags & SA_LCK_LOCK_ORPHAN) {
+					resource_lock->orphan_flag = 1;
+				}
+				else {
+					lck_unlock (resource, resource_lock);
+					global_lock_count -= 1;
+					free (resource_lock);
+				}
+			}
+			else {
+/* 				if (resource_lock->timer_handle != 0) { */
+/* 					api->timer_delete (resource_lock->timer_handle); */
+/* 				} */
+				lck_unlock (resource, resource_lock);
+				global_lock_count -= 1;
+				free (resource_lock);
+			}
+		}
+	}
+	return;
 }
 
 static void message_handler_req_exec_lck_resourceopen (
@@ -1294,18 +1979,23 @@ static void message_handler_req_exec_lck_resourceopen (
 	const struct req_exec_lck_resourceopen *req_exec_lck_resourceopen =
 		message;
 	struct res_lib_lck_resourceopen res_lib_lck_resourceopen;
-	struct res_lib_lck_resourceopenasync res_lib_lck_resourceopenasync;
-	struct resource *resource;
-	struct resource_cleanup *resource_cleanup;
 	SaAisErrorT error = SA_AIS_OK;
-	struct lck_pd *lck_pd;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceOpen %s\n",
-		get_mar_name_t (&req_exec_lck_resourceopen->resource_name));
+	struct lck_pd *lck_pd = NULL;
+	struct resource *resource = NULL;
+	struct resource_cleanup *cleanup = NULL;
+	struct resource_instance *resource_instance = NULL;
+	hdb_handle_t resource_id = 0;
 
-	if (req_exec_lck_resourceopen->fail_with_error != SA_AIS_OK) {
-		error = req_exec_lck_resourceopen->fail_with_error;
-		goto error_exit;
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceOpen\n");
+
+	if (api->ipc_source_is_local (&req_exec_lck_resourceopen->source)) {
+		cleanup = malloc (sizeof (struct resource_cleanup));
+		if (cleanup == NULL) {
+			error = SA_AIS_ERR_NO_MEMORY;
+			goto error_exit;
+		}
 	}
 
 	resource = lck_resource_find (&resource_list_head,
@@ -1316,94 +2006,206 @@ static void message_handler_req_exec_lck_resourceopen (
 			error = SA_AIS_ERR_NOT_EXIST;
 			goto error_exit;
 		}
+
 		resource = malloc (sizeof (struct resource));
 		if (resource == NULL) {
 			error = SA_AIS_ERR_NO_MEMORY;
 			goto error_exit;
 		}
 		memset (resource, 0, sizeof (struct resource));
-		memcpy (&resource->name,
+		memcpy (&resource->resource_name,
 			&req_exec_lck_resourceopen->resource_name,
 			sizeof (mar_name_t));
+/* 		memcpy (&resource->source, */
+/* 			&req_exec_lck_resourceopen->source, */
+/* 			sizeof (mar_message_source_t)); */
 
-		list_init (&resource->list);
+		resource->ex_lock_granted = NULL;
+
 		list_init (&resource->resource_lock_list_head);
-		/* list_add (&resource->list, &resource_list_head); */
-		list_add_tail (&resource->list, &resource_list_head);
-		list_init (&resource->pr_granted_list_head);
-		list_init (&resource->pr_pending_list_head);
-		list_init (&resource->ex_pending_list_head);
+		list_init (&resource->pr_lock_granted_list_head);
+		list_init (&resource->pr_lock_pending_list_head);
+		list_init (&resource->ex_lock_pending_list_head);
 
-		resource->refcount = 0;
-		resource->ex_granted = NULL;
-
-		memset (&resource->refcount_set, 0,
-			sizeof (struct refcount_set) * PROCESSOR_COUNT_MAX);
+		list_init (&resource->resource_list);
+		list_add_tail (&resource->resource_list, &resource_list_head);
 	}
 
-	log_printf (LOGSYS_LEVEL_DEBUG, "RESOURCE opened is %p\n", resource);
-
-	sync_refcount_increment (resource, nodeid);
-	sync_refcount_calculate (resource);
-
-	if (api->ipc_source_is_local (&req_exec_lck_resourceopen->source)) {
-		resource_cleanup = malloc (sizeof (struct resource_cleanup));
-		if (resource_cleanup == NULL) {
-			free (resource);
-			error = SA_AIS_ERR_NO_MEMORY;
-		} else {
-			lck_pd = (struct lck_pd *)api->ipc_private_data_get (req_exec_lck_resourceopen->source.conn);
-			list_init (&resource_cleanup->list);
-			list_init (&resource_cleanup->resource_lock_list_head);
-			/* resource_cleanup->resource = resource; */
-			resource_cleanup->resource_handle = req_exec_lck_resourceopen->resource_handle;
-
-			memcpy (&resource_cleanup->name,
-				&req_exec_lck_resourceopen->resource_name,
-				sizeof (mar_name_t));
-
-			/* list_add (&resource_cleanup->list, &lck_pd->resource_cleanup_list); */
-			list_add_tail (&resource_cleanup->list, &lck_pd->resource_cleanup_list);
-		}
-		resource->refcount += 1;
-	}
+	lck_sync_refcount_increment (resource, nodeid);
+	lck_sync_refcount_calculate (resource);
 
 error_exit:
-	if (api->ipc_source_is_local (&req_exec_lck_resourceopen->source)) {
-		if (req_exec_lck_resourceopen->async_call) {
-			res_lib_lck_resourceopenasync.header.size = sizeof (struct res_lib_lck_resourceopenasync);
-			res_lib_lck_resourceopenasync.header.id = MESSAGE_RES_LCK_RESOURCEOPENASYNC;
-			res_lib_lck_resourceopenasync.header.error = error;
-			res_lib_lck_resourceopenasync.resourceHandle = req_exec_lck_resourceopen->resource_handle;
-			res_lib_lck_resourceopenasync.invocation = req_exec_lck_resourceopen->invocation;
-/* TODO should be a handle database entry
-			memcpy (&res_lib_lck_resourceopenasync.source,
+	if (api->ipc_source_is_local (&req_exec_lck_resourceopen->source))
+	{
+		if (error == SA_AIS_OK) {
+			/*
+			 * Create resource instance.
+			 */
+			hdb_handle_create (&resource_hdb,
+				sizeof (resource_instance), &resource_id);
+			hdb_handle_get (&resource_hdb,
+				resource_id, (void *)&resource_instance);
+			memcpy (&resource_instance->source,
 				&req_exec_lck_resourceopen->source,
 				sizeof (mar_message_source_t));
-*/
 
-			api->ipc_response_send (
-				req_exec_lck_resourceopen->source.conn,
-				&res_lib_lck_resourceopenasync,
-				sizeof (struct res_lib_lck_resourceopenasync));
-			api->ipc_dispatch_send (
-				req_exec_lck_resourceopen->source.conn,
-				&res_lib_lck_resourceopenasync,
-				sizeof (struct res_lib_lck_resourceopenasync));
-		} else {
-			res_lib_lck_resourceopen.header.size = sizeof (struct res_lib_lck_resourceopen);
-			res_lib_lck_resourceopen.header.id = MESSAGE_RES_LCK_RESOURCEOPEN;
-			res_lib_lck_resourceopen.header.error = error;
-/* TODO should be a handle database entry
-			memcpy (&res_lib_lck_resourceopen.source,
-				&req_exec_lck_resourceopen->source,
-				sizeof (mar_message_source_t));
-*/
+			/*
+			 * Add resource to cleanup list.
+			 */
+			lck_pd = api->ipc_private_data_get (req_exec_lck_resourceopen->source.conn);
 
-			api->ipc_response_send (req_exec_lck_resourceopen->source.conn,
-				&res_lib_lck_resourceopen,
-				sizeof (struct res_lib_lck_resourceopen));
+			memcpy (&cleanup->resource_name,
+				&resource->resource_name, sizeof (mar_name_t));
+
+			cleanup->resource_id = resource_id;
+			list_init (&cleanup->cleanup_list);
+			list_add_tail (&cleanup->cleanup_list, &lck_pd->resource_cleanup_list);
 		}
+		else {
+			free (cleanup);
+		}
+
+		res_lib_lck_resourceopen.header.size =
+			sizeof (struct res_lib_lck_resourceopen);
+		res_lib_lck_resourceopen.header.id =
+			MESSAGE_RES_LCK_RESOURCEOPEN;
+		res_lib_lck_resourceopen.header.error = error;
+		res_lib_lck_resourceopen.resource_id = resource_id;
+
+		api->ipc_response_send (
+			req_exec_lck_resourceopen->source.conn,
+			&res_lib_lck_resourceopen,
+			sizeof (struct res_lib_lck_resourceopen));
+	}
+}
+
+static void message_handler_req_exec_lck_resourceopenasync (
+	const void *message,
+	unsigned int nodeid)
+{
+	const struct req_exec_lck_resourceopenasync *req_exec_lck_resourceopenasync =
+		message;
+	struct res_lib_lck_resourceopenasync res_lib_lck_resourceopenasync;
+	struct res_lib_lck_resourceopen_callback res_lib_lck_resourceopen_callback;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct lck_pd *lck_pd = NULL;
+	struct resource *resource = NULL;
+	struct resource_cleanup *cleanup = NULL;
+	struct resource_instance *resource_instance = NULL;
+	hdb_handle_t resource_id = 0;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceOpenAsync\n");
+
+	if (api->ipc_source_is_local (&req_exec_lck_resourceopenasync->source)) {
+		cleanup = malloc (sizeof (struct resource_cleanup));
+		if (cleanup == NULL) {
+			error = SA_AIS_ERR_NO_MEMORY;
+			goto error_exit;
+		}
+	}
+
+	resource = lck_resource_find (&resource_list_head,
+		&req_exec_lck_resourceopenasync->resource_name);
+
+	if (resource == NULL) {
+		if ((req_exec_lck_resourceopenasync->open_flags & SA_LCK_RESOURCE_CREATE) == 0) {
+			error = SA_AIS_ERR_NOT_EXIST;
+			goto error_exit;
+		}
+
+		resource = malloc (sizeof (struct resource));
+		if (resource == NULL) {
+			error = SA_AIS_ERR_NO_MEMORY;
+			goto error_exit;
+		}
+		memset (resource, 0, sizeof (struct resource));
+		memcpy (&resource->resource_name,
+			&req_exec_lck_resourceopenasync->resource_name,
+			sizeof (mar_name_t));
+/* 		memcpy (&resource->source, */
+/* 			&req_exec_lck_resourceopenasync->source, */
+/* 			sizeof (mar_message_source_t)); */
+
+		resource->ex_lock_granted = NULL;
+
+		list_init (&resource->resource_lock_list_head);
+		list_init (&resource->pr_lock_granted_list_head);
+		list_init (&resource->pr_lock_pending_list_head);
+		list_init (&resource->ex_lock_pending_list_head);
+
+		list_init (&resource->resource_list);
+		list_add_tail (&resource->resource_list, &resource_list_head);
+	}
+
+	lck_sync_refcount_increment (resource, nodeid);
+	lck_sync_refcount_calculate (resource);
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_lck_resourceopenasync->source))
+	{
+		if (error == SA_AIS_OK) {
+			/*
+			 * Create resource instance.
+			 */
+			hdb_handle_create (&resource_hdb,
+				sizeof (resource_instance), &resource_id);
+			hdb_handle_get (&resource_hdb,
+				resource_id, (void *)&resource_instance);
+			memcpy (&resource_instance->source,
+				&req_exec_lck_resourceopenasync->source,
+				sizeof (mar_message_source_t));
+
+			/*
+			 * Add resource to cleanup list.
+			 */
+			lck_pd = api->ipc_private_data_get (req_exec_lck_resourceopenasync->source.conn);
+
+			memcpy (&cleanup->resource_name,
+				&resource->resource_name, sizeof (mar_name_t));
+
+			cleanup->resource_id = resource_id;
+			list_init (&cleanup->cleanup_list);
+			list_add_tail (&cleanup->cleanup_list, &lck_pd->resource_cleanup_list);
+		}
+		else {
+			free (cleanup);
+		}
+
+		/*
+		 * Send response to library.
+		 */
+		res_lib_lck_resourceopenasync.header.size =
+			sizeof (struct res_lib_lck_resourceopenasync);
+		res_lib_lck_resourceopenasync.header.id =
+			MESSAGE_RES_LCK_RESOURCEOPENASYNC;
+		res_lib_lck_resourceopenasync.header.error = error;
+		res_lib_lck_resourceopenasync.resource_id = resource_id;
+
+		api->ipc_response_send (
+			req_exec_lck_resourceopenasync->source.conn,
+			&res_lib_lck_resourceopenasync,
+			sizeof (struct res_lib_lck_resourceopenasync));
+
+		/*
+		 * Send callback to library.
+		 */
+		res_lib_lck_resourceopen_callback.header.size =
+			sizeof (struct res_lib_lck_resourceopen_callback);
+		res_lib_lck_resourceopen_callback.header.id =
+			MESSAGE_RES_LCK_RESOURCEOPEN_CALLBACK;
+		res_lib_lck_resourceopen_callback.header.error = error;
+
+		res_lib_lck_resourceopen_callback.resource_handle =
+			req_exec_lck_resourceopenasync->resource_handle;
+		res_lib_lck_resourceopen_callback.invocation =
+			req_exec_lck_resourceopenasync->invocation;
+
+		api->ipc_dispatch_send (
+			req_exec_lck_resourceopenasync->source.conn,
+			&res_lib_lck_resourceopen_callback,
+			sizeof (struct res_lib_lck_resourceopen_callback));
 	}
 }
 
@@ -1414,417 +2216,232 @@ static void message_handler_req_exec_lck_resourceclose (
 	const struct req_exec_lck_resourceclose *req_exec_lck_resourceclose =
 		message;
 	struct res_lib_lck_resourceclose res_lib_lck_resourceclose;
-	struct resource *resource = 0;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceClose %s\n",
-		get_mar_name_t (&req_exec_lck_resourceclose->lockResourceName));
+	struct resource *resource = NULL;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceClose\n");
 
 	resource = lck_resource_find (&resource_list_head,
-		&req_exec_lck_resourceclose->lockResourceName);
+		&req_exec_lck_resourceclose->resource_name);
 
 	if (resource == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
-	/* resource->refcount -= 1; */
+	lck_sync_refcount_decrement (resource, nodeid);
+	lck_sync_refcount_calculate (resource);
 
-	sync_refcount_decrement (resource, nodeid);
-	sync_refcount_calculate (resource);
+	lck_resourcelock_release (resource,
+		req_exec_lck_resourceclose->exit_flag,
+		&req_exec_lck_resourceclose->source);
 
-	if (resource->refcount == 0) {
-		/* TODO */
+	if ((resource->refcount == 0) &&
+	    (resource->ex_lock_granted == NULL) &&
+	    (list_empty (&resource->pr_lock_granted_list_head)))
+	{
+		list_del (&resource->resource_list);
+		free (resource);
 	}
 
 error_exit:
-	if (api->ipc_source_is_local(&req_exec_lck_resourceclose->source)) {
-		lck_resource_cleanup_remove (
-			req_exec_lck_resourceclose->source.conn,
-			req_exec_lck_resourceclose->resource_handle);
+	if (api->ipc_source_is_local (&req_exec_lck_resourceclose->source))	    
+	{
+		if (req_exec_lck_resourceclose->exit_flag == 0) {
+			res_lib_lck_resourceclose.header.size =
+				sizeof (struct res_lib_lck_resourceclose);
+			res_lib_lck_resourceclose.header.id =
+				MESSAGE_RES_LCK_RESOURCECLOSE;
+			res_lib_lck_resourceclose.header.error = error;
 
-		res_lib_lck_resourceclose.header.size = sizeof (struct res_lib_lck_resourceclose);
-		res_lib_lck_resourceclose.header.id = MESSAGE_RES_LCK_RESOURCECLOSE;
-		res_lib_lck_resourceclose.header.error = error;
+			api->ipc_response_send (
+				req_exec_lck_resourceclose->source.conn,
+				&res_lib_lck_resourceclose,
+				sizeof (struct res_lib_lck_resourceclose));
+		}
 
-		api->ipc_response_send (
-			req_exec_lck_resourceclose->source.conn,
-			&res_lib_lck_resourceclose, sizeof (struct res_lib_lck_resourceclose));
-	}
-}
-
-static void waiter_notification_send (struct resource_lock *resource_lock)
-{
-	struct res_lib_lck_lockwaitercallback res_lib_lck_lockwaitercallback;
-
-	if (api->ipc_source_is_local (&resource_lock->callback_source) == 0) {
-		return;
-	}
-
-	res_lib_lck_lockwaitercallback.header.size = sizeof (struct res_lib_lck_lockwaitercallback);
-	res_lib_lck_lockwaitercallback.header.id = MESSAGE_RES_LCK_LOCKWAITERCALLBACK;
-	res_lib_lck_lockwaitercallback.header.error = SA_AIS_OK;
-	res_lib_lck_lockwaitercallback.waiter_signal = resource_lock->waiter_signal;
-	res_lib_lck_lockwaitercallback.lock_id = resource_lock->lock_id;
-	res_lib_lck_lockwaitercallback.mode_requested = resource_lock->lock_mode;
-
-	if (resource_lock->resource->ex_granted) {
-		res_lib_lck_lockwaitercallback.mode_held = SA_LCK_EX_LOCK_MODE;
-	} else {
-		res_lib_lck_lockwaitercallback.mode_held = SA_LCK_PR_LOCK_MODE;
-	}
-
-	api->ipc_dispatch_send (
-		resource_lock->callback_source.conn,
-		&res_lib_lck_lockwaitercallback,
-		sizeof (struct res_lib_lck_lockwaitercallback));
-}
-
-static void waiter_notification_list_send (struct list_head *list_notify_head)
-{
-	struct list_head *list;
-	struct resource_lock *resource_lock;
-
-	for (list = list_notify_head->next;
-		list != list_notify_head;
-		list = list->next) {
-
-		resource_lock = list_entry (list, struct resource_lock, list);
-		waiter_notification_send (resource_lock);
-	}
-}
-
-static void resource_lock_async_deliver (
-	const mar_message_source_t *source,
-	struct resource_lock *resource_lock,
-	SaAisErrorT error)
-{
-	struct res_lib_lck_resourcelockasync res_lib_lck_resourcelockasync;
-
-	if (source && api->ipc_source_is_local(source)) {
-		if (resource_lock->async_call) {
-			res_lib_lck_resourcelockasync.header.size = sizeof (struct res_lib_lck_resourcelockasync);
-			res_lib_lck_resourcelockasync.header.id = MESSAGE_RES_LCK_RESOURCELOCKASYNC;
-			res_lib_lck_resourcelockasync.header.error = error;
-			res_lib_lck_resourcelockasync.resource_lock = (void *)resource_lock;
-			res_lib_lck_resourcelockasync.lockStatus = resource_lock->lock_status;
-			res_lib_lck_resourcelockasync.invocation = resource_lock->invocation;
-			res_lib_lck_resourcelockasync.lockId = resource_lock->lock_id;
-
-			api->ipc_dispatch_send (
-				source->conn,
-				&res_lib_lck_resourcelockasync,
-				sizeof (struct res_lib_lck_resourcelockasync));
+		if (error == SA_AIS_OK) {
+			hdb_handle_put (&resource_hdb, &req_exec_lck_resourceclose->resource_id);
+			hdb_handle_destroy (&resource_hdb, &req_exec_lck_resourceclose->resource_id);
 		}
 	}
 }
 
-static void lock_response_deliver (
-	const mar_message_source_t *source,
-	struct resource_lock *resource_lock,
-	SaAisErrorT error)
+static void message_handler_req_exec_lck_resourcelock (
+	const void *message,
+	unsigned int nodeid)
 {
+	const struct req_exec_lck_resourcelock *req_exec_lck_resourcelock =
+		message;
 	struct res_lib_lck_resourcelock res_lib_lck_resourcelock;
+	SaAisErrorT error = SA_AIS_OK;
 
-	if (source && api->ipc_source_is_local(source)) {
-		if (resource_lock->async_call) {
-			resource_lock_async_deliver (&resource_lock->callback_source, resource_lock, error);
-		} else {
-			res_lib_lck_resourcelock.header.size = sizeof (struct res_lib_lck_resourcelock);
-			res_lib_lck_resourcelock.header.id = MESSAGE_RES_LCK_RESOURCELOCK;
+	struct resource *resource = NULL;
+	struct resource_lock *lock = NULL;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLock\n");
+
+	/* if ((req_exec_lck_resourcelock->lock_flags & ~SA_LCK_LOCK_NO_QUEUE) && */
+	if (global_lock_count == MAX_NUM_LOCKS)
+	{
+		error = SA_AIS_ERR_NO_RESOURCES;
+		goto error_exit;
+	}
+
+	resource = lck_resource_find (&resource_list_head,
+		&req_exec_lck_resourcelock->resource_name);
+
+	if (resource == NULL) {
+		error = SA_AIS_ERR_LIBRARY; /* ? */
+		goto error_exit;
+	}
+
+	lock = malloc (sizeof (struct resource_lock));
+	if (lock == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+	memset (lock, 0, sizeof (struct resource_lock));
+
+	memcpy (&lock->response_source,
+		&req_exec_lck_resourcelock->source,
+		sizeof (mar_message_source_t));
+	memcpy (&lock->callback_source,
+		&req_exec_lck_resourcelock->callback_source,
+		sizeof (mar_message_source_t));
+
+	lock->resource = resource;
+	lock->orphan_flag = 0;
+	lock->invocation = 0;
+	lock->lock_id = req_exec_lck_resourcelock->lock_id;
+	lock->lock_mode = req_exec_lck_resourcelock->lock_mode;
+	lock->lock_flags = req_exec_lck_resourcelock->lock_flags;
+	lock->waiter_signal = req_exec_lck_resourcelock->waiter_signal;
+	/* lock->resource_id = req_exec_lck_resourcelock->resource_id; */
+	/* lock->resource_handle = req_exec_lck_resourcelock->resource_handle; */
+
+	list_init (&lock->list);
+	list_init (&lock->resource_lock_list);
+	list_add_tail (&lock->resource_lock_list, &resource->resource_lock_list_head);
+
+	/* !!! */
+
+	lck_lock (resource, lock);
+
+	/* !!! */
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_lck_resourcelock->source))
+	{
+		if ((lock != NULL) && (lock->lock_status != SA_LCK_LOCK_GRANTED)) {
+			api->timer_add_duration (
+				req_exec_lck_resourcelock->timeout, (void *)(lock),
+				lck_resourcelock_timeout, &lock->timer_handle);
+		}
+		else {
+			res_lib_lck_resourcelock.header.size =
+				sizeof (struct res_lib_lck_resourcelock);
+			res_lib_lck_resourcelock.header.id =
+				MESSAGE_RES_LCK_RESOURCELOCK;
 			res_lib_lck_resourcelock.header.error = error;
-			res_lib_lck_resourcelock.resource_lock = (void *)resource_lock;
-			res_lib_lck_resourcelock.lockStatus = resource_lock->lock_status;
 
-			api->ipc_response_send (source->conn,
+			if (lock != NULL) {
+				res_lib_lck_resourcelock.lock_status = lock->lock_status;
+			}
+
+			api->ipc_response_send (
+				req_exec_lck_resourcelock->source.conn,
 				&res_lib_lck_resourcelock,
 				sizeof (struct res_lib_lck_resourcelock));
 		}
 	}
 }
 
-
-/*
- * Queue a lock if resource flags allow it
- */
-static void lock_queue (
-	struct resource *resource,
-	struct resource_lock *resource_lock)
-{
-	if ((resource_lock->lock_flags & SA_LCK_LOCK_NO_QUEUE) == 0) {
-		/*
-		 * Add lock to the list
-		 */
-		if (resource_lock->lock_mode == SA_LCK_PR_LOCK_MODE) {
-			list_add_tail (&resource_lock->list,
-				&resource->pr_pending_list_head);
-				waiter_notification_send (resource->ex_granted);
-		} else
-		if (resource_lock->lock_mode == SA_LCK_EX_LOCK_MODE) {
-			list_add_tail (&resource_lock->list,
-				&resource->ex_pending_list_head);
-				waiter_notification_list_send (&resource->pr_granted_list_head);
-		}
-	} else {
-		resource_lock->lock_status = SA_LCK_LOCK_NOT_QUEUED;
-	}
-}
-
-/*
-The algorithm:
-
-if ex lock granted
-	if ex pending list has locks
-		send waiter notification to ex lock granted
-else
-	if ex pending list has locks
-		if pr granted list has locks
-			send waiter notification to all pr granted locks
-		else
-			grant ex lock from pending to granted
-	else
-		grant all pr pending locks to pr granted list
-*/
-#define SA_LCK_LOCK_NO_STATUS 0
-static void lock_algorithm (
-	struct resource *resource,
-	struct resource_lock *resource_lock)
-{
-	resource_lock->lock_status = SA_LCK_LOCK_NO_STATUS; /* no status */
-	if (resource->ex_granted) {
-		/*
-		 * Exclusive lock granted
-		 */
-		lock_queue (resource, resource_lock);
-	} else {
-		/*
-		 * Exclusive lock not granted
-		 */
-		if (resource_lock->lock_mode == SA_LCK_EX_LOCK_MODE) {
-			if (list_empty (&resource->pr_granted_list_head) == 0) {
-				lock_queue (resource, resource_lock);
-			} else {
-				/*
-				 * grant ex lock from pending to granted
-				 */
-				resource->ex_granted = resource_lock;
-				resource_lock->lock_status = SA_LCK_LOCK_GRANTED;
-			}
-		} else {
-			/*
-			 * grant all pr pending locks to pr granted list
-			 */
-			/* list_add (&resource_lock->list, &resource->pr_granted_list_head); */
-			list_add_tail (&resource_lock->list, &resource->pr_granted_list_head);
-			resource_lock->lock_status = SA_LCK_LOCK_GRANTED;
-		}
-	}
-}
-
-/*
- *	if lock in ex, set ex to null
- *	delete resource lock from list
- *
- *	 if ex lock not granted
- *		if ex pending list has locks
- *			grant first ex pending list lock to ex lock
- *	if ex lock not granted
- *		if pr pending list has locks
- *			assign all pr pending locks to pr granted lock list
- */
-static void unlock_algorithm (
-	struct resource *resource,
-	struct resource_lock *resource_lock)
-{
-	struct resource_lock *resource_lock_grant;
-	struct list_head *list;
-	struct list_head *list_p;
-
-	/*
-	 * If unlocking the ex lock, reset ex granted
-	 */
-	if (resource_lock == resource->ex_granted) {
-		resource->ex_granted = 0;
-	}
-	else {
-		/*
-		 * Delete resource lock from whichever list it is on
-		 */
-		list_del (&resource_lock->list);
-	}
-	list_del (&resource_lock->resource_list);
-
-	/*
-	 * Check if EX locks are available, if so assign one
-	 */
-	if (resource->ex_granted == 0) {
-		if (list_empty (&resource->ex_pending_list_head) == 0) {
-			/*
-			 * grant first ex pending list lock to ex lock
-			 */
-			resource_lock_grant = list_entry (
-				resource->ex_pending_list_head.next,
-				struct resource_lock, list);
-
-			list_del (&resource_lock_grant->list);
-			resource->ex_granted = resource_lock_grant;
-
-			resource_lock_grant->lock_status = SA_LCK_LOCK_GRANTED;
-			lock_response_deliver (
-				&resource_lock_grant->response_source,
-				resource_lock_grant,
-				SA_AIS_OK);
-		}
-	}
-
-	/*
-	 * Couldn't assign EX lock, so assign any pending PR locks
-	 */
-	if (resource->ex_granted == 0) {
-		if (list_empty (&resource->pr_pending_list_head) == 0) {
-			/*
-			 * assign all pr pending locks to pr granted lock list
-			 */
-
-		   for (list = resource->pr_pending_list_head.next;
-				list != &resource->pr_pending_list_head;
-				list = list->next) {
-
-				resource_lock_grant = list_entry (list, struct resource_lock, list);
-				resource_lock_grant->lock_status = SA_LCK_LOCK_GRANTED;
-
-				lock_response_deliver (
-					&resource_lock_grant->response_source,
-					resource_lock_grant,
-					SA_AIS_OK);
-			}
-
-			/*
-			 * Add pending locks to granted list
-			 */
-			list_p = resource->pr_pending_list_head.next;
-			list_del (&resource->pr_pending_list_head);
-			list_init (&resource->pr_pending_list_head);
-			list_add_tail (list_p, &resource->pr_granted_list_head);
-		}
-	}
-}
-
-static void message_handler_req_exec_lck_resourcelock (
-	void *message,
+static void message_handler_req_exec_lck_resourcelockasync (
+	const void *message,
 	unsigned int nodeid)
 {
-	struct req_exec_lck_resourcelock *req_exec_lck_resourcelock =
+	const struct req_exec_lck_resourcelockasync *req_exec_lck_resourcelockasync =
 		message;
-	struct resource *resource = 0;
-	struct resource_lock *resource_lock = 0;
-	struct resource_cleanup *resource_cleanup = 0;
+	struct res_lib_lck_resourcelockasync res_lib_lck_resourcelockasync;
+	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceLock %s\n",
-		get_mar_name_t (&req_exec_lck_resourcelock->req_lib_lck_resourcelock.lockResourceName));
-
-	resource = lck_resource_find (&resource_list_head,
-		&req_exec_lck_resourcelock->req_lib_lck_resourcelock.lockResourceName);
-
-	if (resource == NULL) {
-		goto error_exit;
-	}
-	resource->refcount += 1;
-
-	resource_lock = malloc (sizeof (struct resource_lock));
-	if (resource_lock == NULL) {
-		lock_response_deliver (&req_exec_lck_resourcelock->source,
-			resource_lock,
-			SA_AIS_ERR_NO_MEMORY);
-		goto error_exit;
-	}
-
-	memset (resource_lock, 0, sizeof (struct resource_lock));
-
-	list_init (&resource_lock->list);
-	list_init (&resource_lock->resource_list);
-	/* list_init (&resource_lock->resource_cleanup_list); */
-
-	list_add_tail (&resource_lock->resource_list, &resource->resource_lock_list_head);
-
-	resource_lock->resource = resource;
-
-	resource_lock->lock_mode =
-		req_exec_lck_resourcelock->req_lib_lck_resourcelock.lockMode;
-	resource_lock->lock_flags =
-		req_exec_lck_resourcelock->req_lib_lck_resourcelock.lockFlags;
-	resource_lock->waiter_signal =
-		req_exec_lck_resourcelock->req_lib_lck_resourcelock.waiterSignal;
-	resource_lock->timeout =
-		req_exec_lck_resourcelock->req_lib_lck_resourcelock.timeout;
-	resource_lock->lock_id =
-		req_exec_lck_resourcelock->req_lib_lck_resourcelock.lockId;
-	resource_lock->async_call =
-		req_exec_lck_resourcelock->req_lib_lck_resourcelock.async_call;
-	resource_lock->invocation =
-		req_exec_lck_resourcelock->req_lib_lck_resourcelock.invocation;
+	struct resource *resource = NULL;
+	struct resource_lock *lock = NULL;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]:\t lock_id=%u addr=%p\n",
-		    (unsigned int)(resource_lock->lock_id),
-		    (void *)(resource_lock));
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLockAsync\n");
 
-	/*
-	 * Waiter callback source
-	 */
-/* TODO should be a handle database entry 
-	memcpy (&resource_lock->callback_source,
-		&req_exec_lck_resourcelock->req_lib_lck_resourcelock.source,
-		sizeof (mar_message_source_t));
-*/
-
-	lock_algorithm (resource, resource_lock);
-
-	/*
-	 * Add resource lock to cleanup handler for this api resource instance
-	 */
-	if (api->ipc_source_is_local (&req_exec_lck_resourcelock->source)) {
-		resource_cleanup = lck_resource_cleanup_find (
-			resource_lock->callback_source.conn,
-			req_exec_lck_resourcelock->resource_handle);
-
-		assert (resource_cleanup != NULL);
-
-		/* list_add (&resource_lock->resource_cleanup_list,
-		   &resource_cleanup->resource_lock_list_head); */
-		/* list_add_tail (&resource_lock->resource_cleanup_list,
-		   &resource_cleanup->resource_lock_list_head); */
-
-		/*
-		 * If lock queued by lock algorithm, dont send response to library now
-		 */
-		if (resource_lock->lock_status != SA_LCK_LOCK_NO_STATUS) {
-			/*
-			 * If lock granted or denied, deliver callback or
-			 * response to library for non-async calls
-			 */
-			lock_response_deliver (
-				&req_exec_lck_resourcelock->source,
-				resource_lock,
-				SA_AIS_OK);
-		} else {
-			memcpy (&resource_lock->response_source,
-				&req_exec_lck_resourcelock->source,
-				sizeof (mar_message_source_t));
-		}
-
-		/*
-		 * Deliver async response to library
-		 */
-		req_exec_lck_resourcelock->source.conn =
-			req_exec_lck_resourcelock->source.conn;
-		resource_lock_async_deliver (
-			&req_exec_lck_resourcelock->source,
-			resource_lock,
-			SA_AIS_OK);
+	/* if ((req_exec_lck_resourcelockasync->lock_flags & ~SA_LCK_LOCK_NO_QUEUE) && */
+	if (global_lock_count == MAX_NUM_LOCKS)
+	{
+		error = SA_AIS_ERR_NO_RESOURCES;
+		goto error_exit;
 	}
 
+	resource = lck_resource_find (&resource_list_head,
+		&req_exec_lck_resourcelockasync->resource_name);
+
+	if (resource == NULL) {
+		error = SA_AIS_ERR_LIBRARY; /* ? */
+		goto error_exit;
+	}
+
+	lock = malloc (sizeof (struct resource_lock));
+	if (lock == NULL) {
+		error = SA_AIS_ERR_NO_MEMORY;
+		goto error_exit;
+	}
+	memset (lock, 0, sizeof (struct resource_lock));
+
+	memcpy (&lock->response_source,
+		&req_exec_lck_resourcelockasync->source,
+		sizeof (mar_message_source_t));
+	memcpy (&lock->callback_source,
+		&req_exec_lck_resourcelockasync->callback_source,
+		sizeof (mar_message_source_t));
+
+	lock->resource = resource;
+	lock->orphan_flag = 0;
+	lock->invocation = req_exec_lck_resourcelockasync->invocation;
+	lock->lock_id = req_exec_lck_resourcelockasync->lock_id;
+	lock->lock_mode = req_exec_lck_resourcelockasync->lock_mode;
+	lock->lock_flags = req_exec_lck_resourcelockasync->lock_flags;
+	lock->waiter_signal = req_exec_lck_resourcelockasync->waiter_signal;
+	/* lock->resource_id = req_exec_lck_resourcelockasync->resource_id; */
+	/* lock->resource_handle = req_exec_lck_resourcelockasync->resource_handle; */
+
+	list_init (&lock->list);
+	list_init (&lock->resource_lock_list);
+	list_add_tail (&lock->resource_lock_list, &resource->resource_lock_list_head);
+
+	/* !!! */
+
+	lck_lock (resource, lock);
+
+	/* !!! */
+
 error_exit:
-	return;
+	if (api->ipc_source_is_local (&req_exec_lck_resourcelockasync->source))
+	{
+		res_lib_lck_resourcelockasync.header.size =
+			sizeof (struct res_lib_lck_resourcelockasync);
+		res_lib_lck_resourcelockasync.header.id =
+			MESSAGE_RES_LCK_RESOURCELOCKASYNC;
+		res_lib_lck_resourcelockasync.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_lck_resourcelockasync->source.conn,
+			&res_lib_lck_resourcelockasync,
+			sizeof (struct res_lib_lck_resourcelockasync));
+
+		if ((lock != NULL) && (lock->lock_status == SA_LCK_LOCK_GRANTED)) {
+			lck_lockgrant_callback_send (lock, error);
+		}
+	}
 }
 
 static void message_handler_req_exec_lck_resourceunlock (
@@ -1834,142 +2451,252 @@ static void message_handler_req_exec_lck_resourceunlock (
 	const struct req_exec_lck_resourceunlock *req_exec_lck_resourceunlock =
 		message;
 	struct res_lib_lck_resourceunlock res_lib_lck_resourceunlock;
-	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
-	struct resource *resource = NULL;
-	struct resource_lock *resource_lock = NULL;
 	SaAisErrorT error = SA_AIS_OK;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: saLckResourceUnlock %s\n",
-		get_mar_name_t (&req_exec_lck_resourceunlock->resource_name));
+	struct resource *resource = NULL;
+	struct resource_lock *resource_lock = NULL;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceUnlock\n");
 
 	resource = lck_resource_find (&resource_list_head,
 		&req_exec_lck_resourceunlock->resource_name);
 
 	if (resource == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
- 	}
-
-	resource->refcount -= 1;
+	}
 
 	resource_lock = lck_resource_lock_find (resource,
 		&req_exec_lck_resourceunlock->source,
 		req_exec_lck_resourceunlock->lock_id);
 
-	assert (resource_lock != NULL);
-
-	/* list_del (&resource_lock->resource_cleanup_list); */
-
-	unlock_algorithm (resource, resource_lock);
-
-error_exit:
-	if (api->ipc_source_is_local(&req_exec_lck_resourceunlock->source)) {
-		if (req_exec_lck_resourceunlock->async_call) {
-			res_lib_lck_resourceunlockasync.header.size = sizeof (struct res_lib_lck_resourceunlockasync);
-			res_lib_lck_resourceunlockasync.header.id = MESSAGE_RES_LCK_RESOURCEUNLOCKASYNC;
-			res_lib_lck_resourceunlockasync.header.error = error;
-			res_lib_lck_resourceunlockasync.invocation =
-				req_exec_lck_resourceunlock->invocation;
-			res_lib_lck_resourceunlockasync.lockId = req_exec_lck_resourceunlock->lock_id;
-
-			api->ipc_response_send (
-				req_exec_lck_resourceunlock->source.conn,
-				&res_lib_lck_resourceunlockasync,
-				sizeof (struct res_lib_lck_resourceunlockasync));
-
-			api->ipc_dispatch_send (
-				req_exec_lck_resourceunlock->source.conn,
-				&res_lib_lck_resourceunlockasync,
-				sizeof (struct res_lib_lck_resourceunlockasync));
-		} else {
-			res_lib_lck_resourceunlock.header.size = sizeof (struct res_lib_lck_resourceunlock);
-			res_lib_lck_resourceunlock.header.id = MESSAGE_RES_LCK_RESOURCEUNLOCK;
-			res_lib_lck_resourceunlock.header.error = error;
-			api->ipc_response_send (req_exec_lck_resourceunlock->source.conn,
-				&res_lib_lck_resourceunlock, sizeof (struct res_lib_lck_resourceunlock));
-		}
-	}
-}
-
-static void message_handler_req_exec_lck_resourcelockorphan (
-	const void *message,
-	unsigned int nodeid)
-{
-	const struct req_exec_lck_resourcelockorphan *req_exec_lck_resourcelockorphan =
-		message;
-	struct resource *resource = 0;
-	struct resource_lock *resource_lock = 0;
-
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: orphan locks for resource %s\n",
-		get_mar_name_t (&req_exec_lck_resourcelockorphan->resource_name));
-
-	resource = lck_resource_find (&resource_list_head,
-		&req_exec_lck_resourcelockorphan->resource_name);
-
-	assert (resource != NULL);
-
-	resource->refcount -= 1;
-
-	resource_lock = lck_resource_lock_find (resource,
-		&req_exec_lck_resourcelockorphan->source,
-		req_exec_lck_resourcelockorphan->lock_id);
-
-	assert (resource_lock != NULL);
-
-	/* list_del (&resource_lock->resource_cleanup_list); */
-
-	unlock_algorithm (resource, resource_lock);
-}
-
-static void message_handler_req_exec_lck_lockpurge (
-	const void *msg,
-	unsigned int nodeid)
-{
-	const struct req_exec_lck_lockpurge *req_exec_lck_lockpurge =
-		msg;
-	struct res_lib_lck_lockpurge res_lib_lck_lockpurge;
-	struct resource *resource = 0;
-	SaAisErrorT error = SA_AIS_OK;
-
-	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckLockPurge %s\n",
-		get_mar_name_t (&req_exec_lck_lockpurge->req_lib_lck_lockpurge.lockResourceName));
-
-	resource = lck_resource_find (&resource_list_head,
-		&req_exec_lck_lockpurge->req_lib_lck_lockpurge.lockResourceName);
-
-	if (resource == NULL) {
+	if (resource_lock == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
+	lck_unlock (resource, resource_lock);
+	global_lock_count -= 1;
+	free (resource_lock);
+
 error_exit:
-	if (api->ipc_source_is_local(&req_exec_lck_lockpurge->source)) {
-//		lck_resource_cleanup_remove (req_exec_lck_lockpurge->source.conn,
-//			resource);
+	if (api->ipc_source_is_local (&req_exec_lck_resourceunlock->source))
+	{
+		res_lib_lck_resourceunlock.header.size =
+			sizeof (struct res_lib_lck_resourceunlock);
+		res_lib_lck_resourceunlock.header.id =
+			MESSAGE_RES_LCK_RESOURCEUNLOCK;
+		res_lib_lck_resourceunlock.header.error = error;
 
-		res_lib_lck_lockpurge.header.size = sizeof (struct res_lib_lck_lockpurge);
-		res_lib_lck_lockpurge.header.id = MESSAGE_RES_LCK_LOCKPURGE;
-		res_lib_lck_lockpurge.header.error = error;
-
-		api->ipc_response_send (req_exec_lck_lockpurge->source.conn,
-			&res_lib_lck_lockpurge, sizeof (struct res_lib_lck_lockpurge));
+		api->ipc_response_send (
+			req_exec_lck_resourceunlock->source.conn,
+			&res_lib_lck_resourceunlock,
+			sizeof (struct res_lib_lck_resourceunlock));
 	}
 }
 
+static void message_handler_req_exec_lck_resourceunlockasync (
+	const void *message,
+	unsigned int nodeid)
+{
+	const struct req_exec_lck_resourceunlockasync *req_exec_lck_resourceunlockasync =
+		message;
+	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
+	struct res_lib_lck_resourceunlock_callback res_lib_lck_resourceunlock_callback;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct resource *resource = NULL;
+	struct resource_lock *resource_lock = NULL;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceUnlockAsync\n");
+
+	resource = lck_resource_find (&resource_list_head,
+		&req_exec_lck_resourceunlockasync->resource_name);
+	if (resource == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	resource_lock = lck_resource_lock_find (resource,
+		&req_exec_lck_resourceunlockasync->source,
+		req_exec_lck_resourceunlockasync->lock_id);
+
+	if (resource_lock == NULL) {
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	lck_unlock (resource, resource_lock);
+	global_lock_count -= 1;
+	free (resource_lock);
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_lck_resourceunlockasync->source))
+	{
+		res_lib_lck_resourceunlockasync.header.size =
+			sizeof (struct res_lib_lck_resourceunlockasync);
+		res_lib_lck_resourceunlockasync.header.id =
+			MESSAGE_RES_LCK_RESOURCEUNLOCKASYNC;
+		res_lib_lck_resourceunlockasync.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_lck_resourceunlockasync->source.conn,
+			&res_lib_lck_resourceunlockasync,
+			sizeof (struct res_lib_lck_resourceunlockasync));
+
+		res_lib_lck_resourceunlock_callback.header.size =
+			sizeof (struct res_lib_lck_resourceunlock_callback);
+		res_lib_lck_resourceunlock_callback.header.id =
+			MESSAGE_RES_LCK_RESOURCEUNLOCK_CALLBACK;
+		res_lib_lck_resourceunlock_callback.header.error = error;
+
+		res_lib_lck_resourceunlock_callback.invocation =
+			req_exec_lck_resourceunlockasync->invocation;
+
+		api->ipc_dispatch_send (
+			req_exec_lck_resourceunlockasync->source.conn,
+			&res_lib_lck_resourceunlock_callback,
+			sizeof (struct res_lib_lck_resourceunlock_callback));
+	}
+}
+
+static void message_handler_req_exec_lck_lockpurge (
+	const void *message,
+	unsigned int nodeid)
+{
+	const struct req_exec_lck_lockpurge *req_exec_lck_lockpurge =
+		message;
+	struct res_lib_lck_lockpurge res_lib_lck_lockpurge;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct resource *resource = NULL;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLockPurge\n");
+
+	resource = lck_resource_find (&resource_list_head,
+		&req_exec_lck_lockpurge->resource_name);
+
+	if (resource == NULL) {
+		/*
+		 * The error code SA_AIS_ERR_NOT_EXIST is not valid
+		 * for saLckLockPurge. What should we return here?
+		 */
+		error = SA_AIS_ERR_NOT_EXIST;
+		goto error_exit;
+	}
+
+	lck_purge (resource);
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_lck_lockpurge->source))
+	{
+		res_lib_lck_lockpurge.header.size =
+			sizeof (struct res_lib_lck_lockpurge);
+		res_lib_lck_lockpurge.header.id =
+			MESSAGE_RES_LCK_LOCKPURGE;
+		res_lib_lck_lockpurge.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_lck_lockpurge->source.conn,
+			&res_lib_lck_lockpurge,
+			sizeof (struct res_lib_lck_lockpurge));
+	}
+}
+
+static void message_handler_req_exec_lck_limitget (
+	const void *message,
+	unsigned int nodeid)
+{
+	const struct req_exec_lck_limitget *req_exec_lck_limitget =
+		message;
+	struct res_lib_lck_limitget res_lib_lck_limitget;
+	SaAisErrorT error = SA_AIS_OK;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLimitGet\n");
+
+error_exit:
+	if (api->ipc_source_is_local (&req_exec_lck_limitget->source))
+	{
+		res_lib_lck_limitget.header.size =
+			sizeof (struct res_lib_lck_limitget);
+		res_lib_lck_limitget.header.id =
+			MESSAGE_RES_LCK_LIMITGET;
+		res_lib_lck_limitget.header.error = error;
+
+		api->ipc_response_send (
+			req_exec_lck_limitget->source.conn,
+			&res_lib_lck_limitget,
+			sizeof (struct res_lib_lck_limitget));
+	}
+}
+
+static void message_handler_req_exec_lck_resourcelock_timeout (
+	const void *message,
+	unsigned int nodeid)
+{
+	const struct req_exec_lck_resourcelock_timeout *req_exec_lck_resourcelock_timeout =
+		message;
+	struct res_lib_lck_resourcelock res_lib_lck_resourcelock;
+	SaAisErrorT error = SA_AIS_OK;
+
+	struct resource *resource = NULL;
+	struct resource_lock *resource_lock = NULL;
+
+	resource = lck_resource_find (&resource_list_head,
+		&req_exec_lck_resourcelock_timeout->resource_name);
+
+	assert (resource != NULL);
+
+	resource_lock = lck_resource_lock_find (
+		resource,
+		&req_exec_lck_resourcelock_timeout->callback_source,
+		req_exec_lck_resourcelock_timeout->lock_id);
+
+	assert (resource_lock != NULL);
+
+	if (api->ipc_source_is_local (&req_exec_lck_resourcelock_timeout->response_source))
+	{
+		res_lib_lck_resourcelock.header.size =
+			sizeof (struct res_lib_lck_resourcelock);
+		res_lib_lck_resourcelock.header.id =
+			MESSAGE_RES_LCK_RESOURCELOCK;
+		res_lib_lck_resourcelock.header.error = SA_AIS_ERR_TIMEOUT;
+
+		res_lib_lck_resourcelock.lock_status =
+			resource_lock->lock_status;
+
+		api->ipc_response_send (
+			req_exec_lck_resourcelock_timeout->response_source.conn,
+			&res_lib_lck_resourcelock,
+			sizeof (struct res_lib_lck_resourcelock));
+	}
+
+	list_del (&resource_lock->list);
+	list_del (&resource_lock->resource_lock_list);
+
+	free (resource_lock);
+}
+
 static void message_handler_req_exec_lck_sync_resource (
-	const void *msg,
+	const void *message,
 	unsigned int nodeid)
 {
 	const struct req_exec_lck_sync_resource *req_exec_lck_sync_resource =
-		msg;
+		message;
 	struct resource *resource;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync resource %s\n",
-		    get_mar_name_t (&req_exec_lck_sync_resource->resource_name));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync_resource\n");
 
 	/*
 	 * Ignore message from previous ring
 	 */
 	if (memcmp (&req_exec_lck_sync_resource->ring_id,
-		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
 	{
 		return;
 	}
@@ -1977,44 +2704,54 @@ static void message_handler_req_exec_lck_sync_resource (
 	resource = lck_resource_find (&sync_resource_list_head,
 		&req_exec_lck_sync_resource->resource_name);
 
+	/*
+	 * This resource should not exist.
+	 */
+	assert (resource == NULL);
+
+	resource = malloc (sizeof (struct resource));
 	if (resource == NULL) {
-		resource = malloc (sizeof (struct resource));
-		if (resource == NULL) {
-			api->error_memory_failure ();
-		}
-
-		memset (resource, 0, sizeof (struct resource));
-		memcpy (&resource->name,
-			&req_exec_lck_sync_resource->resource_name,
-			sizeof (mar_name_t));
-
-		list_init (&resource->list);
-		list_init (&resource->resource_lock_list_head);
-		/* list_add  (&resource->list, &sync_resource_list_head); */
-		list_add_tail  (&resource->list, &sync_resource_list_head);
-		list_init (&resource->pr_granted_list_head);
-		list_init (&resource->pr_pending_list_head);
-		list_init (&resource->ex_pending_list_head);
+		api->error_memory_failure();
 	}
+
+	memset (resource, 0, sizeof (struct resource));
+	memcpy (&resource->resource_name,
+		&req_exec_lck_sync_resource->resource_name,
+		sizeof (mar_name_t));
+	memcpy (&resource->source,
+		&req_exec_lck_sync_resource->source,
+		sizeof (mar_message_source_t));
+
+	resource->ex_lock_granted = NULL;
+
+	list_init (&resource->resource_lock_list_head);
+	list_init (&resource->pr_lock_granted_list_head);
+	list_init (&resource->pr_lock_pending_list_head);
+	list_init (&resource->ex_lock_pending_list_head);
+
+	list_init (&resource->resource_list);
+	list_add_tail (&resource->resource_list, &sync_resource_list_head);
+
+	return;
 }
 
 static void message_handler_req_exec_lck_sync_resource_lock (
-	const void *msg,
+	const void *message,
 	unsigned int nodeid)
 {
 	const struct req_exec_lck_sync_resource_lock *req_exec_lck_sync_resource_lock =
-		msg;
-	struct resource_lock *resource_lock;
+		message;
 	struct resource *resource;
+	struct resource_lock *resource_lock;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "EXEC request: sync resource lock %u\n",
-		    (unsigned int)(req_exec_lck_sync_resource_lock->lock_id));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync_resource_lock\n");
 
 	/*
 	 * Ignore message from previous ring
 	 */
 	if (memcmp (&req_exec_lck_sync_resource_lock->ring_id,
-		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
 	{
 		return;
 	}
@@ -2022,70 +2759,88 @@ static void message_handler_req_exec_lck_sync_resource_lock (
 	resource = lck_resource_find (&sync_resource_list_head,
 		&req_exec_lck_sync_resource_lock->resource_name);
 
+	/*
+	 * This resource should exist.
+	 */
 	assert (resource != NULL);
 
-	/* FIXME: check to make sure the lock doesn't already exist */
+	/* TODO: check to make sure the lock doesn't already exist */
 
 	resource_lock = malloc (sizeof (struct resource_lock));
 	if (resource_lock == NULL) {
 		api->error_memory_failure ();
 	}
+
 	memset (resource_lock, 0, sizeof (struct resource_lock));
+	memcpy (&resource_lock->response_source,
+		&req_exec_lck_sync_resource_lock->response_source,
+		sizeof (mar_message_source_t));
+	memcpy (&resource_lock->callback_source,
+		&req_exec_lck_sync_resource_lock->callback_source,
+		sizeof (mar_message_source_t));
 
 	list_init (&resource_lock->list);
-	list_init (&resource_lock->resource_list);
-	/* list_init (&resource_lock->resource_cleanup_list); */
+	list_init (&resource_lock->resource_lock_list);
 
-	list_add_tail (&resource_lock->resource_list, &resource->resource_lock_list_head);
+	list_add_tail (&resource_lock->resource_lock_list, &resource->resource_lock_list_head);
+
+	resource_lock->resource = resource;
 
 	resource_lock->lock_id = req_exec_lck_sync_resource_lock->lock_id;
 	resource_lock->lock_mode = req_exec_lck_sync_resource_lock->lock_mode;
 	resource_lock->lock_flags = req_exec_lck_sync_resource_lock->lock_flags;
-	resource_lock->waiter_signal = req_exec_lck_sync_resource_lock->waiter_signal;
 	resource_lock->lock_status = req_exec_lck_sync_resource_lock->lock_status;
+	resource_lock->waiter_signal = req_exec_lck_sync_resource_lock->waiter_signal;
+	resource_lock->orphan_flag = req_exec_lck_sync_resource_lock->orphan_flag;
+	resource_lock->invocation = req_exec_lck_sync_resource_lock->invocation;
 	resource_lock->timeout = req_exec_lck_sync_resource_lock->timeout;
-	resource_lock->resource = resource;
-
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_NOTICE, "[DEBUG]: lock_id=%u lock_mode=%u lock_status=%u\n",
-		    (unsigned int)(resource_lock->lock_id),
-		    (unsigned int)(resource_lock->lock_mode),
-		    (unsigned int)(resource_lock->lock_status));
 
 	/*
 	 * Determine the list that this lock should be added to
 	 */
 	if (resource_lock->lock_mode == SA_LCK_PR_LOCK_MODE) {
 		if (resource_lock->lock_status == SA_LCK_LOCK_GRANTED) {
-			list_add_tail (&resource_lock->list, &resource->pr_granted_list_head);
+			list_add_tail (&resource_lock->list, &resource->pr_lock_granted_list_head);
 		} else {
-			list_add_tail (&resource_lock->list, &resource->pr_pending_list_head);
+			list_add_tail (&resource_lock->list, &resource->pr_lock_pending_list_head);
 		}
 	}
 
 	if (resource_lock->lock_mode == SA_LCK_EX_LOCK_MODE) {
 		if (resource_lock->lock_status == SA_LCK_LOCK_GRANTED) {
-			resource->ex_granted = resource_lock;
+			resource->ex_lock_granted = resource_lock;
 		} else {
-			list_add_tail (&resource_lock->list, &resource->ex_pending_list_head);
+			list_add_tail (&resource_lock->list, &resource->ex_lock_pending_list_head);
 		}
 	}
+
+	/*
+	 * Increment the lock count.
+	 */
+	sync_lock_count += 1;
+
+	return;
 }
 
 static void message_handler_req_exec_lck_sync_resource_refcount (
 	const void *message,
 	unsigned int nodeid)
 {
-	const struct req_exec_lck_sync_resource_refcount *req_exec_lck_sync_resource_refcount
-		= message;
+	const struct req_exec_lck_sync_resource_refcount *req_exec_lck_sync_resource_refcount =
+		message;
 	struct resource *resource;
-	unsigned int i, j;
+
+	unsigned int i;
+	unsigned int j;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: sync_resource_refcount\n");
 
 	/*
-	 * Ignore messages from previous ring
+	 * Ignore message from previous ring
 	 */
 	if (memcmp (&req_exec_lck_sync_resource_refcount->ring_id,
-		    &my_saved_ring_id, sizeof (struct memb_ring_id)) != 0)
+		    &saved_ring_id, sizeof (struct memb_ring_id)) != 0)
 	{
 		return;
 	}
@@ -2093,21 +2848,34 @@ static void message_handler_req_exec_lck_sync_resource_refcount (
 	resource = lck_resource_find (&sync_resource_list_head,
 		&req_exec_lck_sync_resource_refcount->resource_name);
 
+	/*
+	 * This resource should exist.
+	 */
 	assert (resource != NULL);
 
-	for (i = 0; i < PROCESSOR_COUNT_MAX; i++) {
+	for (i = 0; i < PROCESSOR_COUNT_MAX; i++)
+	{
 		if (req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid == 0) {
 			break;
 		}
-		for (j = 0; j < PROCESSOR_COUNT_MAX; j++) {
-			if (resource->refcount_set[j].nodeid == 0) {
+
+		if (lck_find_member_nodeid (req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid) == 0) {
+			continue;
+		}
+
+		for (j = 0; j < PROCESSOR_COUNT_MAX; j++)
+		{
+			if (resource->refcount_set[j].nodeid == 0)
+			{
 				resource->refcount_set[j].nodeid =
 					req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid;
 				resource->refcount_set[j].refcount =
 					req_exec_lck_sync_resource_refcount->refcount_set[i].refcount;
 				break;
 			}
-			if (req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid == resource->refcount_set[j].nodeid) {
+
+			if (req_exec_lck_sync_resource_refcount->refcount_set[i].nodeid == resource->refcount_set[j].nodeid)
+			{
 				resource->refcount_set[j].refcount +=
 					req_exec_lck_sync_resource_refcount->refcount_set[i].refcount;
 				break;
@@ -2115,24 +2883,21 @@ static void message_handler_req_exec_lck_sync_resource_refcount (
 		}
 	}
 
-	sync_refcount_calculate (resource);
+	lck_sync_refcount_calculate (resource);
 
-	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: sync refcount for resource %s is %u\n",
-		    get_mar_name_t (&resource->name), (unsigned int)(resource->refcount));
+	return;
 }
 
 static void message_handler_req_lib_lck_resourceopen (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_resourceopen *req_lib_lck_resourceopen
-		= (struct req_lib_lck_resourceopen *)msg;
+	const struct req_lib_lck_resourceopen *req_lib_lck_resourceopen = msg;
 	struct req_exec_lck_resourceopen req_exec_lck_resourceopen;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceOpen %s\n",
-		get_mar_name_t (&req_lib_lck_resourceopen->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckResourceOpen\n");
 
 	req_exec_lck_resourceopen.header.size =
 		sizeof (struct req_exec_lck_resourceopen);
@@ -2142,17 +2907,16 @@ static void message_handler_req_lib_lck_resourceopen (
 	api->ipc_source_set (&req_exec_lck_resourceopen.source, conn);
 
 	memcpy (&req_exec_lck_resourceopen.resource_name,
-		&req_lib_lck_resourceopen->lockResourceName,
-		sizeof (SaNameT));
+		&req_lib_lck_resourceopen->resource_name,
+		sizeof (mar_name_t));
 
-	req_exec_lck_resourceopen.open_flags = req_lib_lck_resourceopen->resourceOpenFlags;
-	req_exec_lck_resourceopen.async_call = 0;
-	req_exec_lck_resourceopen.invocation = 0;
-	req_exec_lck_resourceopen.resource_handle = req_lib_lck_resourceopen->resourceHandle;
-	req_exec_lck_resourceopen.fail_with_error = SA_AIS_OK;
+	req_exec_lck_resourceopen.open_flags =
+		req_lib_lck_resourceopen->open_flags;
+	req_exec_lck_resourceopen.resource_handle =
+		req_lib_lck_resourceopen->resource_handle;
 
-	iovec.iov_base = (char *)&req_exec_lck_resourceopen;
-	iovec.iov_len = sizeof (req_exec_lck_resourceopen);
+	iovec.iov_base = &req_exec_lck_resourceopen;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourceopen);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
@@ -2161,34 +2925,33 @@ static void message_handler_req_lib_lck_resourceopenasync (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_resourceopen *req_lib_lck_resourceopen
-		= (struct req_lib_lck_resourceopen *)msg;
-	struct req_exec_lck_resourceopen req_exec_lck_resourceopen;
+	const struct req_lib_lck_resourceopenasync *req_lib_lck_resourceopenasync = msg;
+	struct req_exec_lck_resourceopenasync req_exec_lck_resourceopenasync;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceOpenAsync %s\n",
-		get_mar_name_t (&req_lib_lck_resourceopen->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckResourceOpenAsync\n");
 
-	req_exec_lck_resourceopen.header.size =
-		sizeof (struct req_exec_lck_resourceopen);
-	req_exec_lck_resourceopen.header.id =
-		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCEOPEN);
+	req_exec_lck_resourceopenasync.header.size =
+		sizeof (struct req_exec_lck_resourceopenasync);
+	req_exec_lck_resourceopenasync.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCEOPENASYNC);
 
-	api->ipc_source_set (&req_exec_lck_resourceopen.source, conn);
+	api->ipc_source_set (&req_exec_lck_resourceopenasync.source, conn);
 
-	memcpy (&req_exec_lck_resourceopen.resource_name,
-		&req_lib_lck_resourceopen->lockResourceName,
+	memcpy (&req_exec_lck_resourceopenasync.resource_name,
+		&req_lib_lck_resourceopenasync->resource_name,
 		sizeof (mar_name_t));
 
-	req_exec_lck_resourceopen.resource_handle = req_lib_lck_resourceopen->resourceHandle;
-	req_exec_lck_resourceopen.invocation = req_lib_lck_resourceopen->invocation;
-	req_exec_lck_resourceopen.open_flags = req_lib_lck_resourceopen->resourceOpenFlags;
-	req_exec_lck_resourceopen.fail_with_error = SA_AIS_OK;
-	req_exec_lck_resourceopen.timeout = 0;
-	req_exec_lck_resourceopen.async_call = 1;
+	req_exec_lck_resourceopenasync.open_flags =
+		req_lib_lck_resourceopenasync->open_flags;
+	req_exec_lck_resourceopenasync.resource_handle =
+		req_lib_lck_resourceopenasync->resource_handle;
+	req_exec_lck_resourceopenasync.invocation =
+		req_lib_lck_resourceopenasync->invocation;
 
-	iovec.iov_base = (char *)&req_exec_lck_resourceopen;
-	iovec.iov_len = sizeof (req_exec_lck_resourceopen);
+	iovec.iov_base = &req_exec_lck_resourceopenasync;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourceopenasync);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
@@ -2197,58 +2960,46 @@ static void message_handler_req_lib_lck_resourceclose (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_resourceclose *req_lib_lck_resourceclose
-		= (struct req_lib_lck_resourceclose *)msg;
+	const struct req_lib_lck_resourceclose *req_lib_lck_resourceclose = msg;
 	struct req_exec_lck_resourceclose req_exec_lck_resourceclose;
-	struct iovec iovecs[2];
-	struct resource *resource;
-	struct res_lib_lck_resourceclose res_lib_lck_resourceclose;
+	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceClose %s\n",
-		get_mar_name_t (&req_lib_lck_resourceclose->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckResourceClose\n");
 
-	resource = lck_resource_find (&resource_list_head,
-		&req_lib_lck_resourceclose->lockResourceName);
+	req_exec_lck_resourceclose.header.size =
+		sizeof (struct req_exec_lck_resourceclose);
+	req_exec_lck_resourceclose.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCECLOSE);
 
-	if (resource != NULL) {
-		req_exec_lck_resourceclose.header.size =
-			sizeof (struct req_exec_lck_resourceclose);
-		req_exec_lck_resourceclose.header.id =
-			SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCECLOSE);
+	api->ipc_source_set (&req_exec_lck_resourceclose.source, conn);
 
-		api->ipc_source_set (&req_exec_lck_resourceclose.source, conn);
+	memcpy (&req_exec_lck_resourceclose.resource_name,
+		&req_lib_lck_resourceclose->resource_name,
+		sizeof (mar_name_t));
 
-		memcpy (&req_exec_lck_resourceclose.lockResourceName,
-			&req_lib_lck_resourceclose->lockResourceName, sizeof (mar_name_t));
+	req_exec_lck_resourceclose.resource_id =
+		req_lib_lck_resourceclose->resource_id;
 
-		req_exec_lck_resourceclose.resource_handle = req_lib_lck_resourceclose->resourceHandle;
-		iovecs[0].iov_base = (char *)&req_exec_lck_resourceclose;
-		iovecs[0].iov_len = sizeof (req_exec_lck_resourceclose);
+	req_exec_lck_resourceclose.exit_flag = 0;
 
-		assert (api->totem_mcast (iovecs, 1, TOTEM_AGREED) == 0);
-	}
-	else {
-		res_lib_lck_resourceclose.header.size = sizeof (struct res_lib_lck_resourceclose);
-		res_lib_lck_resourceclose.header.id = MESSAGE_RES_LCK_RESOURCECLOSE;
-		res_lib_lck_resourceclose.header.error = SA_AIS_ERR_NOT_EXIST;
+	iovec.iov_base = &req_exec_lck_resourceclose;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourceclose);
 
-		api->ipc_response_send (conn,
-			&res_lib_lck_resourceclose,
-			sizeof (struct res_lib_lck_resourceclose));
-	}
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_lck_resourcelock (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_resourcelock *req_lib_lck_resourcelock
-		= (struct req_lib_lck_resourcelock *)msg;
+	const struct req_lib_lck_resourcelock *req_lib_lck_resourcelock = msg;
 	struct req_exec_lck_resourcelock req_exec_lck_resourcelock;
-	struct iovec iovecs[2];
+	struct resource_instance *resource_instance;
+	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceLock %s\n",
-		get_mar_name_t (&req_lib_lck_resourcelock->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckResourceLock\n");
 
 	req_exec_lck_resourcelock.header.size =
 		sizeof (struct req_exec_lck_resourcelock);
@@ -2257,66 +3008,101 @@ static void message_handler_req_lib_lck_resourcelock (
 
 	api->ipc_source_set (&req_exec_lck_resourcelock.source, conn);
 
-	memcpy (&req_exec_lck_resourcelock.req_lib_lck_resourcelock,
-		req_lib_lck_resourcelock,
-		sizeof (struct req_lib_lck_resourcelock));
+	memcpy (&req_exec_lck_resourcelock.resource_name,
+		&req_lib_lck_resourcelock->resource_name,
+		sizeof (mar_name_t));
 
-	req_exec_lck_resourcelock.resource_handle = req_lib_lck_resourcelock->resourceHandle;
-	req_exec_lck_resourcelock.async_call = 0;
-	req_exec_lck_resourcelock.invocation = 0;
-	req_exec_lck_resourcelock.fail_with_error = SA_AIS_OK;
+	req_exec_lck_resourcelock.lock_id =
+		req_lib_lck_resourcelock->lock_id;
+	req_exec_lck_resourcelock.lock_mode =
+		req_lib_lck_resourcelock->lock_mode;
+	req_exec_lck_resourcelock.lock_flags =
+		req_lib_lck_resourcelock->lock_flags;
+	req_exec_lck_resourcelock.waiter_signal =
+		req_lib_lck_resourcelock->waiter_signal;
+	req_exec_lck_resourcelock.resource_handle =
+		req_lib_lck_resourcelock->resource_handle;
+/* 	req_exec_lck_resourcelock.resource_id = */
+/* 		req_lib_lck_resourcelock->resource_id; */
+	req_exec_lck_resourcelock.timeout =
+		req_lib_lck_resourcelock->timeout;
 
-	iovecs[0].iov_base = (char *)&req_exec_lck_resourcelock;
-	iovecs[0].iov_len = sizeof (req_exec_lck_resourcelock);
+	hdb_handle_get (&resource_hdb, req_lib_lck_resourcelock->resource_id,
+		(void *)&resource_instance);
 
-	assert (api->totem_mcast (iovecs, 1, TOTEM_AGREED) == 0);
+	memcpy (&req_exec_lck_resourcelock.callback_source,
+		&resource_instance->source, sizeof (mar_message_source_t));
+
+	hdb_handle_put (&resource_hdb, req_lib_lck_resourcelock->resource_id);
+
+	iovec.iov_base = &req_exec_lck_resourcelock;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourcelock);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_lck_resourcelockasync (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_resourcelock *req_lib_lck_resourcelock
-		= (struct req_lib_lck_resourcelock *)msg;
-	struct req_exec_lck_resourcelock req_exec_lck_resourcelock;
-	struct iovec iovecs[2];
+	const struct req_lib_lck_resourcelockasync *req_lib_lck_resourcelockasync = msg;
+	struct req_exec_lck_resourcelockasync req_exec_lck_resourcelockasync;
+	struct resource_instance *resource_instance;
+	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceLockAsync %s\n",
-		get_mar_name_t (&req_lib_lck_resourcelock->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckResourceLockAsync\n");
 
-	req_exec_lck_resourcelock.header.size =
-		sizeof (struct req_exec_lck_resourcelock);
-	req_exec_lck_resourcelock.header.id =
-		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCELOCK);
+	req_exec_lck_resourcelockasync.header.size =
+		sizeof (struct req_exec_lck_resourcelockasync);
+	req_exec_lck_resourcelockasync.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCELOCKASYNC);
 
-	api->ipc_source_set (&req_exec_lck_resourcelock.source, conn);
+	api->ipc_source_set (&req_exec_lck_resourcelockasync.source, conn);
 
-	memcpy (&req_exec_lck_resourcelock.req_lib_lck_resourcelock,
-		req_lib_lck_resourcelock,
-		sizeof (struct req_lib_lck_resourcelock));
+	memcpy (&req_exec_lck_resourcelockasync.resource_name,
+		&req_lib_lck_resourcelockasync->resource_name,
+		sizeof (mar_name_t));
 
-	req_exec_lck_resourcelock.resource_handle = req_lib_lck_resourcelock->resourceHandle;
-	req_exec_lck_resourcelock.async_call = 1;
-	req_exec_lck_resourcelock.invocation = req_lib_lck_resourcelock->invocation;
-	req_exec_lck_resourcelock.fail_with_error = SA_AIS_OK;
+	req_exec_lck_resourcelockasync.lock_id =
+		req_lib_lck_resourcelockasync->lock_id;
+	req_exec_lck_resourcelockasync.lock_mode =
+		req_lib_lck_resourcelockasync->lock_mode;
+	req_exec_lck_resourcelockasync.lock_flags =
+		req_lib_lck_resourcelockasync->lock_flags;
+	req_exec_lck_resourcelockasync.waiter_signal =
+		req_lib_lck_resourcelockasync->waiter_signal;
+	req_exec_lck_resourcelockasync.resource_handle =
+		req_lib_lck_resourcelockasync->resource_handle;
+/* 	req_exec_lck_resourcelockasync.resource_id = */
+/* 		req_lib_lck_resourcelockasync->resource_id; */
+	req_exec_lck_resourcelockasync.invocation =
+		req_lib_lck_resourcelockasync->invocation;
 
-	iovecs[0].iov_base = (char *)&req_exec_lck_resourcelock;
-	iovecs[0].iov_len = sizeof (req_exec_lck_resourcelock);
+	hdb_handle_get (&resource_hdb, req_lib_lck_resourcelockasync->resource_id,
+		(void *)&resource_instance);
 
-	assert (api->totem_mcast (iovecs, 1, TOTEM_AGREED) == 0);
+	memcpy (&req_exec_lck_resourcelockasync.callback_source,
+		&resource_instance->source, sizeof (mar_message_source_t));
+
+	hdb_handle_put (&resource_hdb, req_lib_lck_resourcelockasync->resource_id);
+
+	iovec.iov_base = &req_exec_lck_resourcelockasync;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourcelockasync);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
 
 static void message_handler_req_lib_lck_resourceunlock (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_resourceunlock *req_lib_lck_resourceunlock
-		= (struct req_lib_lck_resourceunlock *)msg;
+	const struct req_lib_lck_resourceunlock *req_lib_lck_resourceunlock = msg;
 	struct req_exec_lck_resourceunlock req_exec_lck_resourceunlock;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceUnlock %s\n",
-		get_mar_name_t (&req_lib_lck_resourceunlock->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckResourceUnlock\n");
 
 	req_exec_lck_resourceunlock.header.size =
 		sizeof (struct req_exec_lck_resourceunlock);
@@ -2326,15 +3112,14 @@ static void message_handler_req_lib_lck_resourceunlock (
 	api->ipc_source_set (&req_exec_lck_resourceunlock.source, conn);
 
 	memcpy (&req_exec_lck_resourceunlock.resource_name,
-		&req_lib_lck_resourceunlock->lockResourceName,
+		&req_lib_lck_resourceunlock->resource_name,
 		sizeof (mar_name_t));
 
-	req_exec_lck_resourceunlock.lock_id = req_lib_lck_resourceunlock->lockId;
-	req_exec_lck_resourceunlock.async_call = 0;
-	req_exec_lck_resourceunlock.invocation = 0;
+	req_exec_lck_resourceunlock.lock_id =
+		req_lib_lck_resourceunlock->lock_id;
 
-	iovec.iov_base = (char *)&req_exec_lck_resourceunlock;
-	iovec.iov_len = sizeof (req_exec_lck_resourceunlock);
+	iovec.iov_base = &req_exec_lck_resourceunlock;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourceunlock);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
@@ -2343,31 +3128,31 @@ static void message_handler_req_lib_lck_resourceunlockasync (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_resourceunlock *req_lib_lck_resourceunlock
-		= (struct req_lib_lck_resourceunlock *)msg;
-	struct req_exec_lck_resourceunlock req_exec_lck_resourceunlock;
+	const struct req_lib_lck_resourceunlockasync *req_lib_lck_resourceunlockasync = msg;
+	struct req_exec_lck_resourceunlockasync req_exec_lck_resourceunlockasync;
 	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceUnlockAsync %s\n",
-		get_mar_name_t (&req_lib_lck_resourceunlock->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckResourceUnlockAsync\n");
 
-	req_exec_lck_resourceunlock.header.size =
-		sizeof (struct req_exec_lck_resourceunlock);
-	req_exec_lck_resourceunlock.header.id =
-		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCEUNLOCK);
+	req_exec_lck_resourceunlockasync.header.size =
+		sizeof (struct req_exec_lck_resourceunlockasync);
+	req_exec_lck_resourceunlockasync.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_RESOURCEUNLOCKASYNC);
 
-	api->ipc_source_set (&req_exec_lck_resourceunlock.source, conn);
+	api->ipc_source_set (&req_exec_lck_resourceunlockasync.source, conn);
 
-	memcpy (&req_exec_lck_resourceunlock.resource_name,
-		&req_lib_lck_resourceunlock->lockResourceName,
+	memcpy (&req_exec_lck_resourceunlockasync.resource_name,
+		&req_lib_lck_resourceunlockasync->resource_name,
 		sizeof (mar_name_t));
 
-	req_exec_lck_resourceunlock.lock_id = req_lib_lck_resourceunlock->lockId;
-	req_exec_lck_resourceunlock.invocation = req_lib_lck_resourceunlock->invocation;
-	req_exec_lck_resourceunlock.async_call = 1;
+	req_exec_lck_resourceunlockasync.lock_id =
+		req_lib_lck_resourceunlockasync->lock_id;
+	req_exec_lck_resourceunlockasync.invocation =
+		req_lib_lck_resourceunlockasync->invocation;
 
-	iovec.iov_base = (char *)&req_exec_lck_resourceunlock;
-	iovec.iov_len = sizeof (req_exec_lck_resourceunlock);
+	iovec.iov_base = &req_exec_lck_resourceunlockasync;
+	iovec.iov_len = sizeof (struct req_exec_lck_resourceunlockasync);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
@@ -2376,13 +3161,12 @@ static void message_handler_req_lib_lck_lockpurge (
 	void *conn,
 	const void *msg)
 {
-	struct req_lib_lck_lockpurge *req_lib_lck_lockpurge
-		= (struct req_lib_lck_lockpurge *)msg;
+	const struct req_lib_lck_lockpurge *req_lib_lck_lockpurge = msg;
 	struct req_exec_lck_lockpurge req_exec_lck_lockpurge;
-	struct iovec iovecs[2];
+	struct iovec iovec;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "LIB request: saLckResourceLockPurge %s\n",
-		get_mar_name_t (&req_lib_lck_lockpurge->lockResourceName));
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckLockPurge\n");
 
 	req_exec_lck_lockpurge.header.size =
 		sizeof (struct req_exec_lck_lockpurge);
@@ -2391,12 +3175,36 @@ static void message_handler_req_lib_lck_lockpurge (
 
 	api->ipc_source_set (&req_exec_lck_lockpurge.source, conn);
 
-	memcpy (&req_exec_lck_lockpurge.req_lib_lck_lockpurge,
-		req_lib_lck_lockpurge,
-		sizeof (struct req_lib_lck_lockpurge));
+	memcpy (&req_exec_lck_lockpurge.resource_name,
+		&req_lib_lck_lockpurge->resource_name,
+		sizeof (mar_name_t));
 
-	iovecs[0].iov_base = (char *)&req_exec_lck_lockpurge;
-	iovecs[0].iov_len = sizeof (req_exec_lck_lockpurge);
+	iovec.iov_base = &req_exec_lck_lockpurge;
+	iovec.iov_len = sizeof (struct req_exec_lck_lockpurge);
 
-	assert (api->totem_mcast (iovecs, 1, TOTEM_AGREED) == 0);
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
+}
+
+static void message_handler_req_lib_lck_limitget (
+	void *conn,
+	const void *msg)
+{
+	const struct req_lib_lck_limitget *req_lib_lck_limitget = msg;
+	struct req_exec_lck_limitget req_exec_lck_limitget;
+	struct iovec iovec;
+
+	/* DEBUG */
+	log_printf (LOGSYS_LEVEL_DEBUG, "LIB request: saLckLimitGet\n");
+
+	req_exec_lck_limitget.header.size =
+		sizeof (struct req_exec_lck_limitget);
+	req_exec_lck_limitget.header.id =
+		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_LIMITGET);
+
+	api->ipc_source_set (&req_exec_lck_limitget.source, conn);
+
+	iovec.iov_base = &req_exec_lck_limitget;
+	iovec.iov_len = sizeof (struct req_exec_lck_limitget);
+
+	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
 }
