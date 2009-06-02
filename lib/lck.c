@@ -475,6 +475,11 @@ saLckResourceOpen (
 		goto error_exit;
 	}
 
+	if ((resourceFlags & (~SA_LCK_RESOURCE_CREATE)) != 0) {
+		error = SA_AIS_ERR_BAD_FLAGS;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
 		lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
@@ -577,6 +582,11 @@ saLckResourceOpenAsync (
 
 	if (lckResourceName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if ((resourceFlags & (~SA_LCK_RESOURCE_CREATE)) != 0) {
+		error = SA_AIS_ERR_BAD_FLAGS;
 		goto error_exit;
 	}
 
