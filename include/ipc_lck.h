@@ -158,7 +158,7 @@ struct req_lib_lck_resourceunlockasync {
 } __attribute__((aligned(8)));
 
 struct res_lib_lck_resourceunlockasync {
-	coroipc_response_header_t header; __attribute__((aligned(8)));
+	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_lck_lockpurge {

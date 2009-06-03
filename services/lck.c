@@ -67,6 +67,9 @@
 #include "../include/saLck.h"
 #include "../include/ipc_lck.h"
 
+/*If you want compile useful debug functions, uncomment next line*/
+/*#define _LCK_DEBUG_*/
+
 LOGSYS_DECLARE_SUBSYS ("LCK");
 
 enum lck_message_req_types {
@@ -851,6 +854,7 @@ static void lck_confchg_fn (
 	return;
 }
 
+#ifdef _LCK_DEBUG_
 static void lck_print_pr_pending_list (
 	struct resource *resource)
 {
@@ -910,6 +914,7 @@ static void lck_print_ex_pending_list (
 			    (unsigned int)(lock->lock_id), lock->lock_status);
 	}
 }
+#endif
 
 static void lck_print_resource_lock_list (
 	struct resource *resource)
@@ -2618,7 +2623,7 @@ static void message_handler_req_exec_lck_limitget (
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLimitGet\n");
 
-error_exit:
+/*error_exit:*/
 	if (api->ipc_source_is_local (&req_exec_lck_limitget->source))
 	{
 		res_lib_lck_limitget.header.size =
@@ -2641,7 +2646,7 @@ static void message_handler_req_exec_lck_resourcelock_timeout (
 	const struct req_exec_lck_resourcelock_timeout *req_exec_lck_resourcelock_timeout =
 		message;
 	struct res_lib_lck_resourcelock res_lib_lck_resourcelock;
-	SaAisErrorT error = SA_AIS_OK;
+/*	SaAisErrorT error = SA_AIS_OK;*/
 
 	struct resource *resource = NULL;
 	struct resource_lock *resource_lock = NULL;
@@ -3189,7 +3194,7 @@ static void message_handler_req_lib_lck_limitget (
 	void *conn,
 	const void *msg)
 {
-	const struct req_lib_lck_limitget *req_lib_lck_limitget = msg;
+/*	const struct req_lib_lck_limitget *req_lib_lck_limitget = msg;*/
 	struct req_exec_lck_limitget req_exec_lck_limitget;
 	struct iovec iovec;
 
