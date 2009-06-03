@@ -738,7 +738,7 @@ saLckResourceClose (
 		goto error_put;
 	}
 
-	/* lckResourceInstanceFinalize (lckResourceInstance) */
+	lckResourceInstanceFinalize (lckResourceInstance);
 
 error_put:
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
