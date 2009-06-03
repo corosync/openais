@@ -264,6 +264,10 @@ saLckOptionCheck (
 	struct lckInstance *lckInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
+	if (lckOptions == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
 		lckHandle, (void *)&lckInstance));
 	if (error != SA_AIS_OK) {
