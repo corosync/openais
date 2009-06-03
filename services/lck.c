@@ -2047,7 +2047,7 @@ error_exit:
 			 * Create resource instance.
 			 */
 			hdb_handle_create (&resource_hdb,
-				sizeof (resource_instance), &resource_id);
+				sizeof (struct resource_instance), &resource_id);
 			hdb_handle_get (&resource_hdb,
 				resource_id, (void *)&resource_instance);
 			memcpy (&resource_instance->source,
@@ -2155,7 +2155,7 @@ error_exit:
 			 * Create resource instance.
 			 */
 			hdb_handle_create (&resource_hdb,
-				sizeof (resource_instance), &resource_id);
+				sizeof (struct resource_instance), &resource_id);
 			hdb_handle_get (&resource_hdb,
 				resource_id, (void *)&resource_instance);
 			memcpy (&resource_instance->source,
