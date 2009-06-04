@@ -10,7 +10,7 @@
  * - Refactoring of code into several AMF files
  * - Serializers/deserializers
  *
- * Copyright (c) 2007-2008 Red Hat, Inc.
+ * Copyright (c) 2007-2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -325,7 +325,9 @@ struct amf_cluster *amf_config_read (char **error_string)
 	while (fgets (buf, 255, fp)) {
 		line_number += 1;
 		line = buf;
-		line[strlen(line) - 1] = '\0';
+		if (strlen(line) > 0) {
+			line[strlen(line) - 1] = '\0';
+		}
 		/*
 		 * Clear out comments and empty lines
 		 */

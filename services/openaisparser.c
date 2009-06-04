@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Red Hat, Inc.
+ * Copyright (c) 2006, 2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -117,7 +117,9 @@ static int parse_section(FILE *fp,
 	char *loc;
 
 	while (fgets (line, 255, fp)) {
-		line[strlen(line) - 1] = '\0';
+		if (strlen(line) > 0) {
+			line[strlen(line) - 1] = '\0';
+		}
 		/*
 		 * Clear out white space and tabs
 		 */
