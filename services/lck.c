@@ -2443,7 +2443,8 @@ error_exit:
 			&res_lib_lck_resourcelockasync,
 			sizeof (struct res_lib_lck_resourcelockasync));
 
-		if ((lock != NULL) && (lock->lock_status == SA_LCK_LOCK_GRANTED)) {
+		/* if ((lock != NULL) && (lock->lock_status == SA_LCK_LOCK_GRANTED)) { */
+		if ((lock != NULL) && (lock->lock_status != 0)) {
 			lck_lockgrant_callback_send (lock, error);
 		}
 	}
