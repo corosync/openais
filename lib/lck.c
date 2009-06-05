@@ -1059,6 +1059,7 @@ saLckResourceUnlock (
 	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
 		lockId, (void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
+		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
@@ -1134,6 +1135,7 @@ saLckResourceUnlockAsync (
 	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
 		lockId, (void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
+		error = SA_AIS_ERR_NOT_EXIST;
 		goto error_exit;
 	}
 
