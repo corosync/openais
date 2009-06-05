@@ -773,7 +773,7 @@ saLckResourceLock (
 		goto error_exit;
 	}
 
-	if (lockId == NULL) {
+	if (lockId == NULL || lockStatus == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
