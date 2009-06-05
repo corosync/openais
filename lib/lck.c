@@ -778,6 +778,11 @@ saLckResourceLock (
 		goto error_exit;
 	}
 
+	if ((lockFlags & (~SA_LCK_LOCK_NO_QUEUE) & (~SA_LCK_LOCK_ORPHAN)) != 0) {
+		error = SA_AIS_ERR_BAD_FLAGS;
+		goto error_exit;
+	}
+
 	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
 		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
@@ -906,6 +911,11 @@ saLckResourceLockAsync (
 
 	if (lockId == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if ((lockFlags & (~SA_LCK_LOCK_NO_QUEUE) & (~SA_LCK_LOCK_ORPHAN)) != 0) {
+		error = SA_AIS_ERR_BAD_FLAGS;
 		goto error_exit;
 	}
 
