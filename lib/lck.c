@@ -1270,6 +1270,7 @@ saLckLimitGet (
 		sizeof (struct req_lib_lck_limitget);
 	req_lib_lck_limitget.header.id =
 		MESSAGE_REQ_LCK_LIMITGET;
+	req_lib_lck_limitget.limit_id = limitId;
 
 	iov.iov_base = &req_lib_lck_limitget;
 	iov.iov_len = sizeof (struct req_lib_lck_limitget);
@@ -1289,6 +1290,8 @@ saLckLimitGet (
 		error = res_lib_lck_limitget.header.error;
 		goto error_put;
 	}
+
+	(*limitValue).uint64Value = res_lib_lck_limitget.value;
 
 error_put:
 	hdb_handle_put (&lckHandleDatabase, lckHandle);

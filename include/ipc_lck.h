@@ -173,10 +173,12 @@ struct res_lib_lck_lockpurge {
 
 struct req_lib_lck_limitget {
 	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_uint64_t limit_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_lck_limitget {
 	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint64_t value __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_lck_resourceopen_callback {

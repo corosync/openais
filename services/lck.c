@@ -540,6 +540,7 @@ struct req_exec_lck_lockpurge {
 struct req_exec_lck_limitget {
 	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
+	mar_uint64_t limit_id __attribute__((aligned(8)));
 };
 
 struct req_exec_lck_resourcelock_timeout {
@@ -708,6 +709,7 @@ static void exec_lck_limitget_endian_convert (void *msg)
 
 	swab_coroipc_request_header_t (&to_swab->header);
 	swab_mar_message_source_t (&to_swab->source);
+	swab_mar_uint64_t (&to_swab->limit_id);
 
 	return;
 }
@@ -2620,9 +2622,20 @@ static void message_handler_req_exec_lck_limitget (
 		message;
 	struct res_lib_lck_limitget res_lib_lck_limitget;
 	SaAisErrorT error = SA_AIS_OK;
+	SaUint64T value = 0;
 
 	/* DEBUG */
-	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLimitGet\n");
+	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckLimitGet\n");
+
+	switch (req_exec_lck_limitget->limit_id)
+	{
+	case SA_LCK_MAX_NUM_LOCKS_ID:
+		value = MAX_NUM_LOCKS;
+		break;
+	default:
+		error = SA_AIS_ERR_INVALID_PARAM;
+		break;
+	}
 
 /*error_exit:*/
 	if (api->ipc_source_is_local (&req_exec_lck_limitget->source))
@@ -2632,6 +2645,7 @@ static void message_handler_req_exec_lck_limitget (
 		res_lib_lck_limitget.header.id =
 			MESSAGE_RES_LCK_LIMITGET;
 		res_lib_lck_limitget.header.error = error;
+		res_lib_lck_limitget.value = value;
 
 		api->ipc_response_send (
 			req_exec_lck_limitget->source.conn,
@@ -3195,7 +3209,7 @@ static void message_handler_req_lib_lck_limitget (
 	void *conn,
 	const void *msg)
 {
-/*	const struct req_lib_lck_limitget *req_lib_lck_limitget = msg;*/
+	const struct req_lib_lck_limitget *req_lib_lck_limitget = msg;
 	struct req_exec_lck_limitget req_exec_lck_limitget;
 	struct iovec iovec;
 
@@ -3208,6 +3222,8 @@ static void message_handler_req_lib_lck_limitget (
 		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_LIMITGET);
 
 	api->ipc_source_set (&req_exec_lck_limitget.source, conn);
+
+	req_exec_lck_limitget.limit_id = req_lib_lck_limitget->limit_id;
 
 	iovec.iov_base = &req_exec_lck_limitget;
 	iovec.iov_len = sizeof (struct req_exec_lck_limitget);
