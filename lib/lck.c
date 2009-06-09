@@ -1102,7 +1102,7 @@ saLckResourceUnlock (
 	}
 
 	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
-	hdb_handle_destroy (&lckLockIdHandleDatabase, lockId);
+	lckLockIdInstanceFinalize (lckLockIdInstance);
 
 	return (error);
 
@@ -1195,7 +1195,7 @@ saLckResourceUnlockAsync (
 	}
 
 	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
-	hdb_handle_destroy (&lckLockIdHandleDatabase, lockId);
+	lckLockIdInstanceFinalize (lckLockIdInstance);
 
 	return (error);
 
