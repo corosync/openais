@@ -2349,7 +2349,10 @@ static void message_handler_req_exec_lck_resourcelock (
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_lck_resourcelock->source))
 	{
-		if ((lock != NULL) && (lock->lock_status != SA_LCK_LOCK_GRANTED)) {
+		if ((lock != NULL) &&
+		    (lock->lock_status != SA_LCK_LOCK_GRANTED) &&
+		    (lock->lock_status != SA_LCK_LOCK_NOT_QUEUED))
+		{
 			api->timer_add_duration (
 				req_exec_lck_resourcelock->timeout, (void *)(lock),
 				lck_resourcelock_timeout, &lock->timer_handle);
