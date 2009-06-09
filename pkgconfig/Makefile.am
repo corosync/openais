@@ -32,7 +32,7 @@ MAINTAINERCLEANFILES	= Makefile.in
 
 EXTRA_DIST = libtemplate.pc.in
 
-LIBS	= saAmf saCkpt saClm saEvt saLck saMsg saTmr
+LIBS	= SaAmf SaCkpt SaClm SaEvt SaLck SaMsg SaTmr
 
 target_LIBS = $(LIBS:%=lib%.pc)
 CLEANFILES = $(target_LIBS)
