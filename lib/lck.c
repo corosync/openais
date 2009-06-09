@@ -899,8 +899,6 @@ saLckResourceLockAsync (
 	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
 
-	hdb_handle_t ipc_handle;
-
 	/* DEBUG */
 	printf ("[DEBUG]: saLckResourceLockAsync\n");
 
@@ -1016,8 +1014,6 @@ saLckResourceLockAsync (
 		/* goto error_disconnect; */
 		goto error_put_destroy;
 	}
-
-	coroipcc_service_disconnect (ipc_handle);
 
 	list_init (&lckLockIdInstance->list);
 	list_add_tail (&lckLockIdInstance->list, &lckResourceInstance->lock_id_list);
