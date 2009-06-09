@@ -124,7 +124,7 @@ libcfg.so.2.0.0: util.o cfg.o
 	$(CC) -shared -Wl,-soname,libcfg.so.2,-version-script=libcfg.versions util.o cfg.o -o $@
 
 libconfdb.so.2.0.0: util.o confdb.o
-	$(CC) -shared -Wl,-soname,libcfg.so.2,-version-script=libconfdb.versions util.o confdb.o -o $@
+	$(CC) -shared -Wl,-soname,libconfdb.so.2,-version-script=libconfdb.versions util.o confdb.o -o $@
 
 endif
 
