@@ -1810,13 +1810,19 @@ static void lck_unlock (
 		 */
 		list_del (&resource_lock->list);
 
-		if (resource_lock->timer_handle != 0) {
+		/*
+		 * If we are unlocking a lock that was queued, we must
+		 * send a response/callback to the library.
+		 */
+		if (resource_lock->lock_status == 0) {
+			if (resource_lock->timer_handle != 0) {
 				api->timer_delete (resource_lock->timer_handle);
-				lck_resourcelock_response_send (resource_lock, SA_AIS_ERR_TIMEOUT); /* ? */
+				lck_resourcelock_response_send (resource_lock, SA_AIS_ERR_TIMEOUT);
 			}
 			else {
-				lck_lockgrant_callback_send (resource_lock, SA_AIS_ERR_NOT_EXIST); /* ? */
+				lck_lockgrant_callback_send (resource_lock, SA_AIS_ERR_NOT_EXIST);
 			}
+		}
 	}
 
 	/*
