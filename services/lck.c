@@ -1883,9 +1883,6 @@ static void lck_unlock (
 				lock = list_entry (list, struct resource_lock, list);
 				lock->lock_status = SA_LCK_LOCK_GRANTED;
 
-				/* list_del (&lock->list); */
-				/* list_add_tail (&lock->list, &resource->pr_lock_granted_list_head); */
-
 				if (lock->timer_handle != 0) {
 					api->timer_delete (lock->timer_handle);
 					lck_resourcelock_response_send (lock, SA_AIS_OK);
@@ -1898,10 +1895,10 @@ static void lck_unlock (
 			/*
 			 * Move pending shared locks to granted list.
 			 */
-			list = resource->pr_lock_pending_list_head.next;
-			list_del (&resource->pr_lock_pending_list_head);
+			list_splice (&resource->pr_lock_pending_list_head,
+				&resource->pr_lock_granted_list_head);
+
 			list_init (&resource->pr_lock_pending_list_head);
-			list_add_tail (list, &resource->pr_lock_granted_list_head);
 		}
 	}
 }
