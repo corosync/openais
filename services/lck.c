@@ -1674,6 +1674,8 @@ static void lck_lockgrant_callback_send (
 		if (resource_lock != NULL) {
 			res_lib_lck_lockgrant_callback.lock_status =
 				resource_lock->lock_status;
+			res_lib_lck_lockgrant_callback.lock_id =
+				resource_lock->lock_id;
 			res_lib_lck_lockgrant_callback.invocation =
 				resource_lock->invocation;
 		}

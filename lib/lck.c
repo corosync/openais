@@ -288,6 +288,7 @@ saLckDispatch (
 	SaDispatchFlagsT dispatchFlags)
 {
 	struct lckInstance *lckInstance;
+	struct lckLockIdInstance *lckLockIdInstance;
 	struct res_lib_lck_resourceopen_callback *res_lib_lck_resourceopen_callback;
 	struct res_lib_lck_lockgrant_callback *res_lib_lck_lockgrant_callback;
 	struct res_lib_lck_lockwaiter_callback *res_lib_lck_lockwaiter_callback;
@@ -363,10 +364,28 @@ saLckDispatch (
 			res_lib_lck_lockgrant_callback =
 				(struct res_lib_lck_lockgrant_callback *)dispatch_data;
 
+			/*
+			 * Check that the lock_id is still valid before invoking
+			 * the callback. This is needed to handle the case where
+			 * a lock was unlocked before the callback was processed.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
+				res_lib_lck_lockgrant_callback->lock_id,
+				(void *)&lckLockIdInstance));
+			if (error != SA_AIS_OK) {
+				res_lib_lck_lockgrant_callback->header.error =
+					SA_AIS_ERR_NOT_EXIST;
+			}
+
 			callbacks.saLckLockGrantCallback (
 				res_lib_lck_lockgrant_callback->invocation,
 				res_lib_lck_lockgrant_callback->lock_status,
 				res_lib_lck_lockgrant_callback->header.error);
+
+			if (error == SA_AIS_OK) {
+				hdb_handle_put (&lckLockIdHandleDatabase,
+					res_lib_lck_lockgrant_callback->lock_id);
+			}
 
 			break;
 
