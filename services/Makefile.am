@@ -39,11 +39,11 @@ src			= amfapp.c amfcluster.c amfnode.c amfsi.c amfutil.c \
 
 SERVICE_LCRSO		= clm ckpt evt lck msg tmr
 
-REGULAR_LCRSO		= openaisserviceenable openaisparser
+REGULAR_LCRSO		= openaisserviceenable
 
 AMF_OBJECTS		= $(src:%.c=%.o)
 
-SOURCES			= $(SERVICE_LCRSO:%=%.c) $(src) openaisserviceenable.c openaisparser.c
+SOURCES			= $(SERVICE_LCRSO:%=%.c) $(src) openaisserviceenable.c
 
 EXTRA_DIST		= $(SOURCES) aisexec
 

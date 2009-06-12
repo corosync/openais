@@ -30,7 +30,6 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 
 EXTRA_DIST              = autogen.sh \
-			  conf/openais.conf.example \
 			  conf/amf.conf.example
 
 AUTOMAKE_OPTIONS	= foreign
@@ -41,8 +40,7 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
 
 dist_doc_DATA		= LICENSE README.amf AUTHORS
 
-sysconf_DATA		= conf/openais.conf.example \
-			  conf/amf.conf.example
+sysconf_DATA		= conf/amf.conf.example
 
 SUBDIRS	= include lib services test pkgconfig man
 # init
