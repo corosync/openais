@@ -636,7 +636,6 @@ static int poll_handler_connection (
 				res = 0;
 				break;
 			}
-			openais_conn_refcount_dec (conn_info);
 		}
 #if defined(OPENAIS_SOLARIS) || defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
 		/* On many OS poll never return POLLHUP or POLLERR.
@@ -644,9 +643,11 @@ static int poll_handler_connection (
 		 */
 		if (res == 0) {
 			ipc_disconnect (conn_info);
+			openais_conn_refcount_dec (conn_info);
 			return (0);
 		}
 #endif
+		openais_conn_refcount_dec (conn_info);
 	}
 
 	openais_conn_refcount_inc (conn_info);
