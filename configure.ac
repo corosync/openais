@@ -5,7 +5,7 @@
 AC_PREREQ([2.61])
 
 AC_INIT([openais], [trunk], [openais@lists.osdl.org])
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([-Wno-portability])
 
 AC_CONFIG_SRCDIR([lib/clm.c])
 AC_CONFIG_HEADER([include/config.h include/oa_config.h])
