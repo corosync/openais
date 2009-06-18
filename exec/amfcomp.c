@@ -368,7 +368,7 @@ static void *clc_command_run (void *context)
 			/*                                                              
              * TODO: remove this and handle properly later...
              */
-			openais_exit_error (AIS_DONE_FATAL_ERR);
+			openais_shutdown (AIS_DONE_FATAL_ERR);
 		}
 		xprintf ("process (%d) finished with %d\n", pid, status);
 		if (clc_command_run_data->completion_callback) {
@@ -479,7 +479,7 @@ static int clc_cli_instantiate (struct amf_comp *comp)
 
 	clc_command_run_data = malloc (sizeof (struct clc_command_run_data));
 	if (clc_command_run_data == NULL) {
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 	}
 	clc_command_run_data->comp = comp;
 	clc_command_run_data->type = CLC_COMMAND_RUN_OPERATION_TYPE_INSTANTIATE;
@@ -538,7 +538,7 @@ static int lib_comp_terminate_request (struct amf_comp *comp)
 	component_terminate_callback_data =
 		malloc (sizeof (struct component_terminate_callback_data));
 	if (component_terminate_callback_data == NULL) {
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 	}
 	component_terminate_callback_data->comp = comp;
 
@@ -600,7 +600,7 @@ static int clc_cli_cleanup (struct amf_comp *comp)
 	log_printf (LOG_LEVEL_DEBUG, "clc_cli_cleanup\n");
 	clc_command_run_data = malloc (sizeof (struct clc_command_run_data));
 	if (clc_command_run_data == NULL) {
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 	}
 	clc_command_run_data->comp = comp;
 	clc_command_run_data->type = CLC_COMMAND_RUN_OPERATION_TYPE_CLEANUP;
@@ -667,7 +667,7 @@ struct amf_comp *amf_comp_create(struct amf_su *su)
 	struct amf_comp *comp = calloc (1, sizeof (struct amf_comp));
 
 	if (comp == NULL) {
-		openais_exit_error(AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown(AIS_DONE_OUT_OF_MEMORY);
 	}
 	comp->next = su->comp_head;
 	su->comp_head = comp;
@@ -1052,7 +1052,7 @@ static void lib_csi_set_request (
 	p = malloc(sizeof(struct res_lib_amf_csisetcallback) +
 			   char_length_of_csi_attrs);
 	if (p == NULL) {
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 	}
 
 	res_lib = (struct res_lib_amf_csisetcallback*)p;

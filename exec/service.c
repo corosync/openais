@@ -42,6 +42,8 @@
 #include "mainconfig.h"
 #include "util.h"
 #include "print.h"
+#include "main.h"
+#include "ipc.h"
 
 struct default_service {
 	char *name;
@@ -92,6 +94,10 @@ static struct default_service default_services[] = {
 };
 
 struct openais_service_handler *ais_service[SERVICE_HANDLER_MAXIMUM_COUNT];
+
+static struct objdb_iface_ver0 *shutdown_objdb;
+
+static poll_timer_handle shutdown_handle;
 
 static unsigned int default_services_requested (struct objdb_iface_ver0 *objdb)
 {
@@ -387,4 +393,51 @@ unsigned int openais_service_defaults_link_and_init (struct objdb_iface_ver0 *ob
 	}
 	
 	return (0);
+}
+
+static pthread_t aisexec_exit_thread;
+
+static const char *shutdown_strings[128];
+
+static void *aisexec_exit (void *arg)
+{
+	if  (shutdown_objdb) {
+		openais_service_unlink_all (shutdown_objdb);
+	}
+
+	poll_stop (0);
+	totempg_finalize ();
+	openais_ipc_exit ();
+
+	if ((int)arg >= OPENAIS_SHUTDOWN_ERRORCODES_START) {
+		log_printf (LOG_LEVEL_ERROR, "AIS Executive exiting (reason: %s).\n", shutdown_strings[((int)arg) - OPENAIS_SHUTDOWN_ERRORCODES_START]);
+		log_flush();
+		return NULL;
+	}
+	openais_exit_error ((enum e_ais_done)arg);
+
+	/* never reached */
+	return NULL;
+}
+
+static void init_shutdown (void *data)
+{
+	pthread_create (&aisexec_exit_thread, NULL, aisexec_exit, data);
+}
+
+void openais_shutdown (int error_code)
+{
+	poll_timer_add (aisexec_poll_handle, 500, (void *)error_code, init_shutdown, &shutdown_handle);
+}
+
+void openais_shutdown_objdb_register (struct objdb_iface_ver0 *objdb)
+{
+	shutdown_objdb = objdb;
+}
+
+void openais_shutdown_errorstring_register (
+	int error_code,
+	const char *error_string)
+{
+	shutdown_strings[error_code - OPENAIS_SHUTDOWN_ERRORCODES_START] = error_string;
 }

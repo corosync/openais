@@ -73,6 +73,7 @@
 #include "amf.h"
 #include "util.h"
 #include "main.h"
+#include "service.h"
 
 /**
  * Determine if all applications are started
@@ -173,7 +174,7 @@ struct amf_cluster *amf_cluster_create (void)
 	struct amf_cluster *cluster = calloc (1, sizeof (struct amf_cluster));
 
 	if (cluster == NULL) {
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 	}
 
 	cluster->saAmfClusterStartupTimeout = -1;

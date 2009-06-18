@@ -117,6 +117,7 @@
 #include "util.h"
 #include "print.h"
 #include "main.h"
+#include "service.h"
 
 static int presence_state_all_comps_in_su_are_set (struct amf_su *su,
 	SaAmfPresenceStateT state)
@@ -207,7 +208,7 @@ static void comp_assign_csi (struct amf_comp *comp, struct amf_csi *csi,
 
 	csi_assignment = malloc (sizeof (struct amf_csi_assignment));
 	if (csi_assignment == NULL) {
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 	}
 
 	csi_assignment->next = csi->assigned_csis;
@@ -280,7 +281,7 @@ void amf_su_assign_si (struct amf_su *su, struct amf_si *si,
 
 	si_assignment = malloc (sizeof (struct amf_si_assignment));
 	if (si_assignment == NULL) {
-		openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+		openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 	}
 	amf_su_dn_make (su, &si_assignment->name);
 	si_assignment->saAmfSISUHAState = 0; /* undefined confirmed HA state */

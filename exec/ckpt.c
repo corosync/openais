@@ -3813,7 +3813,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint (
 		checkpoint = malloc (sizeof (struct checkpoint));
 		if (checkpoint == 0) {
 			LEAVE();
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 		}
 		memset (checkpoint, 0, sizeof (struct checkpoint));
 
@@ -3911,13 +3911,13 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 		checkpoint_section = malloc (sizeof (struct checkpoint_section));
 		if (checkpoint_section == 0) {
 			LEAVE();
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 		}
 		section_contents = malloc (req_exec_ckpt_sync_checkpoint_section->section_size);
 		if (section_contents == 0) {
 			free (checkpoint_section);
 			LEAVE();
-			openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+			openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 		}
 		if (req_exec_ckpt_sync_checkpoint_section->id_len) {
 			
@@ -3926,7 +3926,7 @@ static void message_handler_req_exec_ckpt_sync_checkpoint_section (
 				free (checkpoint_section);
 				free (section_contents);
 				LEAVE();
-				openais_exit_error (AIS_DONE_OUT_OF_MEMORY);
+				openais_shutdown (AIS_DONE_OUT_OF_MEMORY);
 			}
 
 			/*

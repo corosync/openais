@@ -132,52 +132,14 @@ struct totempg_group openais_group = {
 	.group_len	= 1
 };
 
-static void *aisexec_exit (void *arg)
-{
-	if(objdb) {
-		openais_service_unlink_all (objdb);
-	}
-
-#ifdef DEBUG_MEMPOOL
-	int stats_inuse[MEMPOOL_GROUP_SIZE];
-	int stats_avail[MEMPOOL_GROUP_SIZE];
-	int stats_memoryused[MEMPOOL_GROUP_SIZE];
-	int i;
-
-	mempool_getstats (stats_inuse, stats_avail, stats_memoryused);
-	log_printf (LOG_LEVEL_DEBUG, "Memory pools:\n");
-	for (i = 0; i < MEMPOOL_GROUP_SIZE; i++) {
-	log_printf (LOG_LEVEL_DEBUG, "order %d size %d inuse %d avail %d memory used %d\n",
-		i, 1<<i, stats_inuse[i], stats_avail[i], stats_memoryused[i]);
-	}
-#endif
-
-	log_flush ();
-	poll_stop (0);
-	totempg_finalize ();
-	openais_ipc_exit ();
-	openais_exit_error (AIS_DONE_EXIT);
-
-	/* never reached */
-	return NULL;
-}
-
-pthread_t aisexec_exit_thread;
-static void init_shutdown(void *data) 
-{
-    pthread_create (&aisexec_exit_thread, NULL, aisexec_exit, NULL);
-}
-
-static poll_timer_handle shutdown_handle;
 static void sigquit_handler (int num)
 {
-    /* avoid creating threads from within the interrupt context */
-    poll_timer_add (aisexec_poll_handle, 500, NULL, init_shutdown, &shutdown_handle);
+	openais_shutdown (AIS_DONE_EXIT);
 }
 
 void sigintr_handler (int signum)
 {
-    poll_timer_add (aisexec_poll_handle, 500, NULL, init_shutdown, &shutdown_handle);
+	openais_shutdown (AIS_DONE_EXIT);
 }
 
 static int pool_sizes[] = { 0, 0, 0, 0, 0, 4096, 0, 1, 0, /* 256 */

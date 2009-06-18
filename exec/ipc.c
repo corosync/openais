@@ -834,14 +834,14 @@ void openais_ipc_init (
 	libais_server_fd = socket (PF_UNIX, SOCK_STREAM, 0);
 	if (libais_server_fd == -1) {
 		log_printf (LOG_LEVEL_ERROR ,"Cannot create libais client connections socket.\n");
-		openais_exit_error (AIS_DONE_LIBAIS_SOCKET);
+		openais_shutdown (AIS_DONE_LIBAIS_SOCKET);
 	};
 
 	totemip_nosigpipe (libais_server_fd);
 	res = fcntl (libais_server_fd, F_SETFL, O_NONBLOCK);
 	if (res == -1) {
 		log_printf (LOG_LEVEL_ERROR, "Could not set non-blocking operation on server socket: %s\n", strerror (errno));
-		openais_exit_error (AIS_DONE_LIBAIS_SOCKET);
+		openais_shutdown (AIS_DONE_LIBAIS_SOCKET);
 	}
 
 #if !defined(OPENAIS_LINUX)
@@ -861,7 +861,7 @@ void openais_ipc_init (
 	res = bind (libais_server_fd, (struct sockaddr *)&un_addr, AIS_SUN_LEN(&un_addr));
 	if (res) {
 		log_printf (LOG_LEVEL_ERROR, "ERROR: Could not bind AF_UNIX: %s.\n", strerror (errno));
-		openais_exit_error (AIS_DONE_LIBAIS_BIND);
+		openais_shutdown (AIS_DONE_LIBAIS_BIND);
 	}
 	listen (libais_server_fd, SERVER_BACKLOG);
 

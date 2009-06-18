@@ -126,4 +126,14 @@ extern unsigned int openais_service_defaults_link_and_init (
 
 extern struct openais_service_handler *ais_service[];
 
+extern void openais_shutdown_errorstring_register (
+	int error_code,
+	const char *error_string);
+
+extern void openais_shutdown (int error_code);
+
+extern void openais_shutdown_objdb_register (struct objdb_iface_ver0 *objdb);
+
+#define OPENAIS_SHUTDOWN_ERRORCODES_START 64
+
 #endif /* SERVICE_H_DEFINED */
