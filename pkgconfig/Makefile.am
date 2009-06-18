@@ -51,8 +51,8 @@ lib%.pc: libtemplate.pc.in Makefile
 all-local: $(target_LIBS)
 
 install-exec-local: $(target_LIBS)
-	install -d $(DESTDIR)/$(libdir)/pkgconfig
-	install -m 644 $(target_LIBS) $(DESTDIR)/$(libdir)/pkgconfig
+	$(INSTALL) -d $(DESTDIR)/$(libdir)/pkgconfig
+	$(INSTALL) -m 644 $(target_LIBS) $(DESTDIR)/$(libdir)/pkgconfig
 
 uninstall-local:
 	cd $(DESTDIR)/$(libdir)/pkgconfig && rm -f $(target_LIBS)
