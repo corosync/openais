@@ -20,7 +20,7 @@ MAINTAINERCLEANFILES    = Makefile.in config.h.in
 
 OPENAIS_H		= saAis.h saAmf.h saCkpt.h saClm.h saEvt.h saLck.h saMsg.h saTmr.h
 
-OPENAIS_INTERNAL_H	= ipc_amf.h ipc_ckpt.h ipc_clm.h ipc_evt.h ipc_lck.h ipc_msg.h ipc_tmr.h mar_ckpt.h mar_clm.h mar_evt.h mar_sa.h
+OPENAIS_INTERNAL_H	= ipc_amf.h ipc_ckpt.h ipc_clm.h ipc_evt.h ipc_lck.h ipc_msg.h ipc_tmr.h mar_ckpt.h mar_clm.h mar_evt.h mar_lck.h mar_sa.h
 
 EXTRA_DIST 		= $(noinst_HEADERS)
 
