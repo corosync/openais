@@ -308,7 +308,7 @@ struct amf_cluster *amf_config_read (char **error_string)
 	char                     *value;
 	filename = getenv ("COROSYNC_AMF_CONFIG_FILE");
 	if (!filename) {
-		filename = SYSCONFDIR "/amf.conf";
+		filename = COROSYSCONFDIR "/amf.conf";
 	}
 
 	fp = fopen (filename, "r");

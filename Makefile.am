@@ -40,7 +40,9 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure depcomp \
 
 dist_doc_DATA		= LICENSE README.amf AUTHORS
 
-sysconf_DATA		= conf/amf.conf.example
+corosysconfdir		= ${COROSYSCONFDIR}
+
+corosysconf_DATA	= conf/amf.conf.example
 
 SUBDIRS	= include lib services test pkgconfig man
 # init
