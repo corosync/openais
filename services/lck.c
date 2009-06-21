@@ -1077,7 +1077,7 @@ static inline void lck_sync_resource_lock_timer_stop (void)
 			{
 				resource_lock->timeout =
 					api->timer_expire_time_get (resource_lock->timer_handle);
-			
+
 				api->timer_delete (resource_lock->timer_handle);
 
 				/* DEBUG */
@@ -1821,7 +1821,7 @@ static void lck_unlock (
 	}
 	else {
 		/*
-		 * We are not unlocking the exclusive lock, therefore 
+		 * We are not unlocking the exclusive lock, therefore
 		 * this lock must be in one of the lock lists.
 		 * Remove the lock from the list.
 		 */
@@ -2274,7 +2274,7 @@ static void message_handler_req_exec_lck_resourceclose (
 	}
 
 error_exit:
-	if (api->ipc_source_is_local (&req_exec_lck_resourceclose->source))	    
+	if (api->ipc_source_is_local (&req_exec_lck_resourceclose->source))
 	{
 		if (req_exec_lck_resourceclose->exit_flag == 0) {
 			res_lib_lck_resourceclose.header.size =

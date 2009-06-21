@@ -619,7 +619,7 @@ saLckResourceOpenAsync (
 		goto error_exit;
 	}
 
-	/* 
+	/*
 	 * Check that saLckLockGrantCallback is defined.
 	 */
 	if (lckInstance->callbacks.saLckResourceOpenCallback == NULL) {
@@ -954,7 +954,7 @@ saLckResourceLockAsync (
 		goto error_put;
 	}
 
-	/* 
+	/*
 	 * Check that saLckLockGrantCallback is defined.
 	 */
 	if (lckInstance->callbacks.saLckLockGrantCallback == NULL) {
