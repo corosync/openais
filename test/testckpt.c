@@ -50,7 +50,7 @@
 #include "saCkpt.h"
 #include "sa_error.h"
 
-#ifdef OPENAIS_SOLARIS
+#ifndef timersub
 #define timersub(a, b, result)						\
     do {								\
 	(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;			\
