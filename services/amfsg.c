@@ -522,8 +522,8 @@ static void acsm_enter_idle (amf_sg_t *sg)
 		}
 	}
 
-	free ((void *)sg->recovery_scope.sus);
-	free ((void *)sg->recovery_scope.sis);
+	free (sg->recovery_scope.sus);
+	free (sg->recovery_scope.sis);
 	memset (&sg->recovery_scope, 0, sizeof (struct sg_recovery_scope));
 	sg->node_to_start = NULL;
 
