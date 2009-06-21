@@ -53,7 +53,6 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <assert.h>
 
 #include <saAis.h>
 #include "util.h"

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2002-2005 MontaVista Software, Inc.
- * Copyright (c) 2006 Red Hat, Inc.
+ * Copyright (c) 2006, 2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -39,7 +39,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <sys/types.h>
