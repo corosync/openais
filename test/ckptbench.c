@@ -55,7 +55,7 @@
 #include "saCkpt.h"
 #include "sa_error.h"
 
-#ifdef OPENAIS_SOLARIS
+#ifndef timersub
 #define timersub(a, b, result)						\
     do {								\
 	(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;			\
@@ -259,6 +259,7 @@ int main (void) {
 	for (i = 0; i < 50; i++) { /* number of repetitions - up to 50k */
 		ckpt_benchmark (checkpointHandle, size);
 		size += 1000;
+		signal (SIGALRM, sigalrm_handler);
 	}
 
     error = saCkptFinalize (ckptHandle);
