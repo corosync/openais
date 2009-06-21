@@ -1256,7 +1256,7 @@ static SaAisErrorT evt_open_channel(const mar_name_t *cn, SaUint8T flgs)
 	}
 
 	/*
-	 * create the channel packet to send. Tell the the cluster
+	 * create the channel packet to send. Tell the cluster
 	 * to create the channel.
 	 */
 	memset(&cpkt, 0, sizeof(cpkt));
@@ -1294,7 +1294,7 @@ static SaAisErrorT evt_close_channel(mar_name_t *cn, uint64_t unlink_id, void *c
 	ret = SA_AIS_OK;
 
 	/*
-	 * create the channel packet to send. Tell the the cluster
+	 * create the channel packet to send. Tell the cluster
 	 * to close the channel.
 	 */
 	memset(&cpkt, 0, sizeof(cpkt));
