@@ -1028,6 +1028,10 @@ static int ckpt_checkpoint_close (
 
 static int ckpt_exec_init_fn (struct corosync_api_v1 *corosync_api_v1)
 {
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+
 	api = corosync_api_v1;
 
 	return (0);

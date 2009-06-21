@@ -3102,6 +3102,9 @@ static int evt_exec_init(struct corosync_api_v1 *corosync_api)
 	hdb_handle_t object_find_handle;
 	char *value;
 
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
 	api = corosync_api;
 
 	clmapi = openais_clm_services_api_reference (api, &clm_services_api_handle);

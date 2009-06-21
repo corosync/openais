@@ -189,6 +189,8 @@
  * C7 - Specified number of SU failover actions have been done.
  */
 
+#include <config.h>
+
 #include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
@@ -200,6 +202,13 @@ LOGSYS_DECLARE_SUBSYS ("AMF");
 /******************************************************************************
  * Internal (static) utility functions
  *****************************************************************************/
+
+void amfnode_init (void)
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+}
 
 static void node_acsm_enter_leaving_spontaneously(struct amf_node *node)
 {

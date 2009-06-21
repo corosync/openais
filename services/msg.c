@@ -2390,6 +2390,9 @@ static void msg_exec_dump_fn (void)
 
 static int msg_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_exec_init_fn\n");
 

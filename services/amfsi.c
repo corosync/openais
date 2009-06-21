@@ -110,6 +110,7 @@
  *
  */
 
+#include <config.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,6 +120,13 @@
 #include <corosync/engine/logsys.h>
 
 LOGSYS_DECLARE_SUBSYS ("AMF");
+
+void amfsi_init (void)
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+}
 
 /**
  * Check that all CSI assignments belonging to an SI assignment

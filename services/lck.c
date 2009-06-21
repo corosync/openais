@@ -1465,6 +1465,11 @@ static void lck_exec_dump_fn (void)
 static int lck_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
 	/* DEBUG */
+
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_exec_init_fn\n");
 
 	api = corosync_api;

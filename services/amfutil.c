@@ -157,6 +157,13 @@ char *strstr_rs (const char *haystack, const char *needle)
 	return (end_address);
 }
 
+void amfutil_init (void)
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init ();
+#endif
+}
+
 static int init_category (struct amf_comp *comp, char *loc)
 {
 	if (strcmp (loc, "sa_aware") == 0) {

@@ -362,6 +362,8 @@
  * C31 - no new additional assignments needed or possible
  */
 
+#include <config.h>
+
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
@@ -413,6 +415,13 @@ typedef struct sg_event {
 static	int is_cluster_start(amf_node_t *node_to_start)
 {
 	return node_to_start == NULL;
+}
+
+void amfsg_init (void)
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
 }
 
 static void sg_set_event (amf_sg_event_type_t sg_event_type,

@@ -139,6 +139,7 @@
  * C4 - No Application has Availability Control state == ASSIGNING_WORKLOAD
  */
 
+#include <config.h>
 
 #include <stdlib.h>
 #include <errno.h>
@@ -156,6 +157,13 @@ typedef struct cluster_event {
 	amf_cluster_t *cluster;
 	amf_node_t *node;
 } cluster_event_t;
+
+void amfcluster_init (void)
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+}
 
 /******************************************************************************
  * Internal (static) utility functions

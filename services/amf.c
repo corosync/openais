@@ -1289,6 +1289,18 @@ static void amf_sync_activate (void)
  */
 static int amf_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+	amfapp_init();
+	amfcluster_init();
+	amfcomp_init();
+	amfnode_init();
+	amfsg_init();
+	amfsi_init();
+	amfsu_init();
+	amfutil_init();
+
 	if (gethostname (g_hostname, sizeof (g_hostname)) == -1) {
 		log_printf (LOGSYS_LEVEL_ERROR, "gethostname failed: %d", errno);
 		corosync_fatal_error (COROSYNC_FATAL_ERR);

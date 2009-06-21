@@ -124,6 +124,8 @@
 *  C4 - Sender is Cluster
 */
 
+#include <config.h>
+
 #include <assert.h>
 #include <stdlib.h>
 #include "amf.h"
@@ -144,6 +146,13 @@ typedef struct application_event {
 static	int is_cluster_start(amf_node_t *node_to_start)
 {
 	return node_to_start == NULL;
+}
+
+void amfapp_init (void)
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
 }
 
 static void application_defer_event (

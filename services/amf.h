@@ -1228,5 +1228,20 @@ static inline void setSaNameT (SaNameT *name, const char *str) {
 	}
 }
 
+extern void amfapp_init(void);
+
+extern void amfcluster_init(void);
+
+extern void amfcomp_init(void);
+
+extern void amfnode_init(void);
+
+extern void amfsg_init(void);
+
+extern void amfsi_init(void);
+
+extern void amfsu_init(void);
+
+extern void amfutil_init(void);
 
 #endif /* AMF_H_DEFINED */

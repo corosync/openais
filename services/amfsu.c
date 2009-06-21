@@ -370,6 +370,8 @@
  *
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -403,6 +405,12 @@ typedef struct su_event {
  * Internal (static) utility functions
  *****************************************************************************/
 
+void amfsu_init()
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+}
 
 static void su_event_set(struct amf_su *su, struct amf_comp *comp,
 	SaAmfRecommendedRecoveryT recommended_recovery,

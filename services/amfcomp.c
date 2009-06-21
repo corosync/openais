@@ -123,6 +123,7 @@
  *
  */
 
+#include <config.h>
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -234,6 +235,13 @@ struct invocation {
 	int interface;
 	int active;
 };
+
+void amfcomp_init (void)
+{
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init ();
+#endif
+}
 
 static struct invocation *invocation_entries = 0;
 static int invocation_entries_size = 0;

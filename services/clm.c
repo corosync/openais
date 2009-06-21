@@ -330,6 +330,10 @@ static void my_cluster_node_load (void)
 
 static int clm_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
+#ifdef OPENAIS_SOLARIS
+	logsys_subsys_init();
+#endif
+
 	api = corosync_api;
 
 	memset (cluster_node_entries, 0,
