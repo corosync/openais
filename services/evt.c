@@ -2197,7 +2197,6 @@ static int evt_lib_init(void *conn)
 	 * Initialize the open channel handle database.
 	 */
 	hdb_create(&libevt_pd->esi_hdb);
-printf ("hdb cre %p\n", &libevt_pd->esi_hdb);
 
 	/*
 	 * list of channels open on this instance
@@ -2361,7 +2360,6 @@ common_chan_close(struct event_svr_channel_open	*eco, struct libevt_pd *esip, vo
 	 * remove it's handle (this frees the memory too).
 	 *
 	 */
-printf ("list del %p\n",eco);
 	list_del(&eco->eco_entry);
 	list_del(&eco->eco_instance_entry);
 
@@ -2416,7 +2414,6 @@ static void lib_evt_close_channel(void *conn, const void *message)
 	}
 	eco = ptr;
 
-printf ("close1\n");
 	common_chan_close(eco, esip, conn);
 	hdb_handle_destroy(&esip->esi_hdb, hdb_nocheck_convert(req->icc_channel_handle));
 	hdb_handle_put(&esip->esi_hdb, hdb_nocheck_convert(req->icc_channel_handle));
@@ -3036,7 +3033,6 @@ static int evt_lib_exit(void *conn)
 	struct libevt_pd *esip =
 		api->ipc_private_data_get(conn);
 
-printf ("lib_exit (%p)\n", conn);
 	log_printf(LOGSYS_LEVEL_DEBUG, "saEvtFinalize (Event exit request)\n");
 	log_printf(LOGSYS_LEVEL_DEBUG, "saEvtFinalize %d evts on list\n",
 			esip->esi_nevents);
@@ -3047,9 +3043,7 @@ printf ("lib_exit (%p)\n", conn);
 	for (l = esip->esi_open_chans.next; l != &esip->esi_open_chans; l = nxt) {
 		nxt = l->next;
 		eco = list_entry(l, struct event_svr_channel_open, eco_instance_entry);
-printf ("close2\n");
 		common_chan_close(eco, esip, conn);
-printf ("handle destroy %p %d\n", &esip->esi_hdb, eco->eco_my_handle);
 		hdb_handle_destroy(&esip->esi_hdb, hdb_nocheck_convert(eco->eco_my_handle));
 	}
 
@@ -3087,7 +3081,6 @@ printf ("handle destroy %p %d\n", &esip->esi_hdb, eco->eco_my_handle);
 	/*
 	 * Destroy the open channel handle database
 	 */
-printf ("hdb destroy %p\n", &esip->esi_hdb);
 	hdb_destroy(&esip->esi_hdb);
 
 	return 0;
@@ -3185,13 +3178,10 @@ try_deliver_event(struct event_data *evt,
 	struct event_svr_channel_open *eco;
 	struct event_svr_channel_subscr *ecs;
 	int delivered_event = 0;
-printf ("try_deliver_event\n");
 	/*
 	 * Check open channels
 	 */
 	for (l = eci->esc_open_chans.next; l != &eci->esc_open_chans; l = l->next) {
-printf ("l=%p\n", l);
-fflush (stdout);
 		eco = list_entry(l, struct event_svr_channel_open, eco_entry);
 		/*
 		 * See if enabled to receive
@@ -3525,7 +3515,6 @@ static void evt_chan_open_finish(struct open_chan_pending *ocp,
 	eco->eco_my_handle = handle;
 	eco->eco_conn = ocp->ocp_conn;
 	list_add_tail(&eco->eco_entry, &eci->esc_open_chans);
-printf ("list add %p to open chans\n", eco);
 	list_add_tail(&eco->eco_instance_entry, &esip->esi_open_chans);
 
 	/*
