@@ -2629,8 +2629,7 @@ error_exit:
 			list_add_tail (&cleanup->list, &msg_pd->queue_cleanup_list);
 		}
 		else {
-			if (cleanup)
-				free (cleanup);
+			free (cleanup);
 		}
 
 		api->ipc_response_send (
@@ -2799,8 +2798,7 @@ error_exit:
 			list_add_tail (&cleanup->list, &msg_pd->queue_cleanup_list);
 		}
 		else {
-			if (cleanup)
-				free (cleanup);
+			free (cleanup);
 		}
 
 		api->ipc_response_send (
@@ -3956,8 +3954,7 @@ error_exit:
 		}
 	}
 
-	if (msg != NULL)
-	    free (msg);
+	free (msg);
 }
 
 static void message_handler_req_exec_msg_messagedatafree (
