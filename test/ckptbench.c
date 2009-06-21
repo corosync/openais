@@ -69,32 +69,23 @@
 
 int alarm_notice;
 
-void fail_on_error(SaAisErrorT error, char* opName) {
+static void fail_on_error(SaAisErrorT error, const char *opName) {
 	if (error != SA_AIS_OK) {
         printf ("%s: result %s\n", opName, get_sa_error_b(error));
         exit (1);
 	}
 }
 
-void printSaNameT (SaNameT *name)
-{
-	int i;
+static SaVersionT version = { 'B', 1, 1 };
 
-	for (i = 0; i < name->length; i++) {
-		printf ("%c", name->value[i]);
-	}
-}
-
-SaVersionT version = { 'B', 1, 1 };
-
-SaCkptCallbacksT callbacks = {
+static SaCkptCallbacksT callbacks = {
     0,
     0
 };
 
-SaNameT checkpointName = { 5, "abra\0" };
+static SaNameT checkpointName = { 5, "abra\0" };
 
-SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
+static SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
         .creationFlags =        SA_CKPT_WR_ALL_REPLICAS,
         .checkpointSize =       250000,
         .retentionDuration =    SA_TIME_END,
@@ -103,57 +94,30 @@ SaCkptCheckpointCreationAttributesT checkpointCreationAttributes = {
         .maxSectionIdSize =     15
 };
 
-SaCkptSectionIdT sectionId1 = {
+static SaCkptSectionIdT sectionId1 = {
 	13,
 	(SaUint8T *) "section ID #1"
 };
 
-SaCkptSectionIdT sectionId2 = {
+static SaCkptSectionIdT sectionId2 = {
 	13,
 	(SaUint8T *) "section ID #2"
 };
-SaCkptSectionCreationAttributesT sectionCreationAttributes1 = {
+static SaCkptSectionCreationAttributesT sectionCreationAttributes1 = {
 	&sectionId1,
 	SA_TIME_END
 };
 
-SaCkptSectionCreationAttributesT sectionCreationAttributes2 = {
+static SaCkptSectionCreationAttributesT sectionCreationAttributes2 = {
 	&sectionId2,
 	SA_TIME_END
-};
-
-char readBuffer1[1025];
-
-char readBuffer2[1025];
-
-SaCkptIOVectorElementT ReadVectorElements[] = {
-	{
-		{
-			13,
-			(SaUint8T *) "section ID #1"
-		},
-		readBuffer1,
-		sizeof (readBuffer1),
-		0,
-		0
-	},
-	{
-		{
-			13,
-			(SaUint8T *) "section ID #2"
-		},
-		readBuffer2,
-		sizeof (readBuffer2),
-		0,
-		0
-	}
 };
 
 #define DATASIZE 200000
 #define LOOPS 5000
 
-char data[500000];
-SaCkptIOVectorElementT WriteVectorElements[] = {
+static char data[500000];
+static SaCkptIOVectorElementT WriteVectorElements[] = {
 	{
 		{
 			13,
@@ -178,7 +142,7 @@ SaCkptIOVectorElementT WriteVectorElements[] = {
 #endif
 };
 
-void ckpt_benchmark (SaCkptCheckpointHandleT checkpointHandle,
+static void ckpt_benchmark (SaCkptCheckpointHandleT checkpointHandle,
 	int write_size)
 {
 	struct timeval tv1, tv2, tv_elapsed;
@@ -219,7 +183,7 @@ retry:
 		((float)write_count) * ((float)write_size) /  ((tv_elapsed.tv_sec + (tv_elapsed.tv_usec / 1000000.0)) * 1000000.0));
 }
 
-void sigalrm_handler (int num)
+static void sigalrm_handler (int num)
 {
 	alarm_notice = 1;
 }
