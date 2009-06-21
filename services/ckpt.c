@@ -3344,7 +3344,6 @@ static void sync_refcount_decrement (
 		}
 		if (checkpoint->refcount_set[i].nodeid == nodeid) {
 			checkpoint->refcount_set[i].refcount -= 1;
-log_printf (LOGSYS_LEVEL_NOTICE, "decrementing node id %d %d\n", nodeid, checkpoint->refcount_set[i].refcount);
 			break;
 		}
 	}
