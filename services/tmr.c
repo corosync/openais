@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008 Red Hat, Inc.
+ * Copyright (c) 2008, 2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
@@ -45,7 +45,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <signal.h>
 #include <time.h>
 #include <arpa/inet.h>
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2002-2006 MontaVista Software, Inc.
- * Copyright (c) 2006-2007 Red Hat, Inc.
+ * Copyright (c) 2006-2007, 2009 Red Hat, Inc.
  * Copyright (C) 2006 Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -53,7 +53,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <signal.h>
 #include <time.h>
 #include <unistd.h>
 #include <netinet/in.h>
