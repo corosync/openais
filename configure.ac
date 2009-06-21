@@ -178,6 +178,7 @@ AC_ARG_WITH([lcrso-dir],
 # OS detection
 # THIS SECTION MUST DIE!
 
+CP=cp
 case "$host_os" in
 	*linux*)
 		AC_DEFINE_UNQUOTED([OPENAIS_LINUX], [1],
@@ -198,6 +199,7 @@ case "$host_os" in
 		DARWIN_OPTS="-dynamiclib -bind_at_load \
 			     -current_version ${SONAME} \
 			     -compatibility_version ${SONAME}"
+		CP=rsync
 	;;
 	*bsd*)
 		AC_DEFINE_UNQUOTED([OPENAIS_BSD], [1],
@@ -213,11 +215,14 @@ case "$host_os" in
 				   [Compiling for Solaris platform])
 		AC_DEFINE_UNQUOTED([TS_CLASS], [1],
 				   [Prevent being scheduled RR])
+		CP=rsync
 		OS_CFLAGS=""
 		OS_CPPFLAGS="-D_REENTRANT"
-		OS_LDFLAGS="-Wl,-rpath-link=/usr/lib"
-		OS_DYFLAGS="-Wl,--export-dynamic"
+		OS_LDFLAGS=""
+		OS_DYFLAGS="-Wl,-z,lazyload"
 		DARWIN_OPTS=""
+		SOLARIS_OPTS=" "
+
 	;;
 	*)
 		AC_MSG_ERROR([Unsupported OS? hmmmm])
@@ -315,7 +320,9 @@ AC_SUBST([SONAME])
 AC_SUBST([OS_DYFLAGS])
 
 AM_CONDITIONAL(BUILD_DARWIN, test -n "${DARWIN_OPTS}")
+AM_CONDITIONAL(BUILD_SOLARIS, test -n "${SOLARIS_OPTS}")
 AC_SUBST([DARWIN_OPTS])
+AC_SUBST([SOLARIS_OPTS])
 
 AM_CONDITIONAL(BUILD_HTML_DOCS, test -n "${GROFF}")
 

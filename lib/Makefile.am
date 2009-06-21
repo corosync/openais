@@ -73,11 +73,33 @@ libSaLck.so.$(SONAME): util.o lck.o
 libSaMsg.so.$(SONAME): util.o msg.o
 	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
-libSaAmf.so.$(SONAME): util.o amf.o
-	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
-
 libSaTmr.so.$(SONAME): util.o tmr.o
 	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+endif
+
+if BUILD_SOLARIS
+
+libSaAmf.so.$(SONAME): util.o amf.o
+	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+libSaCkpt.so.$(SONAME): util.o ckpt.o
+	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+libSaClm.so.$(SONAME): util.o clm.o
+	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+libSaEvt.so.$(SONAME): util.o evt.o
+	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+libSaLck.so.$(SONAME): util.o lck.o
+	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+libSaMsg.so.$(SONAME): util.o msg.o
+	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+libSaTmr.so.$(SONAME): util.o tmr.o
+	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 else
 
@@ -145,7 +167,7 @@ all-local: $(SHARED_LIBS)
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/$(libdir)
 	$(INSTALL) -m 755 $(SHARED_LIBS) $(DESTDIR)/$(libdir)
-	cp -a $(SHARED_LIBS_SO) $(SHARED_LIBS_SO_TWO) $(DESTDIR)/$(libdir)
+	$(CP) -a $(SHARED_LIBS_SO) $(SHARED_LIBS_SO_TWO) $(DESTDIR)/$(libdir)
 
 uninstall-local:
 	cd $(DESTDIR)/$(libdir)/ && \

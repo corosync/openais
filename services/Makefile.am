@@ -64,6 +64,18 @@ service_%.lcrso: %.o
 	$(CC) $(CFLAGS) -bundle -bundle_loader /usr/sbin/corosync $^ -o $@
 %.lcrso: %.o
 	$(CC) $(CFLAGS) -bundle -bundle_loader /usr/sbin/corosync $^ -o $@
+endif
+if BUILD_SOLARIS
+
+service_amf.lcrso: $(AMF_OBJECTS)
+	$(LD) $(LDFLAGS) -G $^ -o $@
+
+service_%.lcrso: %.o
+	$(LD) $(LDFLAGS) -G $^ -o $@
+
+%.lcrso: %.o
+	$(LD) $(LDFLAGS) -G $^ -o $@
+
 else
 service_amf.lcrso: $(AMF_OBJECTS)
 	$(CC) $(CFLAGS) -shared -Wl,-soname=$@ $^ -o $@
