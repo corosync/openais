@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008 Red Hat Software, Inc.
+ * Copyright (c) 2008, 2009 Red Hat Software, Inc.
  *
  * All rights reserved.
  *
@@ -32,6 +32,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -32,6 +32,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>

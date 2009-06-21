@@ -2,6 +2,7 @@
  * Test program for event service subscriptions
  */
 
+#include <config.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>

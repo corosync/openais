@@ -32,6 +32,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <config.h>
 #include "serv_amf.h"
 
 // Global variables

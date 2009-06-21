@@ -2,6 +2,7 @@
  * Test program for event service
  */
 
+#include <config.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/poll.h>
