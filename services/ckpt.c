@@ -615,7 +615,14 @@ static struct corosync_service_engine *ckpt_get_handler_ver0 (void)
 	return (&ckpt_service_engine);
 }
 
-__attribute__ ((constructor)) static void register_this_component (void) {
+#ifdef OPENAIS_SOLARIS
+void corosync_lcr_component_register (void);
+
+void corosync_lcr_component_register (void) {
+#else
+__attribute__ ((constructor)) static void corosync_lcr_component_register (void)
+{
+#endif
 	lcr_interfaces_set (&openais_ckpt_ver0[0], &ckpt_service_engine_iface);
 
 	lcr_component_register (&ckpt_comp_ver0);

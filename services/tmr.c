@@ -214,7 +214,15 @@ static struct corosync_service_engine *tmr_get_engine_ver0 (void)
 	return (&tmr_service_engine);
 }
 
-__attribute__ ((constructor)) static void register_this_component (void) {
+#ifdef OPENAIS_SOLARIS
+void corosync_lcr_component_register (void);
+
+void corosync_lcr_component_register (void)
+{
+#else
+__attribute__ ((constructor)) static void corosync_lcr_component_register (void)
+{
+#endif
 	lcr_interfaces_set (&openais_tmr_ver0[0], &tmr_service_engine_iface);
 	lcr_component_register (&tmr_comp_ver0);
 }

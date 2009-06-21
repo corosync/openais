@@ -254,7 +254,15 @@ static struct corosync_service_engine *evt_get_engine_ver0(void)
 	return (&evt_service_engine);
 }
 
-__attribute__ ((constructor)) static void evt_comp_register (void) {
+#ifdef OPENAIS_SOLARIS
+void corosync_lcr_component_register (void);
+
+void corosync_lcr_component_register (void)
+{
+#else
+__attribute__ ((constructor)) static void corosync_lcr_component_register (void)
+{
+#endif
 	lcr_interfaces_set (&openais_evt_ver0[0], &evt_service_engine_iface);
 
 	lcr_component_register (&evt_comp_ver0);

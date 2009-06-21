@@ -269,7 +269,15 @@ static struct corosync_service_engine *clm_get_service_engine_ver0 (void)
 	return (&clm_service_engine);
 }
 
-__attribute__ ((constructor)) static void clm_comp_register (void) {
+
+#ifdef OPENAIS_SOLARIS
+void corosync_lcr_component_register (void);
+
+void corosync_lcr_component_register (void) {
+#else
+__attribute__ ((constructor)) static void corosync_lcr_component_register (void)
+{
+#endif
 	lcr_interfaces_set (&openais_clm_ver0[0], &clm_service_engine_iface);
 	lcr_interfaces_set (&openais_clm_ver0[1], &clm_services_api_ver1);
 

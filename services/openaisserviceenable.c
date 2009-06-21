@@ -173,7 +173,15 @@ struct lcr_comp serviceenable_comp_ver0 = {
 };
 
 
-__attribute__ ((constructor)) static void serviceenable_comp_register (void) {
+#ifdef OPENAIS_SOLARIS
+void corosync_lcr_component_register (void);
+
+void corosync_lcr_component_register (void)
+{
+#else
+__attribute__ ((constructor)) static void corosync_lcr_component_register (void)
+{
+#endif
         lcr_interfaces_set (&openais_serviceenable_ver0[0], &serviceenable_stable_iface_ver0);
         lcr_interfaces_set (&openais_serviceenable_ver0[1], &serviceenable_experimental_iface_ver0);
 

@@ -402,8 +402,15 @@ static struct corosync_service_engine *amf_get_service_engine_ver0 (void)
 	return (&amf_service_engine);
 }
 
-__attribute__ ((constructor)) static void register_this_component (void)
+#ifdef OPENAIS_SOLARIS
+void corosync_lcr_component_register (void);
+
+void corosync_lcr_component_register (void)
 {
+#else
+__attribute__ ((constructor)) static void corosync_lcr_component_register (void)
+{
+#endif
 	lcr_interfaces_set (&openais_amf_ver0[0], &amf_service_engine_iface);
 	lcr_component_register (&amf_comp_ver0);
 }
