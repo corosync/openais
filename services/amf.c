@@ -120,6 +120,8 @@
  * A10- Delete CLM nodes; cluster sync ready
  */
 
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
