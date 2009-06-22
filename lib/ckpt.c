@@ -564,7 +564,7 @@ saCkptCheckpointOpen (
 	}
 	req_lib_ckpt_checkpointopen.checkpoint_open_flags = checkpointOpenFlags;
 
-	iov.iov_base = &req_lib_ckpt_checkpointopen;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointopen;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -691,7 +691,7 @@ saCkptCheckpointOpenAsync (
 	req_lib_ckpt_checkpointopen.checkpoint_open_flags = checkpointOpenFlags;
 	req_lib_ckpt_checkpointopen.checkpoint_handle = checkpointHandle;
 
-	iov.iov_base = &req_lib_ckpt_checkpointopen;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointopen;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointopen);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -749,7 +749,7 @@ saCkptCheckpointClose (
 	req_lib_ckpt_checkpointclose.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov.iov_base = &req_lib_ckpt_checkpointclose;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointclose;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointclose);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -796,7 +796,7 @@ saCkptCheckpointUnlink (
 	marshall_SaNameT_to_mar_name_t (&req_lib_ckpt_checkpointunlink.checkpoint_name,
 		(SaNameT *)checkpointName);
 
-	iov.iov_base = &req_lib_ckpt_checkpointunlink;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointunlink;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointunlink);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -838,7 +838,7 @@ saCkptCheckpointRetentionDurationSet (
 	req_lib_ckpt_checkpointretentiondurationset.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov.iov_base = &req_lib_ckpt_checkpointretentiondurationset;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointretentiondurationset;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointretentiondurationset);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -880,7 +880,7 @@ saCkptActiveReplicaSet (
 	req_lib_ckpt_activereplicaset.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov.iov_base = &req_lib_ckpt_activereplicaset;
+	iov.iov_base = (void *)&req_lib_ckpt_activereplicaset;
 	iov.iov_len = sizeof (struct req_lib_ckpt_activereplicaset);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -924,7 +924,7 @@ saCkptCheckpointStatusGet (
 	req_lib_ckpt_checkpointstatusget.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov.iov_base = &req_lib_ckpt_checkpointstatusget;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointstatusget;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointstatusget);
 
 	error = coroipcc_msg_send_reply_receive (ckptCheckpointInstance->handle,
@@ -991,11 +991,11 @@ saCkptSectionCreate (
 		ckptCheckpointInstance->checkpointId;
 
 
-	iov[0].iov_base = &req_lib_ckpt_sectioncreate;
+	iov[0].iov_base = (void *)&req_lib_ckpt_sectioncreate;
 	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectioncreate);
 	iov_len = 1;
 	if (sectionCreationAttributes->sectionId->id) {
-		iov[1].iov_base = sectionCreationAttributes->sectionId->id;
+		iov[1].iov_base = (void *)sectionCreationAttributes->sectionId->id;
 		iov[1].iov_len = sectionCreationAttributes->sectionId->idLen;
 		iov_len = 2;
 	}
@@ -1056,11 +1056,11 @@ saCkptSectionDelete (
 	req_lib_ckpt_sectiondelete.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov[0].iov_base = &req_lib_ckpt_sectiondelete;
+	iov[0].iov_base = (void *)&req_lib_ckpt_sectiondelete;
 	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectiondelete);
 	iov_len = 1;
 	if (sectionId->idLen) {
-		iov[1].iov_base = sectionId->id;
+		iov[1].iov_base = (void *)sectionId->id;
 		iov[1].iov_len = sectionId->idLen;
 		iov_len = 2;
 	}
@@ -1115,11 +1115,11 @@ saCkptSectionExpirationTimeSet (
 	req_lib_ckpt_sectionexpirationtimeset.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov[0].iov_base = &req_lib_ckpt_sectionexpirationtimeset;
+	iov[0].iov_base = (void *)&req_lib_ckpt_sectionexpirationtimeset;
 	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectionexpirationtimeset);
 	iov_len = 1;
 	if (sectionId->idLen) {
-		iov[1].iov_base = sectionId->id;
+		iov[1].iov_base = (void *)sectionId->id;
 		iov[1].iov_len = sectionId->idLen;
 		iov_len = 2;
 	}
@@ -1207,7 +1207,7 @@ saCkptSectionIterationInitialize (
 	req_lib_ckpt_sectioniterationinitialize.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov.iov_base = &req_lib_ckpt_sectioniterationinitialize;
+	iov.iov_base = (void *)&req_lib_ckpt_sectioniterationinitialize;
 	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationinitialize);
 
 	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->handle,
@@ -1275,7 +1275,7 @@ saCkptSectionIterationNext (
 	req_lib_ckpt_sectioniterationnext.header.id = MESSAGE_REQ_CKPT_SECTIONITERATIONNEXT;
 	req_lib_ckpt_sectioniterationnext.iteration_handle = ckptSectionIterationInstance->executive_iteration_handle;
 
-	iov.iov_base = &req_lib_ckpt_sectioniterationnext;
+	iov.iov_base = (void *)&req_lib_ckpt_sectioniterationnext;
 	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationnext);
 
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
@@ -1347,7 +1347,7 @@ saCkptSectionIterationFinalize (
 	req_lib_ckpt_sectioniterationfinalize.header.id = MESSAGE_REQ_CKPT_SECTIONITERATIONFINALIZE;
 	req_lib_ckpt_sectioniterationfinalize.iteration_handle = ckptSectionIterationInstance->executive_iteration_handle;
 
-	iov.iov_base = &req_lib_ckpt_sectioniterationfinalize;
+	iov.iov_base = (void *)&req_lib_ckpt_sectioniterationfinalize;
 	iov.iov_len = sizeof (struct req_lib_ckpt_sectioniterationfinalize);
 
 	error = coroipcc_msg_send_reply_receive (ckptSectionIterationInstance->handle,
@@ -1520,11 +1520,11 @@ saCkptSectionOverwrite (
 	/*
 	 * Build request IO Vector
 	 */
-	iov[0].iov_base = &req_lib_ckpt_sectionoverwrite;
+	iov[0].iov_base = (void *)&req_lib_ckpt_sectionoverwrite;
 	iov[0].iov_len = sizeof (struct req_lib_ckpt_sectionoverwrite);
 	iov_idx = 1;
 	if (sectionId->idLen) {
-		iov[iov_idx].iov_base = sectionId->id;
+		iov[iov_idx].iov_base = (void *)sectionId->id;
 		iov[iov_idx].iov_len = sectionId->idLen;
 		iov_idx += 1;
 	}
@@ -1593,9 +1593,9 @@ saCkptCheckpointRead (
 		req_lib_ckpt_sectionread.ckpt_id =
 			ckptCheckpointInstance->checkpointId;
 
-		iov[0].iov_base = (char *)&req_lib_ckpt_sectionread;
+		iov[0].iov_base = (void *)&req_lib_ckpt_sectionread;
 		iov[0].iov_len = sizeof (struct req_lib_ckpt_sectionread);
-		iov[1].iov_base = (char *)ioVector[i].sectionId.id;
+		iov[1].iov_base = (void *)ioVector[i].sectionId.id;
 		iov[1].iov_len = ioVector[i].sectionId.idLen;
 
 		coroipcc_msg_send_reply_receive_in_buf_get (
@@ -1691,7 +1691,7 @@ saCkptCheckpointSynchronize (
 	req_lib_ckpt_checkpointsynchronize.ckpt_id =
 		ckptCheckpointInstance->checkpointId;
 
-	iov.iov_base = &req_lib_ckpt_checkpointsynchronize;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointsynchronize;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointsynchronize);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1753,7 +1753,7 @@ saCkptCheckpointSynchronizeAsync (
 		ckptCheckpointInstance->checkpointId;
 	req_lib_ckpt_checkpointsynchronizeasync.invocation = invocation;
 
-	iov.iov_base = &req_lib_ckpt_checkpointsynchronizeasync;
+	iov.iov_base = (void *)&req_lib_ckpt_checkpointsynchronizeasync;
 	iov.iov_len = sizeof (struct req_lib_ckpt_checkpointsynchronizeasync);
 
 	error = coroipcc_msg_send_reply_receive (
