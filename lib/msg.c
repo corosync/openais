@@ -484,7 +484,7 @@ saMsgQueueOpen (
 		req_lib_msg_queueopen.create_attrs_flag = 0;
 	}
 
-	iov.iov_base = &req_lib_msg_queueopen;
+	iov.iov_base = (void *)&req_lib_msg_queueopen;
 	iov.iov_len = sizeof (struct req_lib_msg_queueopen);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -628,7 +628,7 @@ saMsgQueueOpenAsync (
 		req_lib_msg_queueopenasync.create_attrs_flag = 0;
 	}
 
-	iov.iov_base = &req_lib_msg_queueopenasync;
+	iov.iov_base = (void *)&req_lib_msg_queueopenasync;
 	iov.iov_len = sizeof (struct req_lib_msg_queueopenasync);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -697,7 +697,7 @@ saMsgQueueClose (
 	memcpy (&req_lib_msg_queueclose.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queueclose;
+	iov.iov_base = (void *)&req_lib_msg_queueclose;
 	iov.iov_len = sizeof (struct req_lib_msg_queueclose);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -763,7 +763,7 @@ saMsgQueueStatusGet (
 	memcpy (&req_lib_msg_queuestatusget.queue_name,
 		queueName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queuestatusget;
+	iov.iov_base = (void *)&req_lib_msg_queuestatusget;
 	iov.iov_len = sizeof (struct req_lib_msg_queuestatusget);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -825,7 +825,7 @@ saMsgQueueRetentionTimeSet (
 	memcpy (&req_lib_msg_queueretentiontimeset.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queueretentiontimeset;
+	iov.iov_base = (void *)&req_lib_msg_queueretentiontimeset;
 	iov.iov_len = sizeof (struct req_lib_msg_queueretentiontimeset);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -883,7 +883,7 @@ saMsgQueueUnlink (
 	memcpy (&req_lib_msg_queueunlink.queue_name,
 		queueName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queueunlink;
+	iov.iov_base = (void *)&req_lib_msg_queueunlink;
 	iov.iov_len = sizeof (struct req_lib_msg_queueunlink);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -944,7 +944,7 @@ saMsgQueueGroupCreate (
 
 	req_lib_msg_queuegroupcreate.policy = queueGroupPolicy;
 
-	iov.iov_base = &req_lib_msg_queuegroupcreate;
+	iov.iov_base = (void *)&req_lib_msg_queuegroupcreate;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupcreate);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1005,7 +1005,7 @@ saMsgQueueGroupInsert (
 	memcpy (&req_lib_msg_queuegroupinsert.queue_name,
 		queueName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queuegroupinsert;
+	iov.iov_base = (void *)&req_lib_msg_queuegroupinsert;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupinsert);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1066,7 +1066,7 @@ saMsgQueueGroupRemove (
 	memcpy (&req_lib_msg_queuegroupremove.queue_name,
 		queueName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queuegroupremove;
+	iov.iov_base = (void *)&req_lib_msg_queuegroupremove;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupremove);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1125,7 +1125,7 @@ saMsgQueueGroupDelete (
 	memcpy (&req_lib_msg_queuegroupdelete.group_name,
 		queueGroupName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queuegroupdelete;
+	iov.iov_base = (void *)&req_lib_msg_queuegroupdelete;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupdelete);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1215,7 +1215,7 @@ saMsgQueueGroupTrack (
 	req_lib_msg_queuegrouptrack.track_flags = trackFlags;
 	req_lib_msg_queuegrouptrack.buffer_flag = (notificationBuffer != NULL);
 
-	iov.iov_base = &req_lib_msg_queuegrouptrack;
+	iov.iov_base = (void *)&req_lib_msg_queuegrouptrack;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrack);
 
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
@@ -1292,7 +1292,7 @@ saMsgQueueGroupTrackStop (
 	memcpy (&req_lib_msg_queuegrouptrackstop.group_name,
 		queueGroupName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queuegrouptrackstop;
+	iov.iov_base = (void *)&req_lib_msg_queuegrouptrackstop;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrackstop);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1342,7 +1342,7 @@ saMsgQueueGroupNotificationFree (
 	req_lib_msg_queuegroupnotificationfree.header.id =
 		MESSAGE_REQ_MSG_QUEUEGROUPNOTIFICATIONFREE;
 
-	iov.iov_base = &req_lib_msg_queuegroupnotificationfree;
+	iov.iov_base = (void *)&req_lib_msg_queuegroupnotificationfree;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupnotificationfree);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1417,9 +1417,9 @@ saMsgMessageSend (
 
 	req_lib_msg_messagesend.timeout = timeout;
 
-	iov[0].iov_base = &req_lib_msg_messagesend;
+	iov[0].iov_base = (void *)&req_lib_msg_messagesend;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagesend);
-	iov[1].iov_base = message->data;
+	iov[1].iov_base = (void *)message->data;
 	iov[1].iov_len = message->size;
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1496,9 +1496,9 @@ saMsgMessageSendAsync (
 
 	req_lib_msg_messagesendasync.invocation = invocation;
 
-	iov[0].iov_base = &req_lib_msg_messagesendasync;
+	iov[0].iov_base = (void *)&req_lib_msg_messagesendasync;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagesendasync);
-	iov[1].iov_base = message->data;
+	iov[1].iov_base = (void *)message->data;
 	iov[1].iov_len = message->size;
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1577,7 +1577,7 @@ saMsgMessageGet (
 	memcpy (&req_lib_msg_messageget.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_messageget;
+	iov.iov_base = (void *)&req_lib_msg_messageget;
 	iov.iov_len = sizeof (struct req_lib_msg_messageget);
 
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
@@ -1690,7 +1690,7 @@ saMsgMessageCancel (
 	memcpy (&req_lib_msg_messagecancel.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_messagecancel;
+	iov.iov_base = (void *)&req_lib_msg_messagecancel;
 	iov.iov_len = sizeof (struct req_lib_msg_messagecancel);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1770,9 +1770,9 @@ saMsgMessageSendReceive (
 	memcpy (&req_lib_msg_messagesendreceive.message,
 		sendMessage, sizeof (SaMsgMessageT));
 
-	iov[0].iov_base = &req_lib_msg_messagesendreceive;
+	iov[0].iov_base = (void *)&req_lib_msg_messagesendreceive;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagesendreceive);
-	iov[1].iov_base = sendMessage->data;
+	iov[1].iov_base = (void *)sendMessage->data;
 	iov[1].iov_len = sendMessage->size;
 
 	error = coroipcc_msg_send_reply_receive_in_buf_get (
@@ -1863,9 +1863,9 @@ saMsgMessageReply (
 	req_lib_msg_messagereply.sender_id = *senderId;
 	req_lib_msg_messagereply.timeout = timeout;
 
-	iov[0].iov_base = &req_lib_msg_messagereply;
+	iov[0].iov_base = (void *)&req_lib_msg_messagereply;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagereply);
-	iov[1].iov_base = replyMessage->data;
+	iov[1].iov_base = (void *)replyMessage->data;
 	iov[1].iov_len = replyMessage->size;
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1936,9 +1936,9 @@ saMsgMessageReplyAsync (
 	req_lib_msg_messagereplyasync.sender_id = *senderId;
 	req_lib_msg_messagereplyasync.invocation = invocation;
 
-	iov[0].iov_base = &req_lib_msg_messagereplyasync;
+	iov[0].iov_base = (void *)&req_lib_msg_messagereplyasync;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagereplyasync);
-	iov[1].iov_base = replyMessage->data;
+	iov[1].iov_base = (void *)replyMessage->data;
 	iov[1].iov_len = replyMessage->size;
 
 	error = coroipcc_msg_send_reply_receive (
@@ -2011,7 +2011,7 @@ saMsgQueueCapacityThresholdSet (
 	memcpy (&req_lib_msg_queuecapacitythresholdset.thresholds,
 		thresholds, sizeof (SaMsgQueueThresholdsT));
 
-	iov.iov_base = &req_lib_msg_queuecapacitythresholdset;
+	iov.iov_base = (void *)&req_lib_msg_queuecapacitythresholdset;
 	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdset);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -2071,7 +2071,7 @@ saMsgQueueCapacityThresholdGet (
 	memcpy (&req_lib_msg_queuecapacitythresholdget.queue_name,
 		&queueInstance->queue_name, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_msg_queuecapacitythresholdget;
+	iov.iov_base = (void *)&req_lib_msg_queuecapacitythresholdget;
 	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdget);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -2124,7 +2124,7 @@ saMsgMetadataSizeGet (
 	req_lib_msg_metadatasizeget.header.id =
 		MESSAGE_REQ_MSG_METADATASIZEGET;
 
-	iov.iov_base = &req_lib_msg_metadatasizeget;
+	iov.iov_base = (void *)&req_lib_msg_metadatasizeget;
 	iov.iov_len = sizeof (struct req_lib_msg_metadatasizeget);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -2181,7 +2181,7 @@ saMsgLimitGet (
 		MESSAGE_REQ_MSG_LIMITGET;
 	req_lib_msg_limitget.limit_id = limitId;
 
-	iov.iov_base = &req_lib_msg_limitget;
+	iov.iov_base = (void *)&req_lib_msg_limitget;
 	iov.iov_len = sizeof (struct req_lib_msg_limitget);
 
 	error = coroipcc_msg_send_reply_receive (
