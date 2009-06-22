@@ -134,7 +134,7 @@ int main (void) {
 	SaNameT async_name;
 	SaNameT queue_name;
 	SaNameT queue_group_name;
-	SaTimeT time;
+	SaTimeT msg_time;
 	SaMsgSenderIdT id;
 	SaMsgMessageT msg_a;
 	SaMsgMessageT msg_b;
@@ -236,13 +236,13 @@ int main (void) {
 
 	saMsgDispatch (handle, SA_DISPATCH_ALL);
 
-	result = saMsgMessageGet (queue_handle, &msg_a, &time, &id, SA_TIME_ONE_MINUTE);
+	result = saMsgMessageGet (queue_handle, &msg_a, &msg_time, &id, SA_TIME_ONE_MINUTE);
 	printf ("saMsgMessageGet [a] result is %d (should be 1)\n", result);
 
-	result = saMsgMessageGet (queue_handle, &msg_b, &time, &id, SA_TIME_ONE_MINUTE);
+	result = saMsgMessageGet (queue_handle, &msg_b, &msg_time, &id, SA_TIME_ONE_MINUTE);
 	printf ("saMsgMessageGet [b] result is %d (should be 1)\n", result);
 
-	result = saMsgMessageGet (queue_handle, &msg_c, &time, &id, SA_TIME_ONE_MINUTE);
+	result = saMsgMessageGet (queue_handle, &msg_c, &msg_time, &id, SA_TIME_ONE_MINUTE);
 	printf ("saMsgMessageGet [c] result is %d (should be 1)\n", result);
 
 	printf ("saMsgMessageGet { (a) data = %s }\n", (char *)(msg_a.data));
