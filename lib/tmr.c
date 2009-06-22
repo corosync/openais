@@ -358,7 +358,7 @@ saTmrTimerStart (
 
 	req_lib_tmr_timerstart.timer_data = (void *)timerData;
 
-	iov.iov_base = &req_lib_tmr_timerstart;
+	iov.iov_base = (void *)&req_lib_tmr_timerstart;
 	iov.iov_len = sizeof (struct req_lib_tmr_timerstart);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
@@ -425,7 +425,7 @@ saTmrTimerReschedule (
 	memcpy (&req_lib_tmr_timerreschedule.timer_attributes,
 		timerAttributes, sizeof (SaTmrTimerAttributesT));
 
-	iov.iov_base = &req_lib_tmr_timerreschedule,
+	iov.iov_base = (void *)&req_lib_tmr_timerreschedule,
 	iov.iov_len = sizeof (struct req_lib_tmr_timerreschedule);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
@@ -478,7 +478,7 @@ saTmrTimerCancel (
 
 	req_lib_tmr_timercancel.timer_id = timerId;
 
-	iov.iov_base = &req_lib_tmr_timercancel,
+	iov.iov_base = (void *)&req_lib_tmr_timercancel,
 	iov.iov_len = sizeof (struct req_lib_tmr_timercancel);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
@@ -527,7 +527,7 @@ saTmrPeriodicTimerSkip (
 
 	req_lib_tmr_periodictimerskip.timer_id = timerId;
 
-	iov.iov_base = &req_lib_tmr_periodictimerskip,
+	iov.iov_base = (void *)&req_lib_tmr_periodictimerskip,
 	iov.iov_len = sizeof (struct req_lib_tmr_periodictimerskip);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
@@ -578,7 +578,7 @@ saTmrTimerRemainingTimeGet (
 
 	req_lib_tmr_timerremainingtimeget.timer_id = timerId;
 
-	iov.iov_base = &req_lib_tmr_timerremainingtimeget,
+	iov.iov_base = (void *)&req_lib_tmr_timerremainingtimeget,
 	iov.iov_len = sizeof (struct req_lib_tmr_timerremainingtimeget);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
@@ -631,7 +631,7 @@ saTmrTimerAttributesGet (
 
 	req_lib_tmr_timerattributesget.timer_id = timerId;
 
-	iov.iov_base = &req_lib_tmr_timerattributesget,
+	iov.iov_base = (void *)&req_lib_tmr_timerattributesget,
 	iov.iov_len = sizeof (struct req_lib_tmr_timerattributesget);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
@@ -681,7 +681,7 @@ saTmrTimeGet (
 	req_lib_tmr_timeget.header.id =
 		MESSAGE_REQ_TMR_TIMEGET;
 
-	iov.iov_base = &req_lib_tmr_timeget,
+	iov.iov_base = (void *)&req_lib_tmr_timeget,
 	iov.iov_len = sizeof (struct req_lib_tmr_timeget);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
@@ -731,7 +731,7 @@ saTmrClockTickGet (
 	req_lib_tmr_clocktickget.header.id =
 		MESSAGE_REQ_TMR_CLOCKTICKGET;
 
-	iov.iov_base = &req_lib_tmr_clocktickget,
+	iov.iov_base = (void *)&req_lib_tmr_clocktickget,
 	iov.iov_len = sizeof (struct req_lib_tmr_clocktickget);
 
 	error = coroipcc_msg_send_reply_receive (tmrInstance->ipc_handle,
