@@ -846,7 +846,7 @@ saEvtChannelOpen(
 	req.ico_open_flag = channelOpenFlags;
 	marshall_SaNameT_to_mar_name_t (&req.ico_channel_name, (SaNameT *)channelName);
 
-	iov.iov_base = (char *)&req;
+	iov.iov_base = (void *)&req;
 	iov.iov_len = sizeof(req);
 
 	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
@@ -942,7 +942,7 @@ saEvtChannelClose(SaEvtChannelHandleT channelHandle)
 	req.icc_head.id = MESSAGE_REQ_EVT_CLOSE_CHANNEL;
 	req.icc_channel_handle = eci->eci_svr_channel_handle;
 
-	iov.iov_base = (char *)&req;
+	iov.iov_base = (void *)&req;
 	iov.iov_len = sizeof (req);
 
 	error = coroipcc_msg_send_reply_receive (evti->ipc_handle, &iov, 1,
@@ -1057,7 +1057,7 @@ saEvtChannelOpenAsync(SaEvtHandleT evtHandle,
 	req.ico_invocation = invocation;
 	req.ico_open_flag = channelOpenFlags;
 	marshall_SaNameT_to_mar_name_t (&req.ico_channel_name, (SaNameT *)channelName);
-	iov.iov_base = (char *)&req;
+	iov.iov_base = (void *)&req;
 	iov.iov_len = sizeof(req);
 
 
@@ -1153,7 +1153,7 @@ saEvtChannelUnlink(
 	req.iuc_head.size = sizeof(req);
 	req.iuc_head.id = MESSAGE_REQ_EVT_UNLINK_CHANNEL;
 	marshall_SaNameT_to_mar_name_t (&req.iuc_channel_name, (SaNameT *)channelName);
-	iov.iov_base = (char *)&req;
+	iov.iov_base = (void *)&req;
 	iov.iov_len = sizeof(req);
 
 
@@ -1812,7 +1812,7 @@ saEvtEventPublish(
 	req->led_priority = edi->edi_priority;
 	marshall_SaNameT_to_mar_name_t (&req->led_publisher_name, &edi->edi_pub_name);
 
-	iov.iov_base = (char *)req;
+	iov.iov_base = (void *)req;
 	iov.iov_len = req->led_head.size;
 
 	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1, &res,
@@ -1925,7 +1925,7 @@ saEvtEventSubscribe(
 	req->ics_channel_handle = eci->eci_svr_channel_handle;
 	req->ics_sub_id = subscriptionId;
 	req->ics_filter_size = sz;
-	iov.iov_base = (char *)req;
+	iov.iov_base = (void *)req;
 	iov.iov_len = req->ics_head.size;
 
 	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
@@ -1986,7 +1986,7 @@ saEvtEventUnsubscribe(
 
 	req.icu_channel_handle = eci->eci_svr_channel_handle;
 	req.icu_sub_id = subscriptionId;
-	iov.iov_base = (char *)&req;
+	iov.iov_base = (void *)&req;
 	iov.iov_len = sizeof(req);
 
  	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
@@ -2055,7 +2055,7 @@ saEvtEventRetentionTimeClear(
 	req.iec_channel_handle = eci->eci_svr_channel_handle;
 	req.iec_event_id = eventId;
 
-	iov.iov_base = (char *)&req;
+	iov.iov_base = (void *)&req;
 	iov.iov_len = sizeof(req);
 
 	error = coroipcc_msg_send_reply_receive(evti->ipc_handle, &iov, 1,
