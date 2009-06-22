@@ -281,7 +281,7 @@ static void evt_recv_event_get(hdb_handle_t ipc_handle, struct lib_event_data **
 	req.evd_head.id = MESSAGE_REQ_EVT_EVENT_DATA;
 	req.evd_head.size = sizeof(res);
 
-	iov.iov_base = &req;
+	iov.iov_base = (void *)&req;
 	iov.iov_len = sizeof (struct res_evt_event_data);
 
 	coroipcc_msg_send_reply_receive_in_buf_get (
