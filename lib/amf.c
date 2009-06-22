@@ -406,7 +406,7 @@ saAmfComponentRegister (
 			sizeof (SaNameT));
 	}
 
-	iov.iov_base = &req_lib_amf_componentregister;
+	iov.iov_base = (void *)&req_lib_amf_componentregister;
 	iov.iov_len = sizeof (struct req_lib_amf_componentregister);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -454,7 +454,7 @@ saAmfComponentUnregister (
 			sizeof (SaNameT));
 	}
 
-	iov.iov_base = &req_lib_amf_componentunregister;
+	iov.iov_base = (void *)&req_lib_amf_componentunregister;
 	iov.iov_len = sizeof (struct req_lib_amf_componentunregister);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -531,7 +531,7 @@ saAmfPmStart (
 	req_lib_amf_pmstart.pmErrors = pmErrors;
 	req_lib_amf_pmstart.recommendedRecovery = recommendedRecovery;
 
-	iov.iov_base = &req_lib_amf_pmstart;
+	iov.iov_base = (void *)&req_lib_amf_pmstart;
 	iov.iov_len = sizeof (struct req_lib_amf_pmstart);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -572,7 +572,7 @@ saAmfPmStop (
 	req_lib_amf_pmstop.processId = processId;
 	req_lib_amf_pmstop.pmErrors = pmErrors;
 
-	iov.iov_base = &req_lib_amf_pmstop;
+	iov.iov_base = (void *)&req_lib_amf_pmstop;
 	iov.iov_len = sizeof (struct req_lib_amf_pmstop);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -616,7 +616,7 @@ saAmfHealthcheckStart (
 	req_lib_amf_healthcheckstart.invocationType = invocationType;
 	req_lib_amf_healthcheckstart.recommendedRecovery = recommendedRecovery;
 
-	iov.iov_base = &req_lib_amf_healthcheckstart;
+	iov.iov_base = (void *)&req_lib_amf_healthcheckstart;
 	iov.iov_len = sizeof (struct req_lib_amf_healthcheckstart);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -657,7 +657,7 @@ saAmfHealthcheckConfirm (
 		healthcheckKey, sizeof (SaAmfHealthcheckKeyT));
 	req_lib_amf_healthcheckconfirm.healthcheckResult = healthcheckResult;
 
-	iov.iov_base = &req_lib_amf_healthcheckconfirm;
+	iov.iov_base = (void *)&req_lib_amf_healthcheckconfirm;
 	iov.iov_len = sizeof (struct req_lib_amf_healthcheckconfirm);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -696,7 +696,7 @@ saAmfHealthcheckStop (
 	memcpy (&req_lib_amf_healthcheckstop.healthcheckKey,
 		healthcheckKey, sizeof (SaAmfHealthcheckKeyT));
 
-	iov.iov_base = &req_lib_amf_healthcheckstop;
+	iov.iov_base = (void *)&req_lib_amf_healthcheckstop;
 	iov.iov_len = sizeof (struct req_lib_amf_healthcheckstop);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -730,7 +730,7 @@ saAmfHAStateGet (
 		return (error);
 	}
 
-	iov.iov_base = &req_lib_amf_hastateget,
+	iov.iov_base = (void *)&req_lib_amf_hastateget,
 	iov.iov_len = sizeof (struct req_lib_amf_hastateget),
 
 	req_lib_amf_hastateget.header.id = MESSAGE_REQ_AMF_HASTATEGET;
@@ -776,7 +776,7 @@ saAmfCSIQuiescingComplete (
 	req_lib_amf_csiquiescingcomplete.invocation = invocation;
 	req_lib_amf_csiquiescingcomplete.error = error;
 
-	iov.iov_base = &req_lib_amf_csiquiescingcomplete;
+	iov.iov_base = (void *)&req_lib_amf_csiquiescingcomplete;
 	iov.iov_len = sizeof (struct req_lib_amf_csiquiescingcomplete);
 
 	errorResult = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -816,7 +816,7 @@ saAmfProtectionGroupTrack (
 		return (error);
 	}
 
-	iov.iov_base = &req_lib_amf_protectiongrouptrack;
+	iov.iov_base = (void *)&req_lib_amf_protectiongrouptrack;
 	iov.iov_len = sizeof (struct req_lib_amf_protectiongrouptrack);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -851,7 +851,7 @@ saAmfProtectionGroupTrackStop (
 	req_lib_amf_protectiongrouptrackstop.header.id = MESSAGE_REQ_AMF_PROTECTIONGROUPTRACKSTOP;
 	memcpy (&req_lib_amf_protectiongrouptrackstop.csiName, csiName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_amf_protectiongrouptrackstop,
+	iov.iov_base = (void *)&req_lib_amf_protectiongrouptrackstop,
 	iov.iov_len = sizeof (struct req_lib_amf_protectiongrouptrackstop),
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -892,7 +892,7 @@ saAmfComponentErrorReport (
 	req_lib_amf_componenterrorreport.errorDetectionTime = errorDetectionTime;
 	req_lib_amf_componenterrorreport.recommendedRecovery = recommendedRecovery;
 
-	iov.iov_base = &req_lib_amf_componenterrorreport;
+	iov.iov_base = (void *)&req_lib_amf_componenterrorreport;
 	iov.iov_len = sizeof (struct req_lib_amf_componenterrorreport);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -931,7 +931,7 @@ saAmfComponentErrorClear (
 	req_lib_amf_componenterrorclear.header.size = sizeof (struct req_lib_amf_componenterrorclear);
 	memcpy (&req_lib_amf_componenterrorclear.compName, compName, sizeof (SaNameT));
 
-	iov.iov_base = &req_lib_amf_componenterrorclear;
+	iov.iov_base = (void *)&req_lib_amf_componenterrorclear;
 	iov.iov_len = sizeof (struct req_lib_amf_componenterrorclear);
 
 	error = coroipcc_msg_send_reply_receive (amfInstance->handle,
@@ -968,7 +968,7 @@ saAmfResponse (
 	req_lib_amf_response.invocation = invocation;
 	req_lib_amf_response.error = error;
 
-	iov.iov_base = &req_lib_amf_response;
+	iov.iov_base = (void *)&req_lib_amf_response;
 	iov.iov_len = sizeof (struct req_lib_amf_response);
 
 	errorResult = coroipcc_msg_send_reply_receive (
