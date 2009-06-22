@@ -1330,7 +1330,7 @@ static void msg_cancel_pending_message (
 	res_lib_msg_messageget.send_time = 0;
 	res_lib_msg_messageget.sender_id = 0;
 
-	iov.iov_base = &res_lib_msg_messageget;
+	iov.iov_base = (void *)&res_lib_msg_messageget;
 	iov.iov_len = sizeof (struct res_lib_msg_messageget);
 
 	api->ipc_response_iov_send (conn, &iov, 1);
@@ -1357,10 +1357,10 @@ static void msg_deliver_pending_message (
 	res_lib_msg_messageget.send_time = msg->send_time;
 	res_lib_msg_messageget.sender_id = msg->sender_id;
 
-	iov[0].iov_base = &res_lib_msg_messageget;
+	iov[0].iov_base = (void *)&res_lib_msg_messageget;
 	iov[0].iov_len = sizeof (struct res_lib_msg_messageget);
 
-	iov[1].iov_base = msg->message.data;
+	iov[1].iov_base = (void *)msg->message.data;
 	iov[1].iov_len = msg->message.size;
 
 	api->ipc_response_iov_send (conn, iov, 2);
@@ -1547,7 +1547,7 @@ static int msg_close_queue (
 
 	req_exec_msg_queueclose.queue_id = queue_id;
 
-	iov.iov_base = (char *)&req_exec_msg_queueclose;
+	iov.iov_base = (void *)&req_exec_msg_queueclose;
 	iov.iov_len = sizeof (struct req_exec_msg_queueclose);
 
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
@@ -1812,7 +1812,7 @@ static void msg_expire_pending (void *data)
 	memcpy (&req_exec_msg_pending_timeout.source,
 		&pending->source, sizeof (mar_message_source_t));
 
-	iovec.iov_base = (char *)&req_exec_msg_pending_timeout;
+	iovec.iov_base = (void *)&req_exec_msg_pending_timeout;
 	iovec.iov_len = sizeof (struct req_exec_msg_pending_timeout);
 
 	api->totem_mcast (&iovec, 1, TOTEM_AGREED);
@@ -1835,7 +1835,7 @@ static void msg_expire_queue (void *data)
 	memcpy (&req_exec_msg_queue_timeout.queue_name,
 		&queue->queue_name, sizeof (SaNameT));
 
-	iovec.iov_base = (char *)&req_exec_msg_queue_timeout;
+	iovec.iov_base = (void *)&req_exec_msg_queue_timeout;
 	iovec.iov_len = sizeof (struct req_exec_msg_queue_timeout);
 
 	api->totem_mcast (&iovec, 1, TOTEM_AGREED);
@@ -1953,7 +1953,7 @@ static int msg_sync_queue_transmit (
 			queue->priority[i].capacity_reached;
 	}
 
-	iov.iov_base = (char *)&req_exec_msg_sync_queue;
+	iov.iov_base = (void *)&req_exec_msg_sync_queue;
 	iov.iov_len = sizeof (struct req_exec_msg_sync_queue);
 
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
@@ -1990,9 +1990,9 @@ static int msg_sync_queue_message_transmit (
 	req_exec_msg_sync_queue_message.send_time = msg->send_time;
 	req_exec_msg_sync_queue_message.sender_id = msg->sender_id;
 
-	iov[0].iov_base = (char *)&req_exec_msg_sync_queue_message;
+	iov[0].iov_base = (void *)&req_exec_msg_sync_queue_message;
 	iov[0].iov_len = sizeof (struct req_exec_msg_sync_queue_message);
-	iov[1].iov_base = msg->message.data;
+	iov[1].iov_base = (void *)msg->message.data;
 	iov[1].iov_len = msg->message.size;
 
 	return (api->totem_mcast (iov, 2, TOTEM_AGREED));
@@ -2033,7 +2033,7 @@ static int msg_sync_queue_refcount_transmit (
 			queue->refcount_set[i].nodeid;
 	}
 
-	iov.iov_base = (char *)&req_exec_msg_sync_queue_refcount;
+	iov.iov_base = (void *)&req_exec_msg_sync_queue_refcount;
 	iov.iov_len = sizeof (struct req_exec_msg_sync_queue_refcount);
 
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
@@ -2064,7 +2064,7 @@ static int msg_sync_group_transmit (
 
 	req_exec_msg_sync_group.policy = group->policy;
 
-	iov.iov_base = (char *)&req_exec_msg_sync_group;
+	iov.iov_base = (void *)&req_exec_msg_sync_group;
 	iov.iov_len = sizeof (struct req_exec_msg_sync_group);
 
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
@@ -2099,7 +2099,7 @@ static int msg_sync_group_member_transmit (
 
 	req_exec_msg_sync_group_member.queue_id = queue->queue_id;
 
-	iov.iov_base = (char *)&req_exec_msg_sync_group_member;
+	iov.iov_base = (void *)&req_exec_msg_sync_group_member;
 	iov.iov_len = sizeof (struct req_exec_msg_sync_group_member);
 
 	return (api->totem_mcast (&iov, 1, TOTEM_AGREED));
@@ -3206,9 +3206,9 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
 			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
 
-			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_base = (void *)&res_lib_msg_queuegrouptrack_callback;
 			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
-			iov[1].iov_base = buffer;
+			iov[1].iov_base = (void *)buffer;
 			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
 
 			api->ipc_dispatch_iov_send (track->conn, iov, 2);
@@ -3230,9 +3230,9 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
 			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
 
-			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_base = (void *)&res_lib_msg_queuegrouptrack_callback;
 			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
-			iov[1].iov_base = buffer;
+			iov[1].iov_base = (void *)buffer;
 			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
 
 			api->ipc_dispatch_iov_send (track->conn, iov, 2);
@@ -3325,9 +3325,9 @@ static void message_handler_req_exec_msg_queuegroupremove (
 			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
 			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
 
-			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_base = (void *)&res_lib_msg_queuegrouptrack_callback;
 			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
-			iov[1].iov_base = buffer;
+			iov[1].iov_base = (void *)buffer;
 			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
 
 			api->ipc_dispatch_iov_send (track->conn, iov, 2);
@@ -3349,9 +3349,9 @@ static void message_handler_req_exec_msg_queuegroupremove (
 			res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
 			res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
 
-			iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+			iov[0].iov_base = (void *)&res_lib_msg_queuegrouptrack_callback;
 			iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
-			iov[1].iov_base = buffer;
+			iov[1].iov_base = (void *)buffer;
 			iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
 
 			api->ipc_dispatch_iov_send (track->conn, iov, 2);
@@ -3937,11 +3937,11 @@ error_exit:
 			MESSAGE_RES_MSG_MESSAGEGET;
 		res_lib_msg_messageget.header.error = error;
 
-		iov[0].iov_base = &res_lib_msg_messageget;
+		iov[0].iov_base = (void *)&res_lib_msg_messageget;
 		iov[0].iov_len = sizeof (struct res_lib_msg_messageget);
 
 		if (error == SA_AIS_OK) {
-			iov[1].iov_base = msg->message.data;
+			iov[1].iov_base = (void *)msg->message.data;
 			iov[1].iov_len = msg->message.size;
 
 			memcpy (&res_lib_msg_messageget.message, &msg->message,
@@ -4479,7 +4479,7 @@ static void message_handler_req_exec_msg_pending_timeout (
 			MESSAGE_RES_MSG_MESSAGEGET;
 		res_lib_msg_messageget.header.error = SA_AIS_ERR_TIMEOUT;
 
-		iov.iov_base = &res_lib_msg_messageget;
+		iov.iov_base = (void *)&res_lib_msg_messageget;
 		iov.iov_len = sizeof (struct res_lib_msg_messageget);
 
 		api->ipc_response_iov_send (
@@ -4814,7 +4814,7 @@ static void message_handler_req_lib_msg_queueopen (
 	req_exec_msg_queueopen.timeout =
 		req_lib_msg_queueopen->timeout;
 
-	iovec.iov_base = (char *)&req_exec_msg_queueopen;
+	iovec.iov_base = (void *)&req_exec_msg_queueopen;
 	iovec.iov_len = sizeof (req_exec_msg_queueopen);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -4851,7 +4851,7 @@ static void message_handler_req_lib_msg_queueopenasync (
 	req_exec_msg_queueopenasync.invocation =
 		req_lib_msg_queueopenasync->invocation;
 
-	iovec.iov_base = (char *)&req_exec_msg_queueopenasync;
+	iovec.iov_base = (void *)&req_exec_msg_queueopenasync;
 	iovec.iov_len = sizeof (req_exec_msg_queueopenasync);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -4880,7 +4880,7 @@ static void message_handler_req_lib_msg_queueclose (
 	req_exec_msg_queueclose.queue_id =
 		req_lib_msg_queueclose->queue_id;
 
-	iovec.iov_base = (char *)&req_exec_msg_queueclose;
+	iovec.iov_base = (void *)&req_exec_msg_queueclose;
 	iovec.iov_len = sizeof (req_exec_msg_queueclose);
 
 	msg_release_queue_cleanup (conn,
@@ -4910,7 +4910,7 @@ static void message_handler_req_lib_msg_queuestatusget (
 	memcpy (&req_exec_msg_queuestatusget.queue_name,
 		&req_lib_msg_queuestatusget->queue_name, sizeof (SaNameT));
 
-	iovec.iov_base = (char *)&req_exec_msg_queuestatusget;
+	iovec.iov_base = (void *)&req_exec_msg_queuestatusget;
 	iovec.iov_len = sizeof (req_exec_msg_queuestatusget);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -4941,7 +4941,7 @@ static void message_handler_req_lib_msg_queueretentiontimeset (
 	req_exec_msg_queueretentiontimeset.retention_time =
 		req_lib_msg_queueretentiontimeset->retention_time;
 
-	iovec.iov_base = (char *)&req_exec_msg_queueretentiontimeset;
+	iovec.iov_base = (void *)&req_exec_msg_queueretentiontimeset;
 	iovec.iov_len = sizeof (req_exec_msg_queueretentiontimeset);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -4967,7 +4967,7 @@ static void message_handler_req_lib_msg_queueunlink (
 	memcpy (&req_exec_msg_queueunlink.queue_name,
 		&req_lib_msg_queueunlink->queue_name, sizeof (SaNameT));
 
-	iovec.iov_base = (char *)&req_exec_msg_queueunlink;
+	iovec.iov_base = (void *)&req_exec_msg_queueunlink;
 	iovec.iov_len = sizeof (req_exec_msg_queueunlink);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -4996,7 +4996,7 @@ static void message_handler_req_lib_msg_queuegroupcreate (
 	req_exec_msg_queuegroupcreate.policy =
 		req_lib_msg_queuegroupcreate->policy;
 
-	iovec.iov_base = (char *)&req_exec_msg_queuegroupcreate;
+	iovec.iov_base = (void *)&req_exec_msg_queuegroupcreate;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupcreate);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5024,7 +5024,7 @@ static void message_handler_req_lib_msg_queuegroupinsert (
 	memcpy (&req_exec_msg_queuegroupinsert.queue_name,
 		&req_lib_msg_queuegroupinsert->queue_name, sizeof (SaNameT));
 
-	iovec.iov_base = (char *)&req_exec_msg_queuegroupinsert;
+	iovec.iov_base = (void *)&req_exec_msg_queuegroupinsert;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupinsert);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5052,7 +5052,7 @@ static void message_handler_req_lib_msg_queuegroupremove (
 	memcpy (&req_exec_msg_queuegroupremove.queue_name,
 		&req_lib_msg_queuegroupremove->queue_name, sizeof (SaNameT));
 
-	iovec.iov_base = (char *)&req_exec_msg_queuegroupremove;
+	iovec.iov_base = (void *)&req_exec_msg_queuegroupremove;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupremove);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5078,7 +5078,7 @@ static void message_handler_req_lib_msg_queuegroupdelete (
 	memcpy (&req_exec_msg_queuegroupdelete.group_name,
 		&req_lib_msg_queuegroupdelete->group_name, sizeof (SaNameT));
 
-	iovec.iov_base = (char *)&req_exec_msg_queuegroupdelete;
+	iovec.iov_base = (void *)&req_exec_msg_queuegroupdelete;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupdelete);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5127,9 +5127,9 @@ static void message_handler_req_lib_msg_queuegrouptrack (
 		res_lib_msg_queuegrouptrack_callback.buffer.queueGroupPolicy = group->policy;
 		res_lib_msg_queuegrouptrack_callback.member_count = group->member_count;
 
-		iov[0].iov_base = &res_lib_msg_queuegrouptrack_callback;
+		iov[0].iov_base = (void *)&res_lib_msg_queuegrouptrack_callback;
 		iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack_callback);
-		iov[1].iov_base = buffer;
+		iov[1].iov_base = (void *)buffer;
 		iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
 
 		api->ipc_dispatch_iov_send (conn, iov, 2);
@@ -5173,9 +5173,9 @@ error_exit:
 		res_lib_msg_queuegrouptrack.buffer.numberOfItems = count;
 		res_lib_msg_queuegrouptrack.buffer.queueGroupPolicy = group->policy;
 
-		iov[0].iov_base = &res_lib_msg_queuegrouptrack;
+		iov[0].iov_base = (void *)&res_lib_msg_queuegrouptrack;
 		iov[0].iov_len = sizeof (struct res_lib_msg_queuegrouptrack);
-		iov[1].iov_base = buffer;
+		iov[1].iov_base = (void *)buffer;
 		iov[1].iov_len = sizeof (SaMsgQueueGroupNotificationT) * MAX_NUM_QUEUES_PER_GROUP;
 
 		api->ipc_response_iov_send (conn, iov, 2);
@@ -5251,7 +5251,7 @@ static void message_handler_req_lib_msg_queuegroupnotificationfree (
 
 	api->ipc_source_set (&req_exec_msg_queuegroupnotificationfree.source, conn);
 
-	iovec.iov_base = (char *)&req_exec_msg_queuegroupnotificationfree;
+	iovec.iov_base = (void *)&req_exec_msg_queuegroupnotificationfree;
 	iovec.iov_len = sizeof (req_exec_msg_queuegroupnotificationfree);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5282,11 +5282,11 @@ static void message_handler_req_lib_msg_messagesend (
 	req_exec_msg_messagesend.timeout =
 		req_lib_msg_messagesend->timeout;
 
-	iovec[0].iov_base = (char *)&req_exec_msg_messagesend;
+	iovec[0].iov_base = (void *)&req_exec_msg_messagesend;
 	iovec[0].iov_len = sizeof (struct req_exec_msg_messagesend);
 
-	iovec[1].iov_base = ((char *)req_lib_msg_messagesend) +
-		sizeof (struct req_lib_msg_messagesend);
+	iovec[1].iov_base = (void *)(((char *)req_lib_msg_messagesend) +
+		sizeof (struct req_lib_msg_messagesend));
 	iovec[1].iov_len = req_lib_msg_messagesend->header.size -
 		sizeof (struct req_lib_msg_messagesend);
 
@@ -5324,11 +5324,11 @@ static void message_handler_req_lib_msg_messagesendasync (
 	req_exec_msg_messagesendasync.invocation =
 		req_lib_msg_messagesendasync->invocation;
 
-	iovec[0].iov_base = (char *)&req_exec_msg_messagesendasync;
+	iovec[0].iov_base = (void *)&req_exec_msg_messagesendasync;
 	iovec[0].iov_len = sizeof (struct req_exec_msg_messagesendasync);
 
-	iovec[1].iov_base = ((char *)req_lib_msg_messagesendasync) +
-		sizeof (struct req_lib_msg_messagesendasync);
+	iovec[1].iov_base = (void *)(((char *)req_lib_msg_messagesendasync) +
+		sizeof (struct req_lib_msg_messagesendasync));
 	iovec[1].iov_len = req_lib_msg_messagesendasync->header.size -
 		sizeof (struct req_lib_msg_messagesendasync);
 
@@ -5368,7 +5368,7 @@ static void message_handler_req_lib_msg_messageget (
 	req_exec_msg_messageget.timeout =
 		req_lib_msg_messageget->timeout;
 
-	iovec.iov_base = (char *)&req_exec_msg_messageget;
+	iovec.iov_base = (void *)&req_exec_msg_messageget;
 	iovec.iov_len = sizeof (req_exec_msg_messageget);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5390,7 +5390,7 @@ static void message_handler_req_lib_msg_messagedatafree (
 
 	api->ipc_source_set (&req_exec_msg_messagedatafree.source, conn);
 
-	iovec.iov_base = (char *)&req_exec_msg_messagedatafree;
+	iovec.iov_base = (void *)&req_exec_msg_messagedatafree;
 	iovec.iov_len = sizeof (req_exec_msg_messagedatafree);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5421,7 +5421,7 @@ static void message_handler_req_lib_msg_messagecancel (
 	req_exec_msg_messagecancel.pid =
 		req_lib_msg_messagecancel->pid;
 
-	iovec.iov_base = (char *)&req_exec_msg_messagecancel;
+	iovec.iov_base = (void *)&req_exec_msg_messagecancel;
 	iovec.iov_len = sizeof (req_exec_msg_messagecancel);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5455,11 +5455,11 @@ static void message_handler_req_lib_msg_messagesendreceive (
 		(SaMsgSenderIdT)((global_sender_id++) |
 		((unsigned long long)req_exec_msg_messagesendreceive.source.nodeid) << 32);
 
-	iovec[0].iov_base = (char *)&req_exec_msg_messagesendreceive;
+	iovec[0].iov_base = (void *)&req_exec_msg_messagesendreceive;
 	iovec[0].iov_len = sizeof (req_exec_msg_messagesendreceive);
 
-	iovec[1].iov_base = ((char *)req_lib_msg_messagesendreceive) +
-		sizeof (struct req_lib_msg_messagesendreceive);
+	iovec[1].iov_base = (void *)(((char *)req_lib_msg_messagesendreceive) +
+		sizeof (struct req_lib_msg_messagesendreceive));
 	iovec[1].iov_len = req_lib_msg_messagesendreceive->header.size -
 		sizeof (struct req_lib_msg_messagesendreceive);
 
@@ -5497,7 +5497,7 @@ static void message_handler_req_lib_msg_messagereply (
 	req_exec_msg_messagereply.timeout =
 		req_lib_msg_messagereply->timeout;
 
-	iovec.iov_base = (char *)&req_exec_msg_messagereply;
+	iovec.iov_base = (void *)&req_exec_msg_messagereply;
 	iovec.iov_len = sizeof (req_exec_msg_messagereply);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5528,7 +5528,7 @@ static void message_handler_req_lib_msg_messagereplyasync (
 	req_exec_msg_messagereplyasync.invocation =
 		req_lib_msg_messagereplyasync->invocation;
 
-	iovec.iov_base = (char *)&req_exec_msg_messagereplyasync;
+	iovec.iov_base = (void *)&req_exec_msg_messagereplyasync;
 	iovec.iov_len = sizeof (req_exec_msg_messagereplyasync);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5559,7 +5559,7 @@ static void message_handler_req_lib_msg_queuecapacitythresholdset (
 	req_exec_msg_queuecapacitythresholdset.queue_id =
 		req_lib_msg_queuecapacitythresholdset->queue_id;
 
-	iovec.iov_base = (char *)&req_exec_msg_queuecapacitythresholdset;
+	iovec.iov_base = (void *)&req_exec_msg_queuecapacitythresholdset;
 	iovec.iov_len = sizeof (req_exec_msg_queuecapacitythresholdset);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5588,7 +5588,7 @@ static void message_handler_req_lib_msg_queuecapacitythresholdget (
 	req_exec_msg_queuecapacitythresholdget.queue_id =
 		req_lib_msg_queuecapacitythresholdget->queue_id;
 
-	iovec.iov_base = (char *)&req_exec_msg_queuecapacitythresholdget;
+	iovec.iov_base = (void *)&req_exec_msg_queuecapacitythresholdget;
 	iovec.iov_len = sizeof (req_exec_msg_queuecapacitythresholdget);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5610,7 +5610,7 @@ static void message_handler_req_lib_msg_metadatasizeget (
 
 	api->ipc_source_set (&req_exec_msg_metadatasizeget.source, conn);
 
-	iovec.iov_base = (char *)&req_exec_msg_metadatasizeget;
+	iovec.iov_base = (void *)&req_exec_msg_metadatasizeget;
 	iovec.iov_len = sizeof (req_exec_msg_metadatasizeget);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -5635,7 +5635,7 @@ static void message_handler_req_lib_msg_limitget (
 
 	req_exec_msg_limitget.limit_id = req_lib_msg_limitget->limit_id;
 
-	iovec.iov_base = (char *)&req_exec_msg_limitget;
+	iovec.iov_base = (void *)&req_exec_msg_limitget;
 	iovec.iov_len = sizeof (req_exec_msg_limitget);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
