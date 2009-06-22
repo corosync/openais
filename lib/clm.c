@@ -494,7 +494,7 @@ saClmClusterTrack (
 		req_lib_clm_clustertrack.return_in_callback = 1;
 	}
 
-	iov.iov_base = &req_lib_clm_clustertrack;
+	iov.iov_base = (void *)&req_lib_clm_clustertrack;
 	iov.iov_len = sizeof (req_lib_clm_clustertrack);;
 
 	if ((clmInstance->callbacks.saClmClusterTrackCallback == 0) &&
@@ -564,7 +564,7 @@ saClmClusterTrackStop (
 		return (error);
 	}
 
-	iov.iov_base = &req_lib_clm_trackstop;
+	iov.iov_base = (void *)&req_lib_clm_trackstop;
 	iov.iov_len = sizeof (struct req_lib_clm_trackstop);
 
 	error = coroipcc_msg_send_reply_receive (clmInstance->ipc_handle,
@@ -605,7 +605,7 @@ saClmClusterNodeGet (
 		return (error);
 	}
 
-	iov.iov_base = &req_lib_clm_nodeget,
+	iov.iov_base = (void *)&req_lib_clm_nodeget,
 	iov.iov_len = sizeof (struct req_lib_clm_nodeget),
 
 	/*
@@ -663,7 +663,7 @@ saClmClusterNodeGetAsync (
 		goto error_exit;
 	}
 
-	iov.iov_base = &req_lib_clm_nodegetasync;
+	iov.iov_base = (void *)&req_lib_clm_nodegetasync;
 	iov.iov_len = sizeof (req_lib_clm_nodegetasync);
 
 	error = coroipcc_msg_send_reply_receive (
