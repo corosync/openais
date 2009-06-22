@@ -1010,7 +1010,7 @@ static void lck_resource_close (
 	req_exec_lck_resourceclose.resource_id = resource_id;
 	req_exec_lck_resourceclose.exit_flag = 1;
 
-	iovec.iov_base = &req_exec_lck_resourceclose;
+	iovec.iov_base = (void *)&req_exec_lck_resourceclose;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourceclose);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -1041,7 +1041,7 @@ static void lck_resourcelock_timeout (void *data)
 
 	req_exec_lck_resourcelock_timeout.lock_id = lock->lock_id;
 
-	iovec.iov_base = &req_exec_lck_resourcelock_timeout;
+	iovec.iov_base = (void *)&req_exec_lck_resourcelock_timeout;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourcelock_timeout);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -1197,7 +1197,7 @@ static int lck_sync_resource_transmit (
 	memcpy (&req_exec_lck_sync_resource.resource_name,
 		&resource->resource_name, sizeof (mar_name_t));
 
-	iovec.iov_base = (char *)&req_exec_lck_sync_resource;
+	iovec.iov_base = (void *)&req_exec_lck_sync_resource;
 	iovec.iov_len = sizeof (req_exec_lck_sync_resource);
 
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
@@ -1237,7 +1237,7 @@ static int lck_sync_resource_lock_transmit (
 	req_exec_lck_sync_resource_lock.invocation = resource_lock->invocation;
 	req_exec_lck_sync_resource_lock.timeout = resource_lock->timeout;
 
-	iovec.iov_base = (char *)&req_exec_lck_sync_resource_lock;
+	iovec.iov_base = (void *)&req_exec_lck_sync_resource_lock;
 	iovec.iov_len = sizeof (req_exec_lck_sync_resource_lock);
 
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
@@ -1270,7 +1270,7 @@ static int lck_sync_resource_refcount_transmit (
 			resource->refcount_set[i].nodeid;
 	}
 
-	iovec.iov_base = (char *)&req_exec_lck_sync_resource_refcount;
+	iovec.iov_base = (void *)&req_exec_lck_sync_resource_refcount;
 	iovec.iov_len = sizeof (req_exec_lck_sync_resource_refcount);
 
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
@@ -2957,7 +2957,7 @@ static void message_handler_req_lib_lck_resourceopen (
 	req_exec_lck_resourceopen.resource_handle =
 		req_lib_lck_resourceopen->resource_handle;
 
-	iovec.iov_base = &req_exec_lck_resourceopen;
+	iovec.iov_base = (void *)&req_exec_lck_resourceopen;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourceopen);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -2992,7 +2992,7 @@ static void message_handler_req_lib_lck_resourceopenasync (
 	req_exec_lck_resourceopenasync.invocation =
 		req_lib_lck_resourceopenasync->invocation;
 
-	iovec.iov_base = &req_exec_lck_resourceopenasync;
+	iovec.iov_base = (void *)&req_exec_lck_resourceopenasync;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourceopenasync);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -3025,7 +3025,7 @@ static void message_handler_req_lib_lck_resourceclose (
 
 	req_exec_lck_resourceclose.exit_flag = 0;
 
-	iovec.iov_base = &req_exec_lck_resourceclose;
+	iovec.iov_base = (void *)&req_exec_lck_resourceclose;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourceclose);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -3077,7 +3077,7 @@ static void message_handler_req_lib_lck_resourcelock (
 
 	hdb_handle_put (&resource_hdb, req_lib_lck_resourcelock->resource_id);
 
-	iovec.iov_base = &req_exec_lck_resourcelock;
+	iovec.iov_base = (void *)&req_exec_lck_resourcelock;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourcelock);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -3129,7 +3129,7 @@ static void message_handler_req_lib_lck_resourcelockasync (
 
 	hdb_handle_put (&resource_hdb, req_lib_lck_resourcelockasync->resource_id);
 
-	iovec.iov_base = &req_exec_lck_resourcelockasync;
+	iovec.iov_base = (void *)&req_exec_lck_resourcelockasync;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourcelockasync);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -3160,7 +3160,7 @@ static void message_handler_req_lib_lck_resourceunlock (
 	req_exec_lck_resourceunlock.lock_id =
 		req_lib_lck_resourceunlock->lock_id;
 
-	iovec.iov_base = &req_exec_lck_resourceunlock;
+	iovec.iov_base = (void *)&req_exec_lck_resourceunlock;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourceunlock);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -3193,7 +3193,7 @@ static void message_handler_req_lib_lck_resourceunlockasync (
 	req_exec_lck_resourceunlockasync.invocation =
 		req_lib_lck_resourceunlockasync->invocation;
 
-	iovec.iov_base = &req_exec_lck_resourceunlockasync;
+	iovec.iov_base = (void *)&req_exec_lck_resourceunlockasync;
 	iovec.iov_len = sizeof (struct req_exec_lck_resourceunlockasync);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -3221,7 +3221,7 @@ static void message_handler_req_lib_lck_lockpurge (
 		&req_lib_lck_lockpurge->resource_name,
 		sizeof (mar_name_t));
 
-	iovec.iov_base = &req_exec_lck_lockpurge;
+	iovec.iov_base = (void *)&req_exec_lck_lockpurge;
 	iovec.iov_len = sizeof (struct req_exec_lck_lockpurge);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -3247,7 +3247,7 @@ static void message_handler_req_lib_lck_limitget (
 
 	req_exec_lck_limitget.limit_id = req_lib_lck_limitget->limit_id;
 
-	iovec.iov_base = &req_exec_lck_limitget;
+	iovec.iov_base = (void *)&req_exec_lck_limitget;
 	iovec.iov_len = sizeof (struct req_exec_lck_limitget);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
