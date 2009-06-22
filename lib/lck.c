@@ -543,7 +543,7 @@ saLckResourceOpen (
 	req_lib_lck_resourceopen.open_flags = resourceFlags;
 	req_lib_lck_resourceopen.resource_handle = *lckResourceHandle;
 
-	iov.iov_base = &req_lib_lck_resourceopen;
+	iov.iov_base = (void *)&req_lib_lck_resourceopen;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceopen);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -662,7 +662,7 @@ saLckResourceOpenAsync (
 	req_lib_lck_resourceopenasync.resource_handle = lckResourceHandle;
 	req_lib_lck_resourceopenasync.invocation = invocation;
 
-	iov.iov_base = &req_lib_lck_resourceopenasync;
+	iov.iov_base = (void *)&req_lib_lck_resourceopenasync;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceopenasync);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -737,7 +737,7 @@ saLckResourceClose (
 	req_lib_lck_resourceclose.resource_handle = lckResourceHandle;
 	req_lib_lck_resourceclose.resource_id = lckResourceInstance->resource_id;
 
-	iov.iov_base = &req_lib_lck_resourceclose;
+	iov.iov_base = (void *)&req_lib_lck_resourceclose;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceclose);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -856,7 +856,7 @@ saLckResourceLock (
 	req_lib_lck_resourcelock.resource_id = lckResourceInstance->resource_id;
 	req_lib_lck_resourcelock.timeout = timeout;
 
-	iov.iov_base = &req_lib_lck_resourcelock;
+	iov.iov_base = (void *)&req_lib_lck_resourcelock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelock);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1011,7 +1011,7 @@ saLckResourceLockAsync (
 	req_lib_lck_resourcelockasync.resource_id = lckResourceInstance->resource_id;
 	req_lib_lck_resourcelockasync.invocation = invocation;
 
-	iov.iov_base = &req_lib_lck_resourcelockasync;
+	iov.iov_base = (void *)&req_lib_lck_resourcelockasync;
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelockasync);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1102,7 +1102,7 @@ saLckResourceUnlock (
 
 	req_lib_lck_resourceunlock.lock_id = lockId;
 
-	iov.iov_base = &req_lib_lck_resourceunlock;
+	iov.iov_base = (void *)&req_lib_lck_resourceunlock;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceunlock);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1195,7 +1195,7 @@ saLckResourceUnlockAsync (
 	req_lib_lck_resourceunlockasync.lock_id = lockId;
 	req_lib_lck_resourceunlockasync.invocation = invocation;
 
-	iov.iov_base = &req_lib_lck_resourceunlockasync;
+	iov.iov_base = (void *)&req_lib_lck_resourceunlockasync;
 	iov.iov_len = sizeof (struct req_lib_lck_resourceunlockasync);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1256,7 +1256,7 @@ saLckLockPurge (
 	req_lib_lck_lockpurge.header.id =
 		MESSAGE_REQ_LCK_LOCKPURGE;
 
-	iov.iov_base = &req_lib_lck_lockpurge;
+	iov.iov_base = (void *)&req_lib_lck_lockpurge;
 	iov.iov_len = sizeof (struct req_lib_lck_lockpurge);
 
 	error = coroipcc_msg_send_reply_receive (
@@ -1308,7 +1308,7 @@ saLckLimitGet (
 		MESSAGE_REQ_LCK_LIMITGET;
 	req_lib_lck_limitget.limit_id = limitId;
 
-	iov.iov_base = &req_lib_lck_limitget;
+	iov.iov_base = (void *)&req_lib_lck_limitget;
 	iov.iov_len = sizeof (struct req_lib_lck_limitget);
 
 	error = coroipcc_msg_send_reply_receive (
