@@ -1019,7 +1019,7 @@ static int ckpt_checkpoint_close (
 	memset (&req_exec_ckpt_checkpointclose.source, 0,
 		sizeof (mar_message_source_t));
 
-	iovec.iov_base = (char *)&req_exec_ckpt_checkpointclose;
+	iovec.iov_base = (void *)&req_exec_ckpt_checkpointclose;
 	iovec.iov_len = sizeof (req_exec_ckpt_checkpointclose);
 
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
@@ -1503,7 +1503,7 @@ static int callback_expiry (const void *data)
 				&checkpoint->name,
 				sizeof (mar_name_t));
 
-			iovec.iov_base = (char *)&req_exec_ckpt_checkpointunlink;
+			iovec.iov_base = (void *)&req_exec_ckpt_checkpointunlink;
 			iovec.iov_len = sizeof (req_exec_ckpt_checkpointunlink);
 
 			res = api->totem_mcast (&iovec, 1, TOTEM_AGREED);
@@ -1735,7 +1735,7 @@ static void message_handler_req_exec_ckpt_checkpointretentiondurationexpire (
 			&req_exec_ckpt_checkpointretentiondurationexpire->checkpoint_name,
 			sizeof (mar_name_t));
 
-		iovec.iov_base = (char *)&req_exec_ckpt_checkpointunlink;
+		iovec.iov_base = (void *)&req_exec_ckpt_checkpointunlink;
 		iovec.iov_len = sizeof (req_exec_ckpt_checkpointunlink);
 
 		assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -2363,14 +2363,14 @@ error_exit:
 		if (section_size != 0) {
 			res_lib_ckpt_sectionread.data_read = section_size;
 		}
-		iov[0].iov_base = &res_lib_ckpt_sectionread;
+		iov[0].iov_base = (void *)&res_lib_ckpt_sectionread;
 		iov[0].iov_len = sizeof (struct res_lib_ckpt_sectionread);
 		iov_len = 1;
 
 		if (error == SA_AIS_OK) {
 			char *sd;
 			sd = (char *)checkpoint_section->section_data;
-			iov[1].iov_base = &sd[req_exec_ckpt_sectionread->data_offset],
+			iov[1].iov_base = (void *)&sd[req_exec_ckpt_sectionread->data_offset],
 			iov[1].iov_len = section_size;
 			iov_len = 2;
 		}
@@ -2473,7 +2473,7 @@ static void message_handler_req_lib_ckpt_checkpointopen (
 	req_exec_ckpt_checkpointopen.async_call =
 		req_lib_ckpt_checkpointopen->async_call;
 
-	iovec.iov_base = (char *)&req_exec_ckpt_checkpointopen;
+	iovec.iov_base = (void *)&req_exec_ckpt_checkpointopen;
 	iovec.iov_len = sizeof (req_exec_ckpt_checkpointopen);
 
 	assert (api->totem_mcast (&iovec, 1, TOTEM_AGREED) == 0);
@@ -2500,7 +2500,7 @@ static void message_handler_req_lib_ckpt_checkpointclose (
 	req_exec_ckpt_checkpointclose.ckpt_id =
 		req_lib_ckpt_checkpointclose->ckpt_id;
 
-	iovec.iov_base = (char *)&req_exec_ckpt_checkpointclose;
+	iovec.iov_base = (void *)&req_exec_ckpt_checkpointclose;
 	iovec.iov_len = sizeof (req_exec_ckpt_checkpointclose);
 
 	ckpt_checkpoint_remove_cleanup (
@@ -2529,7 +2529,7 @@ static void message_handler_req_lib_ckpt_checkpointunlink (
 		&req_lib_ckpt_checkpointunlink->checkpoint_name,
 		sizeof (mar_name_t));
 
-	iovec.iov_base = (char *)&req_exec_ckpt_checkpointunlink;
+	iovec.iov_base = (void *)&req_exec_ckpt_checkpointunlink;
 	iovec.iov_len = sizeof (req_exec_ckpt_checkpointunlink);
 
 	assert (api->totem_mcast (&iovec, 1,
@@ -2559,7 +2559,7 @@ static void message_handler_req_lib_ckpt_checkpointretentiondurationset (
 	req_exec_ckpt_checkpointretentiondurationset.retention_duration =
 		req_lib_ckpt_checkpointretentiondurationset->retention_duration;
 
-	iovec.iov_base = (char *)&req_exec_ckpt_checkpointretentiondurationset;
+	iovec.iov_base = (void *)&req_exec_ckpt_checkpointretentiondurationset;
 	iovec.iov_len = sizeof (req_exec_ckpt_checkpointretentiondurationset);
 
 	assert (api->totem_mcast (&iovec, 1,
@@ -2689,13 +2689,13 @@ static void message_handler_req_lib_ckpt_sectioncreate (
 	req_exec_ckpt_sectioncreate.initial_data_size =
 		req_lib_ckpt_sectioncreate->initial_data_size;
 
-	iovecs[0].iov_base = (char *)&req_exec_ckpt_sectioncreate;
+	iovecs[0].iov_base = (void *)&req_exec_ckpt_sectioncreate;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sectioncreate);
 
 	/*
 	 * Send section name and initial data in message
 	 */
-	iovecs[1].iov_base = ((char *)req_lib_ckpt_sectioncreate) + sizeof (struct req_lib_ckpt_sectioncreate);
+	iovecs[1].iov_base = (void *)(((char *)req_lib_ckpt_sectioncreate) + sizeof (struct req_lib_ckpt_sectioncreate));
 	iovecs[1].iov_len = req_lib_ckpt_sectioncreate->header.size - sizeof (struct req_lib_ckpt_sectioncreate);
 	req_exec_ckpt_sectioncreate.header.size += iovecs[1].iov_len;
 
@@ -2737,14 +2737,14 @@ static void message_handler_req_lib_ckpt_sectiondelete (
 		req_lib_ckpt_sectiondelete->ckpt_id;
 	req_exec_ckpt_sectiondelete.id_len = req_lib_ckpt_sectiondelete->id_len;
 
-	iovecs[0].iov_base = (char *)&req_exec_ckpt_sectiondelete;
+	iovecs[0].iov_base = (void *)&req_exec_ckpt_sectiondelete;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sectiondelete);
 
 	/*
 	 * Send section name
 	 */
-	iovecs[1].iov_base = ((char *)req_lib_ckpt_sectiondelete) +
-		sizeof (struct req_lib_ckpt_sectiondelete);
+	iovecs[1].iov_base = (void *)(((char *)req_lib_ckpt_sectiondelete) +
+		sizeof (struct req_lib_ckpt_sectiondelete));
 	iovecs[1].iov_len = req_lib_ckpt_sectiondelete->header.size -
 		sizeof (struct req_lib_ckpt_sectiondelete);
 	req_exec_ckpt_sectiondelete.header.size += iovecs[1].iov_len;
@@ -2782,14 +2782,14 @@ static void message_handler_req_lib_ckpt_sectionexpirationtimeset (
 	req_exec_ckpt_sectionexpirationtimeset.expiration_time =
 		req_lib_ckpt_sectionexpirationtimeset->expiration_time;
 
-	iovecs[0].iov_base = (char *)&req_exec_ckpt_sectionexpirationtimeset;
+	iovecs[0].iov_base = (void *)&req_exec_ckpt_sectionexpirationtimeset;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sectionexpirationtimeset);
 
 	/*
 	 * Send section name
 	 */
-	iovecs[1].iov_base = ((char *)req_lib_ckpt_sectionexpirationtimeset) +
-		sizeof (struct req_lib_ckpt_sectionexpirationtimeset);
+	iovecs[1].iov_base = (void *)(((char *)req_lib_ckpt_sectionexpirationtimeset) +
+		sizeof (struct req_lib_ckpt_sectionexpirationtimeset));
 	iovecs[1].iov_len = req_lib_ckpt_sectionexpirationtimeset->header.size -
 		sizeof (struct req_lib_ckpt_sectionexpirationtimeset);
 	req_exec_ckpt_sectionexpirationtimeset.header.size += iovecs[1].iov_len;
@@ -2843,14 +2843,14 @@ static void message_handler_req_lib_ckpt_sectionwrite (
 	req_exec_ckpt_sectionwrite.data_size =
 		req_lib_ckpt_sectionwrite->data_size;
 
-	iovecs[0].iov_base = (char *)&req_exec_ckpt_sectionwrite;
+	iovecs[0].iov_base = (void *)&req_exec_ckpt_sectionwrite;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sectionwrite);
 
 	/*
 	 * Send section name and data to write in message
 	 */
-	iovecs[1].iov_base = ((char *)req_lib_ckpt_sectionwrite) +
-		sizeof (struct req_lib_ckpt_sectionwrite);
+	iovecs[1].iov_base = (void *)(((char *)req_lib_ckpt_sectionwrite) +
+		sizeof (struct req_lib_ckpt_sectionwrite));
 	iovecs[1].iov_len = req_lib_ckpt_sectionwrite->header.size -
 		sizeof (struct req_lib_ckpt_sectionwrite);
 	req_exec_ckpt_sectionwrite.header.size += iovecs[1].iov_len;
@@ -2888,14 +2888,14 @@ static void message_handler_req_lib_ckpt_sectionoverwrite (
 	req_exec_ckpt_sectionoverwrite.data_size =
 		req_lib_ckpt_sectionoverwrite->data_size;
 
-	iovecs[0].iov_base = (char *)&req_exec_ckpt_sectionoverwrite;
+	iovecs[0].iov_base = (void *)&req_exec_ckpt_sectionoverwrite;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sectionoverwrite);
 
 	/*
 	 * Send section name and data to overwrite in message
 	 */
-	iovecs[1].iov_base = ((char *)req_lib_ckpt_sectionoverwrite) +
-		sizeof (struct req_lib_ckpt_sectionoverwrite);
+	iovecs[1].iov_base = (void *)(((char *)req_lib_ckpt_sectionoverwrite) +
+		sizeof (struct req_lib_ckpt_sectionoverwrite));
 	iovecs[1].iov_len = req_lib_ckpt_sectionoverwrite->header.size -
 		sizeof (struct req_lib_ckpt_sectionoverwrite);
 	req_exec_ckpt_sectionoverwrite.header.size += iovecs[1].iov_len;
@@ -2938,14 +2938,14 @@ static void message_handler_req_lib_ckpt_sectionread (
 	req_exec_ckpt_sectionread.data_size =
 		req_lib_ckpt_sectionread->data_size;
 
-	iovecs[0].iov_base = (char *)&req_exec_ckpt_sectionread;
+	iovecs[0].iov_base = (void *)&req_exec_ckpt_sectionread;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sectionread);
 
 		/*
 		 * Send section name and data to overwrite in message
 		 */
-	iovecs[1].iov_base = ((char *)req_lib_ckpt_sectionread) +
-		sizeof (struct req_lib_ckpt_sectionread);
+	iovecs[1].iov_base = (void *)(((char *)req_lib_ckpt_sectionread) +
+		sizeof (struct req_lib_ckpt_sectionread));
 	iovecs[1].iov_len = req_lib_ckpt_sectionread->header.size -
 		sizeof (struct req_lib_ckpt_sectionread);
 	req_exec_ckpt_sectionread.header.size += iovecs[1].iov_len;
@@ -3279,12 +3279,12 @@ error_exit:
 	res_lib_ckpt_sectioniterationnext.header.id = MESSAGE_RES_CKPT_SECTIONITERATIONNEXT;
 	res_lib_ckpt_sectioniterationnext.header.error = error;
 
-	iov[0].iov_base = &res_lib_ckpt_sectioniterationnext;
+	iov[0].iov_base = (void *)&res_lib_ckpt_sectioniterationnext;
 	iov[0].iov_len = sizeof (struct res_lib_ckpt_sectioniterationnext);
 	iov_len = 1;
 
 	if (error == SA_AIS_OK ) {
-		iov[1].iov_base = checkpoint_section->section_descriptor.section_id.id,
+		iov[1].iov_base = (void *)checkpoint_section->section_descriptor.section_id.id,
 		iov[1].iov_len = checkpoint_section->section_descriptor.section_id.id_len;
 		iov_len = 2;
 	}
@@ -3453,7 +3453,7 @@ static int sync_checkpoint_transmit (struct checkpoint *checkpoint)
 	req_exec_ckpt_sync_checkpoint.unlinked =
 		checkpoint->unlinked;
 
-	iovec.iov_base = (char *)&req_exec_ckpt_sync_checkpoint;
+	iovec.iov_base = (void *)&req_exec_ckpt_sync_checkpoint;
 	iovec.iov_len = sizeof (req_exec_ckpt_sync_checkpoint);
 
 	return (api->totem_mcast (&iovec, 1, TOTEM_AGREED));
@@ -3508,11 +3508,11 @@ static int sync_checkpoint_section_transmit (
 	req_exec_ckpt_sync_checkpoint_section.expiration_time =
 		checkpoint_section->section_descriptor.expiration_time;
 
-	iovecs[0].iov_base = (char *)&req_exec_ckpt_sync_checkpoint_section;
+	iovecs[0].iov_base = (void *)&req_exec_ckpt_sync_checkpoint_section;
 	iovecs[0].iov_len = sizeof (req_exec_ckpt_sync_checkpoint_section);
-	iovecs[1].iov_base = checkpoint_section->section_descriptor.section_id.id;
+	iovecs[1].iov_base = (void *)checkpoint_section->section_descriptor.section_id.id;
 	iovecs[1].iov_len = checkpoint_section->section_descriptor.section_id.id_len;
-	iovecs[2].iov_base = checkpoint_section->section_data;
+	iovecs[2].iov_base = (void *)checkpoint_section->section_data;
 	iovecs[2].iov_len = checkpoint_section->section_descriptor.section_size;
 
 	LEAVE();
@@ -3546,7 +3546,7 @@ static int sync_checkpoint_refcount_transmit (
 		req_exec_ckpt_sync_checkpoint_refcount.refcount_set,
 		checkpoint->refcount_set);
 
-	iovec.iov_base = (char *)&req_exec_ckpt_sync_checkpoint_refcount;
+	iovec.iov_base = (void *)&req_exec_ckpt_sync_checkpoint_refcount;
 	iovec.iov_len = sizeof (struct req_exec_ckpt_sync_checkpoint_refcount);
 
 	LEAVE();
