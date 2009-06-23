@@ -1835,9 +1835,6 @@ static void lck_unlock (
 				api->timer_delete (resource_lock->timer_handle);
 				lck_resourcelock_response_send (resource_lock, SA_AIS_ERR_TIMEOUT);
 			}
-			else {
-				lck_lockgrant_callback_send (resource_lock, SA_AIS_ERR_NOT_EXIST);
-			}
 		}
 	}
 
