@@ -218,6 +218,7 @@ struct corosync_service_engine evt_service_engine = {
 	.exec_engine_count			= sizeof(evt_exec_engine) / sizeof(struct corosync_exec_handler),
 	.exec_dump_fn				= NULL,
 	.confchg_fn					= evt_conf_change,
+	.sync_mode					= CS_SYNC_V1,
 	.sync_init					= evt_sync_init,
 	.sync_process				= evt_sync_process,
 	.sync_activate				= evt_sync_activate,

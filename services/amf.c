@@ -350,7 +350,7 @@ static struct corosync_exec_handler amf_exec_engine[] = {
  */
 static struct corosync_service_engine amf_service_engine = {
 	.name				= "openais availability management framework B.01.01",
-	.id					= AMF_SERVICE,
+	.id					= AMF_V2_SERVICE,
 	.private_data_size	= sizeof (struct amf_pd),
 	.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED,
 	.lib_init_fn		= amf_lib_init_fn,
@@ -362,6 +362,7 @@ static struct corosync_service_engine amf_service_engine = {
 	.exec_engine_count	= sizeof (amf_exec_engine) / sizeof (struct corosync_exec_handler),
 	.confchg_fn		= amf_confchg_fn,
 	.exec_dump_fn		= amf_dump_fn,
+	.sync_mode		= CS_SYNC_V2,
 	.sync_init         	= amf_sync_init,
 	.sync_process      	= amf_sync_process,
 	.sync_activate     	= amf_sync_activate,

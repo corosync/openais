@@ -425,6 +425,7 @@ struct corosync_service_engine lck_service_engine = {
 	.exec_engine			= lck_exec_engine,
 	.exec_engine_count		= sizeof (lck_exec_engine) / sizeof (struct corosync_exec_handler),
 	.confchg_fn			= lck_confchg_fn,
+	.sync_mode			= CS_SYNC_V2,
 	.sync_init			= lck_sync_init,
 	.sync_process			= lck_sync_process,
 	.sync_activate			= lck_sync_activate,

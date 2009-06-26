@@ -214,6 +214,7 @@ struct corosync_service_engine clm_service_engine = {
 	.exec_engine		= clm_exec_engine,
 	.exec_engine_count	= sizeof (clm_exec_engine) / sizeof (struct corosync_exec_handler),
 	.confchg_fn		= clm_confchg_fn,
+	.sync_mode		= CS_SYNC_V1,
 	.sync_init		= clm_sync_init,
 	.sync_process		= clm_sync_process,
 	.sync_activate		= clm_sync_activate,

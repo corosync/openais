@@ -575,6 +575,7 @@ struct corosync_service_engine ckpt_service_engine = {
 	.exec_engine			= ckpt_exec_engine,
 	.exec_engine_count		= sizeof (ckpt_exec_engine) / sizeof (struct corosync_exec_handler),
 	.confchg_fn			= ckpt_confchg_fn,
+	.sync_mode			= CS_SYNC_V1,
 	.sync_init			= ckpt_sync_init,
 	.sync_process			= ckpt_sync_process,
 	.sync_activate			= ckpt_sync_activate,

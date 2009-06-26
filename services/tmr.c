@@ -177,6 +177,7 @@ struct corosync_service_engine tmr_service_engine = {
 	.exec_engine		= NULL,
 	.exec_engine_count	= 0,
 	.confchg_fn		= NULL,
+	.sync_mode		= CS_SYNC_V2,
 	.sync_init		= NULL,
 	.sync_process		= NULL,
 	.sync_activate		= NULL,
