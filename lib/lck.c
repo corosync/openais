@@ -525,6 +525,9 @@ saLckResourceOpen (
 	lckResourceInstance->lck_handle = lckHandle;
 	lckResourceInstance->resource_handle = *lckResourceHandle;
 
+	list_init (&lckResourceInstance->lock_id_list);
+	list_init (&lckResourceInstance->list);
+
 	memcpy (&lckResourceInstance->resource_name, lckResourceName,
 		sizeof(SaNameT));
 
@@ -565,8 +568,6 @@ saLckResourceOpen (
 	lckResourceInstance->resource_id =
 		res_lib_lck_resourceopen.resource_id;
 
-	list_init (&lckResourceInstance->lock_id_list);
-	list_init (&lckResourceInstance->list);
 	list_add_tail (&lckResourceInstance->list, &lckInstance->resource_list);
 
 	hdb_handle_put (&lckResourceHandleDatabase, *lckResourceHandle);
@@ -643,6 +644,9 @@ saLckResourceOpenAsync (
 	lckResourceInstance->lck_handle = lckHandle;
 	lckResourceInstance->resource_handle = lckResourceHandle;
 
+	list_init (&lckResourceInstance->lock_id_list);
+	list_init (&lckResourceInstance->list);
+
 	memcpy (&lckResourceInstance->resource_name, lckResourceName,
 		sizeof (SaNameT));
 
@@ -684,8 +688,6 @@ saLckResourceOpenAsync (
 	lckResourceInstance->resource_id =
 		res_lib_lck_resourceopenasync.resource_id;
 
-	list_init (&lckResourceInstance->lock_id_list);
-	list_init (&lckResourceInstance->list);
 	list_add_tail (&lckResourceInstance->list, &lckInstance->resource_list);
 
 	hdb_handle_put (&lckResourceHandleDatabase, lckResourceHandle);
