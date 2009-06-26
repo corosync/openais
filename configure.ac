@@ -104,14 +104,14 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		strerror strrchr strspn strstr pthread_spin_lock \
 		pthread_spin_unlock])
 
-# add man and init dirs?
 AC_CONFIG_FILES([Makefile
-                 include/Makefile
-                 lib/Makefile
-                 man/Makefile
-                 pkgconfig/Makefile
-                 services/Makefile
-                 test/Makefile])
+		 include/Makefile
+		 lib/Makefile
+		 man/Makefile
+		 pkgconfig/Makefile
+		 services/Makefile
+		 test/Makefile
+		 init/Makefile])
 
 ### Local business
 

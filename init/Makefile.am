@@ -1,7 +1,10 @@
+# Copyright (c) 2004 MontaVista Software, Inc.
 # Copyright (c) 2009 Red Hat, Inc.
 #
-# Authors: Andrew Beekhof
-#	   Steven Dake (sdake@redhat.com)
+# Authors: Steven Dake (sdake@redhat.com)
+#          Fabio M. Di Nitto (fdinitto@redhat.com)
+#
+# All rights reserved.
 #
 # This software licensed under BSD license, the text of which follows:
 #
@@ -29,31 +32,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
-EXTRA_DIST		= autogen.sh \
-			  conf/amf.conf.example
+MAINTAINERCLEANFILES	= Makefile.in
 
-AUTOMAKE_OPTIONS	= foreign
-
-MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
-			  config.guess config.sub missing install-sh \
-			  autoheader automake autoconf
-
-dist_doc_DATA		= LICENSE README.amf AUTHORS
-
-corosysconfdir		= ${COROSYSCONFDIR}
-
-corosysconf_DATA	= conf/amf.conf.example
-
-SUBDIRS			= include lib services test pkgconfig man init
-
-lint:
-	for dir in lcr lib exec services tools test; do make -C $$dir lint; done
-
-doxygen:
-	mkdir -p doc/api && doxygen
-
-dist-clean-local:
-	rm -f autoconf automake autoheader $(TARFILE)
-
-clean-generic:
-	rm -rf doc/api
+EXTRA_DIST		= generic mvlcge README redhat
