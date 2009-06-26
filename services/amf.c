@@ -380,7 +380,7 @@ static struct corosync_service_engine_iface_ver0 amf_service_engine_iface = {
 
 static struct lcr_iface openais_amf_ver0[1] = {
 	{
-		.name			= "openais_amf",
+		.name			= "openais_amf_v2",
 		.version		= 0,
 		.versions_replace	= 0,
 		.versions_replace_count = 0,

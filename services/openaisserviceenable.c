@@ -62,14 +62,14 @@ static struct service_engine service_engines[] = {
 	{ "openais_clm", "0" },
 	{ "openais_evt", "0" },
 	{ "openais_ckpt", "0" },
-	{ "openais_amf", "0" },
+	{ "openais_amf_v2", "0" },
 	{ "openais_msg", "0" },
 	{ "openais_lck", "0" },
 	{ "openais_tmr", "0" },
 };
 
 static const char *exluded_service_engines[] = {
-	"openais_amf"
+	"openais_amf_v2"
 };
 
 static int openais_service_enable_worker (
