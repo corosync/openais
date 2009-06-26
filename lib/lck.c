@@ -273,7 +273,7 @@ saLckOptionCheck (
 		goto error_exit;
 	}
 
-	/* TODO */
+	*lckOptions = SA_LCK_OPT_ORPHAN_LOCKS;
 
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
 
