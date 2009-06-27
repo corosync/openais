@@ -410,9 +410,29 @@ saLckDispatch (
 			res_lib_lck_resourceunlock_callback =
 				(struct res_lib_lck_resourceunlock_callback *)dispatch_data;
 
+			/*
+			 * Check that the lock_id is still valid before invoking
+			 * the callback. This is needed to handle the case where
+			 * a lock was unlocked before the callback was processed.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
+				res_lib_lck_resourceunlock_callback->lock_id,
+				(void *)&lckLockIdInstance));
+			if (error != SA_AIS_OK) {
+				res_lib_lck_resourceunlock_callback->header.error =
+					SA_AIS_ERR_NOT_EXIST;
+			}
+
 			callbacks.saLckResourceUnlockCallback (
 				res_lib_lck_resourceunlock_callback->invocation,
 				res_lib_lck_resourceunlock_callback->header.error);
+
+			if (error == SA_AIS_OK) {
+				hdb_handle_put (&lckLockIdHandleDatabase,
+					res_lib_lck_resourceunlock_callback->lock_id);
+
+				lckLockIdInstanceFinalize (lckLockIdInstance);
+			}
 
 			break;
 
@@ -1122,6 +1142,7 @@ saLckResourceUnlock (
 	}
 
 	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
+
 	lckLockIdInstanceFinalize (lckLockIdInstance);
 
 	return (error);
@@ -1215,7 +1236,8 @@ saLckResourceUnlockAsync (
 	}
 
 	hdb_handle_put (&lckLockIdHandleDatabase, lockId);
-	lckLockIdInstanceFinalize (lckLockIdInstance);
+
+	/* lckLockIdInstanceFinalize (lckLockIdInstance); */
 
 	return (error);
 

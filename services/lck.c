@@ -2505,14 +2505,20 @@ static void message_handler_req_exec_lck_resourceunlock (
 		&req_exec_lck_resourceunlock->source,
 		req_exec_lck_resourceunlock->lock_id);
 
-	if (resource_lock == NULL) {
-		error = SA_AIS_ERR_NOT_EXIST;
-		goto error_exit;
-	}
+/* 	if (resource_lock == NULL) { */
+/* 		error = SA_AIS_ERR_NOT_EXIST; */
+/* 		goto error_exit; */
+/* 	} */
 
-	lck_unlock (resource, resource_lock);
-	global_lock_count -= 1;
-	free (resource_lock);
+/* 	lck_unlock (resource, resource_lock); */
+/* 	global_lock_count -= 1; */
+/* 	free (resource_lock); */
+
+	if (resource_lock != NULL) {
+		lck_unlock (resource, resource_lock);
+		global_lock_count -= 1;
+		free (resource_lock);
+	}
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_lck_resourceunlock->source))
@@ -2557,14 +2563,20 @@ static void message_handler_req_exec_lck_resourceunlockasync (
 		&req_exec_lck_resourceunlockasync->source,
 		req_exec_lck_resourceunlockasync->lock_id);
 
-	if (resource_lock == NULL) {
-		error = SA_AIS_ERR_NOT_EXIST;
-		goto error_exit;
-	}
+/* 	if (resource_lock == NULL) { */
+/* 		error = SA_AIS_ERR_NOT_EXIST; */
+/* 		goto error_exit; */
+/* 	} */
 
-	lck_unlock (resource, resource_lock);
-	global_lock_count -= 1;
-	free (resource_lock);
+/* 	lck_unlock (resource, resource_lock); */
+/* 	global_lock_count -= 1; */
+/* 	free (resource_lock); */
+
+	if (resource_lock != NULL) {
+		lck_unlock (resource, resource_lock);
+		global_lock_count -= 1;
+		free (resource_lock);
+	}
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_lck_resourceunlockasync->source))
@@ -2588,6 +2600,8 @@ error_exit:
 
 		res_lib_lck_resourceunlock_callback.invocation =
 			req_exec_lck_resourceunlockasync->invocation;
+		res_lib_lck_resourceunlock_callback.lock_id =
+			req_exec_lck_resourceunlockasync->lock_id;
 
 		api->ipc_dispatch_send (
 			req_exec_lck_resourceunlockasync->source.conn,

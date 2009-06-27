@@ -206,6 +206,7 @@ struct res_lib_lck_lockwaiter_callback {
 struct res_lib_lck_resourceunlock_callback {
 	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
+	mar_uint64_t lock_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 #endif /* IPC_LCK_H_DEFINED */
