@@ -230,7 +230,10 @@ static void message_handler_req_exec_amf_comp_instantiate_tmo(
 static void message_handler_req_exec_amf_comp_cleanup_tmo(
 	const void *message, unsigned int nodeid);
 static void amf_dump_fn (void);
-static void amf_sync_init (void);
+static void amf_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id);
 static int amf_sync_process (void);
 static void amf_sync_abort (void);
 static void amf_sync_activate (void);
@@ -1116,7 +1119,10 @@ static void cluster_joined_nodes_start (void)
  * AMF Framework callback implementation                       *
  *****************************************************************************/
 
-static void amf_sync_init (void)
+static void amf_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	SYNCTRACE ("state %s", scsm_state_names[scsm.state]);
 

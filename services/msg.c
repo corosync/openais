@@ -463,7 +463,11 @@ static struct list_head *msg_sync_iteration_group;
 static struct list_head *msg_sync_iteration_message;
 static struct list_head *msg_sync_iteration_refcount;
 
-static void msg_sync_init (void);
+static void msg_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id);
+
 static int  msg_sync_process (void);
 static void msg_sync_activate (void);
 static void msg_sync_abort (void);
@@ -2261,7 +2265,10 @@ static void msg_sync_group_enter (void)
 	msg_sync_iteration_queue = group->queue_head.next; /* ! */
 }
 
-static void msg_sync_init (void)
+static void msg_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: msg_sync_init\n");

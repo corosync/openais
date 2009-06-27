@@ -131,7 +131,10 @@ static void clm_confchg_fn (
 	const unsigned int *joined_list, size_t joined_list_entries,
 	const struct memb_ring_id *ring_id);
 
-static void clm_sync_init (void);
+static void clm_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id);
 
 static int clm_sync_process (void);
 
@@ -590,7 +593,10 @@ static void clm_confchg_fn (
 /*
  * This is a noop for this service
  */
-static void clm_sync_init (void)
+static void clm_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	return;
 }

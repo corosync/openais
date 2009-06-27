@@ -130,7 +130,10 @@ static int evt_exec_exit(void);
 /*
  * Recovery sync functions
  */
-static void evt_sync_init(void);
+static void evt_sync_init(
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id);
 static int evt_sync_process(void);
 static void evt_sync_activate(void);
 static void evt_sync_abort(void);
@@ -4010,7 +4013,10 @@ static void evt_remote_chan_op(const void *msg, unsigned int nodeid)
  * Set up initial conditions for processing event service
  * recovery.
  */
-static void evt_sync_init(void)
+static void evt_sync_init(
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	SaClmClusterNodeT *cn;
 	struct member_node_data *md;

@@ -279,7 +279,10 @@ static void exec_lck_sync_resource_endian_convert (void *msg);
 static void exec_lck_sync_resource_lock_endian_convert (void *msg);
 static void exec_lck_sync_resource_refcount_endian_convert (void *msg);
 
-static void lck_sync_init (void);
+static void lck_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id);
 static int  lck_sync_process (void);
 static void lck_sync_activate (void);
 static void lck_sync_abort (void);
@@ -1350,7 +1353,10 @@ static void lck_sync_resource_enter (void)
 	lck_sync_iteration_resource_lock = resource->resource_lock_list_head.next;
 }
 
-static void lck_sync_init (void)
+static void lck_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_init\n");

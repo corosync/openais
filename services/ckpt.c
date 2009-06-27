@@ -357,7 +357,11 @@ static void exec_ckpt_sync_checkpoint_section_endian_convert (void *msg);
 static void exec_ckpt_sync_checkpoint_refcount_endian_convert (void *msg);
 
 
-static void ckpt_sync_init (void);
+static void ckpt_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id);
+
 static void ckpt_sync_activate (void);
 static int  ckpt_sync_process (void);
 static void ckpt_sync_abort(void);
@@ -3416,7 +3420,10 @@ static inline void sync_refcounts_enter (void)
 	my_iteration_state_checkpoint_list = checkpoint_list_head.next;
 }
 
-static void ckpt_sync_init (void)
+static void ckpt_sync_init (
+	const unsigned int *member_list,
+	size_t member_list_entries,
+	const struct memb_ring_id *ring_id)
 {
 	ENTER();
 
