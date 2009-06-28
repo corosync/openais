@@ -646,7 +646,7 @@ static void message_handler_req_exec_clm_nodejoin (
 	int found = 0;
 	int i;
 
-	log_printf (LOGSYS_LEVEL_NOTICE, "got nodejoin message %s\n",
+	log_printf (LOGSYS_LEVEL_DEBUG, "got nodejoin message %s\n",
 		req_exec_clm_nodejoin->cluster_node.node_name.value);
 
 	/*
