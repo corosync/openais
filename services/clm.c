@@ -379,7 +379,6 @@ static int clm_exec_init_fn (struct corosync_api_v1 *corosync_api)
 
 	cluster_node_count = 1;
 
-//TODO	main_clm_get_by_nodeid = clm_get_by_nodeid;
 	return (0);
 }
 
