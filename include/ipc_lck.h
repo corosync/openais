@@ -183,13 +183,14 @@ struct res_lib_lck_limitget {
 
 struct res_lib_lck_resourceopen_callback {
 	coroipc_response_header_t header __attribute__((aligned(8)));
-	mar_invocation_t invocation __attribute__((aligned(8)));
 	mar_uint64_t resource_handle __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
 	mar_uint32_t lock_status __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_lck_lockgrant_callback {
 	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
 	mar_uint32_t lock_status __attribute__((aligned(8)));
 	mar_uint64_t lock_id __attribute__((aligned(8)));
@@ -197,6 +198,7 @@ struct res_lib_lck_lockgrant_callback {
 
 struct res_lib_lck_lockwaiter_callback {
 	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
 	mar_uint64_t waiter_signal __attribute__((aligned(8)));
 	mar_uint64_t lock_id __attribute__((aligned(8)));
 	mar_uint32_t mode_held __attribute__((aligned(8)));
@@ -205,6 +207,7 @@ struct res_lib_lck_lockwaiter_callback {
 
 struct res_lib_lck_resourceunlock_callback {
 	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
 	mar_uint64_t lock_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));

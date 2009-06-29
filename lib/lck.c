@@ -288,14 +288,18 @@ saLckDispatch (
 {
 	struct lckInstance *lckInstance;
 	struct lckLockIdInstance *lckLockIdInstance;
+	struct lckResourceInstance *lckResourceInstance;
+
 	struct res_lib_lck_resourceopen_callback *res_lib_lck_resourceopen_callback;
 	struct res_lib_lck_lockgrant_callback *res_lib_lck_lockgrant_callback;
 	struct res_lib_lck_lockwaiter_callback *res_lib_lck_lockwaiter_callback;
 	struct res_lib_lck_resourceunlock_callback *res_lib_lck_resourceunlock_callback;
+
 	SaLckCallbacksT callbacks;
 	SaAisErrorT error = SA_AIS_OK;
 
 	coroipc_response_header_t *dispatch_data;
+
 	int timeout = 1;
 	int cont = 1;
 
@@ -349,6 +353,21 @@ saLckDispatch (
 			res_lib_lck_resourceopen_callback =
 				(struct res_lib_lck_resourceopen_callback *)dispatch_data;
 
+			/*
+			 * Check that the resource handle is still valid before
+			 * invoking the callback. If the resource handle does not
+			 * exist, we skip this callback.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+				res_lib_lck_resourceopen_callback->resource_handle,
+				(void *)&lckResourceInstance));
+			if (error != SA_AIS_OK) {
+				break;
+			}
+
+			hdb_handle_put (&lckResourceHandleDatabase,
+				res_lib_lck_resourceopen_callback->resource_handle);
+
 			callbacks.saLckResourceOpenCallback (
 				res_lib_lck_resourceopen_callback->invocation,
 				res_lib_lck_resourceopen_callback->resource_handle,
@@ -362,6 +381,21 @@ saLckDispatch (
 			}
 			res_lib_lck_lockgrant_callback =
 				(struct res_lib_lck_lockgrant_callback *)dispatch_data;
+
+			/*
+			 * Check that the resource handle is still valid before
+			 * invoking the callback. If the resource handle does not
+			 * exist, we skip this callback.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+				res_lib_lck_lockgrant_callback->resource_handle,
+				(void *)&lckResourceInstance));
+			if (error != SA_AIS_OK) {
+				break;
+			}
+
+			hdb_handle_put (&lckResourceHandleDatabase,
+				res_lib_lck_lockgrant_callback->resource_handle);
 
 			/*
 			 * Check that the lock_id is still valid before invoking
@@ -395,6 +429,21 @@ saLckDispatch (
 			res_lib_lck_lockwaiter_callback =
 				(struct res_lib_lck_lockwaiter_callback *)dispatch_data;
 
+			/*
+			 * Check that the resource handle is still valid before
+			 * invoking the callback. If the resource handle does not
+			 * exist, we skip this callback.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+				res_lib_lck_lockwaiter_callback->resource_handle,
+				(void *)&lckResourceInstance));
+			if (error != SA_AIS_OK) {
+				break;
+			}
+
+			hdb_handle_put (&lckResourceHandleDatabase,
+				res_lib_lck_lockwaiter_callback->resource_handle);
+
 			callbacks.saLckLockWaiterCallback (
 				res_lib_lck_lockwaiter_callback->waiter_signal,
 				res_lib_lck_lockwaiter_callback->lock_id,
@@ -409,6 +458,20 @@ saLckDispatch (
 			}
 			res_lib_lck_resourceunlock_callback =
 				(struct res_lib_lck_resourceunlock_callback *)dispatch_data;
+
+			/*
+			 * Check that the resource handle is still valid before
+			 * invoking the callback.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
+				res_lib_lck_resourceunlock_callback->resource_handle,
+				(void *)&lckResourceInstance));
+			if (error != SA_AIS_OK) {
+				break;
+			}
+
+			hdb_handle_put (&lckResourceHandleDatabase,
+				res_lib_lck_resourceunlock_callback->resource_handle);
 
 			/*
 			 * Check that the lock_id is still valid before invoking
@@ -428,10 +491,9 @@ saLckDispatch (
 				res_lib_lck_resourceunlock_callback->header.error);
 
 			if (error == SA_AIS_OK) {
+				lckLockIdInstanceFinalize (lckLockIdInstance);
 				hdb_handle_put (&lckLockIdHandleDatabase,
 					res_lib_lck_resourceunlock_callback->lock_id);
-
-				lckLockIdInstanceFinalize (lckLockIdInstance);
 			}
 
 			break;

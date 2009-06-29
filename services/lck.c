@@ -532,6 +532,7 @@ struct req_exec_lck_resourcelockasync {
 struct req_exec_lck_resourceunlock {
 	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
 	mar_name_t resource_name __attribute__((aligned(8)));
 	mar_uint64_t lock_id __attribute__((aligned(8)));
 };
@@ -539,6 +540,7 @@ struct req_exec_lck_resourceunlock {
 struct req_exec_lck_resourceunlockasync {
 	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_message_source_t source __attribute__((aligned(8)));
+	mar_uint64_t resource_handle __attribute__((aligned(8)));
 	mar_name_t resource_name __attribute__((aligned(8)));
 	mar_uint64_t lock_id __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
@@ -1645,8 +1647,9 @@ static void lck_lockwaiter_callback_send (
 		res_lib_lck_lockwaiter_callback.header.error = SA_AIS_OK;
 
 		res_lib_lck_lockwaiter_callback.waiter_signal = request_lock->waiter_signal;
-		res_lib_lck_lockwaiter_callback.lock_id = grant_lock->lock_id; /* ? */
+		res_lib_lck_lockwaiter_callback.lock_id = grant_lock->lock_id;
 		res_lib_lck_lockwaiter_callback.mode_requested = request_lock->lock_mode;
+		res_lib_lck_lockwaiter_callback.resource_handle = grant_lock->resource_handle;
 
 		if (grant_lock->resource->ex_lock_granted != NULL) {
 			res_lib_lck_lockwaiter_callback.mode_held = SA_LCK_EX_LOCK_MODE;
@@ -1691,6 +1694,9 @@ static void lck_lockgrant_callback_send (
 		res_lib_lck_lockgrant_callback.header.id =
 			MESSAGE_RES_LCK_LOCKGRANT_CALLBACK;
 		res_lib_lck_lockgrant_callback.header.error = error;
+
+		res_lib_lck_lockgrant_callback.resource_handle =
+			resource_lock->resource_handle;
 
 		if (resource_lock != NULL) {
 			res_lib_lck_lockgrant_callback.lock_status =
@@ -2351,7 +2357,7 @@ static void message_handler_req_exec_lck_resourcelock (
 	lock->lock_flags = req_exec_lck_resourcelock->lock_flags;
 	lock->waiter_signal = req_exec_lck_resourcelock->waiter_signal;
 	/* lock->resource_id = req_exec_lck_resourcelock->resource_id; */
-	/* lock->resource_handle = req_exec_lck_resourcelock->resource_handle; */
+	lock->resource_handle = req_exec_lck_resourcelock->resource_handle;
 
 	list_init (&lock->list);
 	list_init (&lock->resource_lock_list);
@@ -2445,7 +2451,7 @@ static void message_handler_req_exec_lck_resourcelockasync (
 	lock->lock_flags = req_exec_lck_resourcelockasync->lock_flags;
 	lock->waiter_signal = req_exec_lck_resourcelockasync->waiter_signal;
 	/* lock->resource_id = req_exec_lck_resourcelockasync->resource_id; */
-	/* lock->resource_handle = req_exec_lck_resourcelockasync->resource_handle; */
+	lock->resource_handle = req_exec_lck_resourcelockasync->resource_handle;
 
 	list_init (&lock->list);
 	list_init (&lock->resource_lock_list);
@@ -2600,6 +2606,8 @@ error_exit:
 
 		res_lib_lck_resourceunlock_callback.invocation =
 			req_exec_lck_resourceunlockasync->invocation;
+		res_lib_lck_resourceunlock_callback.resource_handle =
+			req_exec_lck_resourceunlockasync->resource_handle;
 		res_lib_lck_resourceunlock_callback.lock_id =
 			req_exec_lck_resourceunlockasync->lock_id;
 
@@ -3175,6 +3183,8 @@ static void message_handler_req_lib_lck_resourceunlock (
 		&req_lib_lck_resourceunlock->resource_name,
 		sizeof (mar_name_t));
 
+	req_exec_lck_resourceunlock.resource_handle =
+		req_lib_lck_resourceunlock->resource_handle;
 	req_exec_lck_resourceunlock.lock_id =
 		req_lib_lck_resourceunlock->lock_id;
 
@@ -3206,6 +3216,8 @@ static void message_handler_req_lib_lck_resourceunlockasync (
 		&req_lib_lck_resourceunlockasync->resource_name,
 		sizeof (mar_name_t));
 
+	req_exec_lck_resourceunlockasync.resource_handle =
+		req_lib_lck_resourceunlockasync->resource_handle;	
 	req_exec_lck_resourceunlockasync.lock_id =
 		req_lib_lck_resourceunlockasync->lock_id;
 	req_exec_lck_resourceunlockasync.invocation =
