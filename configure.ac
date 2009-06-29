@@ -229,6 +229,7 @@ case "$host_os" in
 	;;
 esac
 
+AC_SUBST(CP)
 # *FLAGS handling goes here
 
 ENV_CFLAGS="$CFLAGS"
