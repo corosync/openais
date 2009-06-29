@@ -1,0 +1,158 @@
+%define alphatag @alphatag@
+
+Name: openais
+Summary: The openais Standards-Based Cluster Framework executive and APIs
+Version: @version@
+Release: 1%{?alphatag:.%{alphatag}}%{?dist}
+License: BSD
+Group: System Environment/Base
+URL: http://developer.osdl.org/dev/openais/
+Source0: http://www.osdl.org/downloads/openais-%{version}/openais-%{version}.tar.gz
+
+# Runtime bits
+Requires(post): /sbin/chkconfig
+Requires(preun): /sbin/chkconfig
+Requires: corosync
+Requires: openaislib = %{version}-%{release}
+Conflicts: openais-devel <= 0.89
+
+# Setup/build bits
+BuildRequires: corosynclib-devel
+
+%define buildtrunk 0
+%{?_with_buildtrunk: %define buildtrunk 1}
+
+%if %{buildtrunk}
+BuildRequires: autoconf automake
+%endif
+
+BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+
+%prep
+%setup -q -n openais-%{version}
+
+%if %{buildtrunk}
+./autogen.sh
+%endif
+
+%{_configure}	CFLAGS="$(echo '%{optflags}')" \
+		--prefix=/usr \
+		--localstatedir=/var \
+		--sysconfdir=/etc \
+		--with-lcrso-dir=$(pkg-config corosync --variable lcrsodir) \
+		--libdir=%{_libdir}
+
+%build
+make %{_smp_mflags}
+
+%install
+rm -rf %{buildroot}
+
+make install DESTDIR=%{buildroot}
+mkdir -p %{buildroot}%{_initrddir}
+install -m 755 init/redhat %{buildroot}%{_initrddir}/openais
+
+## tree fixup
+# drop static libs
+rm -f %{buildroot}%{_libdir}/*.a
+# drop docs and html docs for now
+rm -rf %{buildroot}%{_docdir}/*
+
+%clean
+rm -rf %{buildroot}
+
+%description 
+This package contains the openais service handlers, default configuration
+files and init script.
+
+%post
+/sbin/chkconfig --add openais || :
+
+%preun
+if [ $1 -eq 0 ]; then
+    %{_initrddir}/openais stop &>/dev/null || :
+    /sbin/chkconfig --del openais || :
+fi
+
+%postun
+[ "$1" -ge "1" ] && %{_initrddir}/openais condrestart &>/dev/null || :
+
+%files 
+%defattr(-,root,root,-)
+%doc LICENSE README.amf
+%dir /etc/corosync
+%config(noreplace) /etc/corosync/amf.conf.example
+%{_initrddir}/openais
+%dir %{_libexecdir}/lcrso
+%{_libexecdir}/lcrso/openaisserviceenable.lcrso
+%{_libexecdir}/lcrso/service_amf.lcrso
+%{_libexecdir}/lcrso/service_ckpt.lcrso
+%{_libexecdir}/lcrso/service_clm.lcrso
+%{_libexecdir}/lcrso/service_evt.lcrso
+%{_libexecdir}/lcrso/service_lck.lcrso
+%{_libexecdir}/lcrso/service_msg.lcrso
+%{_libexecdir}/lcrso/service_tmr.lcrso
+%{_mandir}/man8/openais_overview.8*
+%{_mandir}/man5/openais.conf.5*
+%{_mandir}/man5/amf.conf.5*
+%{_sbindir}/aisexec
+%{_sbindir}/openais-instantiate
+
+%package -n openaislib
+Summary: The openais Standards-Based Cluster Framework libraries
+Group: System Environment/Libraries
+Conflicts: openais < 0.91-6
+
+%description -n openaislib
+This package contains openais libraries. 
+
+%files -n openaislib
+%defattr(-,root,root,-)
+%doc LICENSE
+%{_libdir}/libSaAmf.so.*
+%{_libdir}/libSaCkpt.so.*
+%{_libdir}/libSaClm.so.*
+%{_libdir}/libSaEvt.so.*
+%{_libdir}/libSaLck.so.*
+%{_libdir}/libSaMsg.so.*
+%{_libdir}/libSaTmr.so.*
+
+%post -n openaislib -p /sbin/ldconfig
+
+%postun -n openaislib -p /sbin/ldconfig
+
+%package -n openaislib-devel
+Summary: The openais Standards-Based Cluster Framework libraries
+Group: Development/Libraries
+Requires: openaislib = %{version}-%{release}
+Requires: pkgconfig
+Provides: openais-devel = %{version}
+Obsoletes: openais-devel < 0.91-6
+
+%description -n openaislib-devel
+This package contains the include files used to develop using openais APIs.
+
+%files -n openaislib-devel
+%defattr(-,root,root,-)
+%doc LICENSE
+%dir %{_includedir}/openais/
+%{_includedir}/openais/saAis.h
+%{_includedir}/openais/saAmf.h
+%{_includedir}/openais/saCkpt.h
+%{_includedir}/openais/saClm.h
+%{_includedir}/openais/saEvt.h
+%{_includedir}/openais/saLck.h
+%{_includedir}/openais/saMsg.h
+%{_includedir}/openais/saTmr.h
+%{_libdir}/libSaAmf.so
+%{_libdir}/libSaCkpt.so
+%{_libdir}/libSaClm.so
+%{_libdir}/libSaEvt.so
+%{_libdir}/libSaLck.so
+%{_libdir}/libSaMsg.so
+%{_libdir}/libSaTmr.so
+%{_libdir}/pkgconfig/*.pc
+
+%changelog
+* @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@
+- Autotools generated version
