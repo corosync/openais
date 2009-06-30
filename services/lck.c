@@ -3217,7 +3217,7 @@ static void message_handler_req_lib_lck_resourceunlockasync (
 		sizeof (mar_name_t));
 
 	req_exec_lck_resourceunlockasync.resource_handle =
-		req_lib_lck_resourceunlockasync->resource_handle;	
+		req_lib_lck_resourceunlockasync->resource_handle;
 	req_exec_lck_resourceunlockasync.lock_id =
 		req_lib_lck_resourceunlockasync->lock_id;
 	req_exec_lck_resourceunlockasync.invocation =

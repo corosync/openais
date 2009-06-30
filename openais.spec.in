@@ -61,7 +61,7 @@ rm -rf %{buildroot}%{_docdir}/*
 %clean
 rm -rf %{buildroot}
 
-%description 
+%description
 This package contains the openais service handlers, default configuration
 files and init script.
 
@@ -77,7 +77,7 @@ fi
 %postun
 [ "$1" -ge "1" ] && %{_initrddir}/openais condrestart &>/dev/null || :
 
-%files 
+%files
 %defattr(-,root,root,-)
 %doc LICENSE README.amf
 %dir /etc/corosync
@@ -104,7 +104,7 @@ Group: System Environment/Libraries
 Conflicts: openais < 0.91-6
 
 %description -n openaislib
-This package contains openais libraries. 
+This package contains openais libraries.
 
 %files -n openaislib
 %defattr(-,root,root,-)
