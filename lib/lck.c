@@ -618,9 +618,6 @@ saLckResourceOpen (
 	req_lib_lck_resourceopen.header.id =
 		MESSAGE_REQ_LCK_RESOURCEOPEN;
 
-/* 	memcpy (&req_lib_lck_resourceopen.resource_name, */
-/* 		lckResourceName, sizeof (SaNameT)); */
-
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_resourceopen.resource_name,
 		(SaNameT *)lckResourceName);
@@ -737,9 +734,6 @@ saLckResourceOpenAsync (
 	req_lib_lck_resourceopenasync.header.id =
 		MESSAGE_REQ_LCK_RESOURCEOPENASYNC;
 
-/* 	memcpy (&req_lib_lck_resourceopenasync.resource_name, */
-/* 		lckResourceName, sizeof (SaNameT)); */
-
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_resourceopenasync.resource_name,
 		(SaNameT *)lckResourceName);
@@ -810,9 +804,6 @@ saLckResourceClose (
 		sizeof (struct req_lib_lck_resourceclose);
 	req_lib_lck_resourceclose.header.id =
 		MESSAGE_REQ_LCK_RESOURCECLOSE;
-
-/* 	memcpy (&req_lib_lck_resourceclose.resource_name, */
-/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
 
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_resourceclose.resource_name,
@@ -890,9 +881,6 @@ saLckResourceLock (
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-/* 	memcpy (&req_lib_lck_resourcelock.resource_name, */
-/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
 
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_resourcelock.resource_name,
@@ -1025,9 +1013,6 @@ saLckResourceLockAsync (
 		goto error_exit;
 	}
 
-/* 	memcpy (&req_lib_lck_resourcelockasync.resource_name, */
-/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
-
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_resourcelockasync.resource_name,
 		&lckResourceInstance->resource_name);
@@ -1063,19 +1048,6 @@ saLckResourceLockAsync (
 		goto error_destroy;
 	}
 
-	/*
-	error = coroipcc_service_connect (
-		COROSYNC_SOCKET_NAME,
-		LCK_SERVICE,
-		IPC_REQUEST_SIZE,
-		IPC_RESPONSE_SIZE,
-		IPC_DISPATCH_SIZE,
-		&ipc_handle);
-	if (error != SA_AIS_OK) {
-		goto error_put_destroy;
-	}
-	*/
-
 	lckLockIdInstance->ipc_handle = lckResourceInstance->ipc_handle;
 	lckLockIdInstance->resource_id = lckResourceInstance->resource_id;
 	lckLockIdInstance->lck_handle = lckResourceInstance->lck_handle;
@@ -1099,7 +1071,6 @@ saLckResourceLockAsync (
 	iov.iov_len = sizeof (struct req_lib_lck_resourcelockasync);
 
 	error = coroipcc_msg_send_reply_receive (
-		/* ipc_handle, */
 		lckResourceInstance->ipc_handle,
 		&iov,
 		1,
@@ -1107,13 +1078,11 @@ saLckResourceLockAsync (
 		sizeof (struct res_lib_lck_resourcelockasync));
 
 	if (error != SA_AIS_OK) {
-		/* goto error_disconnect; */
 		goto error_put_destroy;
 	}
 
 	if (res_lib_lck_resourcelockasync.header.error != SA_AIS_OK) {
 		error = res_lib_lck_resourcelockasync.header.error;
-		/* goto error_disconnect; */
 		goto error_put_destroy;
 	}
 
@@ -1125,10 +1094,6 @@ saLckResourceLockAsync (
 
 	return (error);
 
-/*
-error_disconnect:
-	coroipcc_service_disconnect (ipc_handle);
-*/
 error_put_destroy:
 	hdb_handle_put (&lckLockIdHandleDatabase, *lockId);
 error_destroy:
@@ -1166,9 +1131,6 @@ saLckResourceUnlock (
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
-
-/* 	memcpy (&req_lib_lck_resourceunlock.resource_name, */
-/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
 
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_resourceunlock.resource_name,
@@ -1244,9 +1206,6 @@ saLckResourceUnlockAsync (
 		goto error_put;
 	}
 
-/* 	memcpy (&req_lib_lck_resourceunlockasync.resource_name, */
-/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
-
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_resourceunlockasync.resource_name,
 		&lckResourceInstance->resource_name);
@@ -1262,6 +1221,9 @@ saLckResourceUnlockAsync (
 		goto error_put;
 	}
 
+	/*
+	 * Check that saLckResourceUnlockCallback is defined.
+	 */
 	if (lckInstance->callbacks.saLckResourceUnlockCallback == NULL) {
 		hdb_handle_put (&lckHandleDatabase,
 			lckResourceInstance->lck_handle);
@@ -1327,9 +1289,6 @@ saLckLockPurge (
 	if (error != SA_AIS_OK) {
 		goto error_exit;
 	}
-
-/* 	memcpy (&req_lib_lck_lockpurge.resource_name, */
-/* 		&lckResourceInstance->resource_name, sizeof (SaNameT)); */
 
 	marshall_SaNameT_to_mar_name_t (
 		&req_lib_lck_lockpurge.resource_name,
