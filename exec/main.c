@@ -76,6 +76,7 @@
 #include "print.h"
 #include "util.h"
 #include "version.h"
+#include "schedwrk.h"
 
 #define SERVER_BACKLOG 5
 
