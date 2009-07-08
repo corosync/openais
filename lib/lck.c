@@ -166,9 +166,6 @@ saLckInitialize (
 	struct lckInstance *lckInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saLckInitialize\n");
-
 	if (lckHandle == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -563,12 +560,8 @@ saLckResourceOpen (
 	struct lckResourceInstance *lckResourceInstance;
 	struct req_lib_lck_resourceopen req_lib_lck_resourceopen;
 	struct res_lib_lck_resourceopen res_lib_lck_resourceopen;
-	SaAisErrorT error = SA_AIS_OK;
-
 	struct iovec iov;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saLckResourceOpen\n");
+	SaAisErrorT error = SA_AIS_OK;
 
 	if (lckResourceHandle == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -675,13 +668,9 @@ saLckResourceOpenAsync (
 	struct lckResourceInstance *lckResourceInstance;
 	struct req_lib_lck_resourceopenasync req_lib_lck_resourceopenasync;
 	struct res_lib_lck_resourceopenasync res_lib_lck_resourceopenasync;
-	SaLckResourceHandleT lckResourceHandle;
-	SaAisErrorT error = SA_AIS_OK;
-
 	struct iovec iov;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saLckResourceOpenAsync\n");
+	SaAisErrorT error = SA_AIS_OK;
+	SaLckResourceHandleT lckResourceHandle;
 
 	if (lckResourceName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -791,9 +780,6 @@ saLckResourceClose (
 	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saLckResourceClose\n");
-
 	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
 		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
@@ -857,9 +843,6 @@ saLckResourceLock (
 	SaAisErrorT error = SA_AIS_OK;
 
 	hdb_handle_t ipc_handle;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saLckResourceLock\n");
 
 	if ((lockMode != SA_LCK_PR_LOCK_MODE) && (lockMode != SA_LCK_EX_LOCK_MODE)) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -989,9 +972,6 @@ saLckResourceLockAsync (
 	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saLckResourceLockAsync\n");
-
 	if ((lockMode != SA_LCK_PR_LOCK_MODE) && (lockMode != SA_LCK_EX_LOCK_MODE)) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -1116,9 +1096,6 @@ saLckResourceUnlock (
 	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saLckResourceUnlock\n");
-
 	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
 		lockId, (void *)&lckLockIdInstance));
 	if (error != SA_AIS_OK) {
@@ -1189,9 +1166,6 @@ saLckResourceUnlockAsync (
 	struct res_lib_lck_resourceunlockasync res_lib_lck_resourceunlockasync;
 	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saLckResourceUnlockAsync\n");
 
 	error = hdb_error_to_sa (hdb_handle_get (&lckLockIdHandleDatabase,
 		lockId, (void *)&lckLockIdInstance));
@@ -1281,9 +1255,6 @@ saLckLockPurge (
 	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saLckLockPurge\n");
-
 	error = hdb_error_to_sa (hdb_handle_get (&lckResourceHandleDatabase,
 		lckResourceHandle, (void *)&lckResourceInstance));
 	if (error != SA_AIS_OK) {
@@ -1337,9 +1308,6 @@ saLckLimitGet (
 	struct res_lib_lck_limitget res_lib_lck_limitget;
 	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saLckLimitGet\n");
 
 	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
 		lckHandle, (void *)&lckInstance));
