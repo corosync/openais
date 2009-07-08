@@ -68,7 +68,7 @@ struct tmrInstance {
 	SaTmrHandleT tmrHandle;
 };
 
-DECLARE_HDB_DATABASE(tmrHandleDatabase,NULL);
+DECLARE_HDB_DATABASE (tmrHandleDatabase, NULL);
 
 static SaVersionT tmrVersionsSupported[] = {
 	{ 'A', 1, 1 }
@@ -87,9 +87,6 @@ saTmrInitialize (
 {
 	struct tmrInstance *tmrInstance;
 	SaAisErrorT error = SA_AIS_OK;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrInitialize\n");
 
 	if (tmrHandle == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -150,9 +147,6 @@ saTmrSelectionObjectGet (
 	struct tmrInstance *tmrInstance;
 	SaAisErrorT error = SA_AIS_OK;
 	int fd;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrSelectionObjectGet\n");
 
 	if (selectionObject == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -220,9 +214,9 @@ saTmrDispatch (
 
 		if (dispatch_data == NULL) {
 			if (dispatchFlags == CPG_DISPATCH_ALL) {
-				break; /* exit do while cont is 1 loop */
+				break;
 			} else {
-				continue; /* next poll */
+				continue;
 			}
 		}
 
@@ -274,9 +268,6 @@ saTmrFinalize (
 	struct tmrInstance *tmrInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrFinalize\n");
-
 	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
@@ -312,10 +303,6 @@ saTmrTimerStart (
 	struct req_lib_tmr_timerstart req_lib_tmr_timerstart;
 	struct res_lib_tmr_timerstart res_lib_tmr_timerstart;
 	struct iovec iov;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerStart { data=%p }\n",
-		(void *)(timerData));
 
 	if ((timerAttributes == NULL) || (callTime == NULL) || (timerId == NULL)) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -394,10 +381,6 @@ saTmrTimerReschedule (
 	struct res_lib_tmr_timerreschedule res_lib_tmr_timerreschedule;
 	struct iovec iov;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerReschedule { id=%u }\n",
-		(unsigned int)(timerId));
-
 	if ((timerAttributes == NULL) || (callTime == NULL)) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -457,10 +440,6 @@ saTmrTimerCancel (
 	struct res_lib_tmr_timercancel res_lib_tmr_timercancel;
 	struct iovec iov;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerCancel { id=%u }\n",
-		(unsigned int)(timerId));
-
 	if (timerDataP == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -511,10 +490,6 @@ saTmrPeriodicTimerSkip (
 	struct res_lib_tmr_periodictimerskip res_lib_tmr_periodictimerskip;
 	struct iovec iov;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrPeriodicTimerSkip { id=%u }\n",
-		(unsigned int)(timerId));
-
 	error = hdb_error_to_sa(hdb_handle_get (&tmrHandleDatabase, tmrHandle, (void *)&tmrInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
@@ -556,10 +531,6 @@ saTmrTimerRemainingTimeGet (
 	struct req_lib_tmr_timerremainingtimeget req_lib_tmr_timerremainingtimeget;
 	struct res_lib_tmr_timerremainingtimeget res_lib_tmr_timerremainingtimeget;
 	struct iovec iov;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saTimerRemainingTimeGet { id=%u }\n",
-		(unsigned int)(timerId));
 
 	if (remainingTime == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -610,10 +581,6 @@ saTmrTimerAttributesGet (
 	struct res_lib_tmr_timerattributesget res_lib_tmr_timerattributesget;
 	struct iovec iov;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimerAttributesGet { id=%u }\n",
-		(unsigned int)(timerId));
-
 	if (timerAttributes == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -663,9 +630,6 @@ saTmrTimeGet (
 	struct res_lib_tmr_timeget res_lib_tmr_timeget;
 	struct iovec iov;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrTimeGet\n");
-
 	if (currentTime == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -712,9 +676,6 @@ saTmrClockTickGet (
 	struct req_lib_tmr_clocktickget req_lib_tmr_clocktickget;
 	struct res_lib_tmr_clocktickget res_lib_tmr_clocktickget;
 	struct iovec iov;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saTmrClockTickGet\n");
 
 	if (clockTick == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
