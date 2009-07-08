@@ -68,9 +68,6 @@
 #include "../include/saLck.h"
 #include "../include/ipc_lck.h"
 
-/*If you want compile useful debug functions, uncomment next line*/
-/*#define _LCK_DEBUG_*/
-
 LOGSYS_DECLARE_SUBSYS ("LCK");
 
 enum lck_message_req_types {
@@ -931,7 +928,6 @@ static void lck_print_ex_pending_list (
 			    (unsigned int)(lock->lock_id), lock->lock_status);
 	}
 }
-#endif
 
 static void lck_print_resource_lock_list (
 	struct resource *resource)
@@ -982,14 +978,15 @@ static void lck_print_resource_list (
 				    (unsigned int)(resource->ex_lock_granted->lock_id));
 		}
 
-		lck_print_resource_lock_list (resource);
-/* 		lck_print_ex_pending_list (resource); */
-/* 		lck_print_pr_pending_list (resource); */
-/* 		lck_print_pr_granted_list (resource); */
+/* 		lck_print_resource_lock_list (resource); */
+/* 		lck_print_ex_pending_list (resource);    */
+/* 		lck_print_pr_pending_list (resource);    */
+/* 		lck_print_pr_granted_list (resource);    */
 	}
 
 	return;
 }
+#endif /* _LCK_DEBUG_ */
 
 static void lck_resource_close (
 	const mar_name_t *resource_name,
@@ -1362,7 +1359,6 @@ static void lck_sync_init (
 {
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_init\n");
-	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t global_lock_count = %u\n", global_lock_count);
 
 	/* DEBUG */
 	lck_print_resource_list (&resource_list_head);
@@ -1444,7 +1440,6 @@ static void lck_sync_activate (void)
 	lck_sync_state = LCK_SYNC_STATE_NOT_STARTED;
 
 	/* DEBUG */
-	lck_print_resource_list (&resource_list_head);
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]:\t global_lock_count = %u\n", global_lock_count);
 
 	return;
@@ -1472,12 +1467,11 @@ static void lck_exec_dump_fn (void)
 
 static int lck_exec_init_fn (struct corosync_api_v1 *corosync_api)
 {
-	/* DEBUG */
-
 #ifdef OPENAIS_SOLARIS
 	logsys_subsys_init();
 #endif
 
+	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_exec_init_fn\n");
 
 	api = corosync_api;
@@ -2052,9 +2046,6 @@ static void message_handler_req_exec_lck_resourceopen (
 		memcpy (&resource->resource_name,
 			&req_exec_lck_resourceopen->resource_name,
 			sizeof (mar_name_t));
-/* 		memcpy (&resource->source, */
-/* 			&req_exec_lck_resourceopen->source, */
-/* 			sizeof (mar_message_source_t)); */
 
 		resource->ex_lock_granted = NULL;
 
@@ -2160,9 +2151,6 @@ static void message_handler_req_exec_lck_resourceopenasync (
 		memcpy (&resource->resource_name,
 			&req_exec_lck_resourceopenasync->resource_name,
 			sizeof (mar_name_t));
-/* 		memcpy (&resource->source, */
-/* 			&req_exec_lck_resourceopenasync->source, */
-/* 			sizeof (mar_message_source_t)); */
 
 		resource->ex_lock_granted = NULL;
 
@@ -2320,9 +2308,7 @@ static void message_handler_req_exec_lck_resourcelock (
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLock\n");
 
-	/* if ((req_exec_lck_resourcelock->lock_flags & ~SA_LCK_LOCK_NO_QUEUE) && */
-	if (global_lock_count == MAX_NUM_LOCKS)
-	{
+	if (global_lock_count == MAX_NUM_LOCKS)	{
 		error = SA_AIS_ERR_NO_RESOURCES;
 		goto error_exit;
 	}
@@ -2331,7 +2317,7 @@ static void message_handler_req_exec_lck_resourcelock (
 		&req_exec_lck_resourcelock->resource_name);
 
 	if (resource == NULL) {
-		error = SA_AIS_ERR_LIBRARY; /* ? */
+		error = SA_AIS_ERR_LIBRARY;
 		goto error_exit;
 	}
 
@@ -2363,11 +2349,7 @@ static void message_handler_req_exec_lck_resourcelock (
 	list_init (&lock->resource_lock_list);
 	list_add_tail (&lock->resource_lock_list, &resource->resource_lock_list_head);
 
-	/* !!! */
-
 	lck_lock (resource, lock);
-
-	/* !!! */
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_lck_resourcelock->source))
@@ -2414,7 +2396,6 @@ static void message_handler_req_exec_lck_resourcelockasync (
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLockAsync\n");
 
-	/* if ((req_exec_lck_resourcelockasync->lock_flags & ~SA_LCK_LOCK_NO_QUEUE) && */
 	if (global_lock_count == MAX_NUM_LOCKS)
 	{
 		error = SA_AIS_ERR_NO_RESOURCES;
@@ -2425,7 +2406,7 @@ static void message_handler_req_exec_lck_resourcelockasync (
 		&req_exec_lck_resourcelockasync->resource_name);
 
 	if (resource == NULL) {
-		error = SA_AIS_ERR_LIBRARY; /* ? */
+		error = SA_AIS_ERR_LIBRARY;
 		goto error_exit;
 	}
 
@@ -2457,11 +2438,7 @@ static void message_handler_req_exec_lck_resourcelockasync (
 	list_init (&lock->resource_lock_list);
 	list_add_tail (&lock->resource_lock_list, &resource->resource_lock_list_head);
 
-	/* !!! */
-
 	lck_lock (resource, lock);
-
-	/* !!! */
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_lck_resourcelockasync->source))
@@ -2477,7 +2454,6 @@ error_exit:
 			&res_lib_lck_resourcelockasync,
 			sizeof (struct res_lib_lck_resourcelockasync));
 
-		/* if ((lock != NULL) && (lock->lock_status == SA_LCK_LOCK_GRANTED)) { */
 		if ((lock != NULL) && (lock->lock_status != 0)) {
 			lck_lockgrant_callback_send (lock, error);
 		}
@@ -2685,7 +2661,7 @@ static void message_handler_req_exec_lck_limitget (
 		break;
 	}
 
-/*error_exit:*/
+/* error_exit: */
 	if (api->ipc_source_is_local (&req_exec_lck_limitget->source))
 	{
 		res_lib_lck_limitget.header.size =
@@ -2709,7 +2685,6 @@ static void message_handler_req_exec_lck_resourcelock_timeout (
 	const struct req_exec_lck_resourcelock_timeout *req_exec_lck_resourcelock_timeout =
 		message;
 	struct res_lib_lck_resourcelock res_lib_lck_resourcelock;
-/*	SaAisErrorT error = SA_AIS_OK;*/
 
 	struct resource *resource = NULL;
 	struct resource_lock *resource_lock = NULL;
