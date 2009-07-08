@@ -2294,18 +2294,6 @@ static void message_handler_req_exec_lck_resourceclose (
 		free (resource);
 	}
 
-	/*
-	 * Remove the cleanup entry for this resource.
-	 */
-	cleanup = lck_resource_cleanup_find (
-		req_exec_lck_resourceclose->source.conn,
-		&req_exec_lck_resourceclose->resource_name);
-
-	assert (cleanup != NULL);
-
-	list_del (&cleanup->cleanup_list);
-	free (cleanup);
-
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_lck_resourceclose->source))
 	{
@@ -2323,6 +2311,18 @@ error_exit:
 		}
 
 		if (error == SA_AIS_OK) {
+			/*
+			 * Remove the cleanup entry for this resource.
+			 */
+			cleanup = lck_resource_cleanup_find (
+				req_exec_lck_resourceclose->source.conn,
+				&req_exec_lck_resourceclose->resource_name);
+
+			if (cleanup != NULL) {
+				list_del (&cleanup->cleanup_list);
+				free (cleanup);
+			}
+
 			hdb_handle_put (&resource_hdb, req_exec_lck_resourceclose->resource_id);
 			hdb_handle_destroy (&resource_hdb, req_exec_lck_resourceclose->resource_id);
 		}
