@@ -1360,9 +1360,6 @@ static void lck_sync_init (
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "[DEBUG]: lck_sync_init\n");
 
-	/* DEBUG */
-	lck_print_resource_list (&resource_list_head);
-
 	lck_sync_resource_enter ();
 
 	/*
