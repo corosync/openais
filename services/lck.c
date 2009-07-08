@@ -1593,6 +1593,28 @@ static struct resource_lock *lck_resource_lock_find (
 	return (0);
 }
 
+static struct resource_cleanup *lck_resource_cleanup_find (
+	void *conn,
+	const mar_name_t *resource_name)
+{
+	struct lck_pd *lck_pd = (struct lck_pd *)api->ipc_private_data_get (conn);
+
+	struct resource_cleanup *cleanup;
+	struct list_head *cleanup_list;
+
+	for (cleanup_list = lck_pd->resource_cleanup_list.next;
+	     cleanup_list != &lck_pd->resource_cleanup_list;
+	     cleanup_list = cleanup_list->next)
+	{
+		cleanup = list_entry (cleanup_list, struct resource_cleanup, cleanup_list);
+
+		if (mar_name_match (resource_name, &cleanup->resource_name)) {
+			return (cleanup);
+		}
+	}
+	return (0);
+}
+
 static void lck_resourcelock_response_send (
 	struct resource_lock *resource_lock,
 	SaAisErrorT error)
@@ -2240,6 +2262,7 @@ static void message_handler_req_exec_lck_resourceclose (
 	SaAisErrorT error = SA_AIS_OK;
 
 	struct resource *resource = NULL;
+	struct resource_cleanup *cleanup = NULL;
 
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceClose\n");
@@ -2259,6 +2282,10 @@ static void message_handler_req_exec_lck_resourceclose (
 		req_exec_lck_resourceclose->exit_flag,
 		&req_exec_lck_resourceclose->source);
 
+	/*
+	 * If reference count is zero and there are no granted locks,
+	 * we can remove this resource.
+	 */
 	if ((resource->refcount == 0) &&
 	    (resource->ex_lock_granted == NULL) &&
 	    (list_empty (&resource->pr_lock_granted_list_head)))
@@ -2266,6 +2293,18 @@ static void message_handler_req_exec_lck_resourceclose (
 		list_del (&resource->resource_list);
 		free (resource);
 	}
+
+	/*
+	 * Remove the cleanup entry for this resource.
+	 */
+	cleanup = lck_resource_cleanup_find (
+		req_exec_lck_resourceclose->source.conn,
+		&req_exec_lck_resourceclose->resource_name);
+
+	assert (cleanup != NULL);
+
+	list_del (&cleanup->cleanup_list);
+	free (cleanup);
 
 error_exit:
 	if (api->ipc_source_is_local (&req_exec_lck_resourceclose->source))
