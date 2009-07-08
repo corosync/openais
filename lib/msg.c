@@ -419,13 +419,13 @@ saMsgQueueOpen (
 	}
 
 	if (openFlags & SA_MSG_QUEUE_CREATE) {
-	    if (creationAttributes == NULL) {
-		error = SA_AIS_ERR_INVALID_PARAM;
-		goto error_put;
-	    }
+		if (creationAttributes == NULL) {
+			error = SA_AIS_ERR_INVALID_PARAM;
+			goto error_exit;
+		}
 
-	    if ((creationAttributes->creationFlags != 0) &&
-		(creationAttributes->creationFlags != SA_MSG_QUEUE_PERSISTENT)) {
+		if ((creationAttributes->creationFlags != 0) &&
+		    (creationAttributes->creationFlags != SA_MSG_QUEUE_PERSISTENT)) {
 			error = SA_AIS_ERR_BAD_FLAGS;
 			goto error_exit;
 		}
@@ -559,13 +559,13 @@ saMsgQueueOpenAsync (
 	}
 
 	if (openFlags & SA_MSG_QUEUE_CREATE) {
-	    if (creationAttributes == NULL) {
-		error = SA_AIS_ERR_INVALID_PARAM;
-		goto error_put;
-	    }
+		if (creationAttributes == NULL) {
+			error = SA_AIS_ERR_INVALID_PARAM;
+			goto error_exit;
+		}
 
-	    if ((creationAttributes->creationFlags != 0) &&
-		(creationAttributes->creationFlags != SA_MSG_QUEUE_PERSISTENT)) {
+		if ((creationAttributes->creationFlags != 0) &&
+		    (creationAttributes->creationFlags != SA_MSG_QUEUE_PERSISTENT)) {
 			error = SA_AIS_ERR_BAD_FLAGS;
 			goto error_exit;
 		}
