@@ -458,7 +458,7 @@ static void library_notification_send (
 		/*
 		 * Send notifications to all CLM listeners
 		 */
-		api->ipc_response_send (
+		api->ipc_dispatch_send (
 			clm_pd->conn,
 			&res_lib_clm_clustertrack,
 			sizeof (struct res_lib_clm_clustertrack));
