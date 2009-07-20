@@ -476,6 +476,8 @@ int main (int argc, char **argv)
 
 	objdb->objdb_init ();
 
+	openais_shutdown_objdb_register (objdb);
+
 	/*
 	 * Bootstrap in the default configuration parser or use
 	 * the openais default built in parser if the configuration parser
