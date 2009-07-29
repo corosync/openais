@@ -37,7 +37,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 src			= amfapp.c amfcluster.c amfnode.c amfsi.c amfutil.c \
 			  amf.c amfcomp.c amfsg.c amfsu.c
 
-SERVICE_LCRSO		= clm ckpt evt lck msg tmr
+SERVICE_LCRSO		= clm ckpt evt lck msg tmr ntf
 
 REGULAR_LCRSO		= openaisserviceenable
 

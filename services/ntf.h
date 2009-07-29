@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2009, Allied Telesis Labs, New Zealand
+ * Copyright (c) 2009, Allied Telesis Labs, New Zealand.
  *
  * All rights reserved.
  *
- * Author: Angus Salkeld (ahsalkeld@gmail.com)
+ * Author: Angus Salkeld (angus.salkeld@gmail.com)
  *
  * This software licensed under BSD license, the text of which follows:
  *
@@ -31,24 +31,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "../include/saAis.h"
+#include "../include/saNtf.h"
 
-#ifndef AIS_MAR_SA_H_DEFINED
-#define AIS_MAR_SA_H_DEFINED
+#ifndef NTF_SERVICE_H_DEFINED
+#define NTF_SERVICE_H_DEFINED
 
-static inline void marshall_SaNameT_to_mar_name_t (
-	mar_name_t *dest,
-	const SaNameT *src)
+/* This gives services an API to generate notifications.
+ * Currrently just state change notifications as most AIS
+ * services only need this notification type.
+ */
+
+struct openais_ntf_services_api_ver1 {
+	SaAisErrorT (*state_change_notification_alloc) (SaNtfHandleT ntfHandle,
+			SaNtfStateChangeNotificationT_3 * notification,
+			SaUint16T numCorrelatedNotifications,
+			SaUint16T lengthAdditionalText,
+			SaUint16T numAdditionalInfo,
+			SaUint16T numStateChanges,
+			SaInt16T variableDataSize);
+	SaAisErrorT (*notification_send) (SaNtfNotificationHandleT notificationHandle);
+	SaAisErrorT (*notification_free) (SaNtfNotificationHandleT notificationHandle);
+};
+
+static inline struct openais_ntf_services_api_ver1 *
+openais_ntf_services_api_reference (
+	struct corosync_api_v1 *coroapi,
+	hdb_handle_t *handle)
 {
-	dest->length = src->length;
-	memcpy (dest->value, src->value, SA_MAX_NAME_LENGTH);
-}
+	static void *ntf_services_api_p;
+	struct openais_ntf_services_api_ver1 *return_api;
+	unsigned int res;
 
-static inline void marshall_mar_name_t_to_SaNameT (
-	SaNameT *dest,
-	const mar_name_t *src)
+	res = coroapi->plugin_interface_reference (
+		handle,
+		"openais_ntf_services_api",
+		0,
+		&ntf_services_api_p,
+		0);
+	if (res == -1) {
+		return (NULL);
+	}
+	return_api = (struct openais_ntf_services_api_ver1 *)ntf_services_api_p;
+	return (return_api);
+}
+	
+static int inline openais_ntf_services_api_release (
+	struct corosync_api_v1 *coroapi,
+	unsigned int handle)
 {
-	dest->length = src->length;
-	memcpy (dest->value, src->value, SA_MAX_NAME_LENGTH);
-}
+	unsigned int res;
 
-#endif /* AIS_MAR_SA_H_DEFINED */
+	res = coroapi->plugin_interface_release (handle);
+	return (res);
+}
+	
+#endif /* NTF_SERVICE_H_DEFINED */
+

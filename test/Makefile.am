@@ -22,7 +22,7 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include
 AM_CFLAGS		= $(coroipcc_CFLAGS) $(corosync_CFLAGS)
 coro_LIBS		= $(coroipcc_LIBS)
 
-noinst_PROGRAMS		= testckpt testevt testmsg testmsg2 testmsg3 testlck testlck2  testclm testtmr ckptbench
+noinst_PROGRAMS		= testckpt testevt testmsg testmsg2 testmsg3 testlck testlck2  testclm testtmr ckptbench testntf
 
 noinst_HEADERS          = sa_error.h
 
@@ -65,6 +65,10 @@ testtmr_LDFLAGS		= -L../lib $(coro_LIBS)
 ckptbench_SOURCES	= ckptbench.c sa_error.c
 ckptbench_LDADD		= -lSaCkpt
 ckptbench_LDFLAGS	= -L../lib $(coro_LIBS)
+
+testntf_SOURCES		= testntf.c sa_error.c
+testntf_LDADD		= -lSaNtf
+testntf_LDFLAGS		= -L../lib $(coro_LIBS)
 
 lint:
 	-splint $(LINT_FLAGS) $(CFLAGS) *.c

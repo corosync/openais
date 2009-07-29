@@ -1,0 +1,27 @@
+# Version and symbol export for libSaNtf.so
+
+OPENAIS_NTF_A.03.01 {
+	global:
+		saNtfInitialize_3;
+		saNtfSelectionObjectGet;
+		saNtfDispatch;
+		saNtfFinalize;
+		saNtfMiscellaneousNotificationAllocate;
+		saNtfNotificationFree;
+		saNtfNotificationSend;
+
+	local:
+		saHandleCreate;
+		saHandleDestroy;
+		saHandleInstanceGet;
+		saHandleInstancePut;
+		saPollRetry;
+		saRecvRetry;
+		saSendMsgReceiveReply;
+		saSendMsgRetry;
+		saSendReceiveReply;
+		saSendRetry;
+		saServiceConnect;
+		saVersionVerify;
+		clustTimeNow;
+};

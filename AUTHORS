@@ -15,6 +15,7 @@ Anders Erikkson	amf
 Russell Bryant	gcc4 cleanups
 Fabio Di Nitto	automake, pkgconfig, packaging and releasing for distros
 Jim Meyering	automake
+Angus Salkeld   ntf
 
 Significant credit belongs in our large vibrant community members, who are
 unfortunately too numerous to list.  Your tireless effort in testing, deploying,

@@ -38,7 +38,7 @@ AM_LDFLAGS		= -lpthread
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 lib_LIBRARIES		= libSaAmf.a libSaCkpt.a libSaClm.a libSaEvt.a \
-			  libSaLck.a libSaMsg.a libSaTmr.a
+			  libSaLck.a libSaMsg.a libSaTmr.a libSaNtf.a
 
 SHARED_LIBS		= $(lib_LIBRARIES:%.a=%.so.$(SONAME))
 SHARED_LIBS_SO		= $(lib_LIBRARIES:%.a=%.so)
@@ -51,10 +51,12 @@ libSaEvt_a_SOURCES	= util.c evt.c
 libSaLck_a_SOURCES	= util.c lck.c
 libSaMsg_a_SOURCES	= util.c msg.c
 libSaTmr_a_SOURCES	= util.c tmr.c
+libSaNtf_a_SOURCES	= util.c ntf.c
 
 noinst_HEADERS		= util.h libSaAmf.versions libSaCkpt.versions \
 			  libSaClm.versions libSaEvt.versions \
-			  libSaLck.versions libSaMsg.versions libSaTmr.versions
+			  libSaLck.versions libSaMsg.versions libSaTmr.versions \
+			  libSaNtf.versions
 
 if BUILD_DARWIN
 
@@ -100,6 +102,9 @@ libSaMsg.so.$(SONAME): util.o msg.o
 
 libSaTmr.so.$(SONAME): util.o tmr.o
 	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
+
+libSaNtf.so.$(SONAME): util.o ntf.o
+	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 else
 
@@ -158,6 +163,14 @@ libSaTmr.so.$(SONAME): util.o tmr.o
 		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
 	ln -sf libSaTmr.so.$(SONAME) libSaTmr.so
 	ln -sf libSaTmr.so.$(SONAME) libSaTmr.so.$(SOMAJOR)
+
+libSaNtf.so.$(SONAME): util.o ntf.o
+	$(CC) $(LDFLAGS) -shared -o $@ \
+		-Wl,-soname=libSaNtf.so.$(SOMAJOR) \
+		-Wl,-version-script=$(srcdir)/libSaNtf.versions \
+		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
+	ln -sf libSaNtf.so.$(SONAME) libSaNtf.so
+	ln -sf libSaNtf.so.$(SONAME) libSaNtf.so.$(SOMAJOR)
 
 endif
 
