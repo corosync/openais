@@ -1335,7 +1335,7 @@ static void message_handler_req_exec_ckpt_checkpointopen (
 			checkpoint->checkpoint_creation_attributes.retention_duration;
 
 		if (req_exec_ckpt_checkpointopen->checkpoint_creation_attributes_set &&
-			memcmp (&checkpoint->checkpoint_creation_attributes,
+			memcmp (&req_exec_ckpt_checkpointopen->checkpoint_creation_attributes,
 				&my_creation_attributes,
 				sizeof (mar_ckpt_checkpoint_creation_attributes_t)) != 0) {
 
