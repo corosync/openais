@@ -574,6 +574,9 @@ saCkptCheckpointOpen (
 		&res_lib_ckpt_checkpointopen,
 		sizeof (struct res_lib_ckpt_checkpointopen));
 
+	if (error != SA_AIS_OK) {
+		goto error_put_destroy;
+	}
 	if (res_lib_ckpt_checkpointopen.header.error != SA_AIS_OK) {
 		error = res_lib_ckpt_checkpointopen.header.error;
 		goto error_put_destroy;
