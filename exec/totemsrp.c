@@ -198,8 +198,6 @@ struct mcast {
  *
  * This layer can only handle packets of MTU size.
  */
-#define FRAGMENT_SIZE (FRAME_SIZE_MAX - sizeof (struct mcast) - 20 - 8)
-
 struct rtr_item  {
 	struct memb_ring_id ring_id;
 	unsigned int seq;
@@ -3595,7 +3593,7 @@ static int message_handler_mcast (
 		sort_queue = &instance->regular_sort_queue;
 	}
 
-	assert (msg_len < FRAME_SIZE_MAX);
+	assert (msg_len <= FRAME_SIZE_MAX);
 
 #ifdef TEST_DROP_MCAST_PERCENTAGE
 	if (random()%100 < TEST_DROP_MCAST_PERCENTAGE) {
@@ -3659,7 +3657,7 @@ static int message_handler_mcast (
 	 * Add mcast message to rtr queue if not already in rtr queue
 	 * otherwise free io vectors
 	 */
-	if (msg_len > 0 && msg_len < FRAME_SIZE_MAX &&
+	if (msg_len > 0 && msg_len <= FRAME_SIZE_MAX &&
 		sq_in_range (sort_queue, mcast_header.seq) && 
 		sq_item_inuse (sort_queue, mcast_header.seq) == 0) {
 
@@ -3674,7 +3672,7 @@ static int message_handler_mcast (
 		memcpy (sort_queue_item.iovec[0].iov_base, msg, msg_len);
 		sort_queue_item.iovec[0].iov_len = msg_len;
 		assert (sort_queue_item.iovec[0].iov_len > 0);
-		assert (sort_queue_item.iovec[0].iov_len < FRAME_SIZE_MAX);
+		assert (sort_queue_item.iovec[0].iov_len <= FRAME_SIZE_MAX);
 		sort_queue_item.iov_len = 1;
 		
 		if (sq_lt_compare (instance->my_high_seq_received,
