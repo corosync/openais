@@ -1,9 +1,10 @@
 /*
  * Copyright (c) 2005 MontaVista Software, Inc.
+ * Copyright (c) 2009 Red Hat, Inc.
  *
  * All rights reserved.
  *
- * Author: Steven Dake (sdake@redhat.com)
+ * Authors: Steven Dake (sdake@redhat.com), Ryan O'Hara (rohara@redhat.com)
  *
  * This software licensed under BSD license, the text of which follows:
  *
@@ -57,8 +58,12 @@
 #include <corosync/corodefs.h>
 #include <corosync/hdb.h>
 #include <corosync/list.h>
+#include <corosync/mar_gen.h>
 
 #include "../include/ipc_msg.h"
+#include "../include/mar_msg.h"
+#include "../include/mar_sa.h"
+
 #include "util.h"
 
 struct msgInstance {
@@ -81,11 +86,10 @@ struct queueInstance {
 };
 
 DECLARE_HDB_DATABASE(msgHandleDatabase, NULL);
-
 DECLARE_HDB_DATABASE(queueHandleDatabase, NULL);
 
 static SaVersionT msgVersionsSupported[] = {
-	{ 'B', 1, 1 }
+	{ 'B', 3, 1 }
 };
 
 static struct saVersionDatabase msgVersionDatabase = {
@@ -131,18 +135,19 @@ saMsgInitialize (
 	SaAisErrorT error = SA_AIS_OK;
 
 	if (msgHandle == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = saVersionVerify (&msgVersionDatabase, version);
 	if (error != SA_AIS_OK) {
-		goto error_no_destroy;
+		goto error_exit;
 	}
 
 	error = hdb_error_to_sa (hdb_handle_create (&msgHandleDatabase,
 		sizeof (struct msgInstance), msgHandle));
 	if (error != SA_AIS_OK) {
-		goto error_no_destroy;
+		goto error_exit;
 	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
@@ -158,6 +163,7 @@ saMsgInitialize (
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
 		&msgInstance->ipc_handle);
+
 	if (error != SA_AIS_OK) {
 		goto error_put_destroy;
 	}
@@ -180,7 +186,7 @@ error_put_destroy:
 	hdb_handle_put (&msgHandleDatabase, *msgHandle);
 error_destroy:
 	hdb_handle_destroy (&msgHandleDatabase, *msgHandle);
-error_no_destroy:
+error_exit:
 	return (error);
 }
 
@@ -191,16 +197,18 @@ saMsgSelectionObjectGet (
 {
 	struct msgInstance *msgInstance;
 	SaAisErrorT error = SA_AIS_OK;
+
 	int fd;
 
 	if (selectionObject == NULL) {
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
-		return (error);
+		goto error_exit;
 	}
 
 	error = coroipcc_fd_get (msgInstance->ipc_handle, &fd);
@@ -209,6 +217,7 @@ saMsgSelectionObjectGet (
 
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
+error_exit:
 	return (error);
 }
 
@@ -217,24 +226,34 @@ saMsgDispatch (
 	SaMsgHandleT msgHandle,
 	SaDispatchFlagsT dispatchFlags)
 {
-	SaMsgCallbacksT callbacks;
-	SaAisErrorT error = SA_AIS_OK;
 	struct msgInstance *msgInstance;
-	/* struct queueInstance *queueInstance; */
-	coroipc_response_header_t *dispatch_data;
-	int timeout = 1;
-	int cont = 1;
+	struct queueInstance *queueInstance;
 
 	struct res_lib_msg_queueopen_callback *res_lib_msg_queueopen_callback;
 	struct res_lib_msg_queuegrouptrack_callback *res_lib_msg_queuegrouptrack_callback;
 	struct res_lib_msg_messagedelivered_callback *res_lib_msg_messagedelivered_callback;
 	struct res_lib_msg_messagereceived_callback *res_lib_msg_messagereceived_callback;
 
+	SaMsgQueueGroupNotificationBufferT buffer;
+	SaMsgQueueGroupNotificationT notification[MSG_MAX_NUM_QUEUE_GROUPS];
+	SaNameT group_name;
+
+	coroipc_response_header_t *dispatch_data;
+	mar_msg_queue_group_notification_t *data;
+
+	SaMsgCallbacksT callbacks;
+	SaAisErrorT error = SA_AIS_OK;
+
+	int timeout = 1;
+	int cont = 1;
+	int i;
+
 	if (dispatchFlags != SA_DISPATCH_ONE &&
 	    dispatchFlags != SA_DISPATCH_ALL &&
 	    dispatchFlags != SA_DISPATCH_BLOCKING)
 	{
-		return (SA_AIS_ERR_INVALID_PARAM);
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
 	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
@@ -248,14 +267,16 @@ saMsgDispatch (
 	}
 
 	do {
-
 		error = coroipcc_dispatch_get (
 			msgInstance->ipc_handle,
 			(void **)&dispatch_data,
 			timeout);
+
 		if (error == CS_ERR_BAD_HANDLE) {
-			return (CS_OK);
+			error = CS_OK;
+			goto error_put;
 		}
+
 		if (error != CS_OK) {
 			goto error_put;
 		}
@@ -271,13 +292,29 @@ saMsgDispatch (
 		memcpy (&callbacks, &msgInstance->callbacks,
 			sizeof (msgInstance->callbacks));
 
-		switch (dispatch_data->id) {
+		switch (dispatch_data->id)
+		{
 		case MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK:
 			if (callbacks.saMsgQueueOpenCallback == NULL) {
 				continue;
 			}
 			res_lib_msg_queueopen_callback =
 				(struct res_lib_msg_queueopen_callback *)dispatch_data;
+
+			/*
+			 * Check that the queue handle is still valid before
+			 * invoking the callback. If the queue handle does not
+			 * exist, we skip this callback.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
+				res_lib_msg_queueopen_callback->queue_handle,
+				(void *)&queueInstance));
+			if (error != SA_AIS_OK) {
+				break;
+			}
+
+			hdb_handle_put (&queueHandleDatabase,
+				res_lib_msg_queueopen_callback->queue_handle);
 
 			callbacks.saMsgQueueOpenCallback (
 				res_lib_msg_queueopen_callback->invocation,
@@ -291,17 +328,29 @@ saMsgDispatch (
 				continue;
 			}
 			res_lib_msg_queuegrouptrack_callback =
-				(struct res_lib_msg_queuegrouptrack_callback *)dispatch_data;
+				(struct res_lib_msg_queuegrouptrack_callback *)dispatch_data;			
 
-			res_lib_msg_queuegrouptrack_callback->buffer.notification =
-				(SaMsgQueueGroupNotificationT *)(((char *)res_lib_msg_queuegrouptrack_callback) +
+			data = (mar_msg_queue_group_notification_t *)((char *)(res_lib_msg_queuegrouptrack_callback) +
 				sizeof (struct res_lib_msg_queuegrouptrack_callback));
 
+			buffer.numberOfItems = res_lib_msg_queuegrouptrack_callback->number_of_items;
+			buffer.queueGroupPolicy = res_lib_msg_queuegrouptrack_callback->queue_group_policy;
+			buffer.notification = notification;
+
+			marshall_mar_name_t_to_SaNameT (&group_name,
+				&res_lib_msg_queuegrouptrack_callback->group_name);
+
+			for (i = 0; i < buffer.numberOfItems; i++) {
+				marshall_from_mar_msg_queue_group_notification_t (
+					&notification[i], &data[i]);
+			}
+
 			callbacks.saMsgQueueGroupTrackCallback (
-				&res_lib_msg_queuegrouptrack_callback->group_name,
-				&res_lib_msg_queuegrouptrack_callback->buffer,
+				&group_name,
+				&buffer,
 				res_lib_msg_queuegrouptrack_callback->member_count,
 				res_lib_msg_queuegrouptrack_callback->header.error);
+
 			break;
 
 		case MESSAGE_RES_MSG_MESSAGEDELIVERED_CALLBACK:
@@ -324,6 +373,21 @@ saMsgDispatch (
 			res_lib_msg_messagereceived_callback =
 				(struct res_lib_msg_messagereceived_callback *)dispatch_data;
 
+			/*
+			 * Check that the queue handle is still valid before
+			 * invoking the callback. If the queue handle does not
+			 * exist, we skip this callback.
+			 */
+			error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
+				res_lib_msg_messagereceived_callback->queue_handle,
+				(void *)&queueInstance));
+			if (error != SA_AIS_OK) {
+				break;
+			}
+
+			hdb_handle_put (&queueHandleDatabase,
+				res_lib_msg_messagereceived_callback->queue_handle);
+
 			callbacks.saMsgMessageReceivedCallback (
 				res_lib_msg_messagereceived_callback->queue_handle);
 
@@ -332,6 +396,7 @@ saMsgDispatch (
 		default:
 			break;
 		}
+
 		coroipcc_dispatch_put (msgInstance->ipc_handle);
 
 		switch (dispatchFlags)
@@ -400,20 +465,17 @@ saMsgQueueOpen (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueOpen\n");
-
 	if (queueName == NULL || queueHandle == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
 
-	if ((openFlags & (~SA_MSG_QUEUE_CREATE) & (~SA_MSG_QUEUE_RECEIVE_CALLBACK) & (~SA_MSG_QUEUE_EMPTY)) != 0) {
+	if ((openFlags & ~(SA_MSG_QUEUE_CREATE|SA_MSG_QUEUE_RECEIVE_CALLBACK|SA_MSG_QUEUE_EMPTY)) != 0) {
 		error = SA_AIS_ERR_BAD_FLAGS;
 		goto error_exit;
 	}
 
-	if ((!(openFlags & SA_MSG_QUEUE_CREATE)) && creationAttributes != NULL) {
+	if (((openFlags & SA_MSG_QUEUE_CREATE) == 0) && (creationAttributes != NULL)) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
@@ -438,8 +500,7 @@ saMsgQueueOpen (
 	}
 
 	if ((openFlags & SA_MSG_QUEUE_RECEIVE_CALLBACK) &&
-	    (msgInstance->callbacks.saMsgMessageReceivedCallback == NULL))
-	{
+	    (msgInstance->callbacks.saMsgMessageReceivedCallback == NULL)) {
 		error = SA_AIS_ERR_INIT;
 		goto error_put;
 	}
@@ -457,26 +518,29 @@ saMsgQueueOpen (
 	}
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
-	queueInstance->open_flags = openFlags;
 	queueInstance->queue_handle = *queueHandle;
+	queueInstance->open_flags = openFlags;
 
 	req_lib_msg_queueopen.header.size =
 		sizeof (struct req_lib_msg_queueopen);
 	req_lib_msg_queueopen.header.id =
 		MESSAGE_REQ_MSG_QUEUEOPEN;
 
-	memcpy (&req_lib_msg_queueopen.queue_name,
-		queueName, sizeof (SaNameT));
-	memcpy (&queueInstance->queue_name,
-		queueName, sizeof (SaNameT));
-
 	req_lib_msg_queueopen.queue_handle = *queueHandle;
 	req_lib_msg_queueopen.open_flags = openFlags;
 	req_lib_msg_queueopen.timeout = timeout;
 
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queueopen.queue_name,
+		(SaNameT *)queueName);
+
+	memcpy (&queueInstance->queue_name,
+		queueName, sizeof (SaNameT));
+
 	if (creationAttributes != NULL) {
-		memcpy (&req_lib_msg_queueopen.create_attrs,
-			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
+		marshall_to_mar_msg_queue_creation_attributes_t (
+			&req_lib_msg_queueopen.create_attrs,
+			(SaMsgQueueCreationAttributesT *)creationAttributes);
 		memcpy (&queueInstance->create_attrs,
 			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
 		req_lib_msg_queueopen.create_attrs_flag = 1;
@@ -540,20 +604,17 @@ saMsgQueueOpenAsync (
 	SaMsgQueueHandleT queueHandle;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueOpenAsync\n");
-
 	if (queueName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
 
-	if ((openFlags & (~SA_MSG_QUEUE_CREATE) & (~SA_MSG_QUEUE_RECEIVE_CALLBACK) & (~SA_MSG_QUEUE_EMPTY)) != 0) {
+	if ((openFlags & ~(SA_MSG_QUEUE_CREATE|SA_MSG_QUEUE_RECEIVE_CALLBACK|SA_MSG_QUEUE_EMPTY)) != 0) {
 		error = SA_AIS_ERR_BAD_FLAGS;
 		goto error_exit;
 	}
 
-	if ((!(openFlags & SA_MSG_QUEUE_CREATE)) && creationAttributes != NULL) {
+	if (((openFlags & SA_MSG_QUEUE_CREATE) == 0) && (creationAttributes != NULL)) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
@@ -601,26 +662,29 @@ saMsgQueueOpenAsync (
 	}
 
 	queueInstance->ipc_handle = msgInstance->ipc_handle;
-	queueInstance->open_flags = openFlags;
 	queueInstance->queue_handle = queueHandle;
+	queueInstance->open_flags = openFlags;
 
 	req_lib_msg_queueopenasync.header.size =
 		sizeof (struct req_lib_msg_queueopenasync);
 	req_lib_msg_queueopenasync.header.id =
 		MESSAGE_REQ_MSG_QUEUEOPENASYNC;
 
-	memcpy (&req_lib_msg_queueopenasync.queue_name,
-		queueName, sizeof (SaNameT));
-	memcpy (&queueInstance->queue_name,
-		queueName, sizeof (SaNameT));
-
 	req_lib_msg_queueopenasync.queue_handle = queueHandle;
 	req_lib_msg_queueopenasync.open_flags = openFlags;
 	req_lib_msg_queueopenasync.invocation = invocation;
 
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queueopenasync.queue_name,
+		(SaNameT *)queueName);
+
+	memcpy (&queueInstance->queue_name,
+		queueName, sizeof (SaNameT));
+
 	if (creationAttributes != NULL) {
-		memcpy (&req_lib_msg_queueopenasync.create_attrs,
-			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
+		marshall_to_mar_msg_queue_creation_attributes_t (
+			&req_lib_msg_queueopenasync.create_attrs,
+			(SaMsgQueueCreationAttributesT *)creationAttributes);
 		memcpy (&queueInstance->create_attrs,
 			creationAttributes, sizeof (SaMsgQueueCreationAttributesT));
 		req_lib_msg_queueopenasync.create_attrs_flag = 1;
@@ -678,9 +742,6 @@ saMsgQueueClose (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueClose\n");
-
 	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
 		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
@@ -691,11 +752,12 @@ saMsgQueueClose (
 		sizeof (struct req_lib_msg_queueclose);
 	req_lib_msg_queueclose.header.id =
 		MESSAGE_REQ_MSG_QUEUECLOSE;
-	req_lib_msg_queueclose.queue_id =
-		queueInstance->queue_id;
 
-	memcpy (&req_lib_msg_queueclose.queue_name,
-		&queueInstance->queue_name, sizeof (SaNameT));
+	req_lib_msg_queueclose.queue_id = queueInstance->queue_id;
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queueclose.queue_name,
+		(SaNameT *)(&queueInstance->queue_name));
 
 	iov.iov_base = (void *)&req_lib_msg_queueclose;
 	iov.iov_len = sizeof (struct req_lib_msg_queueclose);
@@ -706,21 +768,17 @@ saMsgQueueClose (
 		1,
 		&res_lib_msg_queueclose,
 		sizeof (struct res_lib_msg_queueclose));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queueclose.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueclose.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
-	list_del (&queueInstance->list);
-
-	hdb_handle_put (&queueHandleDatabase, queueHandle);
-	hdb_handle_destroy (&queueHandleDatabase, queueHandle);
-
-	return (error);
+	queueInstanceFinalize (queueInstance);
 
 error_put:
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
@@ -741,9 +799,6 @@ saMsgQueueStatusGet (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueStatusGet\n");
-
 	if (queueName == NULL || queueStatus == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -760,8 +815,9 @@ saMsgQueueStatusGet (
 	req_lib_msg_queuestatusget.header.id =
 		MESSAGE_REQ_MSG_QUEUESTATUSGET;
 
-	memcpy (&req_lib_msg_queuestatusget.queue_name,
-		queueName, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuestatusget.queue_name,
+		(SaNameT *)queueName);
 
 	iov.iov_base = (void *)&req_lib_msg_queuestatusget;
 	iov.iov_len = sizeof (struct req_lib_msg_queuestatusget);
@@ -772,19 +828,19 @@ saMsgQueueStatusGet (
 		1,
 		&res_lib_msg_queuestatusget,
 		sizeof (struct res_lib_msg_queuestatusget));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queuestatusget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuestatusget.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
-	else {
-		memcpy (queueStatus,
-			&res_lib_msg_queuestatusget.queue_status,
-			sizeof (SaMsgQueueStatusT));
-	}
+
+	memcpy (queueStatus,
+		&res_lib_msg_queuestatusget.queue_status,
+		sizeof (SaMsgQueueStatusT));
 
 error_put:
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
@@ -804,8 +860,10 @@ saMsgQueueRetentionTimeSet (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueRetentionTimeSet\n");
+	if (retentionTime == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
 		queueHandle, (void *)&queueInstance));
@@ -817,13 +875,13 @@ saMsgQueueRetentionTimeSet (
 		sizeof (struct req_lib_msg_queueretentiontimeset);
 	req_lib_msg_queueretentiontimeset.header.id =
 		MESSAGE_REQ_MSG_QUEUERETENTIONTIMESET;
-	req_lib_msg_queueretentiontimeset.queue_id =
-		queueInstance->queue_id;
 
+	req_lib_msg_queueretentiontimeset.queue_id = queueInstance->queue_id;
 	req_lib_msg_queueretentiontimeset.retention_time = *retentionTime;
 
-	memcpy (&req_lib_msg_queueretentiontimeset.queue_name,
-		&queueInstance->queue_name, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queueretentiontimeset.queue_name,
+		(SaNameT *)(&queueInstance->queue_name));
 
 	iov.iov_base = (void *)&req_lib_msg_queueretentiontimeset;
 	iov.iov_len = sizeof (struct req_lib_msg_queueretentiontimeset);
@@ -834,13 +892,14 @@ saMsgQueueRetentionTimeSet (
 		1,
 		&res_lib_msg_queueretentiontimeset,
 		sizeof (struct res_lib_msg_queueretentiontimeset));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queueretentiontimeset.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueretentiontimeset.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -861,9 +920,6 @@ saMsgQueueUnlink (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueUnlink\n");
-
 	if (queueName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -880,8 +936,9 @@ saMsgQueueUnlink (
 	req_lib_msg_queueunlink.header.id =
 		MESSAGE_REQ_MSG_QUEUEUNLINK;
 
-	memcpy (&req_lib_msg_queueunlink.queue_name,
-		queueName, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queueunlink.queue_name,
+		(SaNameT *)queueName);
 
 	iov.iov_base = (void *)&req_lib_msg_queueunlink;
 	iov.iov_len = sizeof (struct req_lib_msg_queueunlink);
@@ -892,13 +949,14 @@ saMsgQueueUnlink (
 		1,
 		&res_lib_msg_queueunlink,
 		sizeof (struct res_lib_msg_queueunlink));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queueunlink.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queueunlink.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -920,9 +978,6 @@ saMsgQueueGroupCreate (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueGroupCreate\n");
-
 	if (queueGroupName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -939,10 +994,11 @@ saMsgQueueGroupCreate (
 	req_lib_msg_queuegroupcreate.header.id =
 		MESSAGE_REQ_MSG_QUEUEGROUPCREATE;
 
-	memcpy (&req_lib_msg_queuegroupcreate.group_name,
-		queueGroupName, sizeof (SaNameT));
-
 	req_lib_msg_queuegroupcreate.policy = queueGroupPolicy;
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegroupcreate.group_name,
+		(SaNameT *)(queueGroupName));
 
 	iov.iov_base = (void *)&req_lib_msg_queuegroupcreate;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupcreate);
@@ -953,13 +1009,14 @@ saMsgQueueGroupCreate (
 		1,
 		&res_lib_msg_queuegroupcreate,
 		sizeof (struct res_lib_msg_queuegroupcreate));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queuegroupcreate.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupcreate.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -981,9 +1038,6 @@ saMsgQueueGroupInsert (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueGroupInsert\n");
-
 	if (queueName == NULL || queueGroupName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -1000,10 +1054,12 @@ saMsgQueueGroupInsert (
 	req_lib_msg_queuegroupinsert.header.id =
 		MESSAGE_REQ_MSG_QUEUEGROUPINSERT;
 
-	memcpy (&req_lib_msg_queuegroupinsert.group_name,
-		queueGroupName, sizeof (SaNameT));
-	memcpy (&req_lib_msg_queuegroupinsert.queue_name,
-		queueName, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegroupinsert.group_name,
+		(SaNameT *)(queueGroupName));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegroupinsert.queue_name,
+		(SaNameT *)(queueName));
 
 	iov.iov_base = (void *)&req_lib_msg_queuegroupinsert;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupinsert);
@@ -1014,13 +1070,14 @@ saMsgQueueGroupInsert (
 		1,
 		&res_lib_msg_queuegroupinsert,
 		sizeof (struct res_lib_msg_queuegroupinsert));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queuegroupinsert.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupinsert.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1042,9 +1099,6 @@ saMsgQueueGroupRemove (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueGroupRemove\n");
-
 	if (queueName == NULL || queueGroupName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -1061,10 +1115,12 @@ saMsgQueueGroupRemove (
 	req_lib_msg_queuegroupremove.header.id =
 		MESSAGE_REQ_MSG_QUEUEGROUPREMOVE;
 
-	memcpy (&req_lib_msg_queuegroupremove.group_name,
-		queueGroupName, sizeof (SaNameT));
-	memcpy (&req_lib_msg_queuegroupremove.queue_name,
-		queueName, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegroupremove.group_name,
+		(SaNameT *)(queueGroupName));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegroupremove.queue_name,
+		(SaNameT *)(queueName));
 
 	iov.iov_base = (void *)&req_lib_msg_queuegroupremove;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupremove);
@@ -1082,7 +1138,7 @@ saMsgQueueGroupRemove (
 
 	if (res_lib_msg_queuegroupremove.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupremove.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1103,9 +1159,6 @@ saMsgQueueGroupDelete (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueGroupDelete\n");
-
 	if (queueGroupName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -1122,8 +1175,9 @@ saMsgQueueGroupDelete (
 	req_lib_msg_queuegroupdelete.header.id =
 		MESSAGE_REQ_MSG_QUEUEGROUPDELETE;
 
-	memcpy (&req_lib_msg_queuegroupdelete.group_name,
-		queueGroupName, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegroupdelete.group_name,
+		(SaNameT *)(queueGroupName));
 
 	iov.iov_base = (void *)&req_lib_msg_queuegroupdelete;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegroupdelete);
@@ -1134,13 +1188,14 @@ saMsgQueueGroupDelete (
 		1,
 		&res_lib_msg_queuegroupdelete,
 		sizeof (struct res_lib_msg_queuegroupdelete));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queuegroupdelete.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegroupdelete.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1161,12 +1216,9 @@ saMsgQueueGroupTrack (
 	struct res_lib_msg_queuegrouptrack *res_lib_msg_queuegrouptrack;
 	struct iovec iov;
 
-	void * buffer;
-
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueGroupTrack\n");
+	void *buffer = NULL;
 
 	if (queueGroupName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -1197,9 +1249,8 @@ saMsgQueueGroupTrack (
 		goto error_exit;
 	}
 
-	if ((trackFlags == SA_TRACK_CURRENT) && (notificationBuffer != NULL) &&
-	    (msgInstance->callbacks.saMsgQueueGroupTrackCallback == NULL))
-	{
+	if ((msgInstance->callbacks.saMsgQueueGroupTrackCallback == NULL) &&
+	    ((trackFlags != SA_TRACK_CURRENT) || (notificationBuffer == NULL))) {
 		error = SA_AIS_ERR_INIT;
 		goto error_put;
 	}
@@ -1209,11 +1260,12 @@ saMsgQueueGroupTrack (
 	req_lib_msg_queuegrouptrack.header.id =
 		MESSAGE_REQ_MSG_QUEUEGROUPTRACK;
 
-	memcpy (&req_lib_msg_queuegrouptrack.group_name,
-		queueGroupName, sizeof (SaNameT));
-
 	req_lib_msg_queuegrouptrack.track_flags = trackFlags;
 	req_lib_msg_queuegrouptrack.buffer_flag = (notificationBuffer != NULL);
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegrouptrack.group_name,
+		(SaNameT *)(queueGroupName));
 
 	iov.iov_base = (void *)&req_lib_msg_queuegrouptrack;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrack);
@@ -1223,35 +1275,22 @@ saMsgQueueGroupTrack (
 		&iov,
 		1,
 		&buffer);
+
 	if (error != SA_AIS_OK) {
-		goto error_unlock;
+		goto error_put;
 	}
 
 	res_lib_msg_queuegrouptrack = buffer;
 
 	if (res_lib_msg_queuegrouptrack->header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegrouptrack->header.error;
-		goto error_unlock;
+		goto error_put;
 	}
 
-	if ((trackFlags & SA_TRACK_CURRENT) && (notificationBuffer != NULL)) {
-		if (res_lib_msg_queuegrouptrack->buffer.numberOfItems > notificationBuffer->numberOfItems) {
-			notificationBuffer->numberOfItems =
-				res_lib_msg_queuegrouptrack->buffer.numberOfItems;
-			error = SA_AIS_ERR_NO_SPACE;
-			goto error_unlock;
-		}
-		notificationBuffer->numberOfItems =
-			res_lib_msg_queuegrouptrack->buffer.numberOfItems;
-		memcpy (notificationBuffer->notification, ((char *)(buffer) +
-			sizeof (struct res_lib_msg_queuegrouptrack)),
-			res_lib_msg_queuegrouptrack->buffer.numberOfItems *
-			sizeof (SaMsgQueueGroupNotificationT));
-	}
-	error = coroipcc_msg_send_reply_receive_in_buf_put (
-		msgInstance->ipc_handle);
+	/* ! */
 
-error_unlock:
+	error = coroipcc_msg_send_reply_receive_in_buf_put (msgInstance->ipc_handle);
+
 error_put:
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
 error_exit:
@@ -1270,9 +1309,6 @@ saMsgQueueGroupTrackStop (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueGroupTrackStop\n");
-
 	if (queueGroupName == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -1289,8 +1325,9 @@ saMsgQueueGroupTrackStop (
 	req_lib_msg_queuegrouptrackstop.header.id =
 		MESSAGE_REQ_MSG_QUEUEGROUPTRACKSTOP;
 
-	memcpy (&req_lib_msg_queuegrouptrackstop.group_name,
-		queueGroupName, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuegrouptrackstop.group_name,
+		(SaNameT *)(queueGroupName));
 
 	iov.iov_base = (void *)&req_lib_msg_queuegrouptrackstop;
 	iov.iov_len = sizeof (struct req_lib_msg_queuegrouptrackstop);
@@ -1301,13 +1338,14 @@ saMsgQueueGroupTrackStop (
 		1,
 		&res_lib_msg_queuegrouptrackstop,
 		sizeof (struct res_lib_msg_queuegrouptrackstop));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queuegrouptrackstop.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuegrouptrackstop.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1322,14 +1360,12 @@ saMsgQueueGroupNotificationFree (
 	SaMsgQueueGroupNotificationT *notification)
 {
 	struct msgInstance *msgInstance;
-	struct req_lib_msg_queuegroupnotificationfree req_lib_msg_queuegroupnotificationfree;
-	struct res_lib_msg_queuegroupnotificationfree res_lib_msg_queuegroupnotificationfree;
-	struct iovec iov;
-
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueGroupNotificationfree\n");
+	if (notification == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
@@ -1337,31 +1373,10 @@ saMsgQueueGroupNotificationFree (
 		goto error_exit;
 	}
 
-	req_lib_msg_queuegroupnotificationfree.header.size =
-		sizeof (struct req_lib_msg_queuegroupnotificationfree);
-	req_lib_msg_queuegroupnotificationfree.header.id =
-		MESSAGE_REQ_MSG_QUEUEGROUPNOTIFICATIONFREE;
+	free (notification);
 
-	iov.iov_base = (void *)&req_lib_msg_queuegroupnotificationfree;
-	iov.iov_len = sizeof (struct req_lib_msg_queuegroupnotificationfree);
-
-	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_handle,
-		&iov,
-		1,
-		&res_lib_msg_queuegroupnotificationfree,
-		sizeof (struct res_lib_msg_queuegroupnotificationfree));
-	if (error != SA_AIS_OK) {
-		goto error_put;
-	}
-
-	if (res_lib_msg_queuegroupnotificationfree.header.error != SA_AIS_OK) {
-		error = res_lib_msg_queuegroupnotificationfree.header.error;
-		goto error_put;	/* ! */
-	}
-
-error_put:
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
+
 error_exit:
 	return (error);
 }
@@ -1380,9 +1395,6 @@ saMsgMessageSend (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageSend\n");
-
 	if (destination == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -1393,8 +1405,7 @@ saMsgMessageSend (
 		goto error_exit;
 	}
 
-	if (message->priority > SA_MSG_MESSAGE_LOWEST_PRIORITY)
-	{
+	if (message->priority > SA_MSG_MESSAGE_LOWEST_PRIORITY)	{
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
@@ -1410,15 +1421,19 @@ saMsgMessageSend (
 	req_lib_msg_messagesend.header.id =
 		MESSAGE_REQ_MSG_MESSAGESEND;
 
-	memcpy (&req_lib_msg_messagesend.destination, destination,
-		sizeof (SaNameT));
-	memcpy (&req_lib_msg_messagesend.message, message,
-		sizeof (SaMsgMessageT));
-
 	req_lib_msg_messagesend.timeout = timeout;
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_messagesend.destination,
+		(SaNameT *)(destination));
+
+	marshall_to_mar_msg_message_t (
+		&req_lib_msg_messagesend.message,
+		(SaMsgMessageT *)(message));
 
 	iov[0].iov_base = (void *)&req_lib_msg_messagesend;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagesend);
+
 	iov[1].iov_base = (void *)message->data;
 	iov[1].iov_len = message->size;
 
@@ -1428,13 +1443,14 @@ saMsgMessageSend (
 		2,
 		&res_lib_msg_messagesend,
 		sizeof (struct res_lib_msg_messagesend));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_messagesend.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesend.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1458,15 +1474,17 @@ saMsgMessageSendAsync (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageSendAsync\n");
-
 	if (destination == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
 
 	if (message == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
+
+	if (message->priority > SA_MSG_MESSAGE_LOWEST_PRIORITY)	{
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
@@ -1478,8 +1496,7 @@ saMsgMessageSendAsync (
 	}
 
 	if ((ackFlags & SA_MSG_MESSAGE_DELIVERED_ACK) &&
-	    (msgInstance->callbacks.saMsgMessageDeliveredCallback == NULL))
-	{
+	    (msgInstance->callbacks.saMsgMessageDeliveredCallback == NULL)) {
 		error = SA_AIS_ERR_INIT;
 		goto error_exit;
 	}
@@ -1489,15 +1506,20 @@ saMsgMessageSendAsync (
 	req_lib_msg_messagesendasync.header.id =
 		MESSAGE_REQ_MSG_MESSAGESENDASYNC;
 
-	memcpy (&req_lib_msg_messagesendasync.destination, destination,
-		sizeof (SaNameT));
-	memcpy (&req_lib_msg_messagesendasync.message, message,
-		sizeof (SaMsgMessageT));
-
 	req_lib_msg_messagesendasync.invocation = invocation;
+	req_lib_msg_messagesendasync.ack_flags = ackFlags;
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_messagesendasync.destination,
+		(SaNameT *)(destination));
+
+	marshall_to_mar_msg_message_t (
+		&req_lib_msg_messagesendasync.message,
+		(SaMsgMessageT *)(message));
 
 	iov[0].iov_base = (void *)&req_lib_msg_messagesendasync;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagesendasync);
+
 	iov[1].iov_base = (void *)message->data;
 	iov[1].iov_len = message->size;
 
@@ -1507,13 +1529,14 @@ saMsgMessageSendAsync (
 		2,
 		&res_lib_msg_messagesendasync,
 		sizeof (struct res_lib_msg_messagesendasync));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_messagesendasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagesendasync.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1534,14 +1557,12 @@ saMsgMessageGet (
 	struct req_lib_msg_messageget req_lib_msg_messageget;
 	struct res_lib_msg_messageget *res_lib_msg_messageget;
 	struct iovec iov;
-	hdb_handle_t ipc_handle;
-
-	void * buffer;
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageGet\n");
+	void *buffer = NULL;
+
+	hdb_handle_t ipc_handle;
 
 	if (message == NULL || senderId == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -1561,6 +1582,7 @@ saMsgMessageGet (
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
 		&ipc_handle);
+
 	if (error != SA_AIS_OK) {
 		goto error_hdb_put;
 	}
@@ -1571,11 +1593,11 @@ saMsgMessageGet (
 		MESSAGE_REQ_MSG_MESSAGEGET;
 
 	req_lib_msg_messageget.queue_id = queueInstance->queue_id;
-	req_lib_msg_messageget.pid = (SaUint32T)(getpid());
 	req_lib_msg_messageget.timeout = timeout;
 
-	memcpy (&req_lib_msg_messageget.queue_name,
-		&queueInstance->queue_name, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_messageget.queue_name,
+		(SaNameT *)(&queueInstance->queue_name));
 
 	iov.iov_base = (void *)&req_lib_msg_messageget;
 	iov.iov_len = sizeof (struct req_lib_msg_messageget);
@@ -1585,6 +1607,7 @@ saMsgMessageGet (
 		&iov,
 		1,
 		&buffer);
+
 	if (error != SA_AIS_OK) {
 		goto error_disconnect;
 	}
@@ -1606,10 +1629,15 @@ saMsgMessageGet (
 	}
 	else {
 		if (res_lib_msg_messageget->message.size > message->size) {
+			message->size = res_lib_msg_messageget->message.size;
 			error = SA_AIS_ERR_NO_SPACE;
 			goto error_ipc_put;
 		}
 	}
+
+	message->type = res_lib_msg_messageget->message.type;
+	message->version = res_lib_msg_messageget->message.version;
+	message->priority = res_lib_msg_messageget->message.priority;
 
 	memcpy (message->data, ((char *)(buffer) +
 		sizeof (struct res_lib_msg_messageget)),
@@ -1639,8 +1667,10 @@ saMsgMessageDataFree (
 	struct msgInstance *msgInstance;
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageDataFree\n");
+	if (data == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa(hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
@@ -1648,12 +1678,9 @@ saMsgMessageDataFree (
 		goto error_exit;
 	}
 
-	if (data == NULL) {
-		error = SA_AIS_ERR_INVALID_PARAM;
-		goto error_exit;
-	}
-
 	free (data);
+
+	hdb_handle_put (&msgHandleDatabase, msgHandle);
 
 error_exit:
 	return (error);
@@ -1670,9 +1697,6 @@ saMsgMessageCancel (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageCancel\n");
-
 	error = hdb_error_to_sa (hdb_handle_get (&queueHandleDatabase,
 		queueHandle, (void *)&queueInstance));
 	if (error != SA_AIS_OK) {
@@ -1687,8 +1711,9 @@ saMsgMessageCancel (
 	req_lib_msg_messagecancel.queue_id = queueInstance->queue_id;
 	req_lib_msg_messagecancel.pid = (SaUint32T)(getpid());
 
-	memcpy (&req_lib_msg_messagecancel.queue_name,
-		&queueInstance->queue_name, sizeof (SaNameT));
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_messagecancel.queue_name,
+		(SaNameT *)(&queueInstance->queue_name));
 
 	iov.iov_base = (void *)&req_lib_msg_messagecancel;
 	iov.iov_len = sizeof (struct req_lib_msg_messagecancel);
@@ -1699,13 +1724,14 @@ saMsgMessageCancel (
 		1,
 		&res_lib_msg_messagecancel,
 		sizeof (struct res_lib_msg_messagecancel));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_messagecancel.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagecancel.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1727,16 +1753,13 @@ saMsgMessageSendReceive (
 	struct req_lib_msg_messagesendreceive req_lib_msg_messagesendreceive;
 	struct res_lib_msg_messagesendreceive *res_lib_msg_messagesendreceive;
 	struct iovec iov[2];
-	hdb_handle_t ipc_handle;
-
-	void * buffer;
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageSendReceive\n");
+	hdb_handle_t ipc_handle;
+	void *buffer = NULL;
 
-	if (destination == NULL || sendMessage == NULL) {
+	if (destination == NULL || sendMessage == NULL || receiveMessage == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
@@ -1745,7 +1768,7 @@ saMsgMessageSendReceive (
 		msgHandle, (void *)&msgInstance));
 	if (error != SA_AIS_OK) {
 		goto error_exit;
-	}
+	}	
 
 	error = coroipcc_service_connect (
 		COROSYNC_SOCKET_NAME,
@@ -1754,6 +1777,7 @@ saMsgMessageSendReceive (
 		IPC_RESPONSE_SIZE,
 		IPC_DISPATCH_SIZE,
 		&ipc_handle);
+
 	if (error != SA_AIS_OK) {
 		goto error_hdb_put;
 	}
@@ -1765,13 +1789,23 @@ saMsgMessageSendReceive (
 
 	req_lib_msg_messagesendreceive.timeout = timeout;
 
-	memcpy (&req_lib_msg_messagesendreceive.destination,
-		destination, sizeof (SaNameT));
-	memcpy (&req_lib_msg_messagesendreceive.message,
-		sendMessage, sizeof (SaMsgMessageT));
+	if (receiveMessage->data != NULL) {
+		req_lib_msg_messagesendreceive.reply_size = receiveMessage->size;
+	} else {
+		req_lib_msg_messagesendreceive.reply_size = 0;
+	}
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_messagesendreceive.destination,
+		(SaNameT *)(destination));
+
+	marshall_to_mar_msg_message_t (
+		&req_lib_msg_messagesendreceive.message,
+		(SaMsgMessageT *)(sendMessage));
 
 	iov[0].iov_base = (void *)&req_lib_msg_messagesendreceive;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagesendreceive);
+
 	iov[1].iov_base = (void *)sendMessage->data;
 	iov[1].iov_len = sendMessage->size;
 
@@ -1780,6 +1814,7 @@ saMsgMessageSendReceive (
 		iov,
 		2,
 		&buffer);
+
 	if (error != SA_AIS_OK) {
 		goto error_disconnect;
 	}
@@ -1838,10 +1873,7 @@ saMsgMessageReply (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageReply\n");
-
-	if (replyMessage == NULL) {
+	if (replyMessage == NULL || senderId == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
@@ -1857,14 +1889,16 @@ saMsgMessageReply (
 	req_lib_msg_messagereply.header.id =
 		MESSAGE_REQ_MSG_MESSAGEREPLY;
 
-	memcpy (&req_lib_msg_messagereply.reply_message,
-		replyMessage, sizeof (SaMsgMessageT));
-
 	req_lib_msg_messagereply.sender_id = *senderId;
 	req_lib_msg_messagereply.timeout = timeout;
 
+	marshall_to_mar_msg_message_t (
+		&req_lib_msg_messagereply.reply_message,
+		(SaMsgMessageT *)(replyMessage));
+
 	iov[0].iov_base = (void *)&req_lib_msg_messagereply;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagereply);
+
 	iov[1].iov_base = (void *)replyMessage->data;
 	iov[1].iov_len = replyMessage->size;
 
@@ -1874,13 +1908,14 @@ saMsgMessageReply (
 		2,
 		&res_lib_msg_messagereply,
 		sizeof (struct res_lib_msg_messagereply));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_messagereply.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereply.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1904,10 +1939,7 @@ saMsgMessageReplyAsync (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMessageReply\n");
-
-	if (replyMessage == NULL) {
+	if (replyMessage == NULL || senderId == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
 	}
@@ -1919,8 +1951,7 @@ saMsgMessageReplyAsync (
 	}
 
 	if ((ackFlags & SA_MSG_MESSAGE_DELIVERED_ACK) &&
-	    (msgInstance->callbacks.saMsgMessageDeliveredCallback == NULL))
-	{
+	    (msgInstance->callbacks.saMsgMessageDeliveredCallback == NULL)) {
 		error = SA_AIS_ERR_INIT;
 		goto error_exit;
 	}
@@ -1930,14 +1961,17 @@ saMsgMessageReplyAsync (
 	req_lib_msg_messagereplyasync.header.id =
 		MESSAGE_REQ_MSG_MESSAGEREPLYASYNC;
 
-	memcpy (&req_lib_msg_messagereplyasync.reply_message,
-		replyMessage, sizeof (SaMsgMessageT));
-
 	req_lib_msg_messagereplyasync.sender_id = *senderId;
 	req_lib_msg_messagereplyasync.invocation = invocation;
+	req_lib_msg_messagereplyasync.ack_flags = ackFlags;
+
+	marshall_to_mar_msg_message_t (
+		&req_lib_msg_messagereplyasync.reply_message,
+		(SaMsgMessageT *)(replyMessage));
 
 	iov[0].iov_base = (void *)&req_lib_msg_messagereplyasync;
 	iov[0].iov_len = sizeof (struct req_lib_msg_messagereplyasync);
+
 	iov[1].iov_base = (void *)replyMessage->data;
 	iov[1].iov_len = replyMessage->size;
 
@@ -1947,13 +1981,14 @@ saMsgMessageReplyAsync (
 		2,
 		&res_lib_msg_messagereplyasync,
 		sizeof (struct res_lib_msg_messagereplyasync));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_messagereplyasync.header.error != SA_AIS_OK) {
 		error = res_lib_msg_messagereplyasync.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -1972,12 +2007,7 @@ saMsgQueueCapacityThresholdSet (
 	struct res_lib_msg_queuecapacitythresholdset res_lib_msg_queuecapacitythresholdset;
 	struct iovec iov;
 
-	int i;
-
 	SaAisErrorT error = SA_AIS_OK;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueCapacityThresholdSet\n");
 
 	if (thresholds == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -1990,24 +2020,17 @@ saMsgQueueCapacityThresholdSet (
 		goto error_exit;
 	}
 
-	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
-		if ((thresholds->capacityAvailable[i]  > thresholds->capacityReached[i]) ||
-		    (thresholds->capacityReached[i] > queueInstance->create_attrs.size[i]))
-		{
-			error = SA_AIS_ERR_INVALID_PARAM;
-			goto error_exit;
-		}
-	}
-
 	req_lib_msg_queuecapacitythresholdset.header.size =
 		sizeof (struct req_lib_msg_queuecapacitythresholdset);
 	req_lib_msg_queuecapacitythresholdset.header.id =
 		MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSET;
-	req_lib_msg_queuecapacitythresholdset.queue_id =
-		queueInstance->queue_id;
 
-	memcpy (&req_lib_msg_queuecapacitythresholdset.queue_name,
-		&queueInstance->queue_name, sizeof (SaNameT));
+	req_lib_msg_queuecapacitythresholdset.queue_id = queueInstance->queue_id;
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuecapacitythresholdset.queue_name,
+		(SaNameT *)(&queueInstance->queue_name));
+
 	memcpy (&req_lib_msg_queuecapacitythresholdset.thresholds,
 		thresholds, sizeof (SaMsgQueueThresholdsT));
 
@@ -2020,13 +2043,14 @@ saMsgQueueCapacityThresholdSet (
 		1,
 		&res_lib_msg_queuecapacitythresholdset,
 		sizeof (struct res_lib_msg_queuecapacitythresholdset));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queuecapacitythresholdset.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdset.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
 error_put:
@@ -2047,9 +2071,6 @@ saMsgQueueCapacityThresholdGet (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgQueueCapacityThresholdGet\n");
-
 	if (thresholds == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
 		goto error_exit;
@@ -2065,11 +2086,12 @@ saMsgQueueCapacityThresholdGet (
 		sizeof (struct req_lib_msg_queuecapacitythresholdget);
 	req_lib_msg_queuecapacitythresholdget.header.id =
 		MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDGET;
-	req_lib_msg_queuecapacitythresholdget.queue_id =
-		queueInstance->queue_id;
 
-	memcpy (&req_lib_msg_queuecapacitythresholdget.queue_name,
-		&queueInstance->queue_name, sizeof (SaNameT));
+	req_lib_msg_queuecapacitythresholdget.queue_id = queueInstance->queue_id;
+
+	marshall_SaNameT_to_mar_name_t (
+		&req_lib_msg_queuecapacitythresholdget.queue_name,
+		(SaNameT *)(&queueInstance->queue_name));
 
 	iov.iov_base = (void *)&req_lib_msg_queuecapacitythresholdget;
 	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdget);
@@ -2080,16 +2102,18 @@ saMsgQueueCapacityThresholdGet (
 		1,
 		&res_lib_msg_queuecapacitythresholdget,
 		sizeof (struct res_lib_msg_queuecapacitythresholdget));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
 	if (res_lib_msg_queuecapacitythresholdget.header.error != SA_AIS_OK) {
 		error = res_lib_msg_queuecapacitythresholdget.header.error;
-		goto error_put;	/* ! */
+		goto error_put;
 	}
 
-	memcpy (thresholds, &res_lib_msg_queuecapacitythresholdget.thresholds,
+	memcpy (thresholds,
+		&res_lib_msg_queuecapacitythresholdget.thresholds,
 		sizeof (SaMsgQueueThresholdsT));
 
 error_put:
@@ -2110,8 +2134,10 @@ saMsgMetadataSizeGet (
 
 	SaAisErrorT error = SA_AIS_OK;
 
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgMetadataSizeGet\n");
+	if (metadataSize == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&msgHandleDatabase,
 		msgHandle, (void *)&msgInstance));
@@ -2133,6 +2159,7 @@ saMsgMetadataSizeGet (
 		1,
 		&res_lib_msg_metadatasizeget,
 		sizeof (struct res_lib_msg_metadatasizeget));
+
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
@@ -2155,14 +2182,7 @@ saMsgLimitGet (
 	SaLimitValueT *limitValue)
 {
 	struct msgInstance *msgInstance;
-	struct req_lib_msg_limitget req_lib_msg_limitget;
-	struct res_lib_msg_limitget res_lib_msg_limitget;
-	struct iovec iov;
-
 	SaAisErrorT error = SA_AIS_OK;
-
-	/* DEBUG */
-	printf ("[DEBUG]: saMsgLimitGet\n");
 
 	if (limitValue == NULL) {
 		error = SA_AIS_ERR_INVALID_PARAM;
@@ -2175,34 +2195,36 @@ saMsgLimitGet (
 		goto error_exit;
 	}
 
-	req_lib_msg_limitget.header.size =
-		sizeof (struct req_lib_msg_limitget);
-	req_lib_msg_limitget.header.id =
-		MESSAGE_REQ_MSG_LIMITGET;
-	req_lib_msg_limitget.limit_id = limitId;
-
-	iov.iov_base = (void *)&req_lib_msg_limitget;
-	iov.iov_len = sizeof (struct req_lib_msg_limitget);
-
-	error = coroipcc_msg_send_reply_receive (
-		msgInstance->ipc_handle,
-		&iov,
-		1,
-		&res_lib_msg_limitget,
-		sizeof (struct res_lib_msg_limitget));
-	if (error != SA_AIS_OK) {
-		goto error_put;
+	switch (limitId)
+	{
+	case SA_MSG_MAX_PRIORITY_AREA_SIZE_ID:
+		limitValue->uint64Value = MSG_MAX_PRIORITY_AREA_SIZE;
+		break;
+	case SA_MSG_MAX_QUEUE_SIZE_ID:
+		limitValue->uint64Value = MSG_MAX_QUEUE_SIZE;
+		break;
+	case SA_MSG_MAX_NUM_QUEUES_ID:
+		limitValue->uint64Value = MSG_MAX_NUM_QUEUES;
+		break;
+	case SA_MSG_MAX_NUM_QUEUE_GROUPS_ID:
+		limitValue->uint64Value = MSG_MAX_NUM_QUEUE_GROUPS;
+		break;
+	case SA_MSG_MAX_NUM_QUEUES_PER_GROUP_ID:
+		limitValue->uint64Value = MSG_MAX_NUM_QUEUES_PER_GROUP;
+		break;
+	case SA_MSG_MAX_MESSAGE_SIZE_ID:
+		limitValue->uint64Value = MSG_MAX_MESSAGE_SIZE;
+		break;
+	case SA_MSG_MAX_REPLY_SIZE_ID:
+		limitValue->uint64Value = MSG_MAX_REPLY_SIZE;
+		break;
+	default:
+		error = SA_AIS_ERR_INVALID_PARAM;
+		break;
 	}
 
-	if (res_lib_msg_limitget.header.error != SA_AIS_OK) {
-		error = res_lib_msg_limitget.header.error;
-		goto error_put;
-	}
-
-	(*limitValue).uint64Value = res_lib_msg_limitget.value;
-
-error_put:
 	hdb_handle_put (&msgHandleDatabase, msgHandle);
+
 error_exit:
 	return (error);
 }
