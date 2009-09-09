@@ -69,6 +69,14 @@ enum res_lib_lck_resource_types {
 	MESSAGE_RES_LCK_RESOURCEUNLOCK_CALLBACK = 12,
 };
 
+/*
+ * Define the limits for the lock service.
+ * These limits are implementation specific and
+ * can be obtained via the library call saLckLimitGet
+ * by passing the appropriate limitId (see saLck.h).
+ */
+#define MAX_NUM_LOCKS 256
+
 struct req_lib_lck_resourceopen {
 	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t resource_name __attribute__((aligned(8)));
