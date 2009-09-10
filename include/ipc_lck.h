@@ -75,7 +75,7 @@ enum res_lib_lck_resource_types {
  * can be obtained via the library call saLckLimitGet
  * by passing the appropriate limitId (see saLck.h).
  */
-#define MAX_NUM_LOCKS 256
+#define LCK_MAX_NUM_LOCKS 4096
 
 struct req_lib_lck_resourceopen {
 	coroipc_request_header_t header __attribute__((aligned(8)));

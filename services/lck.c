@@ -2336,7 +2336,7 @@ static void message_handler_req_exec_lck_resourcelock (
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLock\n");
 
-	if (global_lock_count == MAX_NUM_LOCKS)	{
+	if (global_lock_count == LCK_MAX_NUM_LOCKS)	{
 		error = SA_AIS_ERR_NO_RESOURCES;
 		goto error_exit;
 	}
@@ -2424,7 +2424,7 @@ static void message_handler_req_exec_lck_resourcelockasync (
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckResourceLockAsync\n");
 
-	if (global_lock_count == MAX_NUM_LOCKS)
+	if (global_lock_count == LCK_MAX_NUM_LOCKS)
 	{
 		error = SA_AIS_ERR_NO_RESOURCES;
 		goto error_exit;
