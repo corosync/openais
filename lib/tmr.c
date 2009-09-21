@@ -208,16 +208,16 @@ saTmrDispatch (
 			error = CS_OK;
 			goto error_put;
 		}
-		if (error != CS_OK) {
-			goto error_put;
-		}
-
-		if (dispatch_data == NULL) {
+		if (error == CS_ERR_TRY_AGAIN) {
+			error = CS_OK;
 			if (dispatchFlags == CPG_DISPATCH_ALL) {
 				break;
 			} else {
 				continue;
 			}
+		}
+		if (error != CS_OK) {
+			goto error_put;
 		}
 
 		memcpy (&callbacks, &tmrInstance->callbacks,
