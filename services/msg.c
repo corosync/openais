@@ -3885,6 +3885,14 @@ static void message_handler_req_exec_msg_queuegroupinsert (
 		goto error_exit;
 	}
 
+	/*
+	 * Temporary fix to prevent adding queue to multiple groups.
+	 */
+	if (queue->group != NULL) {
+		error = SA_AIS_ERR_NOT_SUPPORTED;
+		goto error_exit;
+	}
+
 	if (group->member_count >= MSG_MAX_NUM_QUEUES_PER_GROUP) {
 		error = SA_AIS_ERR_NO_RESOURCES;
 		goto error_exit;
