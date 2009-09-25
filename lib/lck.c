@@ -1320,7 +1320,7 @@ saLckLimitGet (
 	switch (limitId)
 	{
 	case SA_LCK_MAX_NUM_LOCKS_ID:
-		limitValue->uint64Value = MAX_NUM_LOCKS;
+		limitValue->uint64Value = LCK_MAX_NUM_LOCKS;
 		break;
 	default:
 		error = SA_AIS_ERR_INVALID_PARAM;
