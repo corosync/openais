@@ -37,7 +37,8 @@
 
 #include "saAis.h"
 #include "saMsg.h"
-
+#include <corosync/hdb.h>
+#include "mar_msg.h"
 
 enum req_lib_msg_queue_types {
 	MESSAGE_REQ_MSG_QUEUEOPEN = 0,
@@ -99,296 +100,317 @@ enum res_lib_msg_queue_types {
 	MESSAGE_RES_MSG_MESSAGERECEIVED_CALLBACK = 28
 };
 
+/*
+ * Define the limits for the message service.
+ * These limits are implementation specific and
+ * can be obtained via the library call saMsgLimitGet
+ * by passing the appropriate limitId (see saMsg.h).
+ */
+#define MSG_MAX_PRIORITY_AREA_SIZE 128000
+#define MSG_MAX_QUEUE_SIZE         512000
+#define MSG_MAX_NUM_QUEUES            32
+#define MSG_MAX_NUM_QUEUE_GROUPS      16
+#define MSG_MAX_NUM_QUEUES_PER_GROUP  16
+#define MSG_MAX_MESSAGE_SIZE          32
+#define MSG_MAX_REPLY_SIZE            32
+
 struct req_lib_msg_queueopen {
-	coroipc_request_header_t header;
-	SaMsgQueueHandleT queue_handle;
-	SaNameT queue_name;
-	SaUint8T create_attrs_flag;
-	SaMsgQueueCreationAttributesT create_attrs;
-	SaMsgQueueOpenFlagsT open_flags;
-	SaTimeT timeout;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_msg_queue_handle_t queue_handle __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint8_t create_attrs_flag __attribute__((aligned(8)));
+	mar_msg_queue_creation_attributes_t create_attrs __attribute__((aligned(8)));
+	mar_msg_queue_open_flags_t open_flags __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queueopen {
-	coroipc_response_header_t header;
-	SaUint32T queue_id;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queueopenasync {
-	coroipc_request_header_t header;
-	SaMsgQueueHandleT queue_handle;
-	SaNameT queue_name;
-	SaUint8T create_attrs_flag;
-	SaMsgQueueCreationAttributesT create_attrs;
-	SaMsgQueueOpenFlagsT open_flags;
-	SaInvocationT invocation;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_msg_queue_handle_t queue_handle __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint8_t create_attrs_flag __attribute__((aligned(8)));
+	mar_msg_queue_creation_attributes_t create_attrs __attribute__((aligned(8)));
+	mar_msg_queue_open_flags_t open_flags __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queueopenasync {
-	coroipc_response_header_t header;
-	SaUint32T queue_id;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queueclose {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-	SaUint32T queue_id;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queueclose {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuestatusget {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuestatusget {
-	coroipc_response_header_t header;
-	SaMsgQueueStatusT queue_status;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_msg_queue_status_t queue_status __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queueretentiontimeset {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-	SaUint32T queue_id;
-	SaTimeT retention_time;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+	mar_time_t retention_time __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queueretentiontimeset {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queueunlink {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queueunlink {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuegroupcreate {
-	coroipc_request_header_t header;
-	SaNameT group_name;
-	SaMsgQueueGroupPolicyT policy;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+	mar_msg_queue_group_policy_t policy __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegroupcreate {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuegroupinsert {
-	coroipc_request_header_t header;
-	SaNameT group_name;
-	SaNameT queue_name;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegroupinsert {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuegroupremove {
-	coroipc_request_header_t header;
-	SaNameT group_name;
-	SaNameT queue_name;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegroupremove {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuegroupdelete {
-	coroipc_request_header_t header;
-	SaNameT group_name;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegroupdelete {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuegrouptrack {
-	coroipc_request_header_t header;
-	SaNameT group_name;
-	SaUint8T track_flags;
-	SaUint8T buffer_flag;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+	mar_uint8_t track_flags __attribute__((aligned(8)));
+	mar_uint8_t buffer_flag __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegrouptrack {
-	coroipc_response_header_t header;
-	SaMsgQueueGroupNotificationBufferT buffer;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+	mar_uint32_t member_count __attribute__((aligned(8)));
+	mar_uint32_t number_of_items __attribute__((aligned(8)));
+	mar_msg_queue_group_policy_t queue_group_policy __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuegrouptrackstop {
-	coroipc_request_header_t header;
-	SaNameT group_name;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegrouptrackstop {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuegroupnotificationfree {
-	coroipc_request_header_t header;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegroupnotificationfree {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messagesend {
-	coroipc_request_header_t header;
-	SaNameT destination;
-	SaTimeT timeout;
-	SaMsgMessageT message;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t destination __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+	mar_msg_message_t message __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagesend {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messagesendasync {
-	coroipc_request_header_t header;
-	SaNameT destination;
-	SaInvocationT invocation;
-	SaMsgMessageT message;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t destination __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+	mar_msg_message_t message __attribute__((aligned(8)));
+	mar_msg_ack_flags_t ack_flags __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagesendasync {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messageget {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-	SaUint32T queue_id;
-	SaUint32T pid;
-	SaTimeT timeout;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messageget {
-	coroipc_response_header_t header;
-	SaTimeT send_time;
-	SaMsgSenderIdT sender_id;
-	SaMsgMessageT message;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_time_t send_time __attribute__((aligned(8)));
+	mar_msg_sender_id_t sender_id __attribute__((aligned(8)));
+	mar_msg_message_t message __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messagedatafree {
-	coroipc_request_header_t header;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagedatafree {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messagecancel {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-	SaUint32T queue_id;
-	SaUint32T pid;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+	mar_uint32_t pid __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagecancel {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messagesendreceive {
-	coroipc_request_header_t header;
-	SaNameT destination;
-	SaTimeT timeout;
-	SaMsgMessageT message;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t destination __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+	mar_size_t reply_size __attribute__((aligned(8)));
+	mar_msg_message_t message __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagesendreceive {
-	coroipc_response_header_t header;
-	SaTimeT reply_time;
-	SaMsgMessageT message;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_time_t reply_time __attribute__((aligned(8)));
+	mar_msg_message_t message __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messagereply {
-	coroipc_request_header_t header;
-	SaMsgMessageT reply_message;
-	SaMsgSenderIdT sender_id;
-	SaTimeT timeout;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_msg_message_t reply_message __attribute__((aligned(8)));
+	mar_msg_sender_id_t sender_id __attribute__((aligned(8)));
+	mar_time_t timeout __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagereply {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_messagereplyasync {
-	coroipc_request_header_t header;
-	SaMsgMessageT reply_message;
-	SaMsgSenderIdT sender_id;
-	SaInvocationT invocation;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_msg_message_t reply_message __attribute__((aligned(8)));
+	mar_msg_sender_id_t sender_id __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+	mar_msg_ack_flags_t ack_flags __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagereplyasync {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuecapacitythresholdset {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-	SaUint32T queue_id;
-	SaMsgQueueThresholdsT thresholds;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+	mar_msg_queue_thresholds_t thresholds __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuecapacitythresholdset {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_queuecapacitythresholdget {
-	coroipc_request_header_t header;
-	SaNameT queue_name;
-	SaUint32T queue_id;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_name_t queue_name __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuecapacitythresholdget {
-	coroipc_response_header_t header;
-	SaMsgQueueThresholdsT thresholds;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_msg_queue_thresholds_t thresholds __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_metadatasizeget {
-	coroipc_request_header_t header;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_metadatasizeget {
-	coroipc_response_header_t header;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct req_lib_msg_limitget {
-	coroipc_request_header_t header;
-	SaMsgLimitIdT limit_id;
-};
+	coroipc_request_header_t header __attribute__((aligned(8)));
+	mar_msg_limit_id_t limit_id __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_limitget {
-	coroipc_response_header_t header;
-	SaUint64T value;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_uint64_t value __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queueopen_callback {
-	coroipc_response_header_t header;
-	SaMsgQueueHandleT queue_handle;
-	SaInvocationT invocation;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_msg_queue_handle_t queue_handle __attribute__((aligned(8)));
+	mar_invocation_t invocation __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegrouptrack_callback {
-	coroipc_response_header_t header;
-	SaNameT group_name;
-	SaMsgQueueGroupNotificationBufferT buffer;
-	SaUint32T member_count;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_name_t group_name __attribute__((aligned(8)));
+	mar_uint32_t member_count __attribute__((aligned(8)));
+	mar_uint32_t number_of_items __attribute__((aligned(8)));
+	mar_msg_queue_group_policy_t queue_group_policy __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagedelivered_callback {
-	coroipc_response_header_t header;
-	SaInvocationT invocation;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+/* 	mar_msg_queue_handle_t queue_handle __attribute__((aligned(8))); */
+	mar_invocation_t invocation __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 struct res_lib_msg_messagereceived_callback {
-	coroipc_response_header_t header;
-	SaMsgQueueHandleT queue_handle;
-};
+	coroipc_response_header_t header __attribute__((aligned(8)));
+	mar_msg_queue_handle_t queue_handle __attribute__((aligned(8)));
+} __attribute__((aligned(8)));
 
 #endif /* IPC_MSG_H_DEFINED */
