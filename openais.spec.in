@@ -35,12 +35,7 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 ./autogen.sh
 %endif
 
-%{_configure}	CFLAGS="$(echo '%{optflags}')" \
-		--prefix=/usr \
-		--localstatedir=/var \
-		--sysconfdir=/etc \
-		--with-lcrso-dir=$(pkg-config corosync --variable lcrsodir) \
-		--libdir=%{_libdir}
+%{configure}
 
 %build
 make %{_smp_mflags}
@@ -80,8 +75,8 @@ fi
 %files
 %defattr(-,root,root,-)
 %doc LICENSE README.amf
-%dir /etc/corosync
-%config(noreplace) /etc/corosync/amf.conf.example
+%dir %{_sysconfdir}/corosync
+%config(noreplace) %{_sysconfdir}/corosync/amf.conf.example
 %{_initrddir}/openais
 %dir %{_libexecdir}/lcrso
 %{_libexecdir}/lcrso/openaisserviceenable.lcrso
