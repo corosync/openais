@@ -1304,10 +1304,12 @@ saLckLimitGet (
 	SaLimitValueT *limitValue)
 {
 	struct lckInstance *lckInstance;
-	struct req_lib_lck_limitget req_lib_lck_limitget;
-	struct res_lib_lck_limitget res_lib_lck_limitget;
-	struct iovec iov;
 	SaAisErrorT error = SA_AIS_OK;
+
+	if (limitValue == NULL) {
+		error = SA_AIS_ERR_INVALID_PARAM;
+		goto error_exit;
+	}
 
 	error = hdb_error_to_sa (hdb_handle_get (&lckHandleDatabase,
 		lckHandle, (void *)&lckInstance));
@@ -1315,35 +1317,18 @@ saLckLimitGet (
 		goto error_exit;
 	}
 
-	req_lib_lck_limitget.header.size =
-		sizeof (struct req_lib_lck_limitget);
-	req_lib_lck_limitget.header.id =
-		MESSAGE_REQ_LCK_LIMITGET;
-	req_lib_lck_limitget.limit_id = limitId;
-
-	iov.iov_base = (void *)&req_lib_lck_limitget;
-	iov.iov_len = sizeof (struct req_lib_lck_limitget);
-
-	error = coroipcc_msg_send_reply_receive (
-		lckInstance->ipc_handle,
-		&iov,
-		1,
-		&res_lib_lck_limitget,
-		sizeof (struct res_lib_lck_limitget));
-
-	if (error != SA_AIS_OK) {
-		goto error_put;
+	switch (limitId)
+	{
+	case SA_LCK_MAX_NUM_LOCKS_ID:
+		limitValue->uint64Value = MAX_NUM_LOCKS;
+		break;
+	default:
+		error = SA_AIS_ERR_INVALID_PARAM;
+		break;
 	}
 
-	if (res_lib_lck_limitget.header.error != SA_AIS_OK) {
-		error = res_lib_lck_limitget.header.error;
-		goto error_put;
-	}
-
-	(*limitValue).uint64Value = res_lib_lck_limitget.value;
-
-error_put:
 	hdb_handle_put (&lckHandleDatabase, lckHandle);
+
 error_exit:
 	return (error);
 }

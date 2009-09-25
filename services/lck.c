@@ -152,14 +152,6 @@ struct resource_instance {
 unsigned int global_lock_count = 0;
 unsigned int sync_lock_count = 0;
 
-/*
- * Define the limits for the lock service.
- * These limits are implementation specific and
- * can be obtained via the library call saLckLimitGet
- * by passing the appropriate limitId (see saLck.h).
- */
-#define MAX_NUM_LOCKS 256
-
 DECLARE_HDB_DATABASE (resource_hdb, NULL);
 
 DECLARE_LIST_INIT(resource_list_head);
@@ -2682,22 +2674,10 @@ static void message_handler_req_exec_lck_limitget (
 		message;
 	struct res_lib_lck_limitget res_lib_lck_limitget;
 	SaAisErrorT error = SA_AIS_OK;
-	SaUint64T value = 0;
 
 	/* DEBUG */
 	log_printf (LOGSYS_LEVEL_DEBUG, "EXEC request: saLckLimitGet\n");
 
-	switch (req_exec_lck_limitget->limit_id)
-	{
-	case SA_LCK_MAX_NUM_LOCKS_ID:
-		value = MAX_NUM_LOCKS;
-		break;
-	default:
-		error = SA_AIS_ERR_INVALID_PARAM;
-		break;
-	}
-
-/* error_exit: */
 	if (api->ipc_source_is_local (&req_exec_lck_limitget->source))
 	{
 		res_lib_lck_limitget.header.size =
@@ -2705,7 +2685,6 @@ static void message_handler_req_exec_lck_limitget (
 		res_lib_lck_limitget.header.id =
 			MESSAGE_RES_LCK_LIMITGET;
 		res_lib_lck_limitget.header.error = error;
-		res_lib_lck_limitget.value = value;
 
 		api->ipc_response_send (
 			req_exec_lck_limitget->source.conn,
@@ -3272,7 +3251,7 @@ static void message_handler_req_lib_lck_limitget (
 	void *conn,
 	const void *msg)
 {
-	const struct req_lib_lck_limitget *req_lib_lck_limitget = msg;
+/* 	const struct req_lib_lck_limitget *req_lib_lck_limitget = msg; */
 	struct req_exec_lck_limitget req_exec_lck_limitget;
 	struct iovec iovec;
 
@@ -3285,8 +3264,6 @@ static void message_handler_req_lib_lck_limitget (
 		SERVICE_ID_MAKE (LCK_SERVICE, MESSAGE_REQ_EXEC_LCK_LIMITGET);
 
 	api->ipc_source_set (&req_exec_lck_limitget.source, conn);
-
-	req_exec_lck_limitget.limit_id = req_lib_lck_limitget->limit_id;
 
 	iovec.iov_base = (void *)&req_exec_lck_limitget;
 	iovec.iov_len = sizeof (struct req_exec_lck_limitget);
