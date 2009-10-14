@@ -662,9 +662,11 @@ static void message_handler_req_lib_clm_clustertrack (void *conn, void *msg)
 		req_lib_clm_clustertrack->track_flags & SA_TRACK_CHANGES_ONLY) {
 
 		clm_pd->track_flags = req_lib_clm_clustertrack->track_flags;
-		clm_pd->tracking_enabled = 1;
 
-		list_add (&clm_pd->list, &library_notification_send_listhead);
+		if (clm_pd->tracking_enabled == 0) {
+			list_add (&clm_pd->list, &library_notification_send_listhead);
+		}
+		clm_pd->tracking_enabled = 1;
 	}
 
 	openais_response_send (
