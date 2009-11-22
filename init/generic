@@ -48,6 +48,7 @@ start() {
 	! internal_status
     then
 	echo -n "starting... "
+	export COROSYNC_DEFAULT_CONFIG_IFACE="openaisserviceenableexperimental:corosync_parser"
 	$prog 2>&1 > /dev/null 2>&1
 	echo -n "rc=$?: "
     fi

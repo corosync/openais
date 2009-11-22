@@ -18,7 +18,7 @@ lockfile="/var/lock/subsys/corosync"
 
 start() {
     echo -n $"Starting OpenAIS ($prog): "
-    export COROSYNC_DEFAULT_CONFIG_IFACE="openaisserviceenable:openaisparser"
+    export COROSYNC_DEFAULT_CONFIG_IFACE="openaisserviceenableexperimental:corosync_parser"
     daemon $exec
     retval=$?
     [ "$retval" -eq 0 ] && touch "$lockfile"
