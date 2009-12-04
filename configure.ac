@@ -170,6 +170,11 @@ AC_ARG_ENABLE([coverage],
 	[  --enable-coverage       : coverage analysis of the codebase. ],
 	[ default="no" ])
 
+AC_ARG_WITH([initddir],
+	[  --with-initddir=DIR     : path to init script directory. ],
+	[ INITDDIR="$withval" ],
+	[ INITDDIR="$sysconfdir/init.d" ])
+
 AC_ARG_WITH([lcrso-dir],
 	[  --with-lcrso-dir=DIR    : corosync lcrso files. ],
 	[ LCRSODIR="$withval" ],
@@ -311,6 +316,7 @@ CPPFLAGS="$ENV_CPPFLAGS $OS_CPPFLAGS"
 LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 
 # substitute what we need:
+AC_SUBST([INITDDIR])
 AC_SUBST([LCRSODIR])
 
 AC_SUBST([SOMAJOR])
@@ -350,6 +356,7 @@ AC_MSG_RESULT([  Header files             = ${includedir}])
 AC_MSG_RESULT([  Arch-independent files   = ${datadir}])
 AC_MSG_RESULT([  State information        = ${localstatedir}])
 AC_MSG_RESULT([  System configuration     = ${sysconfdir}])
+AC_MSG_RESULT([  System init.d directory  = ${INITDDIR}])
 AC_MSG_RESULT([  corosync config dir      = ${COROSYSCONFDIR}])
 AC_MSG_RESULT([  LCRSO                    = ${LCRSODIR}])
 AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
