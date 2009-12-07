@@ -1788,9 +1788,6 @@ static void memb_state_recovery_enter (
 	unsigned int low_ring_aru;
 	unsigned int range = 0;
 	unsigned int messages_originated = 0;
-	char is_originated[4096];
-	char not_originated[4096];
-	char seqno_string_hex[10];
 	struct srp_addr *addr;
 	struct memb_commit_token_memb_entry *memb_list;
 
@@ -1897,8 +1894,6 @@ static void memb_state_recovery_enter (
 	log_printf (instance->totemsrp_log_level_notice,
 		"copying all old ring messages from %x-%x.\n",
 		low_ring_aru + 1, instance->old_ring_state_high_seq_received);
-	strcpy (not_originated, "Not Originated for recovery: ");
-	strcpy (is_originated, "Originated for recovery: ");
 		
 	for (i = 1; i <= range; i++) {
 		struct sort_queue_item *sort_queue_item;
@@ -1906,41 +1901,34 @@ static void memb_state_recovery_enter (
 		void *ptr;
 		int res;
 
-		sprintf (seqno_string_hex, "%x ", low_ring_aru + i);
 		res = sq_item_get (&instance->regular_sort_queue,
 			low_ring_aru + i, &ptr);
 		if (res != 0) {
-			strcat (not_originated, seqno_string_hex);
 		continue;
-	}
-	strcat (is_originated, seqno_string_hex);
-	sort_queue_item = ptr;
-	assert (sort_queue_item->iov_len > 0);
-	assert (sort_queue_item->iov_len <= MAXIOVS);
-	messages_originated++;
-	memset (&message_item, 0, sizeof (struct message_item));
-// TODO	 LEAK
-	message_item.mcast = malloc (sizeof (struct mcast));
-	assert (message_item.mcast);
-	message_item.mcast->header.type = MESSAGE_TYPE_MCAST;
-	srp_addr_copy (&message_item.mcast->system_from, &instance->my_id);
-	message_item.mcast->header.encapsulated = MESSAGE_ENCAPSULATED;
-	message_item.mcast->header.nodeid = instance->my_id.addr[0].nodeid;
-	assert (message_item.mcast->header.nodeid);
-	message_item.mcast->header.endian_detector = ENDIAN_LOCAL;
-	memcpy (&message_item.mcast->ring_id, &instance->my_ring_id,
-		sizeof (struct memb_ring_id));
-	message_item.iov_len = sort_queue_item->iov_len;
-	memcpy (&message_item.iovec, &sort_queue_item->iovec,
-		sizeof (struct iovec) * sort_queue_item->iov_len);
+		}
+		sort_queue_item = ptr;
+		assert (sort_queue_item->iov_len > 0);
+		assert (sort_queue_item->iov_len <= MAXIOVS);
+		messages_originated++;
+		memset (&message_item, 0, sizeof (struct message_item));
+	// TODO	 LEAK
+		message_item.mcast = malloc (sizeof (struct mcast));
+		assert (message_item.mcast);
+		message_item.mcast->header.type = MESSAGE_TYPE_MCAST;
+		srp_addr_copy (&message_item.mcast->system_from, &instance->my_id);
+		message_item.mcast->header.encapsulated = MESSAGE_ENCAPSULATED;
+		message_item.mcast->header.nodeid = instance->my_id.addr[0].nodeid;
+		assert (message_item.mcast->header.nodeid);
+		message_item.mcast->header.endian_detector = ENDIAN_LOCAL;
+		memcpy (&message_item.mcast->ring_id, &instance->my_ring_id,
+			sizeof (struct memb_ring_id));
+		message_item.iov_len = sort_queue_item->iov_len;
+		memcpy (&message_item.iovec, &sort_queue_item->iovec,
+			sizeof (struct iovec) * sort_queue_item->iov_len);
 		queue_item_add (&instance->retrans_message_queue, &message_item);
 	}
 	log_printf (instance->totemsrp_log_level_notice,
 		"Originated %d messages in RECOVERY.\n", messages_originated);
-	strcat (not_originated, "\n");
-	strcat (is_originated, "\n");
-	log_printf (instance->totemsrp_log_level_notice, is_originated);
-	log_printf (instance->totemsrp_log_level_notice, not_originated);
 	goto originated;
 
 no_originate:
