@@ -86,7 +86,7 @@
 #define QUEUE_RTR_ITEMS_SIZE_MAX		16384 /* allow 256 retransmit items */
 #define RETRANS_MESSAGE_QUEUE_SIZE_MAX		500 /* allow 500 messages to be queued */
 #define RECEIVED_MESSAGE_QUEUE_SIZE_MAX		500 /* allow 500 messages to be queued */
-#define MAXIOVS					5	
+#define MAXIOVS					10
 #define RETRANSMIT_ENTRIES_MAX			30
 #define TOKEN_SIZE_MAX				64000 /* bytes */
 
@@ -2017,6 +2017,8 @@ int totemsrp_mcast (
 	message_item.mcast->guarantee = guarantee;
 	srp_addr_copy (&message_item.mcast->system_from, &instance->my_id);
 
+	assert (iov_len <= MAXIOVS);
+
 	for (i = 0; i < iov_len; i++) {
 // TODO LEAK
 		message_item.iovec[i].iov_base = malloc (iovec[i].iov_len);
@@ -2263,6 +2265,7 @@ static int orf_token_mcast (
 		message_item->mcast->seq = ++token->seq;
 		message_item->mcast->this_seqno = instance->global_seqno++;
 
+		assert (message_item->iov_len < MAXIOVS);
 		/*
 		 * Build IO vector
 		 */
@@ -2278,8 +2281,6 @@ static int orf_token_mcast (
 		memcpy (&mcast->ring_id, &instance->my_ring_id, sizeof (struct memb_ring_id));
 
 		sort_queue_item.iov_len = message_item->iov_len + 1;
-
-		assert (sort_queue_item.iov_len < 16);
 
 		/*
 		 * Add message to retransmit queue
