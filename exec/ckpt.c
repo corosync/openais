@@ -506,19 +506,19 @@ static struct openais_lib_handler ckpt_lib_service[] =
 		.lib_handler_fn		= message_handler_req_lib_ckpt_sectioniterationinitialize,
 		.response_size		= sizeof (struct res_lib_ckpt_sectioniterationinitialize),
 		.response_id		= MESSAGE_RES_CKPT_SECTIONITERATIONINITIALIZE,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 15 */
 		.lib_handler_fn		= message_handler_req_lib_ckpt_sectioniterationfinalize,
 		.response_size		= sizeof (struct res_lib_ckpt_sectioniterationfinalize),
 		.response_id		= MESSAGE_RES_CKPT_SECTIONITERATIONFINALIZE,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 16 */
 		.lib_handler_fn		= message_handler_req_lib_ckpt_sectioniterationnext,
 		.response_size		= sizeof (struct res_lib_ckpt_sectioniterationnext),
 		.response_id		= MESSAGE_RES_CKPT_SECTIONITERATIONNEXT,
-		.flow_control		= OPENAIS_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= OPENAIS_FLOW_CONTROL_REQUIRED
 	}
 };
 
