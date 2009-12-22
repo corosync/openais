@@ -574,6 +574,9 @@ openais_msg_send (
 	int req_buffer_idx = 0;
 
 	for (i = 0; i < iov_len; i++) {
+		if ((req_buffer_idx + iov[i].iov_len) > REQ_SIZE) {
+			return (SA_AIS_ERR_INVALID_PARAM);
+		}
 		memcpy (&ipc_segment->shared_memory->req_buffer[req_buffer_idx],
 			iov[i].iov_base,
 			iov[i].iov_len);

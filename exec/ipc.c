@@ -363,6 +363,19 @@ retry_semop:
 		    send_ok = 0;
 		}
 
+		/*
+		 * This happens when the message contains some kind of invalid
+		 * parameter, such as an invalid size
+		 */
+		if (reserved_msgs == -1) {
+			res_overlay.header.size =
+					ais_service[conn_info->service]->lib_service[header->id].response_size;
+			res_overlay.header.id =
+				ais_service[conn_info->service]->lib_service[header->id].response_id;
+			res_overlay.header.error = SA_AIS_ERR_INVALID_PARAM;
+			openais_response_send (conn_info, &res_overlay,
+				res_overlay.header.size);
+		} else
 		if (send_ok) {
  			ipc_serialize_lock_fn();
 			ais_service[conn_info->service]->lib_service[header->id].lib_handler_fn (conn_info, header);
@@ -380,7 +393,9 @@ retry_semop:
 				res_overlay.header.size);
 		}
 
-		totempg_groups_joined_release (reserved_msgs);
+		if (reserved_msgs != -1) {
+			totempg_groups_joined_release (reserved_msgs);
+		}
 		openais_conn_refcount_dec (conn);
 	}
 	pthread_exit (0);
