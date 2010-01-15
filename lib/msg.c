@@ -295,7 +295,7 @@ saMsgDispatch (
 		{
 		case MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK:
 			if (callbacks.saMsgQueueOpenCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_msg_queueopen_callback =
 				(struct res_lib_msg_queueopen_callback *)dispatch_data;
@@ -324,7 +324,7 @@ saMsgDispatch (
 
 		case MESSAGE_RES_MSG_QUEUEGROUPTRACK_CALLBACK:
 			if (callbacks.saMsgQueueGroupTrackCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_msg_queuegrouptrack_callback =
 				(struct res_lib_msg_queuegrouptrack_callback *)dispatch_data;			
@@ -354,7 +354,7 @@ saMsgDispatch (
 
 		case MESSAGE_RES_MSG_MESSAGEDELIVERED_CALLBACK:
 			if (callbacks.saMsgMessageDeliveredCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_msg_messagedelivered_callback =
 				(struct res_lib_msg_messagedelivered_callback *)dispatch_data;
@@ -367,7 +367,7 @@ saMsgDispatch (
 
 		case MESSAGE_RES_MSG_MESSAGERECEIVED_CALLBACK:
 			if (callbacks.saMsgMessageReceivedCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_msg_messagereceived_callback =
 				(struct res_lib_msg_messagereceived_callback *)dispatch_data;
