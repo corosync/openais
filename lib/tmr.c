@@ -226,7 +226,7 @@ saTmrDispatch (
 		switch (dispatch_data->id) {
 		case MESSAGE_RES_TMR_TIMEREXPIREDCALLBACK:
 			if (callbacks.saTmrTimerExpiredCallback == NULL) {
-				continue;
+				break;
 			}
 
 			res_lib_tmr_timerexpiredcallback =
