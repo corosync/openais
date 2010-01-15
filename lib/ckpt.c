@@ -365,7 +365,7 @@ saCkptDispatch (
 		switch (dispatch_data->id) {
 		case MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTOPENASYNC:
 			if (callbacks.saCkptCheckpointOpenCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_ckpt_checkpointopenasync = (struct res_lib_ckpt_checkpointopenasync *) dispatch_data;
 
@@ -409,7 +409,7 @@ saCkptDispatch (
 
 		case MESSAGE_RES_CKPT_CHECKPOINT_CHECKPOINTSYNCHRONIZEASYNC:
 			if (callbacks.saCkptCheckpointSynchronizeCallback == NULL) {
-				continue;
+				break;
 			}
 
 			res_lib_ckpt_checkpointsynchronizeasync = (struct res_lib_ckpt_checkpointsynchronizeasync *) dispatch_data;
