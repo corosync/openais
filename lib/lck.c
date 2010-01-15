@@ -345,7 +345,7 @@ saLckDispatch (
 		switch (dispatch_data->id) {
 		case MESSAGE_RES_LCK_RESOURCEOPEN_CALLBACK:
 			if (callbacks.saLckResourceOpenCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_lck_resourceopen_callback =
 				(struct res_lib_lck_resourceopen_callback *)dispatch_data;
@@ -374,7 +374,7 @@ saLckDispatch (
 
 		case MESSAGE_RES_LCK_LOCKGRANT_CALLBACK:
 			if (callbacks.saLckLockGrantCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_lck_lockgrant_callback =
 				(struct res_lib_lck_lockgrant_callback *)dispatch_data;
@@ -421,7 +421,7 @@ saLckDispatch (
 
 		case MESSAGE_RES_LCK_LOCKWAITER_CALLBACK:
 			if (callbacks.saLckLockWaiterCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_lck_lockwaiter_callback =
 				(struct res_lib_lck_lockwaiter_callback *)dispatch_data;
@@ -451,7 +451,7 @@ saLckDispatch (
 
 		case MESSAGE_RES_LCK_RESOURCEUNLOCK_CALLBACK:
 			if (callbacks.saLckResourceUnlockCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_lck_resourceunlock_callback =
 				(struct res_lib_lck_resourceunlock_callback *)dispatch_data;
