@@ -319,7 +319,7 @@ saClmDispatch (
 
 		case MESSAGE_RES_CLM_TRACKCALLBACK:
 			if (callbacks.saClmClusterTrackCallback == NULL) {
-				continue;
+				break;
 			}
 			res_lib_clm_clustertrack = (struct res_lib_clm_clustertrack *)dispatch_data;
 			error = SA_AIS_OK;
@@ -350,7 +350,7 @@ saClmDispatch (
 
 		case MESSAGE_RES_CLM_NODEGETCALLBACK:
 			if (callbacks.saClmClusterNodeGetCallback == NULL) {
-				continue;
+				break;
 			}
 			res_clm_nodegetcallback = (struct res_clm_nodegetcallback *)dispatch_data;
 			marshall_from_mar_clm_cluster_node_t (
