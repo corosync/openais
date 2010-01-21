@@ -3,11 +3,11 @@
 Name: openais
 Summary: The openais Standards-Based Cluster Framework executive and APIs
 Version: @version@
-Release: 1%{?alphatag:.%{alphatag}}%{?dist}
+Release: 2%{?alphatag:.%{alphatag}}%{?dist}
 License: BSD
 Group: System Environment/Base
-URL: http://developer.osdl.org/dev/openais/
-Source0: http://www.osdl.org/downloads/openais-%{version}/openais-%{version}.tar.gz
+URL: http://openais.org
+Source0: http://devresources.linuxfoundation.org/dev/openais/downloads/%{name}-%{version}/%{name}-%{version}.tar.gz
 
 # Runtime bits
 Requires(post): /sbin/chkconfig
@@ -29,13 +29,14 @@ BuildRequires: autoconf automake
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %prep
-%setup -q -n openais-%{version}
+%setup -q -n %{name}-%{version}
 
 %if %{buildtrunk}
 ./autogen.sh
 %endif
 
-%{configure}
+%{configure} \
+	--with-initddir=%{_initddir}
 
 %build
 make %{_smp_mflags}
@@ -44,8 +45,6 @@ make %{_smp_mflags}
 rm -rf %{buildroot}
 
 make install DESTDIR=%{buildroot}
-mkdir -p %{buildroot}%{_initrddir}
-install -m 755 init/redhat %{buildroot}%{_initrddir}/openais
 
 ## tree fixup
 # drop static libs
@@ -68,9 +67,6 @@ if [ $1 -eq 0 ]; then
     %{_initrddir}/openais stop &>/dev/null || :
     /sbin/chkconfig --del openais || :
 fi
-
-%postun
-[ "$1" -ge "1" ] && %{_initrddir}/openais condrestart &>/dev/null || :
 
 %files
 %defattr(-,root,root,-)
@@ -96,7 +92,7 @@ fi
 %package -n openaislib
 Summary: The openais Standards-Based Cluster Framework libraries
 Group: System Environment/Libraries
-Conflicts: openais < 0.91-6
+Requires: %{name} = %{version}-%{release}
 
 %description -n openaislib
 This package contains openais libraries.
