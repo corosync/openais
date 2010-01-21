@@ -3,11 +3,11 @@
 Name: openais
 Summary: The openais Standards-Based Cluster Framework executive and APIs
 Version: @version@
-Release: 1%{?alphatag:.%{alphatag}}%{?dist}
+Release: 2%{?alphatag:.%{alphatag}}%{?dist}
 License: BSD
 Group: System Environment/Base
-URL: http://developer.osdl.org/dev/openais/
-Source0: http://www.osdl.org/downloads/%{name}-%{version}/%{name}-%{version}.tar.gz
+URL: http://openais.org
+Source0: http://devresources.linuxfoundation.org/dev/openais/downloads/%{name}-%{version}/%{name}-%{version}.tar.gz
 
 # Runtime bits
 Requires(post): /sbin/chkconfig
