@@ -492,15 +492,15 @@ static struct corosync_lib_handler ckpt_lib_engine[] =
 	},
 	{ /* 14 */
 		.lib_handler_fn		= message_handler_req_lib_ckpt_sectioniterationinitialize,
-		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 15 */
 		.lib_handler_fn		= message_handler_req_lib_ckpt_sectioniterationfinalize,
-		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	},
 	{ /* 16 */
 		.lib_handler_fn		= message_handler_req_lib_ckpt_sectioniterationnext,
-		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_NOT_REQUIRED
+		.flow_control		= COROSYNC_LIB_FLOW_CONTROL_REQUIRED
 	}
 };
 
