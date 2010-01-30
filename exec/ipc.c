@@ -981,6 +981,9 @@ static int shared_mem_dispatch_bytes_left (struct conn_info *conn_info)
 	} else {
 		bytes_left = read - write;
 	}
+	if (bytes_left > 0) { 
+		bytes_left--;
+	}
 	return (bytes_left);
 }
 
