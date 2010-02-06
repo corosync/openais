@@ -1997,13 +1997,13 @@ error_exit:
 }
 
 SaAisErrorT
-saMsgQueueCapacityThresholdSet (
+saMsgQueueCapacityThresholdsSet (
 	SaMsgQueueHandleT queueHandle,
 	const SaMsgQueueThresholdsT *thresholds)
 {
 	struct queueInstance *queueInstance;
-	struct req_lib_msg_queuecapacitythresholdset req_lib_msg_queuecapacitythresholdset;
-	struct res_lib_msg_queuecapacitythresholdset res_lib_msg_queuecapacitythresholdset;
+	struct req_lib_msg_queuecapacitythresholdsset req_lib_msg_queuecapacitythresholdsset;
+	struct res_lib_msg_queuecapacitythresholdsset res_lib_msg_queuecapacitythresholdsset;
 	struct iovec iov;
 
 	SaAisErrorT error = SA_AIS_OK;
@@ -2019,37 +2019,37 @@ saMsgQueueCapacityThresholdSet (
 		goto error_exit;
 	}
 
-	req_lib_msg_queuecapacitythresholdset.header.size =
-		sizeof (struct req_lib_msg_queuecapacitythresholdset);
-	req_lib_msg_queuecapacitythresholdset.header.id =
-		MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSET;
+	req_lib_msg_queuecapacitythresholdsset.header.size =
+		sizeof (struct req_lib_msg_queuecapacitythresholdsset);
+	req_lib_msg_queuecapacitythresholdsset.header.id =
+		MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSSET;
 
-	req_lib_msg_queuecapacitythresholdset.queue_id = queueInstance->queue_id;
+	req_lib_msg_queuecapacitythresholdsset.queue_id = queueInstance->queue_id;
 
 	marshall_SaNameT_to_mar_name_t (
-		&req_lib_msg_queuecapacitythresholdset.queue_name,
+		&req_lib_msg_queuecapacitythresholdsset.queue_name,
 		(SaNameT *)(&queueInstance->queue_name));
 
 	marshall_to_mar_msg_queue_thresholds_t (
-		&req_lib_msg_queuecapacitythresholdset.thresholds,
+		&req_lib_msg_queuecapacitythresholdsset.thresholds,
 		(SaMsgQueueThresholdsT *)(thresholds));
 
-	iov.iov_base = (void *)&req_lib_msg_queuecapacitythresholdset;
-	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdset);
+	iov.iov_base = (void *)&req_lib_msg_queuecapacitythresholdsset;
+	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdsset);
 
 	error = coroipcc_msg_send_reply_receive (
 		queueInstance->ipc_handle,
 		&iov,
 		1,
-		&res_lib_msg_queuecapacitythresholdset,
-		sizeof (struct res_lib_msg_queuecapacitythresholdset));
+		&res_lib_msg_queuecapacitythresholdsset,
+		sizeof (struct res_lib_msg_queuecapacitythresholdsset));
 
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
-	if (res_lib_msg_queuecapacitythresholdset.header.error != SA_AIS_OK) {
-		error = res_lib_msg_queuecapacitythresholdset.header.error;
+	if (res_lib_msg_queuecapacitythresholdsset.header.error != SA_AIS_OK) {
+		error = res_lib_msg_queuecapacitythresholdsset.header.error;
 		goto error_put;
 	}
 
@@ -2060,13 +2060,13 @@ error_exit:
 }
 
 SaAisErrorT
-saMsgQueueCapacityThresholdGet (
+saMsgQueueCapacityThresholdsGet (
 	SaMsgQueueHandleT queueHandle,
 	SaMsgQueueThresholdsT *thresholds)
 {
 	struct queueInstance *queueInstance;
-	struct req_lib_msg_queuecapacitythresholdget req_lib_msg_queuecapacitythresholdget;
-	struct res_lib_msg_queuecapacitythresholdget res_lib_msg_queuecapacitythresholdget;
+	struct req_lib_msg_queuecapacitythresholdsget req_lib_msg_queuecapacitythresholdsget;
+	struct res_lib_msg_queuecapacitythresholdsget res_lib_msg_queuecapacitythresholdsget;
 	struct iovec iov;
 
 	SaAisErrorT error = SA_AIS_OK;
@@ -2082,38 +2082,38 @@ saMsgQueueCapacityThresholdGet (
 		goto error_exit;
 	}
 
-	req_lib_msg_queuecapacitythresholdget.header.size =
-		sizeof (struct req_lib_msg_queuecapacitythresholdget);
-	req_lib_msg_queuecapacitythresholdget.header.id =
-		MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDGET;
+	req_lib_msg_queuecapacitythresholdsget.header.size =
+		sizeof (struct req_lib_msg_queuecapacitythresholdsget);
+	req_lib_msg_queuecapacitythresholdsget.header.id =
+		MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSGET;
 
-	req_lib_msg_queuecapacitythresholdget.queue_id = queueInstance->queue_id;
+	req_lib_msg_queuecapacitythresholdsget.queue_id = queueInstance->queue_id;
 
 	marshall_SaNameT_to_mar_name_t (
-		&req_lib_msg_queuecapacitythresholdget.queue_name,
+		&req_lib_msg_queuecapacitythresholdsget.queue_name,
 		(SaNameT *)(&queueInstance->queue_name));
 
-	iov.iov_base = (void *)&req_lib_msg_queuecapacitythresholdget;
-	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdget);
+	iov.iov_base = (void *)&req_lib_msg_queuecapacitythresholdsget;
+	iov.iov_len = sizeof (struct req_lib_msg_queuecapacitythresholdsget);
 
 	error = coroipcc_msg_send_reply_receive (
 		queueInstance->ipc_handle,
 		&iov,
 		1,
-		&res_lib_msg_queuecapacitythresholdget,
-		sizeof (struct res_lib_msg_queuecapacitythresholdget));
+		&res_lib_msg_queuecapacitythresholdsget,
+		sizeof (struct res_lib_msg_queuecapacitythresholdsget));
 
 	if (error != SA_AIS_OK) {
 		goto error_put;
 	}
 
-	if (res_lib_msg_queuecapacitythresholdget.header.error != SA_AIS_OK) {
-		error = res_lib_msg_queuecapacitythresholdget.header.error;
+	if (res_lib_msg_queuecapacitythresholdsget.header.error != SA_AIS_OK) {
+		error = res_lib_msg_queuecapacitythresholdsget.header.error;
 		goto error_put;
 	}
 
 	marshall_from_mar_msg_queue_thresholds_t (thresholds,
-		&res_lib_msg_queuecapacitythresholdget.thresholds);
+		&res_lib_msg_queuecapacitythresholdsget.thresholds);
 
 error_put:
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
