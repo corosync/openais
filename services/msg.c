@@ -3495,10 +3495,6 @@ error_exit:
 			MESSAGE_RES_MSG_QUEUEOPENASYNC;
 		res_lib_msg_queueopenasync.header.error = error;
 
-		if (queue != NULL) {
-			res_lib_msg_queueopenasync.queue_id = queue->queue_id;
-		}
-
 		if (error == SA_AIS_OK) {
 			msg_pd = api->ipc_private_data_get (
 				req_exec_msg_queueopenasync->source.conn);
@@ -3527,6 +3523,10 @@ error_exit:
 		res_lib_msg_queueopen_callback.header.id =
 			MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK;
 		res_lib_msg_queueopen_callback.header.error = error;
+
+		if (queue != NULL) {
+			res_lib_msg_queueopen_callback.queue_id = queue->queue_id;
+		}
 
 		res_lib_msg_queueopen_callback.queue_handle =
 			req_exec_msg_queueopenasync->queue_handle;
