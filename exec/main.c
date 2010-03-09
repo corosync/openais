@@ -112,14 +112,14 @@ static void sigusr2_handler (int num)
 static void sigsegv_handler (int num)
 {
 	signal (SIGSEGV, SIG_DFL);
-	log_flush ();
+	log_flush_at_signal ();
 	raise (SIGSEGV);
 }
 
 static void sigabrt_handler (int num)
 {
 	signal (SIGABRT, SIG_DFL);
-	log_flush ();
+	log_flush_at_signal ();
 	raise (SIGABRT);
 }
 

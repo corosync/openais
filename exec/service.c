@@ -411,7 +411,7 @@ static void *aisexec_exit (void *arg)
 
 	if ((int)arg >= OPENAIS_SHUTDOWN_ERRORCODES_START) {
 		log_printf (LOG_LEVEL_ERROR, "AIS Executive exiting (reason: %s).\n", shutdown_strings[((int)arg) - OPENAIS_SHUTDOWN_ERRORCODES_START]);
-		log_flush();
+		log_flush_before_exit();
 		return NULL;
 	}
 	openais_exit_error ((enum e_ais_done)arg);

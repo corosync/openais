@@ -166,7 +166,7 @@ void openais_exit_error (enum e_ais_done err)
 		}
 	}
 	log_printf (LOG_LEVEL_ERROR, "AIS Executive exiting (reason: %s).\n", error_string);
-	log_flush();
+	log_flush_before_exit();
 	exit (err);
 }
 

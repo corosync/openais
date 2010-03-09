@@ -101,7 +101,7 @@ struct log_data {
 	char *log_string;
 };
 
-static void log_atexit (void);
+static void log_flush_at_setup (void);
 
 static int logger_init (const char *ident, int tags, int level, int mode)
 {
@@ -356,11 +356,9 @@ int log_setup (char **error_string, struct main_config *config)
 	/*
 	** Flush what we have buffered
 	*/
-	log_flush();
+	log_flush_at_setup();
 
 	internal_log_printf(__FILE__, __LINE__, LOG_LEVEL_DEBUG, "log setup\n");
-
-	atexit (log_atexit);
 
 	log_setup_called = 1;
 
@@ -410,14 +408,33 @@ void trace (char *file, int line, int tag, int id, char *format, ...)
 	}
 }
 
-static void log_atexit (void)
+void log_flush_before_exit (void)
 {
 	if (log_setup_called) {
+		log_setup_called = 0;
 		worker_thread_group_wait (&log_thread_group);
+		worker_thread_group_exit (&log_thread_group);
+		worker_thread_group_atsegv (&log_thread_group);
+	} else {
+		struct log_entry *entry = head;
+		struct log_entry *tmp;
+
+		/* do not buffer these printouts */
+		logmode &= ~LOG_MODE_BUFFER;
+
+		while (entry) {
+			internal_log_printf(entry->file, entry->line,
+				entry->level, entry->str);
+			tmp = entry;
+			entry = entry->next;
+			free(tmp);
+		}
+
+		head = tail = NULL;
 	}
 }
 
-void log_flush (void)
+void log_flush_at_signal (void)
 {
 	if (log_setup_called) {
 		log_setup_called = 0;
@@ -440,4 +457,23 @@ void log_flush (void)
 
 		head = tail = NULL;
 	}
+}
+
+static void log_flush_at_setup (void)
+{
+	struct log_entry *entry = head;
+	struct log_entry *tmp;
+
+	/* do not buffer these printouts */
+	logmode &= ~LOG_MODE_BUFFER;
+
+	while (entry) {
+		internal_log_printf(entry->file, entry->line,
+			entry->level, entry->str);
+		tmp = entry;
+		entry = entry->next;
+		free(tmp);
+	}
+
+	head = tail = NULL;
 }
