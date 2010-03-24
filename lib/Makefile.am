@@ -40,9 +40,11 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 lib_LIBRARIES		= libSaAmf.a libSaCkpt.a libSaClm.a libSaEvt.a \
 			  libSaLck.a libSaMsg.a libSaTmr.a
 
-SHARED_LIBS		= $(lib_LIBRARIES:%.a=%.so.$(SONAME))
+LIBS_BASE_GENERAL	= $(filter-out libSaMsg,$(basename $(lib_LIBRARIES)))
+SHARED_LIBS		= $(addsuffix .so.$(SONAME),$(LIBS_BASE_GENERAL)) \
+                          $(addsuffix .so.$(MSG_SONAME),libSaMsg)
 SHARED_LIBS_SO		= $(lib_LIBRARIES:%.a=%.so)
-SHARED_LIBS_SO_TWO	= $(lib_LIBRARIES:%.a=%.so.$(SOMAJOR))
+SHARED_LIBS_SO_TWO	= $(lib_LIBRARIES:%.a=%.so.$(SOMAJOR)) libSaMsg.$(MSG_SOMAJOR)
 
 libSaAmf_a_SOURCES	= util.c amf.c
 libSaCkpt_a_SOURCES	= util.c ckpt.c
@@ -70,7 +72,7 @@ libSaEvt.so.$(SONAME): util.o evt.o
 libSaLck.so.$(SONAME): util.o lck.o
 	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
-libSaMsg.so.$(SONAME): util.o msg.o
+libSaMsg.so.$(MSG_SONAME): util.o msg.o
 	$(CC) $(DARWIN_OPTS) $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaTmr.so.$(SONAME): util.o tmr.o
@@ -95,7 +97,7 @@ libSaEvt.so.$(SONAME): util.o evt.o
 libSaLck.so.$(SONAME): util.o lck.o
 	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
-libSaMsg.so.$(SONAME): util.o msg.o
+libSaMsg.so.$(MSG_SONAME): util.o msg.o
 	$(LD) $(LDFLAGS) $(SOLARIS_OPTS) -G $(coroipcc_LIBS) $^ -o $@ $(AM_LDFLAGS)
 
 libSaTmr.so.$(SONAME): util.o tmr.o
@@ -143,13 +145,13 @@ libSaLck.so.$(SONAME): util.o lck.o
 	ln -sf libSaLck.so.$(SONAME) libSaLck.so
 	ln -sf libSaLck.so.$(SONAME) libSaLck.so.$(SOMAJOR)
 
-libSaMsg.so.$(SONAME): util.o msg.o
+libSaMsg.so.$(MSG_SONAME): util.o msg.o
 	$(CC) -shared -o $@ \
-		-Wl,-soname=libSaMsg.so.$(SOMAJOR) \
+		-Wl,-soname=libSaMsg.so.$(MSG_SOMAJOR) \
 		-Wl,-version-script=$(srcdir)/libSaMsg.versions \
 		$^ $(LDFLAGS) $(coroipcc_LIBS) $(AM_LDFLAGS)
-	ln -sf libSaMsg.so.$(SONAME) libSaMsg.so
-	ln -sf libSaMsg.so.$(SONAME) libSaMsg.so.$(SOMAJOR)
+	ln -sf libSaMsg.so.$(MSG_SONAME) libSaMsg.so
+	ln -sf libSaMsg.so.$(MSG_SONAME) libSaMsg.so.$(MSG_SOMAJOR)
 
 libSaTmr.so.$(SONAME): util.o tmr.o
 	$(CC) $(LDFLAGS) -shared -o $@ \
