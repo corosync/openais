@@ -44,7 +44,7 @@ LIBS_BASE_GENERAL	= $(filter-out libSaMsg,$(basename $(lib_LIBRARIES)))
 SHARED_LIBS		= $(addsuffix .so.$(SONAME),$(LIBS_BASE_GENERAL)) \
                           $(addsuffix .so.$(MSG_SONAME),libSaMsg)
 SHARED_LIBS_SO		= $(lib_LIBRARIES:%.a=%.so)
-SHARED_LIBS_SO_TWO	= $(lib_LIBRARIES:%.a=%.so.$(SOMAJOR)) libSaMsg.$(MSG_SOMAJOR)
+SHARED_LIBS_SO_TWO	= $(addsuffix .so.$(SOMAJOR),$(LIBS_BASE_GENERAL)) libSaMsg.so.$(MSG_SOMAJOR)
 
 libSaAmf_a_SOURCES	= util.c amf.c
 libSaCkpt_a_SOURCES	= util.c ckpt.c
