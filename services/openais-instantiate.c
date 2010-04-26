@@ -43,7 +43,7 @@
 
 struct timespec sleeptime = {
 	.tv_sec = 0,
-	.tv_nsec = 10000 /* 10 msec */
+	.tv_nsec = 10000000 /* 10 msec */
 };
 
 #ifndef xprintf
