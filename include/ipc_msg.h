@@ -62,8 +62,8 @@ enum req_lib_msg_queue_types {
 	MESSAGE_REQ_MSG_MESSAGESENDRECEIVE = 18,
 	MESSAGE_REQ_MSG_MESSAGEREPLY = 19,
 	MESSAGE_REQ_MSG_MESSAGEREPLYASYNC = 20,
-	MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSET = 21,
-	MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDGET = 22,
+	MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSSET = 21,
+	MESSAGE_REQ_MSG_QUEUECAPACITYTHRESHOLDSGET = 22,
 	MESSAGE_REQ_MSG_METADATASIZEGET = 23,
 	MESSAGE_REQ_MSG_LIMITGET = 24
 };
@@ -90,8 +90,8 @@ enum res_lib_msg_queue_types {
 	MESSAGE_RES_MSG_MESSAGESENDRECEIVE = 18,
 	MESSAGE_RES_MSG_MESSAGEREPLY = 19,
 	MESSAGE_RES_MSG_MESSAGEREPLYASYNC = 20,
-	MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDSET = 21,
-	MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDGET = 22,
+	MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDSSET = 21,
+	MESSAGE_RES_MSG_QUEUECAPACITYTHRESHOLDSGET = 22,
 	MESSAGE_RES_MSG_METADATASIZEGET = 23,
 	MESSAGE_RES_MSG_LIMITGET = 24,
 	MESSAGE_RES_MSG_QUEUEOPEN_CALLBACK = 25,
@@ -348,24 +348,24 @@ struct res_lib_msg_messagereplyasync {
 	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
-struct req_lib_msg_queuecapacitythresholdset {
+struct req_lib_msg_queuecapacitythresholdsset {
 	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t queue_name __attribute__((aligned(8)));
 	mar_uint32_t queue_id __attribute__((aligned(8)));
 	mar_msg_queue_thresholds_t thresholds __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
-struct res_lib_msg_queuecapacitythresholdset {
+struct res_lib_msg_queuecapacitythresholdsset {
 	coroipc_response_header_t header __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
-struct req_lib_msg_queuecapacitythresholdget {
+struct req_lib_msg_queuecapacitythresholdsget {
 	coroipc_request_header_t header __attribute__((aligned(8)));
 	mar_name_t queue_name __attribute__((aligned(8)));
 	mar_uint32_t queue_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
-struct res_lib_msg_queuecapacitythresholdget {
+struct res_lib_msg_queuecapacitythresholdsget {
 	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_msg_queue_thresholds_t thresholds __attribute__((aligned(8)));
 } __attribute__((aligned(8)));

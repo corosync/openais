@@ -324,12 +324,12 @@ saMsgMessageReplyAsync (
 	SaMsgAckFlagsT ackFlags);
 
 SaAisErrorT
-saMsgQueueCapacityThresholdSet (
+saMsgQueueCapacityThresholdsSet (
 	SaMsgQueueHandleT queueHandle,
 	const SaMsgQueueThresholdsT *thresholds);
 
 SaAisErrorT
-saMsgQueueCapacityThresholdGet (
+saMsgQueueCapacityThresholdsGet (
 	SaMsgQueueHandleT queueHandle,
 	SaMsgQueueThresholdsT *thresholds);
 
