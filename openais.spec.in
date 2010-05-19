@@ -36,7 +36,7 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %endif
 
 %{configure} \
-	--with-initddir=%{_initddir}
+	--with-initddir=%{_initrddir}
 
 %build
 make %{_smp_mflags}
