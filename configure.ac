@@ -156,6 +156,9 @@ SOMAJOR="3"
 SOMINOR="0"
 SOMICRO="0"
 SONAME="${SOMAJOR}.${SOMINOR}.${SOMICRO}"
+# Special for libSaMsg
+MSG_SOMAJOR="4"
+MSG_SONAME="${MSG_SOMAJOR}.${SOMINOR}.${SOMICRO}"
 
 # local options
 AC_ARG_ENABLE([fatal-warnings],
@@ -323,6 +326,8 @@ AC_SUBST([SOMAJOR])
 AC_SUBST([SOMINOR])
 AC_SUBST([SOMICRO])
 AC_SUBST([SONAME])
+AC_SUBST([MSG_SONAME])
+AC_SUBST([MSG_SOMAJOR])
 
 AC_SUBST([OS_DYFLAGS])
 
@@ -363,6 +368,7 @@ AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])
+AC_MSG_RESULT([  MSG Library SONAME       = ${MSG_SONAME}])
 AC_MSG_RESULT([  Default optimization     = ${OPT_CFLAGS}])
 AC_MSG_RESULT([  Default debug options    = ${GDB_CFLAGS}])
 AC_MSG_RESULT([  Extra compiler warnings  = ${EXTRA_WARNING}])
