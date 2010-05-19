@@ -4081,14 +4081,14 @@ static void ckpt_dump_fn (void)
 			section = list_entry (checkpoint_section_list,
 				struct checkpoint_section, list);
 
-			log_printf (LOGSYS_LEVEL_NOTICE, "   Section %s (%d)",
+			log_printf (LOGSYS_LEVEL_DEBUG, "   Section %s (%d)",
 				section->section_descriptor.section_id.id,
 				section->section_descriptor.section_id.id_len);
-			log_printf (LOGSYS_LEVEL_NOTICE, "      size:     %"PRIu64,
+			log_printf (LOGSYS_LEVEL_DEBUG, "      size:     %"PRIu64,
 				section->section_descriptor.section_size);
-			log_printf (LOGSYS_LEVEL_NOTICE, "      state:    %u",
+			log_printf (LOGSYS_LEVEL_DEBUG, "      state:    %u",
 				section->section_descriptor.section_state);
-			log_printf (LOGSYS_LEVEL_NOTICE, "      exp time: %"PRIu64,
+			log_printf (LOGSYS_LEVEL_DEBUG, "      exp time: %"PRIu64,
 				section->section_descriptor.expiration_time);
 		}
 	}
