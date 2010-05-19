@@ -312,6 +312,12 @@ saMsgDispatch (
 				break;
 			}
 
+			queueInstance->queue_id =
+				res_lib_msg_queueopen_callback->queue_id;
+
+			list_init (&queueInstance->list);
+			list_add_tail (&queueInstance->list, &msgInstance->queue_list);
+
 			hdb_handle_put (&queueHandleDatabase,
 				res_lib_msg_queueopen_callback->queue_handle);
 
@@ -709,11 +715,6 @@ saMsgQueueOpenAsync (
 		error = res_lib_msg_queueopenasync.header.error;
 		goto error_put_destroy;
 	}
-
-	queueInstance->queue_id = res_lib_msg_queueopenasync.queue_id;
-
-	list_init (&queueInstance->list);
-	list_add_tail (&queueInstance->list, &msgInstance->queue_list);
 
 	hdb_handle_put (&queueHandleDatabase, queueHandle);
 	hdb_handle_put (&msgHandleDatabase, msgHandle);

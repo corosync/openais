@@ -141,7 +141,6 @@ struct req_lib_msg_queueopenasync {
 
 struct res_lib_msg_queueopenasync {
 	coroipc_response_header_t header __attribute__((aligned(8)));
-	mar_uint32_t queue_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct req_lib_msg_queueclose {
@@ -392,6 +391,7 @@ struct res_lib_msg_queueopen_callback {
 	coroipc_response_header_t header __attribute__((aligned(8)));
 	mar_msg_queue_handle_t queue_handle __attribute__((aligned(8)));
 	mar_invocation_t invocation __attribute__((aligned(8)));
+	mar_uint32_t queue_id __attribute__((aligned(8)));
 } __attribute__((aligned(8)));
 
 struct res_lib_msg_queuegrouptrack_callback {
