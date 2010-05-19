@@ -368,7 +368,7 @@ static inline void swab_mar_msg_queue_thresholds_t (
 {
 	int i;
 
-	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i < SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 		swab_mar_size_t (&to_swab->capacity_reached[i]);
 		swab_mar_size_t (&to_swab->capacity_available[i]);
 	}
@@ -380,7 +380,7 @@ static inline void marshall_from_mar_msg_queue_thresholds_t (
 {
 	int i;
 
-	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i < SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 		dst->capacityReached[i] = src->capacity_reached[i];
 		dst->capacityAvailable[i] = src->capacity_available[i];
 	}
@@ -392,7 +392,7 @@ static inline void marshall_to_mar_msg_queue_thresholds_t (
 {
 	int i;
 
-	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i < SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
+	for (i = SA_MSG_MESSAGE_HIGHEST_PRIORITY; i <= SA_MSG_MESSAGE_LOWEST_PRIORITY; i++) {
 		dst->capacity_reached[i] = src->capacityReached[i];
 		dst->capacity_available[i] = src->capacityAvailable[i];
 	}
