@@ -35,6 +35,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if defined(OPENAIS_LINUX)
+#define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -58,6 +62,13 @@
 #include "../include/saAis.h"
 #include "../include/ipc_gen.h"
 #include "util.h"
+
+#if defined(OPENAIS_LINUX)
+/*
+ * Define sem_wait timeout (real timeout will be (n-1;n) )
+ */
+#define IPC_SEMWAIT_TIMEOUT 2
+#endif
 
 enum SA_HANDLE_STATE {
 	SA_HANDLE_STATE_EMPTY,
@@ -455,11 +466,77 @@ static void memcpy_swrap (
 }
 int original_flow = -1;
 
+inline static SaAisErrorT
+ipc_sem_wait (
+	struct ipc_segment *ipc_segment,
+	int sem_num)
+{
+	struct sembuf sop;
+#if defined(OPENAIS_LINUX)
+	struct timespec timeout;
+	struct pollfd pfd;
+#endif
+	int res;
+
+	sop.sem_num = sem_num;
+	sop.sem_op = -1;
+	sop.sem_flg = 0;
+
+retry_semop:
+#if defined(OPENAIS_LINUX)
+	timeout.tv_sec = IPC_SEMWAIT_TIMEOUT;
+	timeout.tv_nsec = 0;
+
+	res = semtimedop (ipc_segment->semid, &sop, 1, &timeout);
+	if (res == -1 && errno == EINTR) {
+		goto retry_semop;
+	} else
+	if (res == -1 && errno == EACCES) {
+		priv_change_send (ipc_segment);
+		goto retry_semop;
+	} else
+	if (res == -1 && errno == EAGAIN) {
+		pfd.fd = ipc_segment->fd;
+		pfd.events = 0;
+
+		res = poll (&pfd, 1, 0);
+
+		if (res == -1 && errno != EINTR) {
+			return (SA_AIS_ERR_LIBRARY);
+		}
+
+		if (res == 1) {
+			if (pfd.revents == POLLERR || pfd.revents == POLLHUP || pfd.revents == POLLNVAL) {
+				return (SA_AIS_ERR_LIBRARY);
+			}
+		}
+
+                goto retry_semop;
+	} else
+	if (res == -1) {
+		return (SA_AIS_ERR_LIBRARY);
+	}
+#else
+	res = semop (ipc_segment->semid, &sop, 1);
+	if (res == -1 && errno == EINTR) {
+		goto retry_semop;
+	} else
+	if (res == -1 && errno == EACCES) {
+		priv_change_send (ipc_segment);
+		goto retry_semop;
+	} else
+	if (res == -1) {
+		return (SA_AIS_ERR_LIBRARY);
+	}
+#endif
+
+	return (SA_AIS_OK);
+}
+
 int
 openais_dispatch_recv (void *ipc_ctx, void *data, int timeout)
 {
 	struct pollfd ufds;
-	struct sembuf sop;
 	int poll_events;
 	mar_res_header_t *header;
 	char buf;
@@ -467,6 +544,7 @@ openais_dispatch_recv (void *ipc_ctx, void *data, int timeout)
 	int res;
 	unsigned int my_read;
 	char buf_two = 1;
+	SaAisErrorT err;
 
 	ufds.fd = ipc_segment->fd;
 	ufds.events = POLLIN;
@@ -520,20 +598,7 @@ retry_recv:
 		return (0);
 	}
 
-	sop.sem_num = 2;
-	sop.sem_op = -1;
-	sop.sem_flg = 0;
-
-retry_semop:
-	res = semop (ipc_segment->semid, &sop, 1);
-	if (res == -1 && errno == EINTR) {
-		goto retry_semop;
-	} else
-	if (res == -1 && errno == EACCES) {
-		priv_change_send (ipc_segment);
-		goto retry_semop;
-	} else
-	if (res == -1) {
+	if ((err = ipc_sem_wait (ipc_segment, 2)) != SA_AIS_OK) {
 		return (-1);
 	}
 	
@@ -610,29 +675,11 @@ openais_reply_receive (
 	void *ipc_context,
 	void *res_msg, int res_len)
 {
-	struct sembuf sop;
 	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_context;
-	unsigned int res;
+	SaAisErrorT err;
 
-	/*
-	 * Wait for semaphore #1 indicating a new message from server
-	 * to client in the response queue
-	 */
-	sop.sem_num = 1;
-	sop.sem_op = -1;
-	sop.sem_flg = 0;
-
-retry_semop:
-	res = semop (ipc_segment->semid, &sop, 1);
-	if (res == -1 && errno == EINTR) {
-		goto retry_semop;
-	} else
-	if (res == -1 && errno == EACCES) {
-		priv_change_send (ipc_segment);
-		goto retry_semop;
-	} else
-	if (res == -1) {
-		return (SA_AIS_ERR_LIBRARY);
+	if ((err = ipc_sem_wait (ipc_segment, 1)) != SA_AIS_OK) {
+		return (err);
 	}
 
 	memcpy (res_msg, ipc_segment->shared_memory->res_buffer, res_len);
@@ -644,29 +691,11 @@ openais_reply_receive_in_buf (
 	void *ipc_context,
 	void **res_msg)
 {
-	struct sembuf sop;
 	struct ipc_segment *ipc_segment = (struct ipc_segment *)ipc_context;
-	int res;
+	SaAisErrorT err;
 
-	/*
-	 * Wait for semaphore #1 indicating a new message from server
-	 * to client in the response queue
-	 */
-	sop.sem_num = 1;
-	sop.sem_op = -1;
-	sop.sem_flg = 0;
-
-retry_semop:
-	res = semop (ipc_segment->semid, &sop, 1);
-	if (res == -1 && errno == EINTR) {
-		goto retry_semop;
-	} else
-	if (res == -1 && errno == EACCES) {
-		priv_change_send (ipc_segment);
-		goto retry_semop;
-	} else
-	if (res == -1) {
-		return (SA_AIS_ERR_LIBRARY);
+	if ((err = ipc_sem_wait (ipc_segment, 1)) != SA_AIS_OK) {
+		return (err);
 	}
 
 	*res_msg = (char *)ipc_segment->shared_memory->res_buffer;
