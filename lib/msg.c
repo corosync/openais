@@ -328,6 +328,11 @@ saMsgDispatch (
 			continue;
 		}
 		
+		if (dispatch_avail == -1) {
+			error = SA_AIS_ERR_LIBRARY;
+			goto error_unlock;
+		}
+
 		memset(&dispatch_data, 0, sizeof(struct message_overlay));
 
 		/*

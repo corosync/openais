@@ -382,6 +382,11 @@ saLckDispatch (
 			continue;
 		}
 		
+		if (dispatch_avail == -1) {
+			error = SA_AIS_ERR_LIBRARY;
+			goto error_unlock;
+		}
+
 		/*
 		* Make copy of callbacks, message data, unlock instance,
 		* and call callback. A risk of this dispatch method is that
