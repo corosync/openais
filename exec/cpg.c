@@ -534,7 +534,7 @@ static int cpg_lib_exit_fn (void *conn)
 
 	if (cpd->group_name.length > 0) {
 		cpg_node_joinleave_send (cpd->pid, &cpd->group_name,
-				MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_LEAVE);
+				MESSAGE_REQ_EXEC_CPG_PROCLEAVE, CONFCHG_CPG_REASON_PROCDOWN);
 	}
 	list_del (&cpd->list);
 	openais_conn_refcount_dec (conn);
