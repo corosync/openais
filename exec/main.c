@@ -390,7 +390,12 @@ static void deliver_fn (
 	    /* The component is no longer loaded */
 	    return;
 	}
-	
+	if (fn_id >= ais_service[service]->exec_service_count) {
+		log_printf(LOG_LEVEL_WARNING,
+			"discarded unknown message %d for service %d (max id %d)",
+			fn_id, service, ais_service[service]->exec_service_count);
+		return;
+	}
 	serialize_mutex_lock ();
 
 	if (endian_conversion_required) {
