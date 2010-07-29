@@ -3576,10 +3576,6 @@ static int message_handler_mcast (
 	}
 #endif
 
-        if (srp_addr_equal (&mcast_header.system_from, &instance->my_id) == 0) {
-		cancel_token_retransmit_timeout (instance);
-	}
-
 	/*
 	 * If the message is foreign execute the switch below
 	 */
