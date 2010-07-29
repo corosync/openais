@@ -3269,8 +3269,6 @@ static int message_handler_orf_token (
 
 			return (0); /* discard token */
 		}
-		last_aru = instance->my_last_aru;
-		instance->my_last_aru = token->aru;
 
 		/*
 		 * Discard retransmitted tokens
@@ -3278,6 +3276,8 @@ static int message_handler_orf_token (
 		if (sq_lte_compare (token->token_seq, instance->my_token_seq)) {
 			return (0); /* discard token */
 		}		
+		last_aru = instance->my_last_aru;
+		instance->my_last_aru = token->aru;
 
 		transmits_allowed = fcc_calculate (instance, token);
 		mcasted_retransmit = orf_token_rtr (instance, token, &transmits_allowed);
