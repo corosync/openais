@@ -130,6 +130,8 @@ struct totem_config {
 	char *vsf_type;
 
 	unsigned int broadcast_use;
+
+	unsigned int miss_count_const;
 };
 
 enum totem_configuration_type {

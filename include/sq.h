@@ -42,6 +42,7 @@ struct sq {
 	unsigned int size;
 	void *items;
 	unsigned int *items_inuse;
+	unsigned int *items_miss_count;
 	unsigned int size_per_item;
 	unsigned int head_seqid;
 	unsigned int item_count;
@@ -106,10 +107,23 @@ static inline int sq_init (
 	if (sq->items == 0) {
 		return (-ENOMEM);
 	}
-	memset (sq->items, 0, item_count * size_per_item);
 
 	sq->items_inuse = (void *)malloc (item_count * sizeof (unsigned int));
+	if (sq->items_inuse == NULL) {
+		return (-ENOMEM);
+	}
+
+	sq->items_miss_count = malloc (item_count * sizeof (unsigned int));
+	if (sq->items_miss_count == NULL) {
+		return (-ENOMEM);
+	}
+
+	memset (sq->items, 0, item_count * size_per_item);
+
 	memset (sq->items_inuse, 0, item_count * sizeof (unsigned int));
+
+	memset (sq->items_miss_count, 0, item_count * sizeof (unsigned int));
+
 	return (0);
 }
 
@@ -121,6 +135,7 @@ static inline void sq_reinit (struct sq *sq, unsigned int head_seqid)
 
 	memset (sq->items, 0, sq->item_count * sq->size_per_item);
 	memset (sq->items_inuse, 0, sq->item_count * sizeof (unsigned int));
+	memset (sq->items_miss_count, 0, sq->item_count * sizeof (unsigned int));
 }
 
 static inline void sq_assert (struct sq *sq, unsigned int pos)
@@ -146,11 +161,14 @@ static inline void sq_copy (struct sq *sq_dest, struct sq *sq_src)
 		sq_src->item_count * sq_src->size_per_item);
 	memcpy (sq_dest->items_inuse, sq_src->items_inuse,
 		sq_src->item_count * sizeof (unsigned int));
+	memcpy (sq_dest->items_miss_count, sq_src->items_miss_count,
+		sq_src->item_count * sizeof (unsigned int));
 }
 
 static inline void sq_free (struct sq *sq) {
 	free (sq->items);
 	free (sq->items_inuse);
+	free (sq->items_miss_count);
 }
 
 static inline void *sq_item_add (
@@ -175,6 +193,7 @@ static inline void *sq_item_add (
 	} else {
 		sq->items_inuse[sq_position] = seqid;
 	}
+	sq->items_miss_count[sq_position] = 0;
 
 	return (sq_item);
 }
@@ -199,6 +218,17 @@ static inline unsigned int sq_item_inuse (
 #endif
 	sq_position = (sq->head - sq->head_seqid + seq_id) % sq->size;
 	return (sq->items_inuse[sq_position] != 0);
+}
+
+static inline unsigned int sq_item_miss_count (
+	const struct sq *sq,
+	unsigned int seq_id)
+{
+	unsigned int sq_position;
+
+	sq_position = (sq->head - sq->head_seqid + seq_id) % sq->size;
+	sq->items_miss_count[sq_position]++;
+	return (sq->items_miss_count[sq_position]);
 }
 
 static inline unsigned int sq_size_get (
@@ -283,6 +313,8 @@ static inline void sq_items_release (struct sq *sq, unsigned int seqid)
 	} else {
 //		printf ("releasing %d for %d\n", oldhead, seqid - sq->head_seqid + 1);
 		memset (&sq->items_inuse[oldhead], 0,
+			(seqid - sq->head_seqid + 1) * sizeof (unsigned int));
+		memset (&sq->items_miss_count[oldhead], 0,
 			(seqid - sq->head_seqid + 1) * sizeof (unsigned int));
 	}
 	sq->head_seqid = seqid + 1;
