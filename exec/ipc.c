@@ -98,6 +98,21 @@
 #define MSG_SEND_LOCKED		0
 #define MSG_SEND_UNLOCKED	1
 
+#if defined(OPENAIS_LINUX) || defined(OPENAIS_SOLARIS)
+/* SUN_LEN is broken for abstract namespace
+ */
+#define AIS_SUN_LEN(a) sizeof(*(a))
+#else
+#define AIS_SUN_LEN(a) SUN_LEN(a)
+#endif
+
+static int libais_server_fd = -1;
+#if defined(OPENAIS_LINUX)
+char *socketname = "libais.socket";
+#else
+char *socketname = "/var/run/libais.socket";
+#endif
+
 static unsigned int g_gid_valid = 0;
 
 static void (*ipc_serialize_lock_fn) (void);
@@ -161,6 +176,9 @@ static int priv_change (struct conn_info *conn_info);
 
 static void ipc_disconnect (struct conn_info *conn_info);
 
+static int poll_handler_accept (poll_handle handle, int fd,
+	int revent, void *data);
+
 static int ipc_thread_active (void *conn)
 {
 	struct conn_info *conn_info = (struct conn_info *)conn;
@@ -190,6 +208,78 @@ static int ipc_thread_exiting (void *conn)
 	return (retval);
 }
 
+
+static void publish_server_socket(void)
+{
+	int32_t res = 0;
+	struct sockaddr_un un_addr;
+
+	if (libais_server_fd != -1) {
+		return;
+	}
+	log_printf (LOG_LEVEL_WARNING,
+		"Publishing socket for client connections.\n");
+
+	/*
+	 * Create socket for libais clients, name socket, listen for connections
+	 */
+	libais_server_fd = socket (PF_UNIX, SOCK_STREAM, 0);
+	if (libais_server_fd == -1) {
+		log_printf (LOG_LEVEL_ERROR,
+			"Cannot create libais client connections socket.\n");
+		openais_shutdown (AIS_DONE_LIBAIS_SOCKET);
+	};
+
+	totemip_nosigpipe (libais_server_fd);
+	res = fcntl (libais_server_fd, F_SETFL, O_NONBLOCK);
+	if (res == -1) {
+		log_printf (LOG_LEVEL_ERROR,
+			"Could not set non-blocking operation on server socket: %s\n",
+			strerror (errno));
+		openais_shutdown (AIS_DONE_LIBAIS_SOCKET);
+	}
+
+#if !defined(OPENAIS_LINUX)
+	unlink(socketname);
+#endif
+	memset (&un_addr, 0, sizeof (struct sockaddr_un));
+	un_addr.sun_family = AF_UNIX;
+#if defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
+	un_addr.sun_len = sizeof(struct sockaddr_un);
+#endif
+#if defined(OPENAIS_LINUX)
+	strcpy (un_addr.sun_path + 1, socketname);
+#else
+	strcpy (un_addr.sun_path, socketname);
+#endif
+
+	res = bind (libais_server_fd, (struct sockaddr *)&un_addr, AIS_SUN_LEN(&un_addr));
+	if (res) {
+		log_printf (LOG_LEVEL_ERROR,
+		       "ERROR: Could not bind AF_UNIX: %s.\n",
+		       strerror (errno));
+		openais_shutdown (AIS_DONE_LIBAIS_BIND);
+	}
+	listen (libais_server_fd, SERVER_BACKLOG);
+
+	/*
+	 * Setup libais connection dispatch routine
+	 */
+	poll_dispatch_add (aisexec_poll_handle, libais_server_fd,
+		POLLIN|POLLNVAL, 0, poll_handler_accept);
+}
+
+static void withdraw_server_socket(void)
+{
+	log_printf (LOG_LEVEL_WARNING,
+		"Withdrawing socket for client connections.\n");
+
+	poll_dispatch_delete (aisexec_poll_handle, libais_server_fd);
+	shutdown(libais_server_fd, SHUT_RDWR);
+	close(libais_server_fd);
+	libais_server_fd = -1;
+}
+
 /*
  * returns 0 if should be called again, -1 if finished
  */
@@ -211,6 +301,7 @@ static inline int conn_info_destroy (struct conn_info *conn_info)
 		conn_info->state == CONN_STATE_DISCONNECT_INACTIVE) {
 		list_del (&conn_info->list);
 		close (conn_info->fd);
+		publish_server_socket();
 		free (conn_info);
 		return (-1);
 	}
@@ -257,6 +348,7 @@ static inline int conn_info_destroy (struct conn_info *conn_info)
 		free (conn_info->private_data);
 	}
 	close (conn_info->fd);
+	publish_server_socket();
 	free (conn_info);
 	ipc_serialize_unlock_fn();
 	return (-1);
@@ -736,19 +828,6 @@ static int conn_info_create (int fd)
 	return (0);
 }
 
-#if defined(OPENAIS_LINUX) || defined(OPENAIS_SOLARIS)
-/* SUN_LEN is broken for abstract namespace
- */
-#define AIS_SUN_LEN(a) sizeof(*(a))
-#else
-#define AIS_SUN_LEN(a) SUN_LEN(a)
-#endif
-
-#if defined(OPENAIS_LINUX)
-char *socketname = "libais.socket";
-#else
-char *socketname = "/var/run/libais.socket";
-#endif
 
 static int poll_handler_accept (
 	poll_handle handle,
@@ -773,7 +852,12 @@ retry_accept:
 	}
 
 	if (new_fd == -1) {
-		log_printf (LOG_LEVEL_ERROR, "ERROR: Could not accept Library connection: %s\n", strerror (errno));
+		log_printf (LOG_LEVEL_ERROR,
+			"ERROR: Could not accept Library connection: %s\n",
+			strerror (errno));
+		if (errno == EMFILE || errno == ENFILE) {
+			withdraw_server_socket();
+		}
 		return (0); /* This is an error, but -1 would indicate disconnect from poll loop */
 	}
 
@@ -830,61 +914,18 @@ void message_source_set (
 	source->conn = conn;
 }
 
+
+
 void openais_ipc_init (
 	unsigned int gid_valid,
 	void (*serialize_lock_fn) (void),
 	void (*serialize_unlock_fn) (void))
 {
-	int libais_server_fd;
-	struct sockaddr_un un_addr;
-	int res;
-
 	ipc_serialize_lock_fn = serialize_lock_fn;
 
 	ipc_serialize_unlock_fn = serialize_unlock_fn;
 
-	/*
-	 * Create socket for libais clients, name socket, listen for connections
-	 */
-	libais_server_fd = socket (PF_UNIX, SOCK_STREAM, 0);
-	if (libais_server_fd == -1) {
-		log_printf (LOG_LEVEL_ERROR ,"Cannot create libais client connections socket.\n");
-		openais_shutdown (AIS_DONE_LIBAIS_SOCKET);
-	};
-
-	totemip_nosigpipe (libais_server_fd);
-	res = fcntl (libais_server_fd, F_SETFL, O_NONBLOCK);
-	if (res == -1) {
-		log_printf (LOG_LEVEL_ERROR, "Could not set non-blocking operation on server socket: %s\n", strerror (errno));
-		openais_shutdown (AIS_DONE_LIBAIS_SOCKET);
-	}
-
-#if !defined(OPENAIS_LINUX)
-	unlink(socketname);
-#endif
-	memset (&un_addr, 0, sizeof (struct sockaddr_un));
-	un_addr.sun_family = AF_UNIX;
-#if defined(OPENAIS_BSD) || defined(OPENAIS_DARWIN)
-	un_addr.sun_len = sizeof(struct sockaddr_un);
-#endif
-#if defined(OPENAIS_LINUX)
-	strcpy (un_addr.sun_path + 1, socketname);
-#else
-	strcpy (un_addr.sun_path, socketname);
-#endif
-
-	res = bind (libais_server_fd, (struct sockaddr *)&un_addr, AIS_SUN_LEN(&un_addr));
-	if (res) {
-		log_printf (LOG_LEVEL_ERROR, "ERROR: Could not bind AF_UNIX: %s.\n", strerror (errno));
-		openais_shutdown (AIS_DONE_LIBAIS_BIND);
-	}
-	listen (libais_server_fd, SERVER_BACKLOG);
-
-        /*
-         * Setup libais connection dispatch routine
-         */
-        poll_dispatch_add (aisexec_poll_handle, libais_server_fd,
-                POLLIN|POLLNVAL, 0, poll_handler_accept);
+	publish_server_socket();
 
 	g_gid_valid = gid_valid;
 }
