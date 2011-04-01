@@ -88,8 +88,6 @@ extern int totemnet_mcast_noflush_send (
 	struct iovec *iovec,
 	unsigned int iov_len);
 
-extern int totemnet_recv_flush (totemnet_handle handle);
-
 extern int totemnet_send_flush (totemnet_handle handle);
 
 extern int totemnet_iface_check (totemnet_handle handle);

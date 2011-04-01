@@ -148,8 +148,6 @@ struct totemnet_instance {
 
 	struct iovec totemnet_iov_recv;
 
-	struct iovec totemnet_iov_recv_flush;
-
 	struct totemnet_socket totemnet_sockets;
 
 	struct totem_ip_address mcast_address;
@@ -217,9 +215,6 @@ static void totemnet_instance_initialize (struct totemnet_instance *instance)
 	instance->totemnet_iov_recv.iov_base = instance->iov_buffer;
 
 	instance->totemnet_iov_recv.iov_len = FRAME_SIZE_MAX; //sizeof (instance->iov_buffer);
-	instance->totemnet_iov_recv_flush.iov_base = instance->iov_buffer_flush;
-
-	instance->totemnet_iov_recv_flush.iov_len = FRAME_SIZE_MAX; //sizeof (instance->iov_buffer);
 
 	/*
 	 * There is always atleast 1 processor
@@ -634,11 +629,7 @@ static int net_deliver_fn (
 	unsigned char *msg_offset;
 	unsigned int size_delv;
 
-	if (instance->flushing == 1) {
-		iovec = &instance->totemnet_iov_recv_flush;
-	} else {
-		iovec = &instance->totemnet_iov_recv;
-	}
+	iovec = &instance->totemnet_iov_recv;
 
 	/*
 	 * Receive datagram
@@ -1313,40 +1304,6 @@ int totemnet_processor_count_set (
 			timer_function_netif_check_timeout,
 			&instance->timer_netif_check_timeout);
 	}
-	hdb_handle_put (&totemnet_instance_database, handle);
-
-error_exit:
-	return (res);
-}
-
-int totemnet_recv_flush (totemnet_handle handle)
-{
-	struct totemnet_instance *instance;
-	struct pollfd ufd;
-	int nfds;
-	int res = 0;
-
-	res = hdb_handle_get (&totemnet_instance_database, handle,
-		(void *)&instance);
-	if (res != 0) {
-		res = ENOENT;
-		goto error_exit;
-	}
-
-	instance->flushing = 1;
-
-	do {
-		ufd.fd = instance->totemnet_sockets.mcast_recv;
-		ufd.events = POLLIN;
-		nfds = poll (&ufd, 1, 0);
-		if (nfds == 1 && ufd.revents & POLLIN) {
-		net_deliver_fn (0, instance->totemnet_sockets.mcast_recv,
-			ufd.revents, instance);
-		}
-	} while (nfds == 1);
-
-	instance->flushing = 0;
-
 	hdb_handle_put (&totemnet_instance_database, handle);
 
 error_exit:
