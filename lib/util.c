@@ -339,6 +339,11 @@ openais_service_connect (
 		shmkey = random();
 		ipc_segment->shmid = shmget (shmkey, sizeof (struct shared_memory),
 			IPC_CREAT|IPC_EXCL|0600);
+
+		if (ipc_segment->shmid == -1 && errno == ENOSPC) {
+			res_setup.error = SA_AIS_ERR_NO_SPACE;
+			goto error_exit;
+		}
 	} while (ipc_segment->shmid == -1);
 
 	/*
@@ -348,6 +353,11 @@ openais_service_connect (
 		semkey = random();
 		ipc_segment->semid = semget (semkey, 3, IPC_CREAT|IPC_EXCL|0600);
 		ipc_segment->euid = geteuid ();
+
+		if (ipc_segment->semid == -1 && errno == ENOSPC) {
+			res_setup.error = SA_AIS_ERR_NO_SPACE;
+			goto error_exit;
+		}
 	} while (ipc_segment->semid == -1);
 
 	/*
