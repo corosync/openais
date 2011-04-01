@@ -1617,6 +1617,8 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 	unsigned int trans_memb_list_totemip[PROCESSOR_COUNT_MAX];
 	unsigned int new_memb_list_totemip[PROCESSOR_COUNT_MAX];
 	unsigned int left_list[PROCESSOR_COUNT_MAX];
+	unsigned int i, j;
+	unsigned int res;
 
 	memb_consensus_reset (instance);
 
@@ -1696,7 +1698,6 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 	 */
 	sq_copy (&instance->regular_sort_queue, &instance->recovery_sort_queue);
 	instance->my_last_aru = SEQNO_START_MSG;
-	sq_items_release (&instance->regular_sort_queue, SEQNO_START_MSG - 1);
 
 	instance->my_proc_list_entries = instance->my_new_memb_entries;
 	memcpy (instance->my_proc_list, instance->my_new_memb_list,
@@ -1704,7 +1705,22 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 
 	instance->my_failed_list_entries = 0;
 	instance->my_high_delivered = instance->my_aru;
-// TODO the recovery messages are leaked
+
+	for (i = 0; i <= instance->my_high_delivered; i++) {
+		void *ptr;
+
+		res = sq_item_get (&instance->regular_sort_queue, i, &ptr);
+		if (res == 0) {
+			struct sort_queue_item *regular_message;
+
+			regular_message = ptr;
+                        for (j = 0; j < regular_message->iov_len; j++) {
+                                free (regular_message->iovec[j].iov_base);
+                        }
+		}
+	}
+	sq_items_release (&instance->regular_sort_queue, instance->my_high_delivered);
+	instance->last_released = instance->my_high_delivered;
 
 	log_printf (instance->totemsrp_log_level_notice,
 		"entering OPERATIONAL state.\n");
