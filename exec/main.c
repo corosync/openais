@@ -403,8 +403,9 @@ static void deliver_fn (
 			(header);
 	}
 
-	ais_service[service]->exec_service[fn_id].exec_handler_fn
-		(header, nodeid);
+	if (ais_service[service]->exec_service[fn_id].exec_handler_fn)
+		ais_service[service]->exec_service[fn_id].exec_handler_fn
+			(header, nodeid);
 
 	serialize_mutex_unlock ();
 }
