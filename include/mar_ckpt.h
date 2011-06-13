@@ -92,7 +92,7 @@ static inline void marshall_from_mar_ckpt_checkpoint_creation_attributes_t (
 
 static inline void marshall_to_mar_ckpt_checkpoint_creation_attributes_t (
 	mar_ckpt_checkpoint_creation_attributes_t *dest,
-	SaCkptCheckpointCreationAttributesT *src)
+	const SaCkptCheckpointCreationAttributesT *src)
 {
 	memset (dest, 0, sizeof (mar_ckpt_checkpoint_creation_attributes_t));
 	dest->creation_flags = src->creationFlags;

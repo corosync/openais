@@ -124,7 +124,7 @@ static inline void marshall_from_mar_msg_queue_creation_attributes_t (
 
 static inline void marshall_to_mar_msg_queue_creation_attributes_t (
 	mar_msg_queue_creation_attributes_t *dst,
-	SaMsgQueueCreationAttributesT *src)
+	const SaMsgQueueCreationAttributesT *src)
 {
 	int i;
 
@@ -343,7 +343,7 @@ static inline void marshall_from_mar_msg_message_t (
 
 static inline void marshall_to_mar_msg_message_t (
 	mar_msg_message_t *dst,
-	SaMsgMessageT *src)
+	const SaMsgMessageT *src)
 {
 	memset (dst, 0, sizeof (mar_msg_message_t));
 
@@ -388,7 +388,7 @@ static inline void marshall_from_mar_msg_queue_thresholds_t (
 
 static inline void marshall_to_mar_msg_queue_thresholds_t (
 	mar_msg_queue_thresholds_t *dst,
-	SaMsgQueueThresholdsT *src)
+	const SaMsgQueueThresholdsT *src)
 {
 	int i;
 
