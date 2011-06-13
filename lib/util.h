@@ -41,6 +41,7 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 
+#include <config.h>
 
 struct saVersionDatabase {
 	int versionCount;
@@ -54,9 +55,15 @@ saVersionVerify (
 
 SaTimeT clustTimeNow(void);
 
+#ifdef HAVE_SMALL_MEMORY_FOOTPRINT
+#define IPC_REQUEST_SIZE        1024*64
+#define IPC_RESPONSE_SIZE       1024*64
+#define IPC_DISPATCH_SIZE       1024*64
+#else
 #define IPC_REQUEST_SIZE	8192*128
 #define IPC_RESPONSE_SIZE	8192*128
 #define IPC_DISPATCH_SIZE	8192*128
+#endif
 
 static inline SaAisErrorT hdb_error_to_sa (int res)		\
 {								\
@@ -72,6 +79,5 @@ static inline SaAisErrorT hdb_error_to_sa (int res)		\
 		return (SA_AIS_ERR_LIBRARY);			\
 	}							\
 }
-
 
 #endif /* AIS_UTIL_H_DEFINED */

@@ -173,6 +173,10 @@ AC_ARG_ENABLE([coverage],
 	[  --enable-coverage       : coverage analysis of the codebase. ],
 	[ default="no" ])
 
+AC_ARG_ENABLE([small-memory-footprint],
+	[  --enable-small-memory-footprint : Use small message queues and small messages sizes. ],
+	[ default="no" ])
+
 AC_ARG_WITH([initddir],
 	[  --with-initddir=DIR     : path to init script directory. ],
 	[ INITDDIR="$withval" ],
@@ -301,6 +305,11 @@ if test "x${enable_coverage}" = xyes && \
 else
 	COVERAGE_CFLAGS=""
 	COVERAGE_LDFLAGS=""
+fi
+
+if test "x${enable_small_memory_footprint}" = xyes ; then
+	AC_DEFINE_UNQUOTED([HAVE_SMALL_MEMORY_FOOTPRINT], 1, [have small_memory_footprint])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES small-memory-footprint"
 fi
 
 if test "x${enable_fatal_warnings}" = xyes && \
