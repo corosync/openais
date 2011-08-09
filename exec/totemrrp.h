@@ -97,6 +97,8 @@ extern int totemrrp_mcast_flush_send (
 	struct iovec *iovec,
 	unsigned int iov_len);
 
+extern int totemrrp_recv_flush (totemrrp_handle handle);
+
 extern int totemrrp_send_flush (totemrrp_handle handle);
 
 extern int totemrrp_token_target_set (
