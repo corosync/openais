@@ -176,6 +176,8 @@ static int priv_change (struct conn_info *conn_info);
 
 static void ipc_disconnect (struct conn_info *conn_info);
 
+static void ipc_disconnect_locked (struct conn_info *conn_info, int locked);
+
 static int poll_handler_accept (poll_handle handle, int fd,
 	int revent, void *data);
 
@@ -792,6 +794,11 @@ static int poll_handler_connection (
 
 static void ipc_disconnect (struct conn_info *conn_info)
 {
+	ipc_disconnect_locked (conn_info, 0);
+}
+
+static void ipc_disconnect_locked (struct conn_info *conn_info, int locked)
+{
 	if (conn_info->state == CONN_STATE_THREAD_INACTIVE) {
 		conn_info->state = CONN_STATE_DISCONNECT_INACTIVE;
 		return;
@@ -799,9 +806,16 @@ static void ipc_disconnect (struct conn_info *conn_info)
 	if (conn_info->state != CONN_STATE_THREAD_ACTIVE) {
 		return;
 	}
-	pthread_mutex_lock (&conn_info->mutex);
+
+	if (locked == 0) {
+		pthread_mutex_lock (&conn_info->mutex);
+        }
+
 	conn_info->state = CONN_STATE_THREAD_REQUEST_EXIT;
-	pthread_mutex_unlock (&conn_info->mutex);
+
+	if (locked == 0) {
+		pthread_mutex_unlock (&conn_info->mutex);
+        }
 
 	pthread_kill (conn_info->thread, SIGUSR1);
 }
@@ -1078,7 +1092,7 @@ send_retry:
 		goto send_retry;
 	} else
 	if (res == -1) {
-		ipc_disconnect (conn_info);
+		ipc_disconnect_locked (conn_info, locked);
 	}
 	sop.sem_num = 2;
 	sop.sem_op = 1;
