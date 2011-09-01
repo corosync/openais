@@ -1062,6 +1062,7 @@ void msg_send (void *conn, struct iovec *iov, int iov_len, int locked)
 	}
 
 	buf = !list_empty (&conn_info->outq_head);
+send_retry:
 	res = send (conn_info->fd, &buf, 1, MSG_NOSIGNAL);
 	if (res == -1 && errno == EAGAIN) {
 		if (locked == 0) {
@@ -1073,6 +1074,8 @@ void msg_send (void *conn, struct iovec *iov, int iov_len, int locked)
 		}
         	poll_dispatch_modify (aisexec_poll_handle, conn_info->fd,
 			POLLIN|POLLOUT|POLLNVAL, poll_handler_connection);
+	} else if (res == -1 && errno == EINTR) {
+		goto send_retry;
 	} else
 	if (res == -1) {
 		ipc_disconnect (conn_info);
