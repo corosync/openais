@@ -62,6 +62,11 @@ ifndef OPENAIS_BUILD
 	OPENAIS_BUILD=RELEASE
 endif
 
+# OPENAIS_RT can be defined to 1 to build with librt
+ifndef LINK_WITH_RT
+	LINK_WITH_RT=1
+endif
+
 # OPENAIS_PROFILE
 
 # default CFLAGS, LDFLAGS
@@ -93,6 +98,10 @@ endif
 ifdef OPENAIS_PROFILE
 	CFLAGS += -pg
 	LDFLAGS += -pg
+endif
+
+ifeq (${LINK_WITH_RT}, 1)
+	LDFLAGS += -lrt
 endif
 
 # platform specific CFLAGS, LDFLAGS

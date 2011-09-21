@@ -42,7 +42,7 @@ extern void openais_timer_init (
         void (*serialize_unlock) (void));
 
 extern int openais_timer_add_duration (
-	unsigned long long nanoseconds_in_future,
+	unsigned long long nanosec_duration,
 	void *data,
 	void (*timer_fn) (void *data),
 	openais_timer_handle *handle);
