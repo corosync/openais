@@ -2527,6 +2527,7 @@ static void lib_evt_event_subscribe(void *conn, void *message)
 	unsigned int ret;
 	int i;
 	struct libevt_pd *esip;
+	mar_uint32_t channel_handle;
 
 	esip = (struct libevt_pd *)openais_conn_private_data_get(conn);
 
@@ -2592,6 +2593,12 @@ static void lib_evt_event_subscribe(void *conn, void *message)
 	res.ics_head.size = sizeof(res);
 	res.ics_head.id = MESSAGE_RES_EVT_SUBSCRIBE;
 	res.ics_head.error = error;
+
+	/*
+	 * After openais response send, we shouldn't use any variable dependand on message
+	 * (like req) -> store ics_channel_handle
+	 */
+	channel_handle = req->ics_channel_handle;
 	openais_response_send(conn, &res, sizeof(res));
 
 	/*
@@ -2616,7 +2623,7 @@ static void lib_evt_event_subscribe(void *conn, void *message)
 			}
 		}
 	}
-	hdb_handle_put(&esip->esi_hdb, req->ics_channel_handle);
+	hdb_handle_put(&esip->esi_hdb, channel_handle);
 	return;
 
 subr_put:
