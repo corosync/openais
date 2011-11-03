@@ -89,7 +89,6 @@
 #define MAXIOVS					10
 #define RETRANSMIT_ENTRIES_MAX			30
 #define TOKEN_SIZE_MAX				64000 /* bytes */
-#define LEAVE_DUMMY_NODEID                      0
 
 /*
  * Rollover handling:
@@ -347,8 +346,6 @@ struct totemsrp_instance {
 
 	struct memb_ring_id my_old_ring_id;
 
-	struct memb_ring_id my_last_ring_id;
-
 	int my_aru_count;
 
 	int my_merge_detect_timeout_outstanding;
@@ -400,8 +397,6 @@ struct totemsrp_instance {
 	int orf_token_retransmit_size;
 
 	unsigned int my_token_seq;
-
-	unsigned int my_deliver_confchg;
 
 	/*
 	 * Timers
@@ -551,8 +546,6 @@ static int message_handler_token_hold_cancel (
 	void *msg,
 	int msg_len,
 	int endian_conversion_needed);
-
-static void memb_leave_message_send (struct totemsrp_instance *instance);
 
 static void memb_ring_id_create_or_load (struct totemsrp_instance *, struct memb_ring_id *);
 
@@ -862,7 +855,6 @@ void totemsrp_finalize (
 	if (res != 0) {
 		return;
 	}
-	memb_leave_message_send (instance);
 
 	hdb_handle_put (&totemsrp_instance_database, handle);
 }
@@ -1066,9 +1058,6 @@ static void memb_consensus_set (
 {
 	int found = 0;
 	int i;
-
-	if (addr->addr[0].nodeid == LEAVE_DUMMY_NODEID)
-	        return;
 
 	for (i = 0; i < instance->consensus_list_entries; i++) {
 		if (srp_addr_equal(addr, &instance->consensus_list[i].addr)) {
@@ -1663,13 +1652,10 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 		instance->my_left_memb_entries);
 	srp_addr_to_nodeid (trans_memb_list_totemip,
 		instance->my_trans_memb_list, instance->my_trans_memb_entries);
-	if (instance->my_deliver_confchg) {
-		instance->totemsrp_confchg_fn (TOTEM_CONFIGURATION_TRANSITIONAL,
+	instance->totemsrp_confchg_fn (TOTEM_CONFIGURATION_TRANSITIONAL,
 		trans_memb_list_totemip, instance->my_trans_memb_entries,
 		left_list, instance->my_left_memb_entries,
 		0, 0, &instance->my_ring_id);
-	}
-
 		
 // TODO we need to filter to ensure we only deliver those
 // messages which are part of instance->my_deliver_memb
@@ -1684,12 +1670,10 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 		instance->my_new_memb_list, instance->my_new_memb_entries);
 	srp_addr_to_nodeid (joined_list_totemip, joined_list,
 		joined_list_entries);
-	if (instance->my_deliver_confchg) {
-		instance->totemsrp_confchg_fn (TOTEM_CONFIGURATION_REGULAR,
-			new_memb_list_totemip, instance->my_new_memb_entries,
-			0, 0,
-			joined_list_totemip, joined_list_entries, &instance->my_ring_id);
-	}
+	instance->totemsrp_confchg_fn (TOTEM_CONFIGURATION_REGULAR,
+		new_memb_list_totemip, instance->my_new_memb_entries,
+		0, 0,
+		joined_list_totemip, joined_list_entries, &instance->my_ring_id);
 
 	/*
 	 * The recovery sort queue now becomes the regular
@@ -1756,9 +1740,6 @@ static void memb_state_operational_enter (struct totemsrp_instance *instance)
 	instance->memb_state = MEMB_STATE_OPERATIONAL;
 
 	instance->my_received_flg = 1;
-
-	memcpy (&instance->my_last_ring_id, &instance->my_ring_id,
-		sizeof (struct memb_ring_id));
 
 	return;
 }
@@ -1873,7 +1854,6 @@ static void memb_state_recovery_enter (
 	unsigned int messages_originated = 0;
 	struct srp_addr *addr;
 	struct memb_commit_token_memb_entry *memb_list;
-	int broken_config;
 
 	addr = (struct srp_addr *)commit_token->end_of_commit_token;
 	memb_list = (struct memb_commit_token_memb_entry *)(addr + commit_token->addr_entries);
@@ -1908,31 +1888,6 @@ static void memb_state_recovery_enter (
 		instance->my_memb_list, instance->my_memb_entries,
 		instance->my_trans_memb_list, &instance->my_trans_memb_entries);
 
-	/*
-	 * Determine if all processors from previous regular configuration are
-	 * transitioning to new regular configuration.  If so, don't deliver
-	 * a empty configuration change
-	 */
-	instance->my_deliver_confchg = 1;
-	if (memb_set_equal (instance->my_new_memb_list,
-		instance->my_new_memb_entries,
-		instance->my_memb_list, instance->my_memb_entries)) {
-
-		broken_config = 0;
-		for (i = 0; i < instance->my_new_memb_entries; i++) {
-			if (memcmp (&memb_list[i].ring_id,
-				&instance->my_last_ring_id,
-				sizeof (struct memb_ring_id))) {
-
-				broken_config = 1;
-				break;
-			}
-		}
-		if (broken_config == 0) {
-			instance->my_deliver_confchg = 0;
-		}
-	}
-	
 	for (i = 0; i < instance->my_new_memb_entries; i++) {
 		log_printf (instance->totemsrp_log_level_notice,
 			"position [%d] member %s:\n", i, totemip_print (&addr[i].addr[0]));
@@ -2961,67 +2916,7 @@ static void memb_join_message_send (struct totemsrp_instance *instance)
 		iovs);
 }
 
-static void memb_leave_message_send (struct totemsrp_instance *instance)
-{
-	char memb_join_data[10000];
-	struct memb_join *memb_join = (struct memb_join *)memb_join_data;
-	int active_memb_entries;
-	struct srp_addr active_memb[PROCESSOR_COUNT_MAX];
-	struct iovec iovec[3];
-
-	log_printf (instance->totemsrp_log_level_debug,
-		"sending join/leave message\n");
-
-	/*
-	 * add us to the failed list, and remove us from
-	 * the members list
-	 */
-	memb_set_merge(
-		       &instance->my_id, 1,
-		       instance->my_failed_list, &instance->my_failed_list_entries);
-
-	memb_set_subtract (active_memb, &active_memb_entries,
-			   instance->my_proc_list, instance->my_proc_list_entries,
-			   &instance->my_id, 1);
-
-
-	memb_join->header.type = MESSAGE_TYPE_MEMB_JOIN;
-	memb_join->header.endian_detector = ENDIAN_LOCAL;
-	memb_join->header.encapsulated = 0;
-	memb_join->header.nodeid = LEAVE_DUMMY_NODEID;
-
-	memb_join->ring_seq = instance->my_ring_id.seq;
-	memb_join->proc_list_entries = active_memb_entries;
-	memb_join->failed_list_entries = instance->my_failed_list_entries;
-	srp_addr_copy (&memb_join->system_from, &instance->my_id);
-	memb_join->system_from.addr[0].nodeid = LEAVE_DUMMY_NODEID;
-
-	// TODO: CC Maybe use the actual join send routine.
-	/*
-	 * This mess adds the joined and failed processor lists into the join
-	 * message
-	 */
-	iovec[0].iov_base = memb_join;
-	iovec[0].iov_len = sizeof (struct memb_join);
-
-	iovec[1].iov_base = active_memb;
-	iovec[1].iov_len = active_memb_entries * sizeof (struct srp_addr);
-
-	iovec[2].iov_base = instance->my_failed_list;
-	iovec[2].iov_len = instance->my_failed_list_entries *
-		sizeof (struct srp_addr);
-
-
-	if (instance->totem_config->send_join_timeout) {
-		usleep (random() % (instance->totem_config->send_join_timeout * 1000));
-	}
-
-	totemrrp_mcast_flush_send (
-		instance->totemrrp_handle,
-		iovec, 3);
-}
-
-static void memb_merge_detect_transmit (struct totemsrp_instance *instance)
+static void memb_merge_detect_transmit (struct totemsrp_instance *instance) 
 {
 	struct memb_merge_detect memb_merge_detect;
 	struct iovec iovec[2];
