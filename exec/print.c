@@ -169,7 +169,7 @@ static void log_printf_worker_fn (void *thread_data, void *work_item)
 	}
 
 	if (logmode & LOG_MODE_SYSLOG) {
-		syslog (log_data->level, &log_data->log_string[log_data->syslog_pos]);
+		syslog (log_data->level, "%s", &log_data->log_string[log_data->syslog_pos]);
 	}
 	free (log_data->log_string);
 }
@@ -181,6 +181,7 @@ static void _log_printf (char *file, int line,
 	char newstring[4096];
 	char log_string[4096];
 	char char_time[512];
+	char dropped_log_msg[128];
 	struct timeval tv;
 	int i = 0;
 	int len;
@@ -219,11 +220,11 @@ static void _log_printf (char *file, int line,
 		if (newstring[strlen (newstring) - 1] == '\n') {
 			newstring[strlen (newstring) - 1] = '\0';
 		}
-		len = sprintf (log_string,
-			"%s - prior to this log entry, openais logger dropped '%d' messages because of overflow.", newstring, dropped_log_entries + 1);
-	} else {
-		len = vsprintf (log_string, newstring, ap);
+		sprintf (dropped_log_msg, " - prior to this log entry, openais logger dropped '%d' messages because of overflow.", dropped_log_entries + 1);
+		strcat (newstring, dropped_log_msg);
 	}
+
+	len = vsprintf (log_string, newstring, ap);
 
 	/*
 	** add line feed if not done yet
