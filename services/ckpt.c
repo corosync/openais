@@ -776,14 +776,17 @@ static void ckpt_confchg_fn (
 	unsigned int i, j;
 	unsigned int lowest_nodeid;
 
+    if (!memcmp (&my_saved_ring_id, ring_id,sizeof (struct memb_ring_id))) {
+         if (my_sync_state != SYNC_STATE_NOT_STARTED) {
+                 return;
+         }
+	}
+    if (configuration_type != TOTEM_CONFIGURATION_REGULAR) {
+            return;
+    }
+
 	memcpy (&my_saved_ring_id, ring_id,
 		sizeof (struct memb_ring_id));
-       if (configuration_type != TOTEM_CONFIGURATION_REGULAR) {
-                return;
-        }
-        if (my_sync_state != SYNC_STATE_NOT_STARTED) {
-                return;
-        }
 
 	my_sync_state = SYNC_STATE_STARTED;
 
