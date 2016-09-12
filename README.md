@@ -6,5 +6,7 @@ AIS is the interface a program uses.
 
 Currently it's unmaintained and it's moved to GitHub for archive reasons because fedorahosted is planned for shutdown.
 
+As a actively maintained replacement use [Corosync](http://corosync.github.io/corosync/).
+
 ### Reporting Bugs
 Project is no longer maintained so no bug reporting.
